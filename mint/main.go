@@ -5,14 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"log"
-	"os"
-	"strconv"
-	"time"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 	"github.com/tyler-smith/go-bip32"
+	"log"
+	"os"
+	"strconv"
+	"time"
 )
 
 type BlindedMessage struct {
@@ -52,8 +52,8 @@ type Seed struct {
 	Seed      []byte
 	Active    bool
 	CreatedAt int64
-    Unit     string
-    Id       string
+	Unit      string
+	Id        string
 }
 
 func deriveKeysetId(keysets []Keyset) string {
@@ -160,7 +160,7 @@ func orderKeysetByUnit(keysets []Keyset) map[string][]KeysetResponse {
 	var typesOfUnits = make(map[string][]Keyset)
 
 	for _, keyset := range keysets {
-        if len(typesOfUnits[keyset.Unit]) == 0 {
+		if len(typesOfUnits[keyset.Unit]) == 0 {
 			typesOfUnits[keyset.Unit] = append(typesOfUnits[keyset.Unit], keyset)
 			continue
 		} else {
@@ -173,16 +173,16 @@ func orderKeysetByUnit(keysets []Keyset) map[string][]KeysetResponse {
 	res["keysets"] = []KeysetResponse{}
 
 	for _, value := range typesOfUnits {
-        var keysetResponse KeysetResponse
-        keysetResponse.Id = value[0].Id
-        keysetResponse.Unit = value[0].Unit
-        keysetResponse.Keys = make(map[string]string)
+		var keysetResponse KeysetResponse
+		keysetResponse.Id = value[0].Id
+		keysetResponse.Unit = value[0].Unit
+		keysetResponse.Keys = make(map[string]string)
 
 		for _, keyset := range value {
-            keysetResponse.Keys[strconv.Itoa(keyset.Amount)] = hex.EncodeToString(keyset.PubKey)
+			keysetResponse.Keys[strconv.Itoa(keyset.Amount)] = hex.EncodeToString(keyset.PubKey)
 		}
 
-    res["keysets"] = append(res["keysets"], keysetResponse)
+		res["keysets"] = append(res["keysets"], keysetResponse)
 	}
 	return res
 
@@ -218,26 +218,26 @@ func generateKeysets(masterKey *bip32.Key, values []int) []Keyset {
 }
 
 type SwapMintMethod struct {
-    Method string `json:"method"`
-    Unit string `json:"unit"`
-    MinAmount int `json:"min_amount"`
-    MaxAmount int `json:"max_amount"`
+	Method    string `json:"method"`
+	Unit      string `json:"unit"`
+	MinAmount int    `json:"min_amount"`
+	MaxAmount int    `json:"max_amount"`
 }
 
 type SwapMintInfo struct {
-    Methods *[]SwapMintMethod `json:"methods,omitempty"`
-    Disabled bool `json:"disabled"`
+	Methods  *[]SwapMintMethod `json:"methods,omitempty"`
+	Disabled bool              `json:"disabled"`
 }
 
 type GetInfoResponse struct {
-    Name string `json:"name"`
-    Version string `json:"version"`
-    Pubkey string `json:"pubkey"`
-    Description string `json:"description"`
-    DescriptionLong string `json:"description_long"`
-    Contact [][]string `json:"contact"`
-    Motd string `json:"motd"`
-    Nuts map[string]SwapMintInfo
+	Name            string     `json:"name"`
+	Version         string     `json:"version"`
+	Pubkey          string     `json:"pubkey"`
+	Description     string     `json:"description"`
+	DescriptionLong string     `json:"description_long"`
+	Contact         [][]string `json:"contact"`
+	Motd            string     `json:"motd"`
+	Nuts            map[string]SwapMintInfo
 }
 
 func main() {
@@ -273,7 +273,6 @@ func main() {
 		formattedTime := currentTime.Unix()
 		masterKey, err := bip32.NewMasterKey(seed)
 
-
 		// values for keysets with 2 over n
 		newKeysetValues := []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072}
 
@@ -289,8 +288,8 @@ func main() {
 			Seed:      seed,
 			Active:    true,
 			CreatedAt: formattedTime,
-            Unit:     "sats",
-            Id:       id,
+			Unit:      "sats",
+			Id:        id,
 		}
 
 		saveNewSeed(conn, &newSeed)
@@ -307,94 +306,89 @@ func main() {
 
 	r.GET("/v1/keys", func(c *gin.Context) {
 
-	    keysets := checkForActiveKeyset(conn)
+		keysets := checkForActiveKeyset(conn)
 		keys := orderKeysetByUnit(keysets)
 
 		c.JSON(200, keys)
 
 	})
-    r.GET("/v1/keys/:id", func(c *gin.Context) {
+	r.GET("/v1/keys/:id", func(c *gin.Context) {
 
-        id := c.Param("id")
-	    keysets := checkForKeysetById(conn, id)
+		id := c.Param("id")
+		keysets := checkForKeysetById(conn, id)
 		keys := orderKeysetByUnit(keysets)
 
 		c.JSON(200, keys)
 
 	})
 
-    type BasicKeysetResponse struct {
-        Id   string            `json:"id"`
-        Unit string            `json:"unit"`
-        Active bool            `json:"active"`
-    }
+	type BasicKeysetResponse struct {
+		Id     string `json:"id"`
+		Unit   string `json:"unit"`
+		Active bool   `json:"active"`
+	}
 
-    r.GET("/v1/keysets", func(c *gin.Context) {
+	r.GET("/v1/keysets", func(c *gin.Context) {
 
+		seeds := getAllSeeds(conn)
+		fmt.Println("Seeds", seeds)
 
-	    seeds := getAllSeeds(conn)
-        fmt.Println("Seeds",seeds)
+		keys := make(map[string][]BasicKeysetResponse)
+		keys["keysets"] = []BasicKeysetResponse{}
 
-        keys := make(map[string][]BasicKeysetResponse)
-        keys["keysets"] = []BasicKeysetResponse{}
+		for _, seed := range seeds {
+			keys["keysets"] = append(keys["keysets"], BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active})
 
-        for _, seed := range seeds {
-            keys["keysets"] = append(keys["keysets"], BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active})
-
-        }
+		}
 
 		c.JSON(200, keys)
 
 	})
 
-    r.GET("/v1/info", func(c *gin.Context) {
-        name := os.Getenv("NAME")
-        description := os.Getenv("DESCRIPTION")
-        description_long := os.Getenv("DESCRIPTION_LONG")
-        motd := os.Getenv("DESCRIPTION_LONG")
+	r.GET("/v1/info", func(c *gin.Context) {
+		name := os.Getenv("NAME")
+		description := os.Getenv("DESCRIPTION")
+		description_long := os.Getenv("DESCRIPTION_LONG")
+		motd := os.Getenv("DESCRIPTION_LONG")
 
-        email := []string{"email", os.Getenv("EMAIL")}
-        nostr := []string{"nostr", os.Getenv("NOSTR")}
+		email := []string{"email", os.Getenv("EMAIL")}
+		nostr := []string{"nostr", os.Getenv("NOSTR")}
 
-        contacts := [][]string{email, nostr}
+		contacts := [][]string{email, nostr}
 
-        for i, contact := range contacts {
-            if contact[1] == "" {
-                contacts = append(contacts[:i], contacts[i+1:]...)
-            }
-        }
+		for i, contact := range contacts {
+			if contact[1] == "" {
+				contacts = append(contacts[:i], contacts[i+1:]...)
+			}
+		}
 
-        nuts := make(map[string]SwapMintInfo)
+		nuts := make(map[string]SwapMintInfo)
 
-        nuts["1"] = SwapMintInfo{
-                    Disabled: false,
-                    }
+		nuts["1"] = SwapMintInfo{
+			Disabled: false,
+		}
 
-        nuts["2"] = SwapMintInfo{
-                    Disabled: false,
-                    }
+		nuts["2"] = SwapMintInfo{
+			Disabled: false,
+		}
 
-        nuts["6"] = SwapMintInfo{
-                    Disabled: false,
-                }
+		nuts["6"] = SwapMintInfo{
+			Disabled: false,
+		}
 
-
-        response := GetInfoResponse{
-            Name: name,
-            Version: "AwesomeGoMint/0.1",
-            Description: description,
-            DescriptionLong: description_long,
-            Motd: motd,
-            Contact: contacts,
-            Nuts: nuts,
-        }
-
-
+		response := GetInfoResponse{
+			Name:            name,
+			Version:         "AwesomeGoMint/0.1",
+			Description:     description,
+			DescriptionLong: description_long,
+			Motd:            motd,
+			Contact:         contacts,
+			Nuts:            nuts,
+		}
 
 		c.JSON(200, response)
 
-
-    })
+	})
 
 	r.Run(":8080")
 }
