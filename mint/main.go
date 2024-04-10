@@ -2,152 +2,23 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
-	"github.com/joho/godotenv"
-	"github.com/tyler-smith/go-bip32"
 	"log"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
+	"github.com/lescuer97/cashu-v4v/cashu"
+	"github.com/lightningnetwork/lnd/lnrpc"
+	"github.com/tyler-smith/go-bip32"
 )
 
-type BlindedMessage struct {
-	Amount int32  `json:"amount"`
-	Id     string `json:"id"`
-	B_     string `json:"B_"`
-}
 
-type BlindSignature struct {
-	Amount int32  `json:"amount"`
-	Id     string `json:"id"`
-	C_     string `json:"C_"`
-}
 
-type Proof struct {
-	Amount int32  `json:"amount"`
-	Id     string `json:"id"`
-	Secret string `json:"secret"`
-	C_     string `json:"C_"`
-}
-
-type MintError struct {
-	Detail string `json:"detail"`
-	Code   int8   `json:"code"`
-}
-
-type Keyset struct {
-	Id        string `json:"id"`
-	Active    bool   `json:"active" db:"active"`
-	Unit      string `json:"unit"`
-	Amount    int    `json:"amount"`
-	PubKey    []byte `json:"pub_key"`
-	CreatedAt int64  `json:"created_at"`
-}
-
-type Seed struct {
-	Seed      []byte
-	Active    bool
-	CreatedAt int64
-	Unit      string
-	Id        string
-}
-
-func deriveKeysetId(keysets []Keyset) string {
-	concatBinaryArray := []byte{}
-	for _, keyset := range keysets {
-		concatBinaryArray = append(concatBinaryArray, keyset.PubKey...)
-	}
-	hashedKeysetId := sha256.Sum256(concatBinaryArray)
-	hex := hex.EncodeToString(hashedKeysetId[:])
-
-	return "00" + string(hex[:14])
-
-}
-
-func getAllSeeds(conn *pgx.Conn) []Seed {
-	var seeds []Seed
-
-	rows, err := conn.Query(context.Background(), "SELECT * FROM seeds")
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return seeds
-		}
-		log.Fatal("Error checking for  seeds: ", err)
-	}
-
-	defer rows.Close()
-
-	keysets_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[Seed])
-
-	if err != nil {
-		log.Fatal("Error checking for seeds: ", err)
-	}
-
-	return keysets_collect
-}
-
-func checkForActiveKeyset(conn *pgx.Conn) []Keyset {
-	var keysets []Keyset
-
-	rows, err := conn.Query(context.Background(), "SELECT * FROM keysets WHERE active")
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return keysets
-		}
-		log.Fatal("Error checking for active keyset: ", err)
-	}
-	defer rows.Close()
-
-	keysets_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[Keyset])
-
-	if err != nil {
-		log.Fatal("Error checking for active keyset: ", err)
-	}
-
-	return keysets_collect
-}
-
-func checkForKeysetById(conn *pgx.Conn, id string) []Keyset {
-	var keysets []Keyset
-
-	rows, err := conn.Query(context.Background(), "SELECT * FROM keysets WHERE id = $1", id)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return keysets
-		}
-		log.Fatal("Error checking for active keyset: ", err)
-	}
-	defer rows.Close()
-
-	keysets_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[Keyset])
-
-	if err != nil {
-		log.Fatal("Error checking for active keyset: ", err)
-	}
-
-	return keysets_collect
-}
-
-func saveNewSeed(conn *pgx.Conn, seed *Seed) {
-	_, err := conn.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id) VALUES ($1, $2, $3, $4, $5)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id)
-	if err != nil {
-		log.Fatal("Error saving new seed: ", err)
-	}
-}
-
-func saveNewKeysets(conn *pgx.Conn, keyset []Keyset) {
-	for _, key := range keyset {
-		_, err := conn.Exec(context.Background(), "INSERT INTO keysets (id, active, unit, amount, pubkey, created_at) VALUES ($1, $2, $3, $4, $5, $6)", key.Id, key.Active, key.Unit, key.Amount, key.PubKey, key.CreatedAt)
-		if err != nil {
-			log.Fatal("Error saving new keyset: ", err)
-		}
-	}
-}
 
 type KeysetResponse struct {
 	Id   string            `json:"id"`
@@ -155,9 +26,8 @@ type KeysetResponse struct {
 	Keys map[string]string `json:"keys"`
 }
 
-func orderKeysetByUnit(keysets []Keyset) map[string][]KeysetResponse {
-
-	var typesOfUnits = make(map[string][]Keyset)
+func orderKeysetByUnit(keysets []cashu.Keyset) map[string][]KeysetResponse {
+	var typesOfUnits = make(map[string][]cashu.Keyset)
 
 	for _, keyset := range keysets {
 		if len(typesOfUnits[keyset.Unit]) == 0 {
@@ -188,34 +58,6 @@ func orderKeysetByUnit(keysets []Keyset) map[string][]KeysetResponse {
 
 }
 
-func generateKeysets(masterKey *bip32.Key, values []int) []Keyset {
-	var keysets []Keyset
-
-	// Get the current time
-	currentTime := time.Now()
-
-	// Format the time as a string
-	formattedTime := currentTime.Unix()
-
-	for i, value := range values {
-		childKey, err := masterKey.NewChildKey(uint32(i))
-		if err != nil {
-			log.Fatal("Error generating child key: ", err)
-		}
-		keyset := Keyset{
-			Id:        "",
-			Active:    true,
-			Unit:      "sats",
-			Amount:    value,
-			PubKey:    childKey.PublicKey().Key,
-			CreatedAt: formattedTime,
-		}
-
-		keysets = append(keysets, keyset)
-	}
-
-	return keysets
-}
 
 type SwapMintMethod struct {
 	Method    string `json:"method"`
@@ -257,7 +99,7 @@ func main() {
 
 	defer conn.Close(context.Background())
 
-	keysets := checkForActiveKeyset(conn)
+	keysets := CheckForActiveKeyset(conn)
 
 	if len(keysets) == 0 {
 		seed, err := bip32.NewSeed()
@@ -273,18 +115,16 @@ func main() {
 		formattedTime := currentTime.Unix()
 		masterKey, err := bip32.NewMasterKey(seed)
 
-		// values for keysets with 2 over n
-		newKeysetValues := []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072}
 
-		list_of_keys := generateKeysets(masterKey, newKeysetValues)
+		list_of_keys := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues)
 
-		id := deriveKeysetId(list_of_keys)
+		id := cashu.DeriveKeysetId(list_of_keys)
 
 		for i, _ := range list_of_keys {
 			list_of_keys[i].Id = id
 		}
 
-		newSeed := Seed{
+		newSeed := cashu.Seed{
 			Seed:      seed,
 			Active:    true,
 			CreatedAt: formattedTime,
@@ -292,9 +132,9 @@ func main() {
 			Id:        id,
 		}
 
-		saveNewSeed(conn, &newSeed)
+		SaveNewSeed(conn, &newSeed)
 
-		saveNewKeysets(conn, list_of_keys)
+		SaveNewKeysets(conn, list_of_keys)
 
 		if err != nil {
 			log.Fatal("Error creating master key ", err)
@@ -306,7 +146,7 @@ func main() {
 
 	r.GET("/v1/keys", func(c *gin.Context) {
 
-		keysets := checkForActiveKeyset(conn)
+		keysets := CheckForActiveKeyset(conn)
 		keys := orderKeysetByUnit(keysets)
 
 		c.JSON(200, keys)
@@ -315,7 +155,7 @@ func main() {
 	r.GET("/v1/keys/:id", func(c *gin.Context) {
 
 		id := c.Param("id")
-		keysets := checkForKeysetById(conn, id)
+		keysets := CheckForKeysetById(conn, id)
 		keys := orderKeysetByUnit(keysets)
 
 		c.JSON(200, keys)
@@ -330,7 +170,7 @@ func main() {
 
 	r.GET("/v1/keysets", func(c *gin.Context) {
 
-		seeds := getAllSeeds(conn)
+		seeds := GetAllSeeds(conn)
 		fmt.Println("Seeds", seeds)
 
 		keys := make(map[string][]BasicKeysetResponse)
@@ -346,6 +186,21 @@ func main() {
 	})
 
 	r.GET("/v1/info", func(c *gin.Context) {
+
+        seed, err := GetActiveSeed(conn)
+
+        var pubkey string = ""
+
+        if err != nil {
+            log.Fatal("Error getting active seed: ", err)
+        }
+
+        masterKey, err := bip32.NewMasterKey(seed.Seed)
+
+        if err != nil {
+            log.Fatal("Error creating master key ", err)
+        }
+        pubkey = hex.EncodeToString(masterKey.PublicKey().Key)
 		name := os.Getenv("NAME")
 		description := os.Getenv("DESCRIPTION")
 		description_long := os.Getenv("DESCRIPTION_LONG")
@@ -379,6 +234,7 @@ func main() {
 		response := GetInfoResponse{
 			Name:            name,
 			Version:         "AwesomeGoMint/0.1",
+            Pubkey:          pubkey,
 			Description:     description,
 			DescriptionLong: description_long,
 			Motd:            motd,
@@ -389,6 +245,38 @@ func main() {
 		c.JSON(200, response)
 
 	})
+
+    type PostMintQuoteBolt11Request struct {
+        Amount int64 `json:"amount"`
+        Unit     string `json:"unit"`
+    }
+
+
+    r.POST("/v1/mint/quote/bolt11", func(c *gin.Context) {
+        var mintRequest PostMintQuoteBolt11Request
+        c.BindJSON(&mintRequest)
+
+        invoice :=     lnrpc.Invoice{
+            Memo: "Mint request",
+            Settled: false,
+            Value: mintRequest.Amount,
+            Receipt: make([]byte, 0),
+            RPreimage: make([]byte, 0),
+            RHash: make([]byte, 0),
+        }
+	    jsonBytes, err := lnrpc.ProtoJSONMarshalOpts.Marshal(invoice)
+	if err != nil {
+		fmt.Println("unable to decode response: ", err)
+		return
+	}
+
+	fmt.Printf("%s\n", jsonBytes)
+
+
+        
+        fmt.Println("Mint request", mintRequest)
+
+    })
 
 	r.Run(":8080")
 }
