@@ -30,6 +30,7 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [ ] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md)
 - [ ] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
 - [ ] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
+- [ ] [NUT-13](https://github.com/cashubtc/nuts/blob/main/13.md)
 
 
 
