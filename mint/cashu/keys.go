@@ -3,6 +3,7 @@ package cashu
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"time"
 
@@ -11,15 +12,22 @@ import (
 
 var PosibleKeysetValues []int = []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072}
 
-func DeriveKeysetId(keysets []Keyset) string {
+func DeriveKeysetId(keysets []Keyset) (string, error) {
 	concatBinaryArray := []byte{}
 	for _, keyset := range keysets {
-		concatBinaryArray = append(concatBinaryArray, keyset.PubKey...)
+        pubkey, err := keyset.GetPubKey()
+
+        if err != nil {
+            return "", fmt.Errorf("keyset.GetPubkey: %+v ", err)
+
+        }
+        
+		concatBinaryArray = append(concatBinaryArray, pubkey...)
 	}
 	hashedKeysetId := sha256.Sum256(concatBinaryArray)
 	hex := hex.EncodeToString(hashedKeysetId[:])
 
-	return "00" + string(hex[:14])
+	return "00" + string(hex[:14]), nil
 
 }
 
@@ -40,9 +48,9 @@ func GenerateKeysets(masterKey *bip32.Key, values []int) []Keyset {
 		keyset := Keyset{
 			Id:        "",
 			Active:    true,
-			Unit:      "sats",
+			Unit:      "sat",
 			Amount:    value,
-			PubKey:    childKey.PublicKey().Key,
+			PrivKey:    childKey.B58Serialize(),
 			CreatedAt: formattedTime,
 		}
 

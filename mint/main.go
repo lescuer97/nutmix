@@ -4,29 +4,25 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
-	"os"
-	"strconv"
-	"time"
-
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/cashu-v4v/cashu"
+	"github.com/lescuer97/cashu-v4v/lightning"
+	"github.com/lightningnetwork/lnd/channeldb/migration_01_to_11/zpay32"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/tyler-smith/go-bip32"
+    "github.com/gin-contrib/cors"
+	"log"
+	"os"
+	"slices"
+	"strconv"
+	"time"
 )
 
-
-
-
-type KeysetResponse struct {
-	Id   string            `json:"id"`
-	Unit string            `json:"unit"`
-	Keys map[string]string `json:"keys"`
-}
-
-func orderKeysetByUnit(keysets []cashu.Keyset) map[string][]KeysetResponse {
+func orderKeysetByUnit(keysets []cashu.Keyset) (map[string][]cashu.KeysetResponse, error) {
 	var typesOfUnits = make(map[string][]cashu.Keyset)
 
 	for _, keyset := range keysets {
@@ -38,48 +34,29 @@ func orderKeysetByUnit(keysets []cashu.Keyset) map[string][]KeysetResponse {
 		}
 	}
 
-	res := make(map[string][]KeysetResponse)
+	res := make(map[string][]cashu.KeysetResponse)
 
-	res["keysets"] = []KeysetResponse{}
+	res["keysets"] = []cashu.KeysetResponse{}
 
 	for _, value := range typesOfUnits {
-		var keysetResponse KeysetResponse
+		var keysetResponse cashu.KeysetResponse
 		keysetResponse.Id = value[0].Id
 		keysetResponse.Unit = value[0].Unit
 		keysetResponse.Keys = make(map[string]string)
 
 		for _, keyset := range value {
-			keysetResponse.Keys[strconv.Itoa(keyset.Amount)] = hex.EncodeToString(keyset.PubKey)
+			privkey, err := bip32.B58Deserialize(keyset.PrivKey)
+			if err != nil {
+
+				return nil, err
+			}
+			keysetResponse.Keys[strconv.Itoa(keyset.Amount)] = hex.EncodeToString(privkey.PublicKey().Key)
 		}
 
 		res["keysets"] = append(res["keysets"], keysetResponse)
 	}
-	return res
+	return res, nil
 
-}
-
-
-type SwapMintMethod struct {
-	Method    string `json:"method"`
-	Unit      string `json:"unit"`
-	MinAmount int    `json:"min_amount"`
-	MaxAmount int    `json:"max_amount"`
-}
-
-type SwapMintInfo struct {
-	Methods  *[]SwapMintMethod `json:"methods,omitempty"`
-	Disabled bool              `json:"disabled"`
-}
-
-type GetInfoResponse struct {
-	Name            string     `json:"name"`
-	Version         string     `json:"version"`
-	Pubkey          string     `json:"pubkey"`
-	Description     string     `json:"description"`
-	DescriptionLong string     `json:"description_long"`
-	Contact         [][]string `json:"contact"`
-	Motd            string     `json:"motd"`
-	Nuts            map[string]SwapMintInfo
 }
 
 func main() {
@@ -99,26 +76,32 @@ func main() {
 
 	defer conn.Close(context.Background())
 
-	keysets := CheckForActiveKeyset(conn)
+	keysets, err := CheckForActiveKeyset(conn)
+
+	if err != nil {
+		log.Fatalf("Could not keysets: %v", err)
+	}
 
 	if len(keysets) == 0 {
 		seed, err := bip32.NewSeed()
 
 		if err != nil {
-			log.Fatal("Error creating seed ", err)
+			log.Fatalf("Error creating seed: %+v ", err)
 		}
 
 		// Get the current time
-		currentTime := time.Now()
+		currentTime := time.Now().Unix()
 
-		// Format the time as a string
-		formattedTime := currentTime.Unix()
+		// // Format the time as a string
 		masterKey, err := bip32.NewMasterKey(seed)
-
 
 		list_of_keys := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues)
 
-		id := cashu.DeriveKeysetId(list_of_keys)
+		id, err := cashu.DeriveKeysetId(list_of_keys)
+
+		if err != nil {
+			log.Fatalf("Error DeriveKeysetId: %+v ", err)
+		}
 
 		for i, _ := range list_of_keys {
 			list_of_keys[i].Id = id
@@ -127,57 +110,82 @@ func main() {
 		newSeed := cashu.Seed{
 			Seed:      seed,
 			Active:    true,
-			CreatedAt: formattedTime,
-			Unit:      "sats",
+			CreatedAt: currentTime,
+			Unit:      "sat",
 			Id:        id,
 		}
 
-		SaveNewSeed(conn, &newSeed)
-
-		SaveNewKeysets(conn, list_of_keys)
+		err = SaveNewSeed(conn, &newSeed)
 
 		if err != nil {
-			log.Fatal("Error creating master key ", err)
+			log.Fatalf("SaveNewSeed: %v ", err)
 		}
 
+		err = SaveNewKeysets(conn, list_of_keys)
+
+		if err != nil {
+			log.Fatalf("SaveNewKeysets: %v ", err)
+		}
 	}
 
 	r := gin.Default()
+      r.Use(cors.Default())
 
 	r.GET("/v1/keys", func(c *gin.Context) {
 
-		keysets := CheckForActiveKeyset(conn)
-		keys := orderKeysetByUnit(keysets)
+		keysets, err := CheckForActiveKeyset(conn)
+
+		if err != nil {
+			log.Fatalf("CheckForActiveKeyset: %v ", err)
+			c.JSON(500, "Server side error")
+			return
+		}
+
+		keys, err := orderKeysetByUnit(keysets)
+		if err != nil {
+			log.Printf("orderKeysetByUnit: %v ", err)
+			c.JSON(500, "Server side error")
+			return
+		}
 
 		c.JSON(200, keys)
 
 	})
+
 	r.GET("/v1/keys/:id", func(c *gin.Context) {
 
 		id := c.Param("id")
-		keysets := CheckForKeysetById(conn, id)
-		keys := orderKeysetByUnit(keysets)
+		keysets, err := CheckForKeysetById(conn, id)
+		if err != nil {
+			log.Fatalf("CheckForKeysetById: %v ", err)
+			c.JSON(500, "Server side error")
+			return
+		}
+		keys, err := orderKeysetByUnit(keysets)
+		if err != nil {
+			log.Printf("orderKeysetByUnit: %v ", err)
+			c.JSON(500, "Server side error")
+			return
+		}
 
 		c.JSON(200, keys)
 
 	})
 
-	type BasicKeysetResponse struct {
-		Id     string `json:"id"`
-		Unit   string `json:"unit"`
-		Active bool   `json:"active"`
-	}
-
 	r.GET("/v1/keysets", func(c *gin.Context) {
 
-		seeds := GetAllSeeds(conn)
-		fmt.Println("Seeds", seeds)
+		seeds, err := GetAllSeeds(conn)
+		if err != nil {
+			log.Fatalf("GetAllSeeds: %v ", err)
+			c.JSON(500, "Server side error")
+			return
+		}
 
-		keys := make(map[string][]BasicKeysetResponse)
-		keys["keysets"] = []BasicKeysetResponse{}
+		keys := make(map[string][]cashu.BasicKeysetResponse)
+		keys["keysets"] = []cashu.BasicKeysetResponse{}
 
 		for _, seed := range seeds {
-			keys["keysets"] = append(keys["keysets"], BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active})
+			keys["keysets"] = append(keys["keysets"], cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active})
 
 		}
 
@@ -187,24 +195,24 @@ func main() {
 
 	r.GET("/v1/info", func(c *gin.Context) {
 
-        seed, err := GetActiveSeed(conn)
+		seed, err := GetActiveSeed(conn)
 
-        var pubkey string = ""
+		var pubkey string = ""
 
-        if err != nil {
-            log.Fatal("Error getting active seed: ", err)
-        }
+		if err != nil {
+			log.Fatal("Error getting active seed: ", err)
+		}
 
-        masterKey, err := bip32.NewMasterKey(seed.Seed)
+		masterKey, err := bip32.NewMasterKey(seed.Seed)
 
-        if err != nil {
-            log.Fatal("Error creating master key ", err)
-        }
-        pubkey = hex.EncodeToString(masterKey.PublicKey().Key)
+		if err != nil {
+			log.Fatal("Error creating master key ", err)
+		}
+		pubkey = hex.EncodeToString(masterKey.PublicKey().Key)
 		name := os.Getenv("NAME")
 		description := os.Getenv("DESCRIPTION")
 		description_long := os.Getenv("DESCRIPTION_LONG")
-		motd := os.Getenv("DESCRIPTION_LONG")
+		motd := os.Getenv("MOTD")
 
 		email := []string{"email", os.Getenv("EMAIL")}
 		nostr := []string{"nostr", os.Getenv("NOSTR")}
@@ -217,24 +225,24 @@ func main() {
 			}
 		}
 
-		nuts := make(map[string]SwapMintInfo)
+		nuts := make(map[string]cashu.SwapMintInfo)
 
-		nuts["1"] = SwapMintInfo{
+		nuts["1"] = cashu.SwapMintInfo{
 			Disabled: false,
 		}
 
-		nuts["2"] = SwapMintInfo{
+		nuts["2"] = cashu.SwapMintInfo{
 			Disabled: false,
 		}
 
-		nuts["6"] = SwapMintInfo{
+		nuts["6"] = cashu.SwapMintInfo{
 			Disabled: false,
 		}
 
-		response := GetInfoResponse{
+		response := cashu.GetInfoResponse{
 			Name:            name,
 			Version:         "AwesomeGoMint/0.1",
-            Pubkey:          pubkey,
+			Pubkey:          pubkey,
 			Description:     description,
 			DescriptionLong: description_long,
 			Motd:            motd,
@@ -243,40 +251,155 @@ func main() {
 		}
 
 		c.JSON(200, response)
+	})
+
+	r.POST("/v1/mint/quote/bolt11", func(c *gin.Context) {
+		var mintRequest cashu.PostMintQuoteBolt11Request
+		c.BindJSON(&mintRequest)
+
+		fmt.Println("amount: ", mintRequest.Amount)
+		if mintRequest.Amount == 0 {
+			c.JSON(400, "amount missing")
+			return
+		}
+
+		payReq, err := lightning.CreateMockInvoice(mintRequest.Amount, "mock invoice")
+		if err != nil {
+			log.Println(err)
+			c.JSON(500, "Opps!, something went wrong")
+
+		}
+
+		randUuid, err := uuid.NewRandom()
+		if err != nil {
+
+			log.Println(fmt.Errorf("NewRamdom: %v", err))
+
+			c.JSON(500, "Opps!, something went wrong")
+
+		}
+
+		postRequest := cashu.PostMintQuoteBolt11Response{
+			Quote:   randUuid.String(),
+			Request: payReq,
+			Paid:    true,
+			Expiry:  3600,
+		}
+
+		err = SaveQuoteRequest(conn, postRequest)
+		if err != nil {
+			log.Println(fmt.Errorf("SaveQuoteRequest: %v", err))
+			c.JSON(500, "Opps!, something went wrong")
+		}
+
+		c.JSON(200, postRequest)
 
 	})
 
-    type PostMintQuoteBolt11Request struct {
-        Amount int64 `json:"amount"`
-        Unit     string `json:"unit"`
-    }
+	r.GET("/v1/mint/quote/bolt11/:quote", func(c *gin.Context) {
+		quoteId := c.Param("quote")
+
+		quote, err := GetQuoteById(conn, quoteId)
+
+		if err != nil {
+			log.Println(fmt.Errorf("GetQuoteById: %v", err))
+			c.JSON(500, "Opps!, something went wrong")
+		}
+
+		c.JSON(200, quote)
+	})
+
+	r.POST("/v1/mint/bolt11", func(c *gin.Context) {
+		var mintRequest cashu.PostMintBolt11Request
+		err = c.BindJSON(&mintRequest)
+		if err != nil {
+			log.Printf("Incorrect body: %+v", err)
+			c.JSON(400, "Malformed body request")
+		}
+
+		quote, err := GetQuoteById(conn, mintRequest.Quote)
+
+		if err != nil {
+			log.Println(fmt.Errorf("GetQuoteById: %v", err))
+			c.JSON(500, "Opps!, something went wrong")
+		}
+
+		// check if the quote is paid
+		if quote.Paid == false {
+			c.JSON(400, "Quote not paid")
+			return
+		}
+
+		invoice, err := zpay32.Decode(quote.Request, &chaincfg.MainNetParams)
+
+		if err != nil {
+			log.Println(fmt.Errorf("zpay32.Decode: %v", err))
+			c.JSON(500, "Opps!, something went wrong")
+		}
+
+		var amount int32 = 0
+        var amounts []int32 = make([]int32, 0)
+
+		for _, output := range mintRequest.Outputs {
+			amount += output.Amount
+            amounts = append(amounts, output.Amount)
+
+		}
+
+		amountMilsats, err := lnrpc.UnmarshallAmt(int64(amount), 0)
+
+		if err != nil {
+			log.Println(fmt.Errorf("UnmarshallAmt: %v", err))
+			c.JSON(500, "Opps!, something went wrong")
+		}
+
+		// check the amount in outputs are the same as the quote
+		if int32(*invoice.MilliSat) != int32(amountMilsats) {
+			c.JSON(400, "Amounts in outputs are not the same")
+			return
+		}
+
+        keysets , err := GetKeysetsByAmountList(conn, amounts)
+
+		if err != nil {
+			log.Println(fmt.Errorf("GetKeysetsByAmountList: %v", err))
+			c.JSON(500, "Opps!, something went wrong")
+		}
+
+		var blindedSignatures []cashu.BlindSignature
+		// Create blindSignature with diffie-hellman exchange
+		for _, output := range mintRequest.Outputs {
+
+			index := slices.Index(cashu.PosibleKeysetValues, int(output.Amount))
+
+			if index == -1 {
+				c.JSON(500, "Something happened")
+				return
+			}
 
 
-    r.POST("/v1/mint/quote/bolt11", func(c *gin.Context) {
-        var mintRequest PostMintQuoteBolt11Request
-        c.BindJSON(&mintRequest)
+            key, err := bip32.B58Deserialize( keysets[int(output.Amount)].PrivKey)
+			if err != nil {
+				log.Println(fmt.Errorf("bip32.B58Deserialize: %v", err))
+				c.JSON(500, "Opps!, something went wrong")
+			}
+            
+            blindSignature, err :=  cashu.GenerateBlindSignature(key, output)
 
-        invoice :=     lnrpc.Invoice{
-            Memo: "Mint request",
-            Settled: false,
-            Value: mintRequest.Amount,
-            Receipt: make([]byte, 0),
-            RPreimage: make([]byte, 0),
-            RHash: make([]byte, 0),
-        }
-	    jsonBytes, err := lnrpc.ProtoJSONMarshalOpts.Marshal(invoice)
-	if err != nil {
-		fmt.Println("unable to decode response: ", err)
-		return
-	}
+			if err != nil {
+				log.Println(fmt.Errorf("GenerateBlindSignature: %v", err))
+				c.JSON(500, "Opps!, something went wrong")
+			}
 
-	fmt.Printf("%s\n", jsonBytes)
+			blindedSignatures = append(blindedSignatures, blindSignature)
 
+		}
+		// Store BlidedSignature
 
-        
-        fmt.Println("Mint request", mintRequest)
-
-    })
+		c.JSON(200, cashu.PostMintBolt11Response {
+            Signatures: blindedSignatures,
+        })
+	})
 
 	r.Run(":8080")
 }
