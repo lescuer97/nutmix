@@ -111,7 +111,7 @@ func main() {
 			Seed:      seed,
 			Active:    true,
 			CreatedAt: currentTime,
-			Unit:      "sats",
+			Unit:      "sat",
 			Id:        id,
 		}
 
@@ -292,7 +292,7 @@ func main() {
 			c.JSON(500, "Opps!, something went wrong")
 		}
 
-		c.JSON(200, payReq)
+		c.JSON(200, postRequest)
 
 	})
 

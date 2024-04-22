@@ -48,7 +48,7 @@ func GenerateKeysets(masterKey *bip32.Key, values []int) []Keyset {
 		keyset := Keyset{
 			Id:        "",
 			Active:    true,
-			Unit:      "sats",
+			Unit:      "sat",
 			Amount:    value,
 			PrivKey:    childKey.B58Serialize(),
 			CreatedAt: formattedTime,
