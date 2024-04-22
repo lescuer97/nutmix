@@ -1,4 +1,4 @@
-module github.com/lescuer97/cashu-v4v
+module github.com/lescuer97/nutmix
 
 go 1.22.1
 

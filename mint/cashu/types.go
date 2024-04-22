@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lescuer97/cashu-v4v/crypto"
+	"github.com/lescuer97/nutmix/crypto"
 	"github.com/tyler-smith/go-bip32"
 )
 
