@@ -4,13 +4,14 @@ _Don't be reckless:_ This project is in early development; it does, however, wor
 
 _This project is in active development; it has not gone through optimization and refactoring yet_.
 
-# NutMix
+# Nutmix
 
-This has now been turned into a Golang reference implementation of the Cashu Protocol and a SvelteKit wallet for it. Initially, this was a project to create a value-for-value wallet with Cashu at its core (Might come in the future).
+This has now been turned into a Golang reference implementation of the Cashu Protocol and a SvelteKit wallet for it. This was originally a project to create a value-for-value wallet with Cashu at its core (Might come in the future).
 
 ## Purpose of this project
 
-This is an attempt to learn Go and eCash. I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make a reference implementation of the mint in Go. I am attempting to make all the NUTs available as well as some other ideas such as: Monero ECash token.
+This is an attempt to learn Go and eCash. I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make a reference implementation of the mint in Go. 
+I am attempting to make all the NUTs available as well as some other ideas such as: Monero ECash token.
 
 The wallet is going to be made with SvelteKit (probably not the best option). I will implement the wallet with the possibility of multiple denominations of eCash (SATs, Monero, eUSD). I would also like to have some Nostr functionality.
 
@@ -21,9 +22,9 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [x] [NUT-00](https://github.com/cashubtc/nuts/blob/main/00.md)
 - [x] [NUT-01](https://github.com/cashubtc/nuts/blob/main/01.md)
 - [x] [NUT-02](https://github.com/cashubtc/nuts/blob/main/02.md)
-- [] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md)
-- [] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md)
-- [] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
+- [ ] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md)
+- [ ] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md)
+- [ ] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
 - [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md)
 - [ ] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md)
 - [ ] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
@@ -38,10 +39,10 @@ Right now, the wallet and the mint are being developed as completely separate pr
 
 ### Things to implement
 
-- [] Implement obligatory NUTs.
-- [] Add Tests for NUT calls.
-- [] Add Tests for crypto functions.
-- [] Explore the use of http std library and not Gin.
+- [ ] Implement obligatory NUTs.
+- [ ] Add Tests for NUT calls.
+- [ ] Add Tests for crypto functions.
+- [ ] Explore the use of http std library and not Gin.
 
 
 
