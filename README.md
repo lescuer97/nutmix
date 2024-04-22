@@ -4,13 +4,13 @@ _Don't be reckless:_ This project is in early development; it does, however, wor
 
 _This project is in active development; it has not gone through optimization and refactoring yet_.
 
-# cashu-v4v
+# NUTMIX
 
-This has now been turned into an attempt at a Golang reference implementation of the Cashu Protocol and a SvelteKit wallet for it. Initially, this was a project to create a value-for-value wallet with Cashu at its core.
+This has now been turned into a Golang reference implementation of the Cashu Protocol and a SvelteKit wallet for it. Initially, this was a project to create a value-for-value wallet with Cashu at its core (Might come in the future).
 
 ## Purpose of this project
 
-This is just an attempt to learn Go. I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make a reference implementation of the mint in Go. I am attempting to make all the NUTs available as well as some other ideas such as: Monero ECash token.
+This is an attempt to learn Go and eCash. I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make a reference implementation of the mint in Go. I am attempting to make all the NUTs available as well as some other ideas such as: Monero ECash token.
 
 The wallet is going to be made with SvelteKit (probably not the best option). I will implement the wallet with the possibility of multiple denominations of eCash (SATs, Monero, eUSD). I would also like to have some Nostr functionality.
 
@@ -32,11 +32,17 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [ ] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
 - [ ] [NUT-13](https://github.com/cashubtc/nuts/blob/main/13.md)
 
-
-
 ## Development
 
 Right now, the wallet and the mint are being developed as completely separate projects.
+
+### Things to implement
+
+- [] Implement obligatory NUTs.
+- [] Add Tests for NUT calls.
+- [] Add Tests for crypto functions.
+- [] Explore the use of http std library and not Gin.
+
 
 
 ### Mint
