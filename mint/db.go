@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/lescuer97/cashu-v4v/cashu"
+	"github.com/lescuer97/nutmix/cashu"
 )
 
 func GetAllSeeds(conn *pgx.Conn) ([]cashu.Seed, error) {
