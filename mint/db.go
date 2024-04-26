@@ -141,7 +141,7 @@ func GetQuoteById(conn *pgx.Conn, id string) (cashu.PostMintQuoteBolt11Response,
 }
 
 func GetKeysetsByAmountList(conn *pgx.Conn, keyAmounts []int32) (map[int]cashu.Keyset, error) {
-    var keysetMap = make(map[int]cashu.Keyset)
+	var keysetMap = make(map[int]cashu.Keyset)
 
 	rows, err := conn.Query(context.Background(), "SELECT * FROM keysets WHERE amount = ANY($1)", keyAmounts)
 	if err != nil {
@@ -159,9 +159,9 @@ func GetKeysetsByAmountList(conn *pgx.Conn, keyAmounts []int32) (map[int]cashu.K
 		return keysetMap, fmt.Errorf("Collecting rows: %v", err)
 	}
 
-    for _, keyset := range keysets_collect {
-        keysetMap[keyset.Amount] = keyset
-    }
+	for _, keyset := range keysets_collect {
+		keysetMap[keyset.Amount] = keyset
+	}
 
 	return keysetMap, nil
 }

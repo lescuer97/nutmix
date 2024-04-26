@@ -152,3 +152,38 @@ type BasicKeysetResponse struct {
 	Unit   string `json:"unit"`
 	Active bool   `json:"active"`
 }
+
+type PostMeltQuoteBolt11Request struct {
+    Request string `json:"request"`
+    Unit    string `json:"unit"`
+}
+
+type PostMeltQuoteBolt11Response struct {
+    Quote string `json:"quote"`
+    Amount int64 `json:"amount"`
+    FeeReserve int64 `json:"fee_reserve"`
+    Paid bool `json:"paid"`
+    Expiry int64 `json:"expiry"`
+}
+
+type PostSwapRequest struct {
+    Inputs []Proof `json:"inputs"`
+    Outputs []BlindedMessage `json:"outputs"`
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
