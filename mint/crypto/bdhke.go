@@ -8,6 +8,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
+
 // This cryptography module was taken form the gonuts project. https://github.com/elnosh/gonuts/blob/main/crypto/bdhke.go
 
 
@@ -89,10 +90,6 @@ func Verify(secret string, k *secp256k1.PrivateKey, C *secp256k1.PublicKey) bool
 		return false
 	}
 	valid := verify(Y, k, C)
-	// if !valid {
-	// 	Y := HashToCurveDeprecated([]byte(secret))
-	// 	valid = verify(Y, k, C)
-	// }
 
 	return valid
 }
@@ -100,6 +97,7 @@ func Verify(secret string, k *secp256k1.PrivateKey, C *secp256k1.PublicKey) bool
 func verify(Y *secp256k1.PublicKey, k *secp256k1.PrivateKey, C *secp256k1.PublicKey) bool {
 	var Ypoint, result secp256k1.JacobianPoint
 	Y.AsJacobian(&Ypoint)
+
 
 	secp256k1.ScalarMultNonConst(&k.Key, &Ypoint, &result)
 	result.ToAffine()

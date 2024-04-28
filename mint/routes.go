@@ -3,40 +3,27 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
-	"os"
-	"slices"
-
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/cashu"
+	"github.com/lescuer97/nutmix/crypto"
 	"github.com/lescuer97/nutmix/lightning"
 	"github.com/lightningnetwork/lnd/channeldb/migration_01_to_11/zpay32"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/tyler-smith/go-bip32"
+	"log"
+	"os"
 )
 
-func V1Routes(r *gin.Engine, conn *pgx.Conn) {
+func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
 
-		keysets, err := CheckForActiveKeyset(conn)
-
-		if err != nil {
-			log.Fatalf("CheckForActiveKeyset: %w ", err)
-			c.JSON(500, "Server side error")
-			return
-		}
-
-		keys, err := cashu.OrderKeysetByUnit(keysets)
-		if err != nil {
-			log.Printf("orderKeysetByUnit: %w ", err)
-			c.JSON(500, "Server side error")
-			return
-		}
+		keys := mint.OrderActiveKeysByUnit()
 
 		c.JSON(200, keys)
 
@@ -45,15 +32,19 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn) {
 	v1.GET("/keys/:id", func(c *gin.Context) {
 
 		id := c.Param("id")
-		keysets, err := CheckForKeysetById(conn, id)
+
+		keysets, err := mint.GetKeysetById(cashu.Sats, id)
+
 		if err != nil {
-			log.Fatalf("CheckForKeysetById: %w ", err)
+			log.Printf("GetKeysetById: %+v ", err)
 			c.JSON(500, "Server side error")
 			return
 		}
-		keys, err := cashu.OrderKeysetByUnit(keysets)
+
+		keys := cashu.OrderKeysetByUnit(keysets)
+
 		if err != nil {
-			log.Printf("orderKeysetByUnit: %w ", err)
+			log.Printf("orderKeysetByUnit: %+v", err)
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -65,7 +56,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn) {
 
 		seeds, err := GetAllSeeds(conn)
 		if err != nil {
-			log.Fatalf("GetAllSeeds: %w ", err)
+			log.Fatalf("GetAllSeeds: %+v ", err)
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -75,7 +66,6 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn) {
 
 		for _, seed := range seeds {
 			keys["keysets"] = append(keys["keysets"], cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active})
-
 		}
 
 		c.JSON(200, keys)
@@ -145,7 +135,6 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn) {
 		var mintRequest cashu.PostMintQuoteBolt11Request
 		c.BindJSON(&mintRequest)
 
-		fmt.Println("amount: ", mintRequest.Amount)
 		if mintRequest.Amount == 0 {
 			c.JSON(400, "amount missing")
 			return
@@ -201,7 +190,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn) {
 		err := c.BindJSON(&mintRequest)
 
 		if err != nil {
-			log.Printf("Incorrect body: %w", err)
+			log.Printf("Incorrect body: %+v", err)
 			c.JSON(400, "Malformed body request")
 		}
 
@@ -209,7 +198,13 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn) {
 
 		if err != nil {
 			log.Println(fmt.Errorf("GetQuoteById: %w", err))
+			if err == pgx.ErrNoRows {
+				c.JSON(404, "Quote not found")
+				return
+
+			}
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		// check if the quote is paid
@@ -231,7 +226,6 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn) {
 		for _, output := range mintRequest.Outputs {
 			amount += output.Amount
 			amounts = append(amounts, output.Amount)
-
 		}
 
 		amountMilsats, err := lnrpc.UnmarshallAmt(int64(amount), 0)
@@ -247,39 +241,10 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn) {
 			return
 		}
 
-		keysets, err := GetKeysetsByAmountList(conn, amounts)
-
+		blindedSignatures, err := mint.SignBlindedMessages(mintRequest.Outputs, cashu.Sats)
 		if err != nil {
-			log.Println(fmt.Errorf("GetKeysetsByAmountList: %w", err))
+			log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
-		}
-
-		var blindedSignatures []cashu.BlindSignature
-		// Create blindSignature with diffie-hellman exchange
-		for _, output := range mintRequest.Outputs {
-
-			index := slices.Index(cashu.PosibleKeysetValues, int(output.Amount))
-
-			if index == -1 {
-				c.JSON(500, "Something happened")
-				return
-			}
-
-			key, err := bip32.B58Deserialize(keysets[int(output.Amount)].PrivKey)
-			if err != nil {
-				log.Println(fmt.Errorf("bip32.B58Deserialize: %w", err))
-				c.JSON(500, "Opps!, something went wrong")
-			}
-
-			blindSignature, err := cashu.GenerateBlindSignature(key, output)
-
-			if err != nil {
-				log.Println(fmt.Errorf("GenerateBlindSignature: %w", err))
-				c.JSON(500, "Opps!, something went wrong")
-			}
-
-			blindedSignatures = append(blindedSignatures, blindSignature)
-
 		}
 
 		// Store BlidedSignature
@@ -294,22 +259,110 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn) {
 		err := c.BindJSON(&swapRequest)
 
 		var AmountProofs, AmountSignature int32
+		var CList, SecretList []string
 
+		if len(swapRequest.Inputs) == 0 || len(swapRequest.Outputs) == 0 {
+			c.JSON(400, "Inputs or Outputs are empty")
+			return
+		}
 		// check proof have the same amount as blindedSignatures
 		for _, proof := range swapRequest.Inputs {
 			AmountProofs += proof.Amount
+			CList = append(CList, proof.C)
+			SecretList = append(SecretList, proof.Secret)
 		}
 		for _, output := range swapRequest.Outputs {
 			AmountSignature += output.Amount
 		}
 
-		if err != nil {
-			log.Printf("Incorrect body: %w", swapRequest)
-			log.Printf("Incorrect body: %w", err)
-			c.JSON(400, "Malformed body request")
+		if AmountProofs != AmountSignature {
+			c.JSON(400, "Amounts in proofs are not the same as in signatures")
+			return
 		}
 
-		c.JSON(500, "OK")
+		// check if we know any of the proofs
+		knownProofs, err := CheckListOfProofs(conn, CList, SecretList)
+
+		fmt.Printf("knownProofs: %v\n", knownProofs)
+
+		if err != nil {
+			log.Printf("CheckListOfProofs: %+v", err)
+			c.JSON(400, "Malformed body request")
+			return
+		}
+
+		if len(knownProofs) != 0 {
+			c.JSON(400, "Proofs already used")
+			return
+		}
+
+		fmt.Printf("swapRequest.Inputs: %v\n", swapRequest.Inputs)
+
+		// verify the proofs signatures are correct
+		for _, proof := range swapRequest.Inputs {
+
+			var keysetToUse cashu.Keyset
+			for _, keyset := range mint.Keysets[cashu.Sats] {
+				if keyset.Amount == int(proof.Amount) && keyset.Id == proof.Id {
+					keysetToUse = keyset
+					break
+				}
+			}
+
+			// check if keysetToUse is not assigned
+			if keysetToUse.Id == "" {
+				c.JSON(500, "Proofs id not found in the database")
+				return
+			}
+
+			fmt.Printf("keysetToUse: %v\n", keysetToUse)
+
+			parsedBlinding, err := hex.DecodeString(proof.C)
+
+			if err != nil {
+				log.Printf("hex.DecodeString: %+v", err)
+				c.JSON(400, "could not decode a proof")
+				return
+			}
+
+			pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
+			if err != nil {
+				log.Printf("secp256k1.ParsePubKey: %+v", err)
+				c.JSON(400, "could not parse proof blinding factor")
+				return
+			}
+
+			verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
+
+			if !verified {
+				c.JSON(403, "invalid proof")
+				return
+			}
+
+		}
+
+		// sign the outputs
+		blindedSignatures, err := mint.SignBlindedMessages(swapRequest.Outputs, cashu.Sats)
+
+		if err != nil {
+			log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+			c.JSON(500, "Opps!, something went wrong")
+		}
+
+		response := cashu.PostSwapResponse{
+			Signatures: blindedSignatures,
+		}
+
+		// send proofs to database
+		err = SaveProofs(conn, swapRequest.Inputs)
+
+		if err != nil {
+			log.Println(fmt.Errorf("SaveProofs: %w", err))
+			log.Println(fmt.Errorf("Proofs: %+v", swapRequest.Inputs))
+			c.JSON(200, response)
+		}
+
+		c.JSON(200, response)
 	})
 
 }

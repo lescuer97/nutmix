@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/cashu"
 )
@@ -63,11 +64,29 @@ func CheckForActiveKeyset(conn *pgx.Conn) ([]cashu.Keyset, error) {
 	}
 	defer rows.Close()
 
-	keysets_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Keyset])
+	var keysets_collect []cashu.Keyset
 
-	if err != nil {
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			log.Fatalf("error while iterating dataset, %w", err)
+			return keysets_collect, err
+		}
 
-		return keysets_collect, fmt.Errorf("Collecting rows: %v", err)
+		privKey := secp256k1.PrivKeyFromBytes(values[4].([]byte))
+		amount := values[3].(int32)
+
+		keyset := cashu.Keyset{
+			Id:        values[0].(string),
+			Active:    values[1].(bool),
+			Unit:      values[2].(string),
+			Amount:    int(amount),
+			PrivKey:   privKey,
+			CreatedAt: values[5].(int64),
+		}
+
+		keysets_collect = append(keysets_collect, keyset)
+
 	}
 
 	return keysets_collect, nil
@@ -83,11 +102,27 @@ func CheckForKeysetById(conn *pgx.Conn, id string) ([]cashu.Keyset, error) {
 		}
 	}
 	defer rows.Close()
+	var keysets_collect []cashu.Keyset
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			log.Fatalf("error while iterating dataset, %w", err)
+			return keysets_collect, err
+		}
 
-	keysets_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Keyset])
+		privKey := secp256k1.PrivKeyFromBytes(values[4].([]byte))
+		amount := values[3].(int32)
 
-	if err != nil {
-		return keysets_collect, fmt.Errorf("Collecting rows: %v", err)
+		keyset := cashu.Keyset{
+			Id:        values[0].(string),
+			Active:    values[1].(bool),
+			Unit:      values[2].(string),
+			Amount:    int(amount),
+			PrivKey:   privKey,
+			CreatedAt: values[5].(int64),
+		}
+		keysets_collect = append(keysets_collect, keyset)
+
 	}
 
 	return keysets_collect, nil
@@ -104,7 +139,7 @@ func SaveNewSeed(conn *pgx.Conn, seed *cashu.Seed) error {
 
 func SaveNewKeysets(conn *pgx.Conn, keyset []cashu.Keyset) error {
 	for _, key := range keyset {
-		_, err := conn.Exec(context.Background(), "INSERT INTO keysets (id, active, unit, amount, privkey, created_at) VALUES ($1, $2, $3, $4, $5, $6)", key.Id, key.Active, key.Unit, key.Amount, key.PrivKey, key.CreatedAt)
+		_, err := conn.Exec(context.Background(), "INSERT INTO keysets (id, active, unit, amount, privkey, created_at) VALUES ($1, $2, $3, $4, $5, $6)", key.Id, key.Active, key.Unit, key.Amount, key.PrivKey.Serialize(), key.CreatedAt)
 		if err != nil {
 			return fmt.Errorf("Inserting to keysets: %v", err)
 		}
@@ -126,7 +161,7 @@ func GetQuoteById(conn *pgx.Conn, id string) (cashu.PostMintQuoteBolt11Response,
 	rows, err := conn.Query(context.Background(), "SELECT * FROM mint_request WHERE quote = $1", id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("No rows found: %v", err)
+			return cashu.PostMintQuoteBolt11Response{}, err
 		}
 	}
 	defer rows.Close()
@@ -134,6 +169,9 @@ func GetQuoteById(conn *pgx.Conn, id string) (cashu.PostMintQuoteBolt11Response,
 	quote, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.PostMintQuoteBolt11Response])
 
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return cashu.PostMintQuoteBolt11Response{}, err
+		}
 		return quote, fmt.Errorf("CollectOneRow: %v", err)
 	}
 
@@ -152,11 +190,31 @@ func GetKeysetsByAmountList(conn *pgx.Conn, keyAmounts []int32) (map[int]cashu.K
 	}
 	defer rows.Close()
 
-	keysets_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Keyset])
+	var keysets_collect []cashu.Keyset
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			log.Fatalf("error while iterating dataset, %+v", err)
+		}
+
+		privKey := secp256k1.PrivKeyFromBytes(values[4].([]byte))
+		amount := values[3].(int32)
+
+		keyset := cashu.Keyset{
+			Id:        values[0].(string),
+			Active:    values[1].(bool),
+			Unit:      values[2].(string),
+			Amount:    int(amount),
+			PrivKey:   privKey,
+			CreatedAt: values[5].(int64),
+		}
+		keysets_collect = append(keysets_collect, keyset)
+
+	}
 
 	if err != nil {
 
-		return keysetMap, fmt.Errorf("Collecting rows: %v", err)
+		return keysetMap, fmt.Errorf("Collecting rows: %w", err)
 	}
 
 	for _, keyset := range keysets_collect {
@@ -164,4 +222,39 @@ func GetKeysetsByAmountList(conn *pgx.Conn, keyAmounts []int32) (map[int]cashu.K
 	}
 
 	return keysetMap, nil
+}
+
+func CheckListOfProofs(conn *pgx.Conn, CList []string, SecretList []string) ([]cashu.Proof, error) {
+
+	var proofList []cashu.Proof
+	rows, err := conn.Query(context.Background(), "SELECT * FROM proofs WHERE C = ANY($1) OR secret = ANY($2)", CList, SecretList)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return proofList, nil
+		}
+	}
+	defer rows.Close()
+
+	proof, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.Proof])
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return proofList, nil
+		}
+		return proofList, fmt.Errorf("CollectOneRow: %v", err)
+	}
+
+	proofList = append(proofList, proof)
+
+	return proofList, nil
+}
+
+func SaveProofs(conn *pgx.Conn, proofs []cashu.Proof) error {
+	for _, proof := range proofs {
+		_, err := conn.Exec(context.Background(), "INSERT INTO proofs (C, secret, amount, id) VALUES ($1, $2, $3, $4)", proof.C, proof.Secret, proof.Amount, proof.Id)
+		if err != nil {
+			return fmt.Errorf("Inserting to proofs: %v", err)
+		}
+	}
+	return nil
 }

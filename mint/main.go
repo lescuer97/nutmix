@@ -30,26 +30,25 @@ func main() {
 
 	defer conn.Close(context.Background())
 
-	keysets, err := CheckForActiveKeyset(conn)
+	seeds, err := GetAllSeeds(conn)
 
 	if err != nil {
 		log.Fatalf("Could not keysets: %v", err)
 	}
 
-	if len(keysets) == 0 {
+	if len(seeds) == 0 {
 		seed, err := bip32.NewSeed()
 
 		if err != nil {
 			log.Fatalf("Error creating seed: %+v ", err)
 		}
-
 		// Get the current time
 		currentTime := time.Now().Unix()
 
 		// // Format the time as a string
 		masterKey, err := bip32.NewMasterKey(seed)
 
-		list_of_keys := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues)
+		list_of_keys := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues, "")
 
 		id, err := cashu.DeriveKeysetId(list_of_keys)
 
@@ -65,28 +64,31 @@ func main() {
 			Seed:      seed,
 			Active:    true,
 			CreatedAt: currentTime,
-			Unit:      "sat",
+			Unit:      cashu.Sats,
 			Id:        id,
 		}
 
 		err = SaveNewSeed(conn, &newSeed)
 
-		if err != nil {
-			log.Fatalf("SaveNewSeed: %v ", err)
-		}
-
-		err = SaveNewKeysets(conn, list_of_keys)
+		seeds = append(seeds, newSeed)
 
 		if err != nil {
-			log.Fatalf("SaveNewKeysets: %v ", err)
+			log.Fatalf("SaveNewSeed: %+v ", err)
 		}
+
+	}
+
+	mint, err := SetUpMint(seeds)
+
+	if err != nil {
+		log.Fatalf("SetUpMint: %+v ", err)
 	}
 
 	r := gin.Default()
 
 	r.Use(cors.Default())
 
-	V1Routes(r, conn)
+	V1Routes(r, conn, mint)
 
 	r.Run(":8080")
 }

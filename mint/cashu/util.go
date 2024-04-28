@@ -3,11 +3,9 @@ package cashu
 import (
 	"encoding/hex"
 	"strconv"
-
-	"github.com/tyler-smith/go-bip32"
 )
 
-func OrderKeysetByUnit(keysets []Keyset) (map[string][]KeysetResponse, error) {
+func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
 	var typesOfUnits = make(map[string][]Keyset)
 
 	for _, keyset := range keysets {
@@ -30,16 +28,12 @@ func OrderKeysetByUnit(keysets []Keyset) (map[string][]KeysetResponse, error) {
 		keysetResponse.Keys = make(map[string]string)
 
 		for _, keyset := range value {
-			privkey, err := bip32.B58Deserialize(keyset.PrivKey)
-			if err != nil {
-
-				return nil, err
-			}
-			keysetResponse.Keys[strconv.Itoa(keyset.Amount)] = hex.EncodeToString(privkey.PublicKey().Key)
+			
+			keysetResponse.Keys[strconv.Itoa(keyset.Amount)] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
 		}
 
 		res["keysets"] = append(res["keysets"], keysetResponse)
 	}
-	return res, nil
+	return res
 
 }

@@ -4,11 +4,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/crypto"
-	"github.com/tyler-smith/go-bip32"
 )
+
+
+const Sats string = "sat"
 
 
 type BlindedMessage struct {
@@ -17,20 +18,13 @@ type BlindedMessage struct {
 	B_     string `json:"B_"`
 }
 
-func (b *BlindedMessage) SignBlindedMessage() {
-
-}
-
 type BlindSignature struct {
 	Amount int32  `json:"amount"`
 	Id     string `json:"id"`
 	C_     string `json:"C_"`
 }
 
-func GenerateBlindSignature (privateKey *bip32.Key, blindedMessage BlindedMessage) (BlindSignature, error) {
-
-			k := secp256k1.PrivKeyFromBytes(privateKey.Key)
-
+func GenerateBlindSignature (k *secp256k1.PrivateKey, blindedMessage BlindedMessage) (BlindSignature, error) {
 			decodedBlindFactor, err := hex.DecodeString(blindedMessage.B_)
 
 			if err != nil {
@@ -59,7 +53,7 @@ type Proof struct {
 	Amount int32  `json:"amount"`
 	Id     string `json:"id"`
 	Secret string `json:"secret"`
-	C     string `json:"C"`
+	C     string `json:"C" db:"c"`
 }
 
 type MintError struct {
@@ -72,20 +66,13 @@ type Keyset struct {
 	Active    bool   `json:"active" db:"active"`
 	Unit      string `json:"unit"`
 	Amount    int    `json:"amount"`
-	PrivKey  string `json:"priv_key"`
+	PrivKey  *secp256k1.PrivateKey `json:"priv_key"`
 	CreatedAt int64  `json:"created_at"`
 }
 
-func (keyset *Keyset) GetPubKey() ([]byte, error)  {
-    privKey, err := bip32.B58Deserialize(keyset.PrivKey)
-
-    if err != nil {
-        return nil, err
-
-    }
-    return privKey.PublicKey().Key, err
-
-
+func (keyset *Keyset) GetPubKey() *secp256k1.PublicKey  {
+    pubkey :=keyset.PrivKey.PubKey()  
+    return pubkey
 }
 
 type Seed struct {
@@ -119,6 +106,8 @@ type GetInfoResponse struct {
 	Nuts            map[string]SwapMintInfo
 }
 
+
+type KeysResponse map[string][]KeysetResponse
 
 type KeysetResponse struct {
 	Id   string            `json:"id"`
@@ -169,6 +158,9 @@ type PostMeltQuoteBolt11Response struct {
 type PostSwapRequest struct {
     Inputs []Proof `json:"inputs"`
     Outputs []BlindedMessage `json:"outputs"`
+}
+type PostSwapResponse struct {
+    Signatures []BlindSignature `json:"signatures"`
 }
 
 
