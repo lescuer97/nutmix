@@ -9,7 +9,20 @@ import (
 )
 
 
-const Sats string = "sat"
+
+type Unit int
+
+const Sat  Unit = iota + 1
+
+// String - Creating common behavior - give the type a String function
+func (d Unit) String() string {
+	return [...]string{"sat"}[d-1]
+}
+
+// EnumIndex - Creating common behavior - give the type a EnumIndex functio
+func (d Unit) EnumIndex() int {
+	return int(d)
+}
 
 
 type BlindedMessage struct {
@@ -142,6 +155,27 @@ type BasicKeysetResponse struct {
 	Active bool   `json:"active"`
 }
 
+type MeltRequestDB struct {
+    Quote string `json:"quote"`
+    Unit  string `json:"unit"`
+    Expiry int64 `json:"expiry"`
+    Amount int64 `json:"amount"`
+    FeeReserve int64 `json:"fee_reserve" db:"fee_reserve"`
+    Paid bool `json:"paid"`
+    Request string `json:"request"`
+}
+
+func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
+    return PostMeltQuoteBolt11Response {
+        Quote: meltRequest.Quote,
+        Amount: meltRequest.Amount,
+        FeeReserve: meltRequest.FeeReserve,
+        Paid: meltRequest.Paid,
+        Expiry: meltRequest.Expiry,
+    }
+
+}
+
 type PostMeltQuoteBolt11Request struct {
     Request string `json:"request"`
     Unit    string `json:"unit"`
@@ -159,8 +193,20 @@ type PostSwapRequest struct {
     Inputs []Proof `json:"inputs"`
     Outputs []BlindedMessage `json:"outputs"`
 }
+
 type PostSwapResponse struct {
     Signatures []BlindSignature `json:"signatures"`
+}
+
+type PostMeltBolt11Request struct {
+    Quote string `json:"quote"`
+    Inputs []Proof `json:"inputs"`
+}
+
+type PostMeltBolt11Response struct {
+    Paid bool `json:"paid"`
+    PaymentPreimage string `json:"payment_preimage"`
+
 }
 
 

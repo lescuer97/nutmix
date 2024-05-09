@@ -64,7 +64,7 @@ func main() {
 			Seed:      seed,
 			Active:    true,
 			CreatedAt: currentTime,
-			Unit:      cashu.Sats,
+			Unit:      cashu.Sat.String(),
 			Id:        id,
 		}
 

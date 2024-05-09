@@ -147,7 +147,7 @@ func SaveNewKeysets(conn *pgx.Conn, keyset []cashu.Keyset) error {
 	return nil
 }
 
-func SaveQuoteRequest(conn *pgx.Conn, request cashu.PostMintQuoteBolt11Response) error {
+func SaveQuoteMintRequest(conn *pgx.Conn, request cashu.PostMintQuoteBolt11Response) error {
 	_, err := conn.Exec(context.Background(), "INSERT INTO mint_request (quote, request, paid, expiry) VALUES ($1, $2, $3, $4)", request.Quote, request.Request, request.Paid, request.Expiry)
 	if err != nil {
 		return fmt.Errorf("Inserting to mint_request: %v", err)
@@ -155,8 +155,34 @@ func SaveQuoteRequest(conn *pgx.Conn, request cashu.PostMintQuoteBolt11Response)
 	}
 	return nil
 }
+func ModifyQuoteMintPayStatus(conn *pgx.Conn, request cashu.PostMintQuoteBolt11Response) error {
+	// change the paid status of the quote
+	_, err := conn.Exec(context.Background(), "UPDATE mint_request SET paid = $1 WHERE quote = $2", request.Paid, request.Quote)
+	if err != nil {
+		return fmt.Errorf("Inserting to mint_request: %v", err)
 
-func GetQuoteById(conn *pgx.Conn, id string) (cashu.PostMintQuoteBolt11Response, error) {
+	}
+	return nil
+}
+func SaveQuoteMeltRequest(conn *pgx.Conn, request cashu.MeltRequestDB) error {
+	_, err := conn.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, paid) VALUES ($1, $2, $3, $4, $5, $6, $7)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.Paid)
+	if err != nil {
+		return fmt.Errorf("Inserting to mint_request: %v", err)
+
+	}
+	return nil
+}
+func ModifyQuoteMeltPayStatus(conn *pgx.Conn, request cashu.MeltRequestDB) error {
+	// change the paid status of the quote
+	_, err := conn.Exec(context.Background(), "UPDATE melt_request SET paid = $1 WHERE quote = $2", request.Paid, request.Quote)
+	if err != nil {
+		return fmt.Errorf("Inserting to mint_request: %v", err)
+
+	}
+	return nil
+}
+
+func GetMintQuoteById(conn *pgx.Conn, id string) (cashu.PostMintQuoteBolt11Response, error) {
 
 	rows, err := conn.Query(context.Background(), "SELECT * FROM mint_request WHERE quote = $1", id)
 	if err != nil {
@@ -171,6 +197,27 @@ func GetQuoteById(conn *pgx.Conn, id string) (cashu.PostMintQuoteBolt11Response,
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.PostMintQuoteBolt11Response{}, err
+		}
+		return quote, fmt.Errorf("CollectOneRow: %v", err)
+	}
+
+	return quote, nil
+}
+func GetMeltQuoteById(conn *pgx.Conn, id string) (cashu.MeltRequestDB, error) {
+
+	rows, err := conn.Query(context.Background(), "SELECT * FROM melt_request WHERE quote = $1", id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return cashu.MeltRequestDB{}, err
+		}
+	}
+	defer rows.Close()
+
+	quote, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return cashu.MeltRequestDB{}, err
 		}
 		return quote, fmt.Errorf("CollectOneRow: %v", err)
 	}
