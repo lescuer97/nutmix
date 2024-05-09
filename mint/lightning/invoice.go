@@ -57,7 +57,7 @@ func  mppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Preimag
 }
 
 
-func CreateMockInvoice(amountSats int64, description string ) (string, error) {
+func CreateMockInvoice(amountSats int64, description string, network chaincfg.Params ) (string, error) {
 	milsats, err := lnrpc.UnmarshallAmt(amountSats, 0)
 	if err != nil {
 		return "", fmt.Errorf("UnmarshallAmt: %v", err)
@@ -122,27 +122,6 @@ func CreateMockInvoice(amountSats int64, description string ) (string, error) {
 	}
 
     return payReqString, nil
-	// newInvoice := &invoices.Invoice{
-	// 	CreationDate:   creationTime,
-	// 	Memo:           []byte(invoiceData.Memo),
-	// 	PaymentRequest: []byte(payReqString),
-	// 	Terms: invoices.ContractTerm{
-	// 		FinalCltvDelta:  int32(payReq.MinFinalCLTVExpiry()),
-	// 		Expiry:          payReq.Expiry(),
-	// 		Value:           invoiceData.Value,
-	// 		PaymentPreimage: preImage,
-	// 		PaymentAddr:     paymentAddr,
-	// 		Features:        invoiceFeatures,
-	// 	},
-	// 	HodlInvoice: false,
-	// }
-	//
-	//
- //    fmt.Println("payReq", payReqString);
- //    fmt.Printf("invoice %+v  ", invoiceData);
-
-
-    // return *newInvoice, nil
 }
 
 

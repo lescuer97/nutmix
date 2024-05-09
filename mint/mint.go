@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/lescuer97/nutmix/cashu"
+	"github.com/lescuer97/nutmix/comms"
 	"github.com/tyler-smith/go-bip32"
 )
 
@@ -13,6 +16,8 @@ type KeysetMap map[int]cashu.Keyset
 type Mint struct {
 	ActiveKeysets map[string]KeysetMap
 	Keysets       map[string][]cashu.Keyset
+	LightningComs comms.LightingComms
+	Network       chaincfg.Params
 }
 
 func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) ([]cashu.BlindSignature, error) {
@@ -69,6 +74,26 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 		ActiveKeysets: make(map[string]KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
 	}
+
+	network := os.Getenv("NETWORK")
+	switch network {
+	case "testnet":
+		mint.Network = chaincfg.TestNet3Params
+	case "mainnet":
+		mint.Network = chaincfg.MainNetParams
+	case "regtest":
+		mint.Network = chaincfg.RegressionNetParams
+	default:
+		log.Fatalf("Invalid network: %s", network)
+	}
+
+	lightningComs, err := comms.SetupLightingComms()
+
+	if err != nil {
+		return mint, err
+	}
+
+	mint.LightningComs = *lightningComs
 
 	for _, seed := range seeds {
 		masterKey, err := bip32.NewMasterKey(seed.Seed)
