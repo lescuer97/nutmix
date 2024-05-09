@@ -3,19 +3,18 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"log"
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/cashu"
 	"github.com/lescuer97/nutmix/comms"
-	"github.com/lescuer97/nutmix/crypto"
 	"github.com/lescuer97/nutmix/lightning"
-	"github.com/lightningnetwork/lnd/channeldb/migration_01_to_11/zpay32"
 	"github.com/lightningnetwork/lnd/lnrpc"
+	"github.com/lightningnetwork/lnd/zpay32"
 	"github.com/tyler-smith/go-bip32"
-	"log"
-	"os"
 )
 
 func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
@@ -42,12 +41,6 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		}
 
 		keys := cashu.OrderKeysetByUnit(keysets)
-
-		if err != nil {
-			log.Printf("orderKeysetByUnit: %+v", err)
-			c.JSON(500, "Server side error")
-			return
-		}
 
 		c.JSON(200, keys)
 
@@ -177,7 +170,6 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 
 			}
 			hash := hex.EncodeToString(resInvoice.GetRHash())
-			fmt.Printf("hash: %v", hash)
 			response = cashu.PostMintQuoteBolt11Response{
 				Quote:   hash,
 				Request: resInvoice.GetPaymentRequest(),
@@ -203,8 +195,6 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		quoteId := c.Param("quote")
 
 		quote, err := GetMintQuoteById(conn, quoteId)
-
-		fmt.Printf("quote %v", quote)
 
 		if err != nil {
 			log.Println(fmt.Errorf("GetQuoteById: %w", err))
@@ -288,18 +278,20 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		err := c.BindJSON(&swapRequest)
 
 		var AmountProofs, AmountSignature int32
-		var CList, SecretList []string
+		var CList, SecretsList []string
 
 		if len(swapRequest.Inputs) == 0 || len(swapRequest.Outputs) == 0 {
 			c.JSON(400, "Inputs or Outputs are empty")
 			return
 		}
+
 		// check proof have the same amount as blindedSignatures
 		for _, proof := range swapRequest.Inputs {
 			AmountProofs += proof.Amount
 			CList = append(CList, proof.C)
-			SecretList = append(SecretList, proof.Secret)
+			SecretsList = append(SecretsList, proof.Secret)
 		}
+
 		for _, output := range swapRequest.Outputs {
 			AmountSignature += output.Amount
 		}
@@ -310,7 +302,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		}
 
 		// check if we know any of the proofs
-		knownProofs, err := CheckListOfProofs(conn, CList, SecretList)
+		knownProofs, err := CheckListOfProofs(conn, CList, SecretsList)
 
 		if err != nil {
 			log.Printf("CheckListOfProofs: %+v", err)
@@ -323,46 +315,13 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 			return
 		}
 
-		fmt.Printf("swapRequest.Inputs: %v\n", swapRequest.Inputs)
-
 		// verify the proofs signatures are correct
 		for _, proof := range swapRequest.Inputs {
 
-			var keysetToUse cashu.Keyset
-			for _, keyset := range mint.Keysets[cashu.Sat.String()] {
-				if keyset.Amount == int(proof.Amount) && keyset.Id == proof.Id {
-					keysetToUse = keyset
-					break
-				}
-			}
-
-			// check if keysetToUse is not assigned
-			if keysetToUse.Id == "" {
-				c.JSON(500, "Proofs id not found in the database")
-				return
-			}
-
-			fmt.Printf("keysetToUse: %v\n", keysetToUse)
-
-			parsedBlinding, err := hex.DecodeString(proof.C)
-
+			err := mint.ValidateProof(proof)
 			if err != nil {
-				log.Printf("hex.DecodeString: %+v", err)
-				c.JSON(400, "could not decode a proof")
-				return
-			}
-
-			pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
-			if err != nil {
-				log.Printf("secp256k1.ParsePubKey: %+v", err)
-				c.JSON(400, "could not parse proof blinding factor")
-				return
-			}
-
-			verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
-
-			if !verified {
-				c.JSON(403, "invalid proof")
+				log.Println(fmt.Errorf("ValidateProof: %w", err))
+				c.JSON(403, "Invalid Proof")
 				return
 			}
 
@@ -394,10 +353,10 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 
 	v1.POST("/melt/quote/bolt11", func(c *gin.Context) {
 		var meltRequest cashu.PostMeltQuoteBolt11Request
-
 		err := c.BindJSON(&meltRequest)
 
 		invoice, err := zpay32.Decode(meltRequest.Request, &mint.Network)
+
 		if err != nil {
 			log.Println(fmt.Errorf("zpay32.Decode: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
@@ -455,14 +414,10 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 
 		quote, err := GetMeltQuoteById(conn, quoteId)
 
-		fmt.Printf("quote %v", quote)
-
 		if err != nil {
 			log.Println(fmt.Errorf("GetQuoteById: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
 		}
-
-		fmt.Printf("quote:  %+v", quote.GetPostMeltQuoteResponse())
 
 		c.JSON(200, quote.GetPostMeltQuoteResponse())
 	})
@@ -516,46 +471,15 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		// verify the proofs signatures are correct
 		for _, proof := range meltRequest.Inputs {
 
-			var keysetToUse cashu.Keyset
-			for _, keyset := range mint.Keysets[cashu.Sat.String()] {
-				if keyset.Amount == int(proof.Amount) && keyset.Id == proof.Id {
-					keysetToUse = keyset
-					break
-				}
-			}
-
-			// check if keysetToUse is not assigned
-			if keysetToUse.Id == "" {
-				c.JSON(500, "Proofs id not found in the database")
-				return
-			}
-
-			parsedBlinding, err := hex.DecodeString(proof.C)
-
-			fmt.Printf("parsedBlinding: %v\n", parsedBlinding)
-
+			err := mint.ValidateProof(proof)
 			if err != nil {
-				log.Printf("hex.DecodeString: %+v", err)
-				c.JSON(400, "could not decode a proof")
-				return
-			}
-
-			pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
-			if err != nil {
-				log.Printf("secp256k1.ParsePubKey: %+v", err)
-				c.JSON(400, "could not parse proof blinding factor")
-				return
-			}
-
-			verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
-
-			if !verified {
-				c.JSON(403, "invalid proof")
+				c.JSON(403, "Invalid Proof")
 				return
 			}
 		}
 
 		payment, err := mint.LightningComs.PayInvoice(quote.Request)
+
 		if err != nil {
 			log.Printf("mint.LightningComs.PayInvoice %+v", err)
 			c.JSON(400, "could not make payment")
@@ -566,8 +490,6 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 			c.JSON(400, "invoice is already paid")
 			return
 		}
-
-		fmt.Printf("payment: %+v", payment)
 
 		// send proofs to database
 		err = SaveProofs(conn, meltRequest.Inputs)

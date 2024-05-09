@@ -119,7 +119,6 @@ type GetInfoResponse struct {
 	Nuts            map[string]SwapMintInfo
 }
 
-
 type KeysResponse map[string][]KeysetResponse
 
 type KeysetResponse struct {

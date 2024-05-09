@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/lightningnetwork/lnd/channeldb/migration_01_to_11/zpay32"
 	"github.com/lightningnetwork/lnd/lnrpc"
+	"github.com/lightningnetwork/lnd/zpay32"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
@@ -72,8 +72,6 @@ func (l *LightingComms) PayInvoice(invoice string) (*lnrpc.SendResponse, error) 
 
     res, err := client.SendPaymentSync(ctx, &lnrpc.SendRequest{PaymentRequest: invoice})
 
-    fmt.Printf("res: %+v \n", res)
-    
     if err != nil {
         return nil, err
     }

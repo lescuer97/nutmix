@@ -48,6 +48,28 @@ func HashToCurve(message []byte) (*secp256k1.PublicKey, error) {
 	return nil, errors.New("No valid point found")
 }
 
+// B_ = Y + rG
+func BlindMessage(secret string, r *secp256k1.PrivateKey) (*secp256k1.PublicKey,
+	*secp256k1.PrivateKey, error) {
+
+	var ypoint, rpoint, blindedMessage secp256k1.JacobianPoint
+	Y, err := HashToCurve([]byte(secret))
+	if err != nil {
+		return nil, nil, err
+	}
+	Y.AsJacobian(&ypoint)
+
+	rpub := r.PubKey()
+	rpub.AsJacobian(&rpoint)
+
+	// blindedMessage = Y + rG
+	secp256k1.AddNonConst(&ypoint, &rpoint, &blindedMessage)
+	blindedMessage.ToAffine()
+	B_ := secp256k1.NewPublicKey(&blindedMessage.X, &blindedMessage.Y)
+
+	return B_, r, nil
+}
+
 // C_ = kB_
 func SignBlindedMessage(B_ *secp256k1.PublicKey, k *secp256k1.PrivateKey) *secp256k1.PublicKey {
 	var bpoint, result secp256k1.JacobianPoint

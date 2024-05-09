@@ -69,7 +69,7 @@ func CheckForActiveKeyset(conn *pgx.Conn) ([]cashu.Keyset, error) {
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
-			log.Fatalf("error while iterating dataset, %w", err)
+			log.Printf("error while iterating dataset, %+v", err)
 			return keysets_collect, err
 		}
 
@@ -106,7 +106,7 @@ func CheckForKeysetById(conn *pgx.Conn, id string) ([]cashu.Keyset, error) {
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
-			log.Fatalf("error while iterating dataset, %w", err)
+			log.Printf("error while iterating dataset, %+v", err)
 			return keysets_collect, err
 		}
 

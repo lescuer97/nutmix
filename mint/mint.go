@@ -1,13 +1,17 @@
 package main
 
 import (
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/cashu"
 	"github.com/lescuer97/nutmix/comms"
+	"github.com/lescuer97/nutmix/crypto"
 	"github.com/tyler-smith/go-bip32"
 )
 
@@ -18,6 +22,50 @@ type Mint struct {
 	Keysets       map[string][]cashu.Keyset
 	LightningComs comms.LightingComms
 	Network       chaincfg.Params
+}
+
+// errors types for validation
+
+var (
+	ErrKeysetNotFound         = errors.New("Keyset not found")
+	ErrKeysetForProofNotFound = errors.New("Keyset for proof not found")
+	ErrInvalidProof           = errors.New("Invalid proof")
+)
+
+func (m *Mint) ValidateProof(proof cashu.Proof) error {
+	var keysetToUse cashu.Keyset
+	for _, keyset := range m.Keysets[cashu.Sat.String()] {
+		if keyset.Amount == int(proof.Amount) && keyset.Id == proof.Id {
+			keysetToUse = keyset
+			break
+		}
+	}
+
+	// check if keysetToUse is not assigned
+	if keysetToUse.Id == "" {
+		return ErrKeysetForProofNotFound
+	}
+
+	parsedBlinding, err := hex.DecodeString(proof.C)
+
+	if err != nil {
+		log.Printf("hex.DecodeString: %+v", err)
+		return err
+	}
+
+	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
+	if err != nil {
+		log.Printf("secp256k1.ParsePubKey: %+v", err)
+		return err
+	}
+
+	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
+
+	if !verified {
+		return ErrInvalidProof
+	}
+
+	return nil
 }
 
 func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) ([]cashu.BlindSignature, error) {
