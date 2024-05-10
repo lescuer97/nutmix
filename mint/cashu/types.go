@@ -4,11 +4,29 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/crypto"
-	"github.com/tyler-smith/go-bip32"
 )
+
+
+
+var ExpiryTime int64 = time.Now().Add(15 * time.Minute).Unix()
+
+type Unit int
+
+const Sat  Unit = iota + 1
+
+// String - Creating common behavior - give the type a String function
+func (d Unit) String() string {
+	return [...]string{"sat"}[d-1]
+}
+
+// EnumIndex - Creating common behavior - give the type a EnumIndex functio
+func (d Unit) EnumIndex() int {
+	return int(d)
+}
 
 
 type BlindedMessage struct {
@@ -17,20 +35,13 @@ type BlindedMessage struct {
 	B_     string `json:"B_"`
 }
 
-func (b *BlindedMessage) SignBlindedMessage() {
-
-}
-
 type BlindSignature struct {
 	Amount int32  `json:"amount"`
 	Id     string `json:"id"`
 	C_     string `json:"C_"`
 }
 
-func GenerateBlindSignature (privateKey *bip32.Key, blindedMessage BlindedMessage) (BlindSignature, error) {
-
-			k := secp256k1.PrivKeyFromBytes(privateKey.Key)
-
+func GenerateBlindSignature (k *secp256k1.PrivateKey, blindedMessage BlindedMessage) (BlindSignature, error) {
 			decodedBlindFactor, err := hex.DecodeString(blindedMessage.B_)
 
 			if err != nil {
@@ -59,7 +70,7 @@ type Proof struct {
 	Amount int32  `json:"amount"`
 	Id     string `json:"id"`
 	Secret string `json:"secret"`
-	C     string `json:"C"`
+	C     string `json:"C" db:"c"`
 }
 
 type MintError struct {
@@ -72,20 +83,13 @@ type Keyset struct {
 	Active    bool   `json:"active" db:"active"`
 	Unit      string `json:"unit"`
 	Amount    int    `json:"amount"`
-	PrivKey  string `json:"priv_key"`
+	PrivKey  *secp256k1.PrivateKey `json:"priv_key"`
 	CreatedAt int64  `json:"created_at"`
 }
 
-func (keyset *Keyset) GetPubKey() ([]byte, error)  {
-    privKey, err := bip32.B58Deserialize(keyset.PrivKey)
-
-    if err != nil {
-        return nil, err
-
-    }
-    return privKey.PublicKey().Key, err
-
-
+func (keyset *Keyset) GetPubKey() *secp256k1.PublicKey  {
+    pubkey :=keyset.PrivKey.PubKey()  
+    return pubkey
 }
 
 type Seed struct {
@@ -119,6 +123,7 @@ type GetInfoResponse struct {
 	Nuts            map[string]SwapMintInfo
 }
 
+type KeysResponse map[string][]KeysetResponse
 
 type KeysetResponse struct {
 	Id   string            `json:"id"`
@@ -135,7 +140,7 @@ type PostMintQuoteBolt11Response struct {
 	Quote string  `json:"quote"`
 	Request   string `json:"request"`
 	Paid   bool `json:"paid"`
-	Expiry   uint64 `json:"expiry"`
+	Expiry   int64 `json:"expiry"`
 }
 
 type PostMintBolt11Request struct {
@@ -152,3 +157,74 @@ type BasicKeysetResponse struct {
 	Unit   string `json:"unit"`
 	Active bool   `json:"active"`
 }
+
+type MeltRequestDB struct {
+    Quote string `json:"quote"`
+    Unit  string `json:"unit"`
+    Expiry int64 `json:"expiry"`
+    Amount int64 `json:"amount"`
+    FeeReserve int64 `json:"fee_reserve" db:"fee_reserve"`
+    Paid bool `json:"paid"`
+    Request string `json:"request"`
+}
+
+func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
+    return PostMeltQuoteBolt11Response {
+        Quote: meltRequest.Quote,
+        Amount: meltRequest.Amount,
+        FeeReserve: meltRequest.FeeReserve,
+        Paid: meltRequest.Paid,
+        Expiry: meltRequest.Expiry,
+    }
+
+}
+
+type PostMeltQuoteBolt11Request struct {
+    Request string `json:"request"`
+    Unit    string `json:"unit"`
+}
+
+type PostMeltQuoteBolt11Response struct {
+    Quote string `json:"quote"`
+    Amount int64 `json:"amount"`
+    FeeReserve int64 `json:"fee_reserve"`
+    Paid bool `json:"paid"`
+    Expiry int64 `json:"expiry"`
+}
+
+type PostSwapRequest struct {
+    Inputs []Proof `json:"inputs"`
+    Outputs []BlindedMessage `json:"outputs"`
+}
+
+type PostSwapResponse struct {
+    Signatures []BlindSignature `json:"signatures"`
+}
+
+type PostMeltBolt11Request struct {
+    Quote string `json:"quote"`
+    Inputs []Proof `json:"inputs"`
+}
+
+type PostMeltBolt11Response struct {
+    Paid bool `json:"paid"`
+    PaymentPreimage string `json:"payment_preimage"`
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
