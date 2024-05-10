@@ -55,11 +55,11 @@ func GenerateKeysets(masterKey *bip32.Key, values []int, id string) ([]Keyset, e
 	return keysets, nil
 }
 
-func SetUpSeedAndKeyset() (*Seed, []Keyset, error) {
+func SetUpSeedAndKeyset() (Seed, []Keyset, error) {
 		seed, err := bip32.NewSeed()
 
 		if err != nil {
-            return  nil, nil, err
+            return  Seed{}, nil, err
 
 		}
 		// Get the current time
@@ -71,13 +71,13 @@ func SetUpSeedAndKeyset() (*Seed, []Keyset, error) {
 		list_of_keys, err := GenerateKeysets(masterKey, PosibleKeysetValues, "")
 
 		if err != nil {
-            return nil, nil, err
+            return Seed{}, nil, err
 		}
 
 		id, err := DeriveKeysetId(list_of_keys)
 
 		if err != nil {
-            return nil, nil, err
+            return Seed{}, nil, err
 		}
 
 		for i, _ := range list_of_keys {
@@ -92,5 +92,5 @@ func SetUpSeedAndKeyset() (*Seed, []Keyset, error) {
 			Id:        id,
 		}
 
-    return &newSeed, list_of_keys, nil
+    return newSeed, list_of_keys, nil
 }

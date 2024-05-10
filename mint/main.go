@@ -7,10 +7,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/cashu"
-	"github.com/tyler-smith/go-bip32"
 	"log"
 	"os"
-	"time"
 )
 
 func main() {
@@ -36,22 +34,9 @@ func main() {
 		log.Fatalf("Could not keysets: %v", err)
 	}
 
+	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
-		seed, err := bip32.NewSeed()
-
-		if err != nil {
-			log.Fatalf("Error creating seed: %+v ", err)
-		}
-		// Get the current time
-		currentTime := time.Now().Unix()
-
-		// // Format the time as a string
-		masterKey, err := bip32.NewMasterKey(seed)
-
-		list_of_keys, err := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues, "")
-		if err != nil {
-			log.Fatalf("Error GenerateKeysets: %+v ", err)
-		}
+		seed, list_of_keys, err := cashu.SetUpSeedAndKeyset()
 
 		id, err := cashu.DeriveKeysetId(list_of_keys)
 
@@ -63,17 +48,9 @@ func main() {
 			list_of_keys[i].Id = id
 		}
 
-		newSeed := cashu.Seed{
-			Seed:      seed,
-			Active:    true,
-			CreatedAt: currentTime,
-			Unit:      cashu.Sat.String(),
-			Id:        id,
-		}
+		err = SaveNewSeed(conn, &seed)
 
-		err = SaveNewSeed(conn, &newSeed)
-
-		seeds = append(seeds, newSeed)
+		seeds = append(seeds, seed)
 
 		if err != nil {
 			log.Fatalf("SaveNewSeed: %+v ", err)

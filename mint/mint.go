@@ -103,7 +103,6 @@ func (m *Mint) GetKeysetById(unit string, id string) ([]cashu.Keyset, error) {
 }
 
 func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
-
 	// convert map to slice
 	var keys []cashu.Keyset
 	for _, keyset := range m.ActiveKeysets {
@@ -132,7 +131,7 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 	case "regtest":
 		mint.Network = chaincfg.RegressionNetParams
 	default:
-		log.Fatalf("Invalid network: %s", network)
+		return mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
 	lightningComs, err := comms.SetupLightingComms()
@@ -143,7 +142,7 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 
 	mint.LightningComs = *lightningComs
 
-    // uses seed to generate the keysets
+	// uses seed to generate the keysets
 	for _, seed := range seeds {
 		masterKey, err := bip32.NewMasterKey(seed.Seed)
 		if err != nil {
@@ -152,10 +151,9 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 		}
 		keysets, err := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues, seed.Id)
 
-        if err != nil {
-            return mint, fmt.Errorf("GenerateKeysets: %v", err)
-        }
-
+		if err != nil {
+			return mint, fmt.Errorf("GenerateKeysets: %v", err)
+		}
 
 		if seed.Active {
 			mint.ActiveKeysets[seed.Unit] = make(KeysetMap)

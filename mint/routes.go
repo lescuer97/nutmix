@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
-	"os"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -14,6 +12,8 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"github.com/tyler-smith/go-bip32"
+	"log"
+	"os"
 )
 
 func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
@@ -48,7 +48,6 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 
 		seeds, err := GetAllSeeds(conn)
 		if err != nil {
-			log.Fatalf("GetAllSeeds: %+v ", err)
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -70,13 +69,16 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		var pubkey string = ""
 
 		if err != nil {
-			log.Fatal("Error getting active seed: ", err)
+			c.JSON(500, "Server side error")
+			return
 		}
 
 		masterKey, err := bip32.NewMasterKey(seed.Seed)
 
 		if err != nil {
-			log.Fatal("Error creating master key ", err)
+			log.Printf("Error creating master key: %v ", err)
+			c.JSON(500, "Server side error")
+			return
 		}
 		pubkey = hex.EncodeToString(masterKey.PublicKey().Key)
 		name := os.Getenv("NAME")
@@ -152,11 +154,12 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
+
 			response = cashu.PostMintQuoteBolt11Response{
 				Quote:   randUuid.String(),
 				Request: payReq,
 				Paid:    true,
-				Expiry:  3600,
+				Expiry:  cashu.ExpiryTime,
 			}
 
 		case comms.LND_WALLET:
@@ -173,7 +176,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 				Quote:   hash,
 				Request: resInvoice.GetPaymentRequest(),
 				Paid:    false,
-				Expiry:  3600,
+				Expiry:  cashu.ExpiryTime,
 			}
 
 		default:
@@ -198,6 +201,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("GetQuoteById: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		c.JSON(200, quote)
@@ -211,6 +215,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Printf("Incorrect body: %+v", err)
 			c.JSON(400, "Malformed body request")
+			return
 		}
 
 		quote, err := GetMintQuoteById(conn, mintRequest.Quote)
@@ -236,6 +241,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("zpay32.Decode: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		var amount int32 = 0
@@ -251,6 +257,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("UnmarshallAmt: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		// check the amount in outputs are the same as the quote
@@ -263,6 +270,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		// Store BlidedSignature
@@ -332,6 +340,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		response := cashu.PostSwapResponse{
@@ -345,6 +354,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 			log.Println(fmt.Errorf("SaveProofs: %w", err))
 			log.Println(fmt.Errorf("Proofs: %+v", swapRequest.Inputs))
 			c.JSON(200, response)
+			return
 		}
 
 		c.JSON(200, response)
@@ -359,6 +369,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("zpay32.Decode: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		query, err := mint.LightningComs.QueryPayment(invoice)
@@ -366,6 +377,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		fee := lightning.GetAverageRouteFee(query.Routes) / 1000
@@ -380,7 +392,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 
 		response := cashu.PostMeltQuoteBolt11Response{
 			Paid:       false,
-			Expiry:     3600,
+			Expiry:     cashu.ExpiryTime,
 			FeeReserve: fee,
 			Amount:     int64(*invoice.MilliSat) / 1000,
 			Quote:      randUuid.String(),
@@ -416,6 +428,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("GetQuoteById: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		c.JSON(200, quote.GetPostMeltQuoteResponse())
@@ -441,6 +454,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("GetMeltQuoteById: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
 		}
 
 		var CList, SecretList []string
@@ -502,9 +516,10 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 			log.Println(fmt.Errorf("SaveProofs: %w", err))
 			log.Println(fmt.Errorf("Proofs: %+v", meltRequest.Inputs))
 			c.JSON(200, response)
+			return
 		}
 
-		c.JSON(200, quote.GetPostMeltQuoteResponse())
+		c.JSON(200, response)
 	})
 
 }

@@ -4,11 +4,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"time"
+
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/crypto"
 )
 
 
+
+var ExpiryTime int64 = time.Now().Add(15 * time.Minute).Unix()
 
 type Unit int
 
@@ -136,7 +140,7 @@ type PostMintQuoteBolt11Response struct {
 	Quote string  `json:"quote"`
 	Request   string `json:"request"`
 	Paid   bool `json:"paid"`
-	Expiry   uint64 `json:"expiry"`
+	Expiry   int64 `json:"expiry"`
 }
 
 type PostMintBolt11Request struct {
