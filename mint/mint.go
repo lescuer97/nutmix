@@ -143,13 +143,19 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 
 	mint.LightningComs = *lightningComs
 
+    // uses seed to generate the keysets
 	for _, seed := range seeds {
 		masterKey, err := bip32.NewMasterKey(seed.Seed)
 		if err != nil {
 			log.Println(fmt.Errorf("NewMasterKey: %v", err))
 			return mint, err
 		}
-		keysets := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues, seed.Id)
+		keysets, err := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues, seed.Id)
+
+        if err != nil {
+            return mint, fmt.Errorf("GenerateKeysets: %v", err)
+        }
+
 
 		if seed.Active {
 			mint.ActiveKeysets[seed.Unit] = make(KeysetMap)

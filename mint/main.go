@@ -48,7 +48,10 @@ func main() {
 		// // Format the time as a string
 		masterKey, err := bip32.NewMasterKey(seed)
 
-		list_of_keys := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues, "")
+		list_of_keys, err := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues, "")
+		if err != nil {
+			log.Fatalf("Error GenerateKeysets: %+v ", err)
+		}
 
 		id, err := cashu.DeriveKeysetId(list_of_keys)
 

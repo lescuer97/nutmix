@@ -19,7 +19,8 @@ func GetAllSeeds(conn *pgx.Conn) ([]cashu.Seed, error) {
 		if err == pgx.ErrNoRows {
 			return seeds, fmt.Errorf("No rows found: %v", err)
 		}
-		log.Fatal("Error checking for  seeds: ", err)
+
+		return seeds,  fmt.Errorf("Error checking for  seeds: %+v", err)
 	}
 
 	defer rows.Close()
@@ -38,15 +39,14 @@ func GetActiveSeed(conn *pgx.Conn) (cashu.Seed, error) {
 	var err error
 	rows, err := conn.Query(context.Background(), "SELECT * FROM seeds WHERE active")
 	if err != nil {
-		log.Fatal("Error checking for active keyset: ", err)
+		return cashu.Seed{},  fmt.Errorf("Error checking for Active seeds: %+v", err)
 	}
 	defer rows.Close()
 
 	seed, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.Seed])
 
 	if err != nil {
-		log.Fatal("Error checking for active keyset: ", err)
-		return seed, err
+        return seed, fmt.Errorf("GetActiveSeed: %v", err)
 	}
 
 	return seed, nil
@@ -60,7 +60,7 @@ func CheckForActiveKeyset(conn *pgx.Conn) ([]cashu.Keyset, error) {
 		if err == pgx.ErrNoRows {
 			return keysets, fmt.Errorf("No rows found: %v", err)
 		}
-		log.Fatal("Error checking for active keyset: ", err)
+        return keysets, fmt.Errorf("Error checking for active keyset: %+v", err)
 	}
 	defer rows.Close()
 
@@ -131,7 +131,6 @@ func CheckForKeysetById(conn *pgx.Conn, id string) ([]cashu.Keyset, error) {
 func SaveNewSeed(conn *pgx.Conn, seed *cashu.Seed) error {
 	_, err := conn.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id) VALUES ($1, $2, $3, $4, $5)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id)
 	if err != nil {
-		log.Fatal("Error saving new seed: ", err)
 		return fmt.Errorf("inserting to DB: %v", err)
 	}
 	return nil
@@ -233,7 +232,7 @@ func GetKeysetsByAmountList(conn *pgx.Conn, keyAmounts []int32) (map[int]cashu.K
 		if err == pgx.ErrNoRows {
 			return keysetMap, fmt.Errorf("No rows found: %v", err)
 		}
-		log.Fatal("Error checking for active keyset: ", err)
+		return keysetMap, fmt.Errorf("Error checking for keysets: %+v", err)
 	}
 	defer rows.Close()
 
@@ -241,7 +240,7 @@ func GetKeysetsByAmountList(conn *pgx.Conn, keyAmounts []int32) (map[int]cashu.K
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
-			log.Fatalf("error while iterating dataset, %+v", err)
+            return keysetMap, fmt.Errorf("Error while iterating dataset: %v", err)
 		}
 
 		privKey := secp256k1.PrivKeyFromBytes(values[4].([]byte))
@@ -257,11 +256,6 @@ func GetKeysetsByAmountList(conn *pgx.Conn, keyAmounts []int32) (map[int]cashu.K
 		}
 		keysets_collect = append(keysets_collect, keyset)
 
-	}
-
-	if err != nil {
-
-		return keysetMap, fmt.Errorf("Collecting rows: %w", err)
 	}
 
 	for _, keyset := range keysets_collect {

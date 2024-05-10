@@ -3,7 +3,6 @@ package lightning
 import "github.com/lightningnetwork/lnd/lnrpc"
 
 func GetAverageRouteFee(routes []*lnrpc.Route) int64 {
-
     var fees int64
     var amount_routes int
 

@@ -3,7 +3,6 @@ package cashu
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"log"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -25,7 +24,7 @@ func DeriveKeysetId(keysets []Keyset) (string, error) {
 	return "00" + hex[:14], nil
 }
 
-func GenerateKeysets(masterKey *bip32.Key, values []int, id string) []Keyset {
+func GenerateKeysets(masterKey *bip32.Key, values []int, id string) ([]Keyset, error) {
 	var keysets []Keyset
 
 	// Get the current time
@@ -37,7 +36,7 @@ func GenerateKeysets(masterKey *bip32.Key, values []int, id string) []Keyset {
 	for i, value := range values {
 		childKey, err := masterKey.NewChildKey(uint32(i))
 		if err != nil {
-			log.Fatal("Error generating child key: ", err)
+			return nil, err
 		}
         privKey := secp256k1.PrivKeyFromBytes(childKey.Key)
 
@@ -53,5 +52,45 @@ func GenerateKeysets(masterKey *bip32.Key, values []int, id string) []Keyset {
 		keysets = append(keysets, keyset)
 	}
 
-	return keysets
+	return keysets, nil
+}
+
+func SetUpSeedAndKeyset() (*Seed, []Keyset, error) {
+		seed, err := bip32.NewSeed()
+
+		if err != nil {
+            return  nil, nil, err
+
+		}
+		// Get the current time
+		currentTime := time.Now().Unix()
+
+		// // Format the time as a string
+		masterKey, err := bip32.NewMasterKey(seed)
+
+		list_of_keys, err := GenerateKeysets(masterKey, PosibleKeysetValues, "")
+
+		if err != nil {
+            return nil, nil, err
+		}
+
+		id, err := DeriveKeysetId(list_of_keys)
+
+		if err != nil {
+            return nil, nil, err
+		}
+
+		for i, _ := range list_of_keys {
+			list_of_keys[i].Id = id
+		}
+
+		newSeed := Seed{
+			Seed:      seed,
+			Active:    true,
+			CreatedAt: currentTime,
+			Unit:      Sat.String(),
+			Id:        id,
+		}
+
+    return &newSeed, list_of_keys, nil
 }
