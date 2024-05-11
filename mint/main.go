@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/cashu"
 	"log"
@@ -20,15 +20,13 @@ func main() {
 
 	databaseConUrl := os.Getenv("DATABASE_URL")
 
-	conn, err := pgx.Connect(context.Background(), databaseConUrl)
+	pool, err := pgxpool.New(context.Background(), databaseConUrl)
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
 	}
 
-	defer conn.Close(context.Background())
-
-	seeds, err := GetAllSeeds(conn)
+	seeds, err := GetAllSeeds(pool)
 
 	if err != nil {
 		log.Fatalf("Could not keysets: %v", err)
@@ -48,7 +46,7 @@ func main() {
 			list_of_keys[i].Id = id
 		}
 
-		err = SaveNewSeed(conn, &seed)
+		err = SaveNewSeed(pool, &seed)
 
 		seeds = append(seeds, seed)
 
@@ -68,7 +66,9 @@ func main() {
 
 	r.Use(cors.Default())
 
-	V1Routes(r, conn, mint)
+	V1Routes(r, pool, mint)
+
+	defer pool.Close()
 
 	r.Run(":8080")
 }

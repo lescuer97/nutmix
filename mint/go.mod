@@ -4,6 +4,7 @@ go 1.22.1
 
 require (
 	github.com/btcsuite/btcd v0.24.2-beta.rc1
+	github.com/btcsuite/btcd/btcec/v2 v2.3.3
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
 	github.com/gin-contrib/cors v1.7.1
 	github.com/gin-gonic/gin v1.9.1
@@ -13,7 +14,6 @@ require (
 	github.com/lightningnetwork/lnd v0.17.4-beta.rc1
 	github.com/tyler-smith/go-bip32 v1.0.0
 	google.golang.org/grpc v1.63.2
-	google.golang.org/protobuf v1.33.0
 )
 
 require (
@@ -22,7 +22,6 @@ require (
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.3.3 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.5 // indirect
 	github.com/btcsuite/btcd/btcutil/psbt v1.1.9 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
@@ -78,6 +77,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
 	github.com/jackc/pgtype v1.14.3 // indirect
 	github.com/jackc/pgx/v4 v4.18.3 // indirect
+	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/jrick/logrotate v1.0.0 // indirect
@@ -157,6 +157,7 @@ require (
 	google.golang.org/genproto v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/errgo.v1 v1.0.1 // indirect
 	gopkg.in/macaroon-bakery.v2 v2.3.0 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect

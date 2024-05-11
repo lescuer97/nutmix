@@ -18,7 +18,7 @@ import (
 
 // mppPaymentHashAndPreimage returns the payment hash and preimage to use for an
 // MPP invoice.
-func  mppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Preimage,
+func mppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Preimage,
 	lntypes.Hash, error) {
 
 	var (
@@ -56,72 +56,65 @@ func  mppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Preimag
 	return paymentPreimage, paymentHash, nil
 }
 
-
-func CreateMockInvoice(amountSats int64, description string, network chaincfg.Params ) (string, error) {
+func CreateMockInvoice(amountSats int64, description string, network chaincfg.Params) (string, error) {
 	milsats, err := lnrpc.UnmarshallAmt(amountSats, 0)
 	if err != nil {
 		return "", fmt.Errorf("UnmarshallAmt: %v", err)
 	}
 
-    invoiceData := invoicesrpc.AddInvoiceData{
-        Memo: description,
-        Value: milsats,
-        Preimage: nil,
-        Expiry: 3600,
-        Private: false,
-        Hash: nil,
-    }
+	invoiceData := invoicesrpc.AddInvoiceData{
+		Memo:     description,
+		Value:    milsats,
+		Preimage: nil,
+		Expiry:   3600,
+		Private:  false,
+		Hash:     nil,
+	}
 
-    _, paymentHash, err := mppPaymentHashAndPreimage(&invoiceData)
+	_, paymentHash, err := mppPaymentHashAndPreimage(&invoiceData)
 
-    var options []func(*zpay32.Invoice)
+	var options []func(*zpay32.Invoice)
 
-    options = append(options, zpay32.Description(description))
-    options = append(options, zpay32.Amount(milsats))
-    options = append(options, zpay32.CLTVExpiry(64000))
+	options = append(options, zpay32.Description(description))
+	options = append(options, zpay32.Amount(milsats))
+	options = append(options, zpay32.CLTVExpiry(64000))
 
-    // Generate and set a random payment address for this invoice. If the
+	// Generate and set a random payment address for this invoice. If the
 	// sender understands payment addresses, this can be used to avoid
 	// intermediaries probing the receiver.
 	var paymentAddr [32]byte
 	if _, err := rand.Read(paymentAddr[:]); err != nil {
-		return "", fmt.Errorf("paymentAddres Creation: %v", err) 
+		return "", fmt.Errorf("paymentAddres Creation: %v", err)
 	}
 	options = append(options, zpay32.PaymentAddr(paymentAddr))
 
+	creationTime := time.Now()
+	payReq, err := zpay32.NewInvoice(&chaincfg.MainNetParams, paymentHash, creationTime, options...)
 
-    creationTime := time.Now()
-    payReq, err := zpay32.NewInvoice(&chaincfg.MainNetParams,  paymentHash, creationTime, options...  )
+	// Set our desired invoice features and add them to our list of options.
+	var invoiceFeatures *lnwire.FeatureVector
+	options = append(options, zpay32.Features(invoiceFeatures))
 
-    // Set our desired invoice features and add them to our list of options.
-	var invoiceFeatures *lnwire.FeatureVector    	
-    options = append(options, zpay32.Features(invoiceFeatures))
+	if err != nil {
+		return "", err
 
+	}
 
-    
-    if err != nil {
-        return "", err
-
-    }
-
-    payReqString, err := payReq.Encode(zpay32.MessageSigner{
+	payReqString, err := payReq.Encode(zpay32.MessageSigner{
 		SignCompact: func(msg []byte) ([]byte, error) {
-            key, err := secp256k1.GeneratePrivateKey()
+			key, err := secp256k1.GeneratePrivateKey()
 
-            if err != nil {
-                return make([]byte, 0), fmt.Errorf("GeneratePrivateKey: %v ", err) 
-            }
+			if err != nil {
+				return make([]byte, 0), fmt.Errorf("GeneratePrivateKey: %v ", err)
+			}
 
-			return ecdsa.SignCompact( key,msg, true), nil
+			return ecdsa.SignCompact(key, msg, true), nil
 		},
 	})
 
-
-    if err != nil {
-		return "",  fmt.Errorf("SignMessage: %v", err)
+	if err != nil {
+		return "", fmt.Errorf("SignMessage: %v", err)
 	}
 
-    return payReqString, nil
+	return payReqString, nil
 }
-
-
