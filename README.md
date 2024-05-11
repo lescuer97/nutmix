@@ -22,9 +22,9 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [x] [NUT-00](https://github.com/cashubtc/nuts/blob/main/00.md)
 - [x] [NUT-01](https://github.com/cashubtc/nuts/blob/main/01.md)
 - [x] [NUT-02](https://github.com/cashubtc/nuts/blob/main/02.md)
-- [ ] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md)
-- [ ] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md)
-- [ ] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
+- [x] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md)
+- [x] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md)
+- [x] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
 - [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md)
 - [ ] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md)
 - [ ] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
@@ -39,9 +39,9 @@ Right now, the wallet and the mint are being developed as completely separate pr
 
 ### Things to implement
 
-- [ ] Implement obligatory NUTs.
+- [x] Implement obligatory NUTs.
+- [x] Add Tests for crypto functions.
 - [ ] Add Tests for NUT calls.
-- [ ] Add Tests for crypto functions.
 - [ ] Explore the use of http std library and not Gin.
 
 
