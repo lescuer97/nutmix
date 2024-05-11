@@ -26,8 +26,6 @@ func main() {
 		log.Fatal("Error conecting to db", err)
 	}
 
-	// defer conn.Close(context.Background())
-
 	seeds, err := GetAllSeeds(pool)
 
 	if err != nil {

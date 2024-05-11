@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -105,6 +104,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
             nuts[nut] = cashu.SwapMintInfo{
                 Disabled: false,
             }
+        }
 
 		response := cashu.GetInfoResponse{
 			Name:            name,
