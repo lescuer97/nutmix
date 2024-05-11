@@ -38,7 +38,6 @@ func TestHashToCurve(t *testing.T) {
 	}
 }
 
-
 func TestBlindMessage(t *testing.T) {
 	tests := []struct {
 		secret         string
@@ -169,5 +168,3 @@ func TestVerify(t *testing.T) {
 		t.Error("failed verification")
 	}
 }
-
-

@@ -44,7 +44,6 @@ func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
 
 	seed, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.Seed])
 
-
 	if err != nil {
 		return seed, fmt.Errorf("GetActiveSeed: %v", err)
 	}
@@ -129,7 +128,7 @@ func CheckForKeysetById(pool *pgxpool.Pool, id string) ([]cashu.Keyset, error) {
 }
 
 func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
-    _, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id) VALUES ($1, $2, $3, $4, $5)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id)
+	_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id) VALUES ($1, $2, $3, $4, $5)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id)
 
 	if err != nil {
 		return fmt.Errorf("inserting to DB: %v", err)
@@ -155,7 +154,7 @@ func SaveNewKeysets(pool *pgxpool.Pool, keyset []cashu.Keyset) error {
 
 func SaveQuoteMintRequest(pool *pgxpool.Pool, request cashu.PostMintQuoteBolt11Response) error {
 
-    _, err := pool.Exec(context.Background(), "INSERT INTO mint_request (quote, request, paid, expiry) VALUES ($1, $2, $3, $4)", request.Quote, request.Request, request.Paid, request.Expiry)
+	_, err := pool.Exec(context.Background(), "INSERT INTO mint_request (quote, request, paid, expiry) VALUES ($1, $2, $3, $4)", request.Quote, request.Request, request.Paid, request.Expiry)
 	if err != nil {
 		return fmt.Errorf("Inserting to mint_request: %v", err)
 
@@ -165,7 +164,7 @@ func SaveQuoteMintRequest(pool *pgxpool.Pool, request cashu.PostMintQuoteBolt11R
 func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, request cashu.PostMintQuoteBolt11Response) error {
 
 	// change the paid status of the quote
-    _, err := pool.Exec(context.Background(), "UPDATE mint_request SET paid = $1 WHERE quote = $2", request.Paid, request.Quote)
+	_, err := pool.Exec(context.Background(), "UPDATE mint_request SET paid = $1 WHERE quote = $2", request.Paid, request.Quote)
 	if err != nil {
 		return fmt.Errorf("Inserting to mint_request: %v", err)
 
@@ -174,7 +173,7 @@ func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, request cashu.PostMintQuoteBol
 }
 func SaveQuoteMeltRequest(pool *pgxpool.Pool, request cashu.MeltRequestDB) error {
 
-    _, err := pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, paid) VALUES ($1, $2, $3, $4, $5, $6, $7)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.Paid)
+	_, err := pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, paid) VALUES ($1, $2, $3, $4, $5, $6, $7)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.Paid)
 	if err != nil {
 		return fmt.Errorf("Inserting to mint_request: %v", err)
 
@@ -183,7 +182,7 @@ func SaveQuoteMeltRequest(pool *pgxpool.Pool, request cashu.MeltRequestDB) error
 }
 func ModifyQuoteMeltPayStatus(pool *pgxpool.Pool, request cashu.MeltRequestDB) error {
 	// change the paid status of the quote
-    _, err := pool.Exec(context.Background(), "UPDATE melt_request SET paid = $1 WHERE quote = $2", request.Paid, request.Quote)
+	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET paid = $1 WHERE quote = $2", request.Paid, request.Quote)
 	if err != nil {
 		return fmt.Errorf("Inserting to mint_request: %v", err)
 
@@ -192,7 +191,6 @@ func ModifyQuoteMeltPayStatus(pool *pgxpool.Pool, request cashu.MeltRequestDB) e
 }
 
 func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.PostMintQuoteBolt11Response, error) {
-
 
 	rows, err := pool.Query(context.Background(), "SELECT * FROM mint_request WHERE quote = $1", id)
 	if err != nil {
@@ -305,7 +303,7 @@ func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) 
 
 func SaveProofs(pool *pgxpool.Pool, proofs []cashu.Proof) error {
 	for _, proof := range proofs {
-        _, err := pool.Exec(context.Background(), "INSERT INTO proofs (C, secret, amount, id) VALUES ($1, $2, $3, $4)", proof.C, proof.Secret, proof.Amount, proof.Id)
+		_, err := pool.Exec(context.Background(), "INSERT INTO proofs (C, secret, amount, id) VALUES ($1, $2, $3, $4)", proof.C, proof.Secret, proof.Amount, proof.Id)
 		if err != nil {
 			return fmt.Errorf("Inserting to proofs: %v", err)
 		}

@@ -11,7 +11,6 @@ import (
 
 // This cryptography module was taken form the gonuts project. https://github.com/elnosh/gonuts/blob/main/crypto/bdhke.go
 
-
 const DomainSeparator = "Secp256k1_HashToCurve_Cashu_"
 
 //     Generates a secp256k1 point from a message.
@@ -82,8 +81,6 @@ func SignBlindedMessage(B_ *secp256k1.PublicKey, k *secp256k1.PrivateKey) *secp2
 	return C_
 }
 
-
-
 // C = C_ - rK
 func UnblindSignature(C_ *secp256k1.PublicKey, r *secp256k1.PrivateKey,
 	K *secp256k1.PublicKey) *secp256k1.PublicKey {
@@ -120,11 +117,9 @@ func verify(Y *secp256k1.PublicKey, k *secp256k1.PrivateKey, C *secp256k1.Public
 	var Ypoint, result secp256k1.JacobianPoint
 	Y.AsJacobian(&Ypoint)
 
-
 	secp256k1.ScalarMultNonConst(&k.Key, &Ypoint, &result)
 	result.ToAffine()
 	pk := secp256k1.NewPublicKey(&result.X, &result.Y)
 
 	return C.IsEqual(pk)
 }
-

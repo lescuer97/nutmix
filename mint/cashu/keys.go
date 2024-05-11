@@ -14,7 +14,7 @@ var PosibleKeysetValues []int = []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 102
 func DeriveKeysetId(keysets []Keyset) (string, error) {
 	concatBinaryArray := []byte{}
 	for _, keyset := range keysets {
-        pubkey := keyset.GetPubKey()
+		pubkey := keyset.GetPubKey()
 
 		concatBinaryArray = append(concatBinaryArray, pubkey.SerializeCompressed()...)
 	}
@@ -38,14 +38,14 @@ func GenerateKeysets(masterKey *bip32.Key, values []int, id string) ([]Keyset, e
 		if err != nil {
 			return nil, err
 		}
-        privKey := secp256k1.PrivKeyFromBytes(childKey.Key)
+		privKey := secp256k1.PrivKeyFromBytes(childKey.Key)
 
 		keyset := Keyset{
 			Id:        id,
 			Active:    true,
 			Unit:      Sat.String(),
 			Amount:    value,
-			PrivKey:    privKey,
+			PrivKey:   privKey,
 			CreatedAt: formattedTime,
 		}
 
@@ -56,41 +56,41 @@ func GenerateKeysets(masterKey *bip32.Key, values []int, id string) ([]Keyset, e
 }
 
 func SetUpSeedAndKeyset() (Seed, []Keyset, error) {
-		seed, err := bip32.NewSeed()
+	seed, err := bip32.NewSeed()
 
-		if err != nil {
-            return  Seed{}, nil, err
+	if err != nil {
+		return Seed{}, nil, err
 
-		}
-		// Get the current time
-		currentTime := time.Now().Unix()
+	}
+	// Get the current time
+	currentTime := time.Now().Unix()
 
-		// // Format the time as a string
-		masterKey, err := bip32.NewMasterKey(seed)
+	// // Format the time as a string
+	masterKey, err := bip32.NewMasterKey(seed)
 
-		list_of_keys, err := GenerateKeysets(masterKey, PosibleKeysetValues, "")
+	list_of_keys, err := GenerateKeysets(masterKey, PosibleKeysetValues, "")
 
-		if err != nil {
-            return Seed{}, nil, err
-		}
+	if err != nil {
+		return Seed{}, nil, err
+	}
 
-		id, err := DeriveKeysetId(list_of_keys)
+	id, err := DeriveKeysetId(list_of_keys)
 
-		if err != nil {
-            return Seed{}, nil, err
-		}
+	if err != nil {
+		return Seed{}, nil, err
+	}
 
-		for i, _ := range list_of_keys {
-			list_of_keys[i].Id = id
-		}
+	for i, _ := range list_of_keys {
+		list_of_keys[i].Id = id
+	}
 
-		newSeed := Seed{
-			Seed:      seed,
-			Active:    true,
-			CreatedAt: currentTime,
-			Unit:      Sat.String(),
-			Id:        id,
-		}
+	newSeed := Seed{
+		Seed:      seed,
+		Active:    true,
+		CreatedAt: currentTime,
+		Unit:      Sat.String(),
+		Id:        id,
+	}
 
-    return newSeed, list_of_keys, nil
+	return newSeed, list_of_keys, nil
 }

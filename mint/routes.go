@@ -320,7 +320,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		}
 
 		if len(knownProofs) != 0 {
-            log.Printf("Proofs already used: %+v", knownProofs )
+			log.Printf("Proofs already used: %+v", knownProofs)
 			c.JSON(400, "Proofs already used")
 			return
 		}

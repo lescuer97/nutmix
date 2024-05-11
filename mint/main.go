@@ -70,7 +70,7 @@ func main() {
 
 	V1Routes(r, pool, mint)
 
-    defer pool.Close()
+	defer pool.Close()
 
 	r.Run(":8080")
 }
