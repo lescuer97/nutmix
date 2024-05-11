@@ -3,20 +3,21 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/cashu"
 	"github.com/lescuer97/nutmix/comms"
 	"github.com/lescuer97/nutmix/lightning"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"github.com/tyler-smith/go-bip32"
-	"log"
-	"os"
 )
 
-func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
+func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
@@ -46,7 +47,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 	})
 	v1.GET("/keysets", func(c *gin.Context) {
 
-		seeds, err := GetAllSeeds(conn)
+		seeds, err := GetAllSeeds(pool)
 		if err != nil {
 			c.JSON(500, "Server side error")
 			return
@@ -64,7 +65,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 
 	v1.GET("/info", func(c *gin.Context) {
 
-		seed, err := GetActiveSeed(conn)
+		seed, err := GetActiveSeed(pool)
 
 		var pubkey string = ""
 
@@ -183,7 +184,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
 		}
 
-		err := SaveQuoteMintRequest(conn, response)
+		err := SaveQuoteMintRequest(pool, response)
 		if err != nil {
 			log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
@@ -196,7 +197,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
 		quoteId := c.Param("quote")
 
-		quote, err := GetMintQuoteById(conn, quoteId)
+		quote, err := GetMintQuoteById(pool, quoteId)
 
 		if err != nil {
 			log.Println(fmt.Errorf("GetQuoteById: %w", err))
@@ -218,13 +219,13 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 			return
 		}
 
-		quote, err := GetMintQuoteById(conn, mintRequest.Quote)
+		quote, err := GetMintQuoteById(pool, mintRequest.Quote)
 
 		invoiceDB, err := mint.LightningComs.CheckIfInvoicePayed(quote.Quote)
 
 		if invoiceDB.State == lnrpc.Invoice_SETTLED {
 			quote.Paid = true
-			err := ModifyQuoteMintPayStatus(conn, quote)
+			err := ModifyQuoteMintPayStatus(pool, quote)
 			if err != nil {
 				log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
 				c.JSON(500, "Opps!, something went wrong")
@@ -288,6 +289,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		var CList, SecretsList []string
 
 		if len(swapRequest.Inputs) == 0 || len(swapRequest.Outputs) == 0 {
+			log.Println("Inputs or Outputs are empty")
 			c.JSON(400, "Inputs or Outputs are empty")
 			return
 		}
@@ -309,7 +311,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		}
 
 		// check if we know any of the proofs
-		knownProofs, err := CheckListOfProofs(conn, CList, SecretsList)
+		knownProofs, err := CheckListOfProofs(pool, CList, SecretsList)
 
 		if err != nil {
 			log.Printf("CheckListOfProofs: %+v", err)
@@ -318,6 +320,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		}
 
 		if len(knownProofs) != 0 {
+            log.Printf("Proofs already used: %+v", knownProofs )
 			c.JSON(400, "Proofs already used")
 			return
 		}
@@ -348,7 +351,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		}
 
 		// send proofs to database
-		err = SaveProofs(conn, swapRequest.Inputs)
+		err = SaveProofs(pool, swapRequest.Inputs)
 
 		if err != nil {
 			log.Println(fmt.Errorf("SaveProofs: %w", err))
@@ -408,7 +411,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 			Paid:       response.Paid,
 		}
 
-		err = SaveQuoteMeltRequest(conn, dbRequest)
+		err = SaveQuoteMeltRequest(pool, dbRequest)
 
 		if err != nil {
 			log.Println(fmt.Errorf("SaveQuoteMeltRequest: %w", err))
@@ -423,7 +426,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 	v1.GET("/melt/quote/bolt11/:quote", func(c *gin.Context) {
 		quoteId := c.Param("quote")
 
-		quote, err := GetMeltQuoteById(conn, quoteId)
+		quote, err := GetMeltQuoteById(pool, quoteId)
 
 		if err != nil {
 			log.Println(fmt.Errorf("GetQuoteById: %w", err))
@@ -449,7 +452,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 			return
 		}
 
-		quote, err := GetMeltQuoteById(conn, meltRequest.Quote)
+		quote, err := GetMeltQuoteById(pool, meltRequest.Quote)
 
 		if err != nil {
 			log.Println(fmt.Errorf("GetMeltQuoteById: %w", err))
@@ -468,7 +471,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		}
 
 		// check if we know any of the proofs
-		knownProofs, err := CheckListOfProofs(conn, CList, SecretList)
+		knownProofs, err := CheckListOfProofs(pool, CList, SecretList)
 
 		if err != nil {
 			log.Printf("CheckListOfProofs: %+v", err)
@@ -505,7 +508,7 @@ func V1Routes(r *gin.Engine, conn *pgx.Conn, mint Mint) {
 		}
 
 		// send proofs to database
-		err = SaveProofs(conn, meltRequest.Inputs)
+		err = SaveProofs(pool, meltRequest.Inputs)
 
 		response := cashu.PostMeltBolt11Response{
 			Paid:            true,
