@@ -74,7 +74,7 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 
 		correctKeyset := m.ActiveKeysets[unit][int(output.Amount)]
 
-		blindSignature, err := cashu.GenerateBlindSignature(correctKeyset.PrivKey, output)
+		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
 
 		if err != nil {
 			log.Println(fmt.Errorf("GenerateBlindSignature: %w", err))

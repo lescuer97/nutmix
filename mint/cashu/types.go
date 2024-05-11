@@ -32,14 +32,9 @@ type BlindedMessage struct {
 	B_     string `json:"B_"`
 }
 
-type BlindSignature struct {
-	Amount int32  `json:"amount"`
-	Id     string `json:"id"`
-	C_     string `json:"C_"`
-}
 
-func GenerateBlindSignature(k *secp256k1.PrivateKey, blindedMessage BlindedMessage) (BlindSignature, error) {
-	decodedBlindFactor, err := hex.DecodeString(blindedMessage.B_)
+func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
+	decodedBlindFactor, err := hex.DecodeString(b.B_)
 
 	if err != nil {
 		log.Println(fmt.Errorf("DecodeString: %v", err))
@@ -56,10 +51,16 @@ func GenerateBlindSignature(k *secp256k1.PrivateKey, blindedMessage BlindedMessa
 	C_ := crypto.SignBlindedMessage(B_, k)
 
 	return BlindSignature{
-		Amount: blindedMessage.Amount,
-		Id:     blindedMessage.Id,
+		Amount: b.Amount,
+		Id:     b.Id,
 		C_:     hex.EncodeToString(C_.SerializeCompressed()),
 	}, nil
+}
+
+type BlindSignature struct {
+	Amount int32  `json:"amount"`
+	Id     string `json:"id"`
+	C_     string `json:"C_"`
 }
 
 type Proof struct {
