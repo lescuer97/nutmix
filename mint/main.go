@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/cashu"
 	"log"
-	"os"
 )
 
 func main() {
@@ -18,9 +15,9 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	databaseConUrl := os.Getenv("DATABASE_URL")
 
-	pool, err := pgxpool.New(context.Background(), databaseConUrl)
+	pool, err := DatabaseSetup()
+
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)

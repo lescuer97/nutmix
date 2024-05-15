@@ -1,3 +1,5 @@
 .env
 build-errors.log
 mint/tmp/
+env/
+nutmix

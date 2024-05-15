@@ -1,0 +1,22 @@
+# version: "3"
+
+services:
+  db:
+    image: postgres
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+
+  mint:
+    build: ./mint/
+    restart: on-failure:10
+    volumes:
+      - ./env/:/env
+    environment:
+      - PORT=8080
+      - DATABASE_URL=postgres://postgres:admin@db/postgres
+    depends_on:
+      - db
