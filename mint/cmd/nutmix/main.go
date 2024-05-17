@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
-	"os"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"log"
+	"os"
 )
 
 func main() {
