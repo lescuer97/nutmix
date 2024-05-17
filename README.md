@@ -59,9 +59,9 @@ if you want to run the project in docker you will need two thinks.
 
 If you have this correctly setup it should be as easy as running a simple docker command on linux:
 
-`
+```
 docker compose up 
-`
+```
 
 ### Development
 
@@ -70,15 +70,17 @@ docker compose up
 if you want to develop for the project I recommend personnaly run a hybrid setup. I run the mint locally and the db on docker. 
 
 1. run the database in docker. please check you have the necesary info in the `.env` file. 
-`
+
+```
 docker compose up db 
-`
+```
 
 2. Run the mint locally. 
-`
+
+```
 # build the project
 go run cmd/nutmix/*.go
-`
+```
 
  
 
