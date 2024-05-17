@@ -9,9 +9,9 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lescuer97/nutmix/cashu"
-	"github.com/lescuer97/nutmix/comms"
-	"github.com/lescuer97/nutmix/crypto"
+	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/comms"
+	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/tyler-smith/go-bip32"
 )
 
@@ -130,6 +130,8 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 		mint.Network = chaincfg.MainNetParams
 	case "regtest":
 		mint.Network = chaincfg.RegressionNetParams
+	case "signet":
+		mint.Network = chaincfg.SigNetParams
 	default:
 		return mint, fmt.Errorf("Invalid network: %s", network)
 	}

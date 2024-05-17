@@ -4,20 +4,25 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/lescuer97/nutmix/cashu"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"log"
+	"os"
 )
 
 func main() {
-	err := godotenv.Load()
+	docker := os.Getenv("DOCKER")
 
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	switch {
+	case docker == "true":
+		log.Println("Running in docker")
+	default:
+		err := godotenv.Load("../.env")
+		if err != nil {
+			log.Fatal("ERROR: no .env file found and not running in docker")
+		}
 	}
 
-
 	pool, err := DatabaseSetup()
-
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
@@ -39,7 +44,7 @@ func main() {
 			log.Fatalf("Error DeriveKeysetId: %+v ", err)
 		}
 
-		for i, _ := range list_of_keys {
+		for i := range list_of_keys {
 			list_of_keys[i].Id = id
 		}
 

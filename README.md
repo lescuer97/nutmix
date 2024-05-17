@@ -32,6 +32,7 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [ ] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
 - [ ] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
 - [ ] [NUT-13](https://github.com/cashubtc/nuts/blob/main/13.md)
+- [ ] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
 
 ## Development
 
@@ -41,20 +42,48 @@ Right now, the wallet and the mint are being developed as completely separate pr
 
 - [x] Implement obligatory NUTs.
 - [x] Add Tests for crypto functions.
-- [ ] Add Tests for NUT calls.
+- [ ] Add Tests for general functionality of mint.
+- [ ] Make GUI for data about the mint and actions.
 - [ ] Explore the use of http std library and not Gin.
 
 
+### Run the Mint
 
-### Mint
+This project is thought to be able to be ran on a docker container or locally.
 
-TODO
+if you want to run the project in docker you will need two thinks. 
 
-#### Development of mint
+1. `env` directory at the base of your project for your lightning node certificates.
+2. Set the correct variables in an `.env` file. Use the env.example file as reference.
+   You need to make sure to use a strong `POSTGRES_PASSWORD` and make user the username and password are the same in the `DATABASE_URL`
 
+If you have this correctly setup it should be as easy as running a simple docker command on linux:
 
-#### Run PostgreSQL DB
+```
+docker compose up 
+```
+
+### Development
+
+#### Mint
+
+if you want to develop for the project I recommend personnaly run a hybrid setup. I run the mint locally and the db on docker. 
+
+1. run the database in docker. please check you have the necesary info in the `.env` file. 
+
+```
+docker compose up db 
+```
+
+2. Run the mint locally. 
+
+```
+# build the project
+go run cmd/nutmix/*.go
+```
+
+ 
 
 ### Wallet
-TODO
+TODO!
 
