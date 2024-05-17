@@ -2,41 +2,41 @@ package main
 
 import (
 	"context"
-	"log"
 	"fmt"
-	"os"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/pressly/goose/v3"
+	"log"
+	"os"
 )
 
 func DatabaseSetup() (*pgxpool.Pool, error) {
 	databaseConUrl := os.Getenv("DATABASE_URL")
 
-    fmt.Println("databaseConUrl: ", databaseConUrl)
+	fmt.Println("databaseConUrl: ", databaseConUrl)
 	pool, err := pgxpool.New(context.Background(), databaseConUrl)
 
-    if err := goose.SetDialect("postgres"); err != nil {
-        log.Fatalf("Error setting dialect: %v", err)
-    }
+	if err := goose.SetDialect("postgres"); err != nil {
+		log.Fatalf("Error setting dialect: %v", err)
+	}
 
-    db := stdlib.OpenDBFromPool(pool)
+	db := stdlib.OpenDBFromPool(pool)
 
-    if err := goose.Up(db, "migrations"); err != nil {
-        log.Fatalf("Error running migrations: %v", err)
-    }
+	if err := goose.Up(db, "migrations"); err != nil {
+		log.Fatalf("Error running migrations: %v", err)
+	}
 
-    if err := db.Close(); err != nil {
-        panic(err)
-    }
+	if err := db.Close(); err != nil {
+		panic(err)
+	}
 
-    if err != nil {
-        return nil, fmt.Errorf("Error connecting to database: %v", err)
-    }
+	if err != nil {
+		return nil, fmt.Errorf("Error connecting to database: %v", err)
+	}
 
-    return pool, nil
+	return pool, nil
 }
 
 func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
@@ -79,8 +79,6 @@ func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
 	return seed, nil
 }
 
-
-
 func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
 	_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id) VALUES ($1, $2, $3, $4, $5)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id)
 
@@ -89,7 +87,6 @@ func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
 	}
 	return nil
 }
-
 
 func SaveQuoteMintRequest(pool *pgxpool.Pool, request cashu.PostMintQuoteBolt11Response) error {
 
@@ -171,7 +168,6 @@ func GetMeltQuoteById(pool *pgxpool.Pool, id string) (cashu.MeltRequestDB, error
 
 	return quote, nil
 }
-
 
 func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) ([]cashu.Proof, error) {
 

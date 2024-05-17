@@ -80,7 +80,7 @@ func SetUpSeedAndKeyset() (Seed, []Keyset, error) {
 		return Seed{}, nil, err
 	}
 
-	for i, _ := range list_of_keys {
+	for i := range list_of_keys {
 		list_of_keys[i].Id = id
 	}
 

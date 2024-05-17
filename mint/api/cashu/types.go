@@ -32,7 +32,6 @@ type BlindedMessage struct {
 	B_     string `json:"B_"`
 }
 
-
 func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
 	decodedBlindFactor, err := hex.DecodeString(b.B_)
 

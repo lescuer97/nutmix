@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
-	"os"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,6 +12,8 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"github.com/tyler-smith/go-bip32"
+	"log"
+	"os"
 )
 
 func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
@@ -98,13 +98,13 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		}
 
 		nuts := make(map[string]cashu.SwapMintInfo)
-        var activeNuts []string = []string{"1", "2", "3", "4", "5", "6"}
+		var activeNuts []string = []string{"1", "2", "3", "4", "5", "6"}
 
-        for _, nut := range activeNuts {
-            nuts[nut] = cashu.SwapMintInfo{
-                Disabled: false,
-            }
-        }
+		for _, nut := range activeNuts {
+			nuts[nut] = cashu.SwapMintInfo{
+				Disabled: false,
+			}
+		}
 
 		response := cashu.GetInfoResponse{
 			Name:            name,
@@ -141,7 +141,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
-                
+
 			randUuid, err := uuid.NewRandom()
 
 			if err != nil {
@@ -529,11 +529,11 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			SecretList = append(SecretList, proof.Secret)
 		}
 
-        if AmountProofs <=  int32(quote.Amount) {
-            log.Printf("Not enought proofs to expend. Needs: %v",quote.Amount )
-            c.JSON(403, "Not enought proofs to expend. Needs: %v" )
-            return
-        }
+		if AmountProofs <= int32(quote.Amount) {
+			log.Printf("Not enought proofs to expend. Needs: %v", quote.Amount)
+			c.JSON(403, "Not enought proofs to expend. Needs: %v")
+			return
+		}
 
 		// check if we know any of the proofs
 		knownProofs, err := CheckListOfProofs(pool, CList, SecretList)

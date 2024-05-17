@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
-
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -14,22 +12,17 @@ import (
 func main() {
 	docker := os.Getenv("DOCKER")
 
-    fmt.Println("docker: ", docker)
-
-    switch {
-    case docker == "true":
-        log.Println("Running in docker")
-    default:
-	    err := godotenv.Load("../.env")
-	    if err != nil {
-            log.Fatal("ERROR: no .env file found and not running in docker")
-
-	    }
-
-    }
+	switch {
+	case docker == "true":
+		log.Println("Running in docker")
+	default:
+		err := godotenv.Load("../.env")
+		if err != nil {
+			log.Fatal("ERROR: no .env file found and not running in docker")
+		}
+	}
 
 	pool, err := DatabaseSetup()
-
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
@@ -51,7 +44,7 @@ func main() {
 			log.Fatalf("Error DeriveKeysetId: %+v ", err)
 		}
 
-		for i, _ := range list_of_keys {
+		for i := range list_of_keys {
 			list_of_keys[i].Id = id
 		}
 
