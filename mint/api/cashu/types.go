@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lescuer97/nutmix/crypto"
+	"github.com/lescuer97/nutmix/pkg/crypto"
 )
 
 var ExpiryTime int64 = time.Now().Add(15 * time.Minute).Unix()

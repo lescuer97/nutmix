@@ -8,13 +8,14 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/lescuer97/nutmix/cashu"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/pressly/goose/v3"
 )
 
 func DatabaseSetup() (*pgxpool.Pool, error) {
 	databaseConUrl := os.Getenv("DATABASE_URL")
 
+    fmt.Println("databaseConUrl: ", databaseConUrl)
 	pool, err := pgxpool.New(context.Background(), databaseConUrl)
 
     if err := goose.SetDialect("postgres"); err != nil {

@@ -1,4 +1,5 @@
 .env
 build-errors.log
 mint/tmp/
+mint/main
 env/
