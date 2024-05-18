@@ -62,11 +62,35 @@ type BlindSignature struct {
 	C_     string `json:"C_"`
 }
 
+type ProofState string
+
+const UNSPENT ProofState = "UNSPENT"
+const SPENT ProofState = "SPENT"
+const PENDING ProofState = "PENDING"
+
 type Proof struct {
 	Amount int32  `json:"amount"`
 	Id     string `json:"id"`
 	Secret string `json:"secret"`
 	C      string `json:"C" db:"c"`
+	Y      string `json:"Y" db:"Y"`
+}
+
+func (p Proof) HashSecretToCurve() (Proof, error) {
+
+	// Get Hash to curve of secret
+	parsedProof := []byte(p.Secret)
+
+	y, err := crypto.HashToCurve(parsedProof)
+
+	if err != nil {
+		log.Printf("crypto.HashToCurve: %+v", err)
+		return p, err
+	}
+
+	Y_hex := hex.EncodeToString(y.SerializeCompressed())
+	p.Y = Y_hex
+	return p, nil
 }
 
 type MintError struct {
@@ -205,4 +229,18 @@ type PostMeltBolt11Request struct {
 type PostMeltBolt11Response struct {
 	Paid            bool   `json:"paid"`
 	PaymentPreimage string `json:"payment_preimage"`
+}
+
+type PostCheckStateRequest struct {
+	Ys []string `json:"Ys"`
+}
+
+type CheckState struct {
+	Y       string     `json:"Y"`
+	State   ProofState `json:"state"`
+	Witness *string    `json:"witness"`
+}
+
+type PostCheckStateResponse struct {
+	States []CheckState `json:"states"`
 }

@@ -182,7 +182,7 @@ func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) 
 	}
 	defer rows.Close()
 
-	proof, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.Proof])
+	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -191,17 +191,44 @@ func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) 
 		return proofList, fmt.Errorf("CollectOneRow: %v", err)
 	}
 
-	proofList = append(proofList, proof)
+	proofList = proof
 
 	return proofList, nil
 }
 
 func SaveProofs(pool *pgxpool.Pool, proofs []cashu.Proof) error {
 	for _, proof := range proofs {
-		_, err := pool.Exec(context.Background(), "INSERT INTO proofs (C, secret, amount, id) VALUES ($1, $2, $3, $4)", proof.C, proof.Secret, proof.Amount, proof.Id)
+		_, err := pool.Exec(context.Background(), "INSERT INTO proofs (C, secret, amount, id, Y) VALUES ($1, $2, $3, $4, $5)", proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y)
 		if err != nil {
 			return fmt.Errorf("Inserting to proofs: %v", err)
 		}
 	}
 	return nil
+}
+
+func CheckListOfProofsBySecretCurve(pool *pgxpool.Pool, Ys []string) ([]cashu.Proof, error) {
+
+	var proofList []cashu.Proof
+
+	rows, err := pool.Query(context.Background(), "SELECT * FROM proofs WHERE Y = ANY($1)", Ys)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return proofList, nil
+		}
+	}
+	defer rows.Close()
+
+	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return proofList, nil
+		}
+		return proofList, fmt.Errorf("CollectOneRow: %v", err)
+	}
+
+	proofList = proof
+
+	return proofList, nil
 }

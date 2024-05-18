@@ -22,6 +22,7 @@ type Mint struct {
 	Keysets       map[string][]cashu.Keyset
 	LightningComs comms.LightingComms
 	Network       chaincfg.Params
+	PendingProofs []cashu.Proof
 }
 
 // errors types for validation
@@ -143,6 +144,7 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 	}
 
 	mint.LightningComs = *lightningComs
+	mint.PendingProofs = make([]cashu.Proof, 0)
 
 	// uses seed to generate the keysets
 	for _, seed := range seeds {
