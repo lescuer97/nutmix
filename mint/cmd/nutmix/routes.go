@@ -3,6 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
+	"os"
+	"slices"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,8 +16,6 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"github.com/tyler-smith/go-bip32"
-	"log"
-	"os"
 )
 
 func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
@@ -316,10 +318,19 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		}
 
 		// check proof have the same amount as blindedSignatures
-		for _, proof := range swapRequest.Inputs {
+		for i, proof := range swapRequest.Inputs {
 			AmountProofs += proof.Amount
 			CList = append(CList, proof.C)
 			SecretsList = append(SecretsList, proof.Secret)
+
+			p, err := proof.HashSecretToCurve()
+
+			if err != nil {
+				log.Printf("proof.HashSecretToCurve(): %+v", err)
+				c.JSON(400, "Problem processing proofs")
+				return
+			}
+			swapRequest.Inputs[i] = p
 		}
 
 		for _, output := range swapRequest.Outputs {
@@ -500,14 +511,14 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
 
-		if len(meltRequest.Inputs) == 0 {
-			c.JSON(400, "Outputs are empty")
-			return
-		}
-
 		if err != nil {
 			log.Println(fmt.Errorf("c.BindJSON: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
+		if len(meltRequest.Inputs) == 0 {
+			c.JSON(400, "Outputs are empty")
 			return
 		}
 
@@ -523,13 +534,25 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		var AmountProofs int32
 
 		// check proof have the same amount as blindedSignatures
-		for _, proof := range meltRequest.Inputs {
+		for i, proof := range meltRequest.Inputs {
 			AmountProofs += proof.Amount
 			CList = append(CList, proof.C)
 			SecretList = append(SecretList, proof.Secret)
+
+			p, err := proof.HashSecretToCurve()
+
+			if err != nil {
+				log.Printf("proof.HashSecretToCurve(): %+v", err)
+				c.JSON(400, "Problem processing proofs")
+				return
+			}
+
+			meltRequest.Inputs[i] = p
+			mint.PendingProofs = append(mint.PendingProofs, p)
+
 		}
 
-		if AmountProofs <= int32(quote.Amount) {
+		if AmountProofs < int32(quote.Amount) {
 			log.Printf("Not enought proofs to expend. Needs: %v", quote.Amount)
 			c.JSON(403, "Not enought proofs to expend. Needs: %v")
 			return
@@ -602,6 +625,80 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
+		newPendingProofs := []cashu.Proof{}
+		// remove proofs from pending proofs
+		for _, proof := range mint.PendingProofs {
+			if !slices.Contains(meltRequest.Inputs, proof) {
+				newPendingProofs = append(newPendingProofs, proof)
+			}
+		}
+
+		mint.PendingProofs = newPendingProofs
+
 		c.JSON(200, response)
+	})
+
+	v1.POST("/checkstate", func(c *gin.Context) {
+		var checkStateRequest cashu.PostCheckStateRequest
+		err := c.BindJSON(&checkStateRequest)
+		if err != nil {
+			log.Println(fmt.Errorf("c.BindJSON: %w", err))
+			c.JSON(400, "Malformed Body")
+			return
+		}
+
+		checkStateResponse := cashu.PostCheckStateResponse{
+			States: make([]cashu.CheckState, 0),
+		}
+
+		// set as unspent
+		proofs, err := CheckListOfProofsBySecretCurve(pool, checkStateRequest.Ys)
+
+		proofsForRemoval := make([]cashu.Proof, 0)
+
+		for _, state := range checkStateRequest.Ys {
+
+			pendingAndSpent := false
+
+			checkState := cashu.CheckState{
+				Y:       state,
+				State:   cashu.UNSPENT,
+				Witness: nil,
+			}
+
+			switch {
+			// check if is in list of pending proofs
+			case slices.ContainsFunc(mint.PendingProofs, func(p cashu.Proof) bool {
+				return p.Y == state
+			}):
+				pendingAndSpent = true
+				checkState.State = cashu.PENDING
+			// Check if is in list of spents and if its also pending add it for removal of pending list
+			case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
+				compare := p.Y == state
+				if compare && pendingAndSpent {
+
+					proofsForRemoval = append(proofsForRemoval, p)
+				}
+				return compare
+			}):
+				checkState.State = cashu.SPENT
+			}
+
+			checkStateResponse.States = append(checkStateResponse.States, checkState)
+		}
+
+		// remove proofs from pending proofs
+		if len(proofsForRemoval) != 0 {
+			newPendingProofs := []cashu.Proof{}
+			for _, proof := range mint.PendingProofs {
+				if !slices.Contains(proofsForRemoval, proof) {
+					newPendingProofs = append(newPendingProofs, proof)
+				}
+			}
+		}
+
+		c.JSON(200, checkStateResponse)
+
 	})
 }
