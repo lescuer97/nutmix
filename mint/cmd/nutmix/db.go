@@ -15,7 +15,6 @@ import (
 func DatabaseSetup() (*pgxpool.Pool, error) {
 	databaseConUrl := os.Getenv("DATABASE_URL")
 
-	fmt.Println("databaseConUrl: ", databaseConUrl)
 	pool, err := pgxpool.New(context.Background(), databaseConUrl)
 
 	if err := goose.SetDialect("postgres"); err != nil {
