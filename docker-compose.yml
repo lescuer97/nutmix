@@ -6,6 +6,8 @@ services:
     restart: always
     ports:
       - 5432:5432
+    volumes: 
+      - db:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -18,9 +20,10 @@ services:
     ports:
       - 8080:8080
     restart: on-failure:10
-    volumes:
-      - ./env/:/env
     environment:
       - PORT=8080
     depends_on:
       - db
+volumes:
+  db:
+    driver: local
