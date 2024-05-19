@@ -54,7 +54,7 @@ services:
       - "traefik.http.routers.mint.middlewares=mint,mint_redirect,mint-https"
       - "traefik.http.routers.mint.rule=Host(`${MINT_HOSTNAME}`)"
       - "traefik.http.routers.mint.tls.certresolver=selfhostedservices"
-      - "traefik.http.services.mint.loadbalancer.server.port=80"
+      - "traefik.http.services.mint.loadbalancer.server.port=8080"
       - "traefik.http.middlewares.mint.headers.customRequestHeaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.mint-https.redirectscheme.scheme=https"
       - "traefik.http.routers.mint-http.entrypoints=web"

@@ -26,7 +26,7 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [x] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md)
 - [x] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
 - [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md)
-- [ ] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md)
+- [x] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md)
 - [ ] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
 - [ ] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md)
 - [ ] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
@@ -53,9 +53,13 @@ This project is thought to be able to be ran on a docker container or locally.
 
 if you want to run the project in docker you will need two thinks. 
 
-1. `env` directory at the base of your project for your lightning node certificates.
-2. Set the correct variables in an `.env` file. Use the env.example file as reference.
-   You need to make sure to use a strong `POSTGRES_PASSWORD` and make user the username and password are the same in the `DATABASE_URL`
+You'll need  the correct variables in an `.env` file. Use the env.example file as reference.
+
+You need to make sure to use a strong `POSTGRES_PASSWORD` and make user the username and password are the same in the `DATABASE_URL`
+
+It's important to set up the variables under `LIGHTNING CONNECTION` for connecting to a node. 
+
+if you want to run with traefik and you also need to fill variables below `HOSTING` for your domains.
 
 If you have this correctly setup it should be as easy as running a simple docker command on linux:
 
@@ -67,12 +71,15 @@ docker compose up
 
 #### Mint
 
+
 if you want to develop for the project I recommend personnaly run a hybrid setup. I run the mint locally and the db on docker. 
+
+I have a special development docker compose called: `docker-compose-dev.yml`. This is for simpler development without having traefik in the middle.
 
 1. run the database in docker. please check you have the necesary info in the `.env` file. 
 
 ```
-docker compose up db 
+docker compose -f docker-compose-dev.yml up db
 ```
 
 2. Run the mint locally. 
