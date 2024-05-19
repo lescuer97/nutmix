@@ -35,11 +35,9 @@ services:
       - path: ".env"
         required: true
     build: ./mint/
-    # ports:
-    #   - 8080:8080
+    ports:
+      - 8080:8080
     restart: on-failure:10
-    environment:
-      - PORT=8080
     depends_on:
       - db
     labels:
