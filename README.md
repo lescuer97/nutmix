@@ -6,7 +6,7 @@ _This project is in active development; it has not gone through optimization and
 
 # Nutmix
 
-This has now been turned into a Golang reference implementation of the Cashu Protocol and a SvelteKit wallet for it. This was originally a project to create a value-for-value wallet with Cashu at its core (Might come in the future).
+Cashu protocol mint. 
 
 ## Purpose of this project
 
