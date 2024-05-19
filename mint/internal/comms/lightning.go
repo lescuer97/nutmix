@@ -2,8 +2,10 @@ package comms
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/lightningnetwork/lnd/lnrpc"
@@ -17,8 +19,8 @@ const (
 	FAKE_WALLET       = "FakeWallet"
 	LND_WALLET        = "LndGrpcWallet"
 	LND_HOST          = "LND_GRPC_HOST"
-	LND_CERT_PATH     = "LND_CERT_PATH"
-	LND_MACAROON_PATH = "LND_MACAROON_PATH"
+	LND_TLS_CERT     = "LND_TLS_CERT"
+	LND_MACAROON = "LND_MACAROON"
 )
 
 type LightingComms struct {
@@ -100,28 +102,21 @@ func SetupLightingComms() (*LightingComms, error) {
 	if host == "" {
 		return nil, fmt.Errorf("LND_HOST not available")
 	}
-	certPath := os.Getenv(LND_CERT_PATH)
-	if certPath == "" {
+	pem_cert := os.Getenv(LND_TLS_CERT)
+	if pem_cert == "" {
 		return nil, fmt.Errorf("LND_CERT_PATH not available")
 	}
-	macaroonPath := os.Getenv(LND_MACAROON_PATH)
-	if macaroonPath == "" {
-		return nil, fmt.Errorf("LND_MACAROON_PATH not available")
-	}
 
-	macaroonBytes, err := os.ReadFile(macaroonPath)
 
-	if err != nil {
-		return nil, fmt.Errorf("error reading macaroon: os.ReadFile %v", err)
-	}
+    certPool := x509.NewCertPool()
+    appendOk := certPool.AppendCertsFromPEM([]byte(pem_cert))
 
-	macaroonHex := hex.EncodeToString(macaroonBytes)
+    if !appendOk {
+        log.Printf("x509.AppendCertsFromPEM(): failed")
+        return nil, fmt.Errorf("x509.AppendCertsFromPEM(): failed")
+    }
 
-	certFile, err := credentials.NewClientTLSFromFile(certPath, "")
-
-	if err != nil {
-		return nil, err
-	}
+	certFile := credentials.NewClientTLSFromCert(certPool, "")
 
 	tlsDialOption := grpc.WithTransportCredentials(certFile)
 
@@ -135,5 +130,11 @@ func SetupLightingComms() (*LightingComms, error) {
 		return nil, err
 	}
 
-	return &LightingComms{Macaroon: macaroonHex, RpcClient: clientConn}, nil
+	macaroon := os.Getenv(LND_MACAROON)
+
+    if macaroon == "" {
+        return nil, fmt.Errorf("LND_MACAROON_PATH not available")
+    }
+
+	return &LightingComms{Macaroon: macaroon, RpcClient: clientConn}, nil
 }
