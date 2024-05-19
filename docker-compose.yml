@@ -1,6 +1,24 @@
-# version: "3"
-
 services:
+  traefik:
+    image: "traefik:v3.0.0"
+    container_name: "traefik"
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.selfhostedservices.acme.tlschallenge=true"
+      - "--certificatesresolvers.selfhostedservices.acme.email=${LE_EMAIL_ADDRESS}"
+      - "--certificatesresolvers.selfhostedservices.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
   db:
     image: postgres
     restart: always
@@ -20,10 +38,28 @@ services:
     ports:
       - 8080:8080
     restart: on-failure:10
-    environment:
-      - PORT=8080
     depends_on:
       - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.mint.headers.browserXSSFilter=true"
+      - "traefik.http.middlewares.mint.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.mint.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.mint.headers.stsPreload=true"
+      - "traefik.http.middlewares.mint.headers.stsSeconds=155520011"
+      - "traefik.http.middlewares.mint_redirect.redirectregex.permanent=true"
+      - "traefik.http.middlewares.mint_redirect.redirectregex.regex=https://(.*)/.well-known/(card|cal)dav"
+      - "traefik.http.middlewares.mint_redirect.redirectregex.replacement=https://$${1}/remote.php/dav/"
+      - "traefik.http.routers.mint.entrypoints=websecure"
+      - "traefik.http.routers.mint.middlewares=mint,mint_redirect,mint-https"
+      - "traefik.http.routers.mint.rule=Host(`${MINT_HOSTNAME}`)"
+      - "traefik.http.routers.mint.tls.certresolver=selfhostedservices"
+      - "traefik.http.services.mint.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.mint.headers.customRequestHeaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.mint-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.mint-http.entrypoints=web"
+      - "traefik.http.routers.mint-http.rule=Host(`${MINT_HOSTNAME}`)"
+      - "traefik.http.routers.mint-http.middlewares=mint-https@docker"
 volumes:
   db:
     driver: local

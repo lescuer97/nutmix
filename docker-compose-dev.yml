@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres
+    restart: always
+    ports:
+      - 5432:5432
+    volumes: 
+      - db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  mint:
+    env_file:
+      - path: ".env"
+        required: true
+    build: ./mint/
+    ports:
+      - 8080:8080
+    restart: on-failure:10
+    depends_on:
+      - db
+volumes:
+  db:
+    driver: local
