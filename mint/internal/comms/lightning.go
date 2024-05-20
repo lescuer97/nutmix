@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/lightningnetwork/lnd/lnrpc"
+	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -16,10 +17,10 @@ import (
 )
 
 const (
-	FAKE_WALLET       = "FakeWallet"
-	LND_WALLET        = "LndGrpcWallet"
-	LND_HOST          = "LND_GRPC_HOST"
-	LND_TLS_CERT     = "LND_TLS_CERT"
+	FAKE_WALLET  = "FakeWallet"
+	LND_WALLET   = "LndGrpcWallet"
+	LND_HOST     = "LND_GRPC_HOST"
+	LND_TLS_CERT = "LND_TLS_CERT"
 	LND_MACAROON = "LND_MACAROON"
 )
 
@@ -78,18 +79,65 @@ func (l *LightingComms) PayInvoice(invoice string) (*lnrpc.SendResponse, error) 
 	return res, nil
 }
 
+// Make route hints from zpay32 to lnrpc
+func convert_route_hints(routes [][]zpay32.HopHint) []*lnrpc.RouteHint {
+
+	routehints := []*lnrpc.RouteHint{}
+	for _, route := range routes {
+		var hopHints []*lnrpc.HopHint
+		for _, hint := range route {
+			hophint := lnrpc.HopHint{
+				NodeId:                    hex.EncodeToString(hint.NodeID.SerializeCompressed()),
+				ChanId:                    hint.ChannelID,
+				FeeBaseMsat:               hint.FeeBaseMSat,
+				FeeProportionalMillionths: hint.FeeProportionalMillionths,
+				CltvExpiryDelta:           uint32(hint.CLTVExpiryDelta),
+			}
+			hopHints = append(hopHints, &hophint)
+		}
+
+		routehints = append(routehints, &lnrpc.RouteHint{
+			HopHints: *&hopHints,
+		})
+	}
+	return routehints
+
+}
+func getFeatureBits(features *lnwire.FeatureVector) []lnrpc.FeatureBit {
+	invoiceFeatures := features.Features()
+	featureBits := make([]lnrpc.FeatureBit, len(invoiceFeatures))
+
+	for k := range invoiceFeatures {
+		feature := lnrpc.FeatureBit(int32(k))
+		featureBits = append(featureBits, feature)
+	}
+	return featureBits
+}
+
 func (l *LightingComms) QueryPayment(invoice *zpay32.Invoice) (*lnrpc.QueryRoutesResponse, error) {
 
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
 
 	client := lnrpc.NewLightningClient(l.RpcClient)
 
+	routeHints := convert_route_hints(invoice.RouteHints)
+
+	featureBits := getFeatureBits(invoice.Features)
+
+	log.Printf("routehints: %+v \n\n", routeHints)
+
 	queryRoutes := lnrpc.QueryRoutesRequest{
-		PubKey:  hex.EncodeToString(invoice.Destination.SerializeCompressed()),
-		AmtMsat: int64(*invoice.MilliSat),
+		PubKey:     hex.EncodeToString(invoice.Destination.SerializeCompressed()),
+		AmtMsat:    int64(*invoice.MilliSat),
+		RouteHints: routeHints,
+
+		DestFeatures: featureBits,
 	}
 
 	res, err := client.QueryRoutes(ctx, &queryRoutes)
+
+	log.Printf("QueryRoutes: %+v \n\n", res)
+	log.Printf("QueryRoutes err: %+v", res)
 
 	if err != nil {
 		return nil, err
@@ -107,14 +155,13 @@ func SetupLightingComms() (*LightingComms, error) {
 		return nil, fmt.Errorf("LND_CERT_PATH not available")
 	}
 
+	certPool := x509.NewCertPool()
+	appendOk := certPool.AppendCertsFromPEM([]byte(pem_cert))
 
-    certPool := x509.NewCertPool()
-    appendOk := certPool.AppendCertsFromPEM([]byte(pem_cert))
-
-    if !appendOk {
-        log.Printf("x509.AppendCertsFromPEM(): failed")
-        return nil, fmt.Errorf("x509.AppendCertsFromPEM(): failed")
-    }
+	if !appendOk {
+		log.Printf("x509.AppendCertsFromPEM(): failed")
+		return nil, fmt.Errorf("x509.AppendCertsFromPEM(): failed")
+	}
 
 	certFile := credentials.NewClientTLSFromCert(certPool, "")
 
@@ -132,9 +179,9 @@ func SetupLightingComms() (*LightingComms, error) {
 
 	macaroon := os.Getenv(LND_MACAROON)
 
-    if macaroon == "" {
-        return nil, fmt.Errorf("LND_MACAROON_PATH not available")
-    }
+	if macaroon == "" {
+		return nil, fmt.Errorf("LND_MACAROON_PATH not available")
+	}
 
 	return &LightingComms{Macaroon: macaroon, RpcClient: clientConn}, nil
 }
