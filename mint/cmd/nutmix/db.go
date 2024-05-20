@@ -115,9 +115,9 @@ func SaveQuoteMeltRequest(pool *pgxpool.Pool, request cashu.MeltRequestDB) error
 	}
 	return nil
 }
-func ModifyQuoteMeltPayStatus(pool *pgxpool.Pool, request cashu.MeltRequestDB) error {
+func ModifyQuoteMeltPayStatus(pool *pgxpool.Pool, paid bool, request string) error {
 	// change the paid status of the quote
-	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET paid = $1 WHERE quote = $2", request.Paid, request.Quote)
+	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET paid = $1 WHERE quote = $2", paid, request)
 	if err != nil {
 		return fmt.Errorf("Inserting to mint_request: %v", err)
 

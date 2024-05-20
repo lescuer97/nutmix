@@ -196,11 +196,44 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		quoteId := c.Param("quote")
 
 		quote, err := GetMintQuoteById(pool, quoteId)
-
 		if err != nil {
-			log.Println(fmt.Errorf("GetQuoteById: %w", err))
+			log.Println(fmt.Errorf("GetMintQuoteById: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
+		}
+
+		lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
+		switch lightningBackendType {
+
+		case comms.FAKE_WALLET:
+			quote.Paid = true
+			err := ModifyQuoteMintPayStatus(pool, quote)
+			if err != nil {
+				log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
+		case comms.LND_WALLET:
+			invoiceDB, err := mint.LightningComs.CheckIfInvoicePayed(quote.Quote)
+			if err != nil {
+				log.Println(fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+			if invoiceDB.State == lnrpc.Invoice_SETTLED {
+				quote.Paid = true
+				err := ModifyQuoteMintPayStatus(pool, quote)
+				if err != nil {
+					log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
+					c.JSON(500, "Opps!, something went wrong")
+					return
+				}
+
+			} else {
+				c.JSON(400, "Quote not paid")
+				return
+			}
 		}
 
 		c.JSON(200, quote)
@@ -242,6 +275,12 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		case comms.LND_WALLET:
 			invoiceDB, err := mint.LightningComs.CheckIfInvoicePayed(quote.Quote)
 
+			if err != nil {
+				log.Println(fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
 			if invoiceDB.State == lnrpc.Invoice_SETTLED {
 				quote.Paid = true
 				err := ModifyQuoteMintPayStatus(pool, quote)
@@ -280,6 +319,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 			// check the amount in outputs are the same as the quote
 			if int32(*invoice.MilliSat) != int32(amountMilsats) {
+				log.Println(fmt.Errorf("wrong amount of milisats: %w, needed", int32(*invoice.MilliSat), int32(amountMilsats)))
 				c.JSON(400, "Amounts in outputs are not the same")
 				return
 			}
@@ -504,6 +544,40 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
+		lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
+		switch lightningBackendType {
+
+		case comms.FAKE_WALLET:
+			quote.Paid = true
+			err := ModifyQuoteMeltPayStatus(pool, quote.Paid, quote.Request)
+			if err != nil {
+				log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
+		case comms.LND_WALLET:
+			invoiceDB, err := mint.LightningComs.CheckIfInvoicePayed(quote.Quote)
+			if err != nil {
+				log.Println(fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+			if invoiceDB.State == lnrpc.Invoice_SETTLED {
+				quote.Paid = true
+				err := ModifyQuoteMeltPayStatus(pool, quote.Paid, quote.Request)
+				if err != nil {
+					log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
+					c.JSON(500, "Opps!, something went wrong")
+					return
+				}
+
+			} else {
+				c.JSON(400, "Quote not paid")
+				return
+			}
+		}
+
 		c.JSON(200, quote.GetPostMeltQuoteResponse())
 	})
 
@@ -601,14 +675,18 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-			if payment.PaymentError == "invoice is already paid" {
+			switch {
+			case payment.PaymentError == "invoice is already paid":
 				c.JSON(400, "invoice is already paid")
 				return
-			}
-
-			if payment.PaymentError == "unable to find a path to destination" {
+			case payment.PaymentError == "unable to find a path to destination":
 				c.JSON(400, "unable to find a path to destination")
 				return
+			case payment.PaymentError != "":
+				log.Printf("unknown lighting error: %+v", payment.PaymentError)
+				c.JSON(400, "unable to find a path to destination")
+				return
+
 			}
 
 			response = cashu.PostMeltBolt11Response{
@@ -622,10 +700,16 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		// send proofs to database
 		err = SaveProofs(pool, meltRequest.Inputs)
-
 		if err != nil {
 			log.Println(fmt.Errorf("SaveProofs: %w", err))
 			log.Println(fmt.Errorf("Proofs: %+v", meltRequest.Inputs))
+			c.JSON(200, response)
+			return
+		}
+		err = ModifyQuoteMeltPayStatus(pool, true, meltRequest.Quote)
+
+		if err != nil {
+			log.Println(fmt.Errorf("ModifyQuoteMeltPayStatus: %w", err))
 			c.JSON(200, response)
 			return
 		}
