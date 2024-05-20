@@ -124,20 +124,19 @@ func (l *LightingComms) QueryPayment(invoice *zpay32.Invoice) (*lnrpc.QueryRoute
 
 	featureBits := getFeatureBits(invoice.Features)
 
-	log.Printf("routehints: %+v \n\n", routeHints)
-
 	queryRoutes := lnrpc.QueryRoutesRequest{
-		PubKey:     hex.EncodeToString(invoice.Destination.SerializeCompressed()),
-		AmtMsat:    int64(*invoice.MilliSat),
-		RouteHints: routeHints,
-
-		DestFeatures: featureBits,
+		PubKey:            hex.EncodeToString(invoice.Destination.SerializeCompressed()),
+		AmtMsat:           int64(*invoice.MilliSat),
+		RouteHints:        routeHints,
+		DestFeatures:      featureBits,
+		UseMissionControl: true,
 	}
 
 	res, err := client.QueryRoutes(ctx, &queryRoutes)
 
-	log.Printf("QueryRoutes: %+v \n\n", res)
-	log.Printf("QueryRoutes err: %+v", res)
+	if res == nil {
+		return nil, fmt.Errorf("No routes found")
+	}
 
 	if err != nil {
 		return nil, err

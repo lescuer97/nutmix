@@ -606,6 +606,11 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
+			if payment.PaymentError == "unable to find a path to destination" {
+				c.JSON(400, "unable to find a path to destination")
+				return
+			}
+
 			response = cashu.PostMeltBolt11Response{
 				Paid:            true,
 				PaymentPreimage: string(payment.PaymentPreimage),
