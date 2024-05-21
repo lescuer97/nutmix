@@ -66,10 +66,8 @@ func main() {
 
 	r := gin.Default()
 
-
-
-    config := cors.DefaultConfig()
-    config.AllowOrigins = []string{"https://"+os.Getenv("MINT_HOSTNAME"), "http://"+os.Getenv("MINT_HOSTNAME")}
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
 
 	r.Use(cors.Default())
 
