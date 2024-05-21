@@ -96,10 +96,10 @@ func SaveQuoteMintRequest(pool *pgxpool.Pool, request cashu.PostMintQuoteBolt11R
 	}
 	return nil
 }
-func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, request cashu.PostMintQuoteBolt11Response) error {
+func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, paid bool, request string) error {
 
 	// change the paid status of the quote
-	_, err := pool.Exec(context.Background(), "UPDATE mint_request SET paid = $1 WHERE quote = $2", request.Paid, request.Quote)
+	_, err := pool.Exec(context.Background(), "UPDATE mint_request SET paid = $1 WHERE quote = $2", paid, request)
 	if err != nil {
 		return fmt.Errorf("Inserting to mint_request: %v", err)
 

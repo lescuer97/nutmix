@@ -9,9 +9,11 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/pkg/crypto"
+	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/tyler-smith/go-bip32"
 )
 
@@ -31,6 +33,7 @@ var (
 	ErrKeysetNotFound         = errors.New("Keyset not found")
 	ErrKeysetForProofNotFound = errors.New("Keyset for proof not found")
 	ErrInvalidProof           = errors.New("Invalid proof")
+	ErrQuoteNotPaid           = errors.New("Quote not paid")
 )
 
 func (m *Mint) ValidateProof(proof cashu.Proof) error {
@@ -171,4 +174,41 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 	}
 
 	return mint, nil
+}
+
+type AddToDBFunc func(*pgxpool.Pool,bool, string) error
+
+func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, request string , dbCall AddToDBFunc) (bool, error){
+    
+
+		lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
+		switch lightningBackendType {
+
+		case comms.FAKE_WALLET:
+			err := dbCall(pool, true,  request)
+			if err != nil {
+				return false, fmt.Errorf("dbCall: %w", err)
+			}
+
+            return true, nil
+
+		case comms.LND_WALLET:
+			invoiceDB, err := m.LightningComs.CheckIfInvoicePayed(request)
+			if err != nil {
+				return false ,fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err) 
+			}
+			if invoiceDB.State == lnrpc.Invoice_SETTLED {
+			    err := dbCall(pool, true,  request)
+				if err != nil {
+				    return false ,fmt.Errorf("dbCall: %w", err) 
+				}
+                return true, nil
+
+			} else {
+
+				return false, nil
+			}
+
+		}
+        return false, nil
 }
