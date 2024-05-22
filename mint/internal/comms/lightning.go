@@ -43,14 +43,15 @@ func (l *LightingComms) RequestInvoice(amount int64) (*lnrpc.AddInvoiceResponse,
 	return res, nil
 
 }
-func (l *LightingComms) CheckIfInvoicePayed(hash string) (*lnrpc.Invoice, error) {
+func (l *LightingComms) CheckIfInvoicePayed(quote string) (*lnrpc.Invoice, error) {
 
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
 
 	client := lnrpc.NewLightningClient(l.RpcClient)
-	decodedHash, err := hex.DecodeString(hash)
+
+	decodedHash, err := hex.DecodeString(quote)
 	if err != nil {
-		return nil, err
+        return nil, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote ) 
 	}
 
 	rhash := lnrpc.PaymentHash{

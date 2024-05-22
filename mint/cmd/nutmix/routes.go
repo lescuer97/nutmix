@@ -202,7 +202,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-        ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Request, ModifyQuoteMintPayStatus)
+        ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Quote, ModifyQuoteMintPayStatus)
 
         if err != nil {
             log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
@@ -523,7 +523,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-        ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Request, ModifyQuoteMeltPayStatus)
+        ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Quote, ModifyQuoteMeltPayStatus)
 
         if err != nil {
             log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
