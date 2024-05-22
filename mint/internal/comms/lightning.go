@@ -50,7 +50,7 @@ func (l *LightingComms) CheckIfInvoicePayed(hash string) (*lnrpc.Invoice, error)
 	client := lnrpc.NewLightningClient(l.RpcClient)
 	decodedHash, err := hex.DecodeString(hash)
 	if err != nil {
-		return nil, err
+        return nil, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, hash ) 
 	}
 
 	rhash := lnrpc.PaymentHash{

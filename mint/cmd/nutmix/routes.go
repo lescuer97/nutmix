@@ -253,7 +253,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			blindedSignatures = signedSignatures
 
 		case comms.LND_WALLET:
-			invoiceDB, err := mint.LightningComs.CheckIfInvoicePayed(quote.Quote)
+			invoiceDB, err := mint.LightningComs.CheckIfInvoicePayed(quote.Request)
 
 			if err != nil {
 				log.Println(fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err))
