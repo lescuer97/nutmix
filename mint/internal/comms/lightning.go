@@ -51,7 +51,7 @@ func (l *LightingComms) CheckIfInvoicePayed(quote string) (*lnrpc.Invoice, error
 
 	decodedHash, err := hex.DecodeString(quote)
 	if err != nil {
-        return nil, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote ) 
+		return nil, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
 	}
 
 	rhash := lnrpc.PaymentHash{
@@ -151,6 +151,8 @@ func SetupLightingComms() (*LightingComms, error) {
 		return nil, fmt.Errorf("LND_HOST not available")
 	}
 	pem_cert := os.Getenv(LND_TLS_CERT)
+
+
 	if pem_cert == "" {
 		return nil, fmt.Errorf("LND_CERT_PATH not available")
 	}

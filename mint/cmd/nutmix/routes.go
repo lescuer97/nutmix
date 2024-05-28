@@ -202,19 +202,19 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-        ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Quote, ModifyQuoteMintPayStatus)
+		ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Quote, ModifyQuoteMintPayStatus)
 
-        if err != nil {
-            log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
-            c.JSON(500, "Opps!, something went wrong")
-            return
-        }
+		if err != nil {
+			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
 
-        quote.Paid = ok
-        if !ok {
-            c.JSON(400, "Quote not paid")
-            return 
-        }
+		quote.Paid = ok
+		if !ok {
+			c.JSON(400, "Quote not paid")
+			return
+		}
 
 		c.JSON(200, quote)
 	})
@@ -262,7 +262,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			}
 
 			if invoiceDB.State == lnrpc.Invoice_SETTLED {
-				err := ModifyQuoteMintPayStatus(pool,true, quote.Quote)
+				err := ModifyQuoteMintPayStatus(pool, true, quote.Quote)
 				if err != nil {
 					log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
 					c.JSON(500, "Opps!, something went wrong")
@@ -298,7 +298,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 			// check the amount in outputs are the same as the quote
 			if int32(*invoice.MilliSat) != int32(amountMilsats) {
-				log.Println(fmt.Errorf("wrong amount of milisats: %w, needed", int32(*invoice.MilliSat), int32(amountMilsats)))
+				log.Println(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)))
 				c.JSON(400, "Amounts in outputs are not the same")
 				return
 			}
@@ -523,19 +523,19 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-        ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Quote, ModifyQuoteMeltPayStatus)
+		ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Quote, ModifyQuoteMeltPayStatus)
 
-        if err != nil {
-            log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
-            c.JSON(500, "Opps!, something went wrong")
-            return
-        }
+		if err != nil {
+			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
 
-        quote.Paid = ok
-        if !ok {
-            c.JSON(400, "Quote not paid")
-            return 
-        }
+		quote.Paid = ok
+		if !ok {
+			c.JSON(400, "Quote not paid")
+			return
+		}
 
 		c.JSON(200, quote.GetPostMeltQuoteResponse())
 	})
@@ -633,7 +633,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-            // catch the comm
+			// catch the comm
 			switch {
 			case payment.PaymentError == "invoice is already paid":
 				c.JSON(400, "invoice is already paid")

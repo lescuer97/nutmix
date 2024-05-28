@@ -140,13 +140,22 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 		return mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
-	lightningComs, err := comms.SetupLightingComms()
+	lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
+	switch lightningBackendType {
 
-	if err != nil {
-		return mint, err
+	case comms.FAKE_WALLET:
+
+	case comms.LND_WALLET:
+		lightningComs, err := comms.SetupLightingComms()
+
+		if err != nil {
+			return mint, err
+		}
+		mint.LightningComs = *lightningComs
+	default:
+		log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
 	}
 
-	mint.LightningComs = *lightningComs
 	mint.PendingProofs = make([]cashu.Proof, 0)
 
 	// uses seed to generate the keysets
@@ -176,37 +185,37 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 	return mint, nil
 }
 
-type AddToDBFunc func(*pgxpool.Pool,bool, string) error
+type AddToDBFunc func(*pgxpool.Pool, bool, string) error
 
-func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quote string , dbCall AddToDBFunc) (bool, error){
-		lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
-		switch lightningBackendType {
+func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (bool, error) {
+	lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
+	switch lightningBackendType {
 
-		case comms.FAKE_WALLET:
-			err := dbCall(pool, true,  quote)
+	case comms.FAKE_WALLET:
+		err := dbCall(pool, true, quote)
+		if err != nil {
+			return false, fmt.Errorf("dbCall: %w", err)
+		}
+
+		return true, nil
+
+	case comms.LND_WALLET:
+		invoiceDB, err := m.LightningComs.CheckIfInvoicePayed(quote)
+		if err != nil {
+			return false, fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
+		}
+		if invoiceDB.State == lnrpc.Invoice_SETTLED {
+			err := dbCall(pool, true, quote)
 			if err != nil {
 				return false, fmt.Errorf("dbCall: %w", err)
 			}
+			return true, nil
 
-            return true, nil
+		} else {
 
-		case comms.LND_WALLET:
-			invoiceDB, err := m.LightningComs.CheckIfInvoicePayed(quote)
-			if err != nil {
-				return false ,fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err) 
-			}
-			if invoiceDB.State == lnrpc.Invoice_SETTLED {
-			    err := dbCall(pool, true, quote)
-				if err != nil {
-				    return false ,fmt.Errorf("dbCall: %w", err) 
-				}
-                return true, nil
-
-			} else {
-
-				return false, nil
-			}
-
+			return false, nil
 		}
-        return false, nil
+
+	}
+	return false, nil
 }
