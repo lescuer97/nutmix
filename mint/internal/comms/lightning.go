@@ -152,7 +152,6 @@ func SetupLightingComms() (*LightingComms, error) {
 	}
 	pem_cert := os.Getenv(LND_TLS_CERT)
 
-
 	if pem_cert == "" {
 		return nil, fmt.Errorf("LND_CERT_PATH not available")
 	}
