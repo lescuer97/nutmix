@@ -3,6 +3,7 @@ package cashu
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -24,7 +25,7 @@ func DeriveKeysetId(keysets []Keyset) (string, error) {
 	return "00" + hex[:14], nil
 }
 
-func GenerateKeysets(masterKey *bip32.Key, values []int, id string) ([]Keyset, error) {
+func GenerateKeysets(masterKey *bip32.Key, values []int, id string, unit Unit) ([]Keyset, error) {
 	var keysets []Keyset
 
 	// Get the current time
@@ -43,7 +44,7 @@ func GenerateKeysets(masterKey *bip32.Key, values []int, id string) ([]Keyset, e
 		keyset := Keyset{
 			Id:        id,
 			Active:    true,
-			Unit:      Sat.String(),
+			Unit:      unit.String(),
 			Amount:    value,
 			PrivKey:   privKey,
 			CreatedAt: formattedTime,
@@ -55,42 +56,71 @@ func GenerateKeysets(masterKey *bip32.Key, values []int, id string) ([]Keyset, e
 	return keysets, nil
 }
 
-func SetUpSeedAndKeyset() (Seed, []Keyset, error) {
-	seed, err := bip32.NewSeed()
-
-	if err != nil {
-		return Seed{}, nil, err
-
-	}
+func SetUpSeedAndKeyset(masterKey *bip32.Key, version int, unit Unit) (Seed, error) {
 	// Get the current time
 	currentTime := time.Now().Unix()
 
-	// // Format the time as a string
-	masterKey, err := bip32.NewMasterKey(seed)
+	// Derive key from version
 
-	list_of_keys, err := GenerateKeysets(masterKey, PosibleKeysetValues, "")
+	versionKey, err := masterKey.NewChildKey(uint32(version))
 
 	if err != nil {
-		return Seed{}, nil, err
+		return Seed{}, fmt.Errorf("Error deriving key from version: %v", err)
+	}
+
+	list_of_keys, err := GenerateKeysets(versionKey, PosibleKeysetValues, "", unit)
+
+	if err != nil {
+		return Seed{}, err
 	}
 
 	id, err := DeriveKeysetId(list_of_keys)
 
 	if err != nil {
-		return Seed{}, nil, err
-	}
-
-	for i := range list_of_keys {
-		list_of_keys[i].Id = id
+		return Seed{}, err
 	}
 
 	newSeed := Seed{
-		Seed:      seed,
+		Seed:      versionKey.Key,
 		Active:    true,
 		CreatedAt: currentTime,
-		Unit:      Sat.String(),
+		Unit:      unit.String(),
 		Id:        id,
+		Version:   version,
 	}
 
-	return newSeed, list_of_keys, nil
+	return newSeed, nil
+}
+
+func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) ([]Seed, error) {
+	key_bytes, err := hex.DecodeString(keyFromMint)
+
+	var seeds []Seed
+
+	if err != nil {
+		return nil, fmt.Errorf("Error decoding mint private key: %+v ", err)
+	}
+
+	masterKey, err := bip32.NewMasterKey(key_bytes)
+
+	if err != nil {
+		return nil, fmt.Errorf("Error creating master key: %+v ", err)
+	}
+
+	for _, seedDerivationPath := range availableSeeds {
+
+		// Set the derivation for each type of ecash. Ex: sat, usd, eur
+		seedKey, err := masterKey.NewChildKey(uint32(seedDerivationPath))
+
+		if err != nil {
+			return nil, fmt.Errorf("could not generate derivation por seed: %+v ", err)
+		}
+
+		seed, err := SetUpSeedAndKeyset(seedKey, version, seedDerivationPath)
+
+		seeds = append(seeds, seed)
+
+	}
+
+	return seeds, nil
 }

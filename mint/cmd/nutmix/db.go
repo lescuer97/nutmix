@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-func DatabaseSetup() (*pgxpool.Pool, error) {
+func DatabaseSetup(migrationDir string) (*pgxpool.Pool, error) {
 	databaseConUrl := os.Getenv("DATABASE_URL")
 
 	pool, err := pgxpool.New(context.Background(), databaseConUrl)
@@ -23,7 +23,7 @@ func DatabaseSetup() (*pgxpool.Pool, error) {
 
 	db := stdlib.OpenDBFromPool(pool)
 
-	if err := goose.Up(db, "migrations"); err != nil {
+	if err := goose.Up(db, migrationDir); err != nil {
 		log.Fatalf("Error running migrations: %v", err)
 	}
 
@@ -79,7 +79,24 @@ func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
 }
 
 func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
-	_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id) VALUES ($1, $2, $3, $4, $5)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id)
+	_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id, version) VALUES ($1, $2, $3, $4, $5, $6)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version)
+
+	if err != nil {
+		return fmt.Errorf("inserting to DB: %v", err)
+	}
+	return nil
+}
+func SaveNewSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
+
+	entries := [][]any{}
+	columns := []string{"seed", "active", "created_at", "unit", "id", "version"}
+	tableName := "seeds"
+
+	for _, seed := range seeds {
+		entries = append(entries, []any{seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version})
+	}
+
+	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
 	if err != nil {
 		return fmt.Errorf("inserting to DB: %v", err)
@@ -89,7 +106,7 @@ func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
 
 func SaveQuoteMintRequest(pool *pgxpool.Pool, request cashu.PostMintQuoteBolt11Response) error {
 
-	_, err := pool.Exec(context.Background(), "INSERT INTO mint_request (quote, request, paid, expiry) VALUES ($1, $2, $3, $4)", request.Quote, request.Request, request.Paid, request.Expiry)
+	_, err := pool.Exec(context.Background(), "INSERT INTO mint_request (quote, request, paid, expiry, unit) VALUES ($1, $2, $3, $4, $5)", request.Quote, request.Request, request.Paid, request.Expiry, request.Unit)
 	if err != nil {
 		return fmt.Errorf("Inserting to mint_request: %v", err)
 

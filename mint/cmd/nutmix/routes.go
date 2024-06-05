@@ -33,7 +33,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		id := c.Param("id")
 
-		keysets, err := mint.GetKeysetById(cashu.Sat.String(), id)
+		keysets, err := mint.GetKeysetById(id)
 
 		if err != nil {
 			log.Printf("GetKeysetById: %+v ", err)
@@ -175,6 +175,8 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				Request: resInvoice.GetPaymentRequest(),
 				Paid:    false,
 				Expiry:  cashu.ExpiryTime,
+                Unit:   mintRequest.Unit,
+
 			}
 
 		default:
@@ -243,7 +245,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		switch lightningBackendType {
 
 		case comms.FAKE_WALLET:
-			signedSignatures, err := mint.SignBlindedMessages(mintRequest.Outputs, cashu.Sat.String())
+			signedSignatures, err := mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
 
 			if err != nil {
 				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
@@ -303,7 +305,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-			signedSignatures, err := mint.SignBlindedMessages(mintRequest.Outputs, cashu.Sat.String())
+			signedSignatures, err := mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
 
 			if err != nil {
 				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
@@ -335,6 +337,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			c.JSON(400, "Inputs or Outputs are empty")
 			return
 		}
+
 
 		// check proof have the same amount as blindedSignatures
 		for i, proof := range swapRequest.Inputs {
@@ -376,10 +379,18 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
+        unit, err := mint.CheckProofsAreSameUnit(swapRequest.Inputs)
+
+        if err != nil {
+            log.Printf("CheckProofsAreSameUnit: %+v", err)
+            c.JSON(400, "Proofs are not the same unit")
+            return
+        }
+
 		// verify the proofs signatures are correct
 		for _, proof := range swapRequest.Inputs {
 
-			err := mint.ValidateProof(proof)
+			err := mint.ValidateProof(proof, unit)
 			if err != nil {
 				log.Println(fmt.Errorf("ValidateProof: %w", err))
 				c.JSON(403, "Invalid Proof")
@@ -605,9 +616,17 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
+        unit, err := mint.CheckProofsAreSameUnit(meltRequest.Inputs)
+
+        if err != nil {
+            log.Printf("CheckProofsAreSameUnit: %+v", err)
+            c.JSON(400, "Proofs are not the same unit")
+            return
+        }
+
 		// verify the proofs signatures are correct
 		for _, proof := range meltRequest.Inputs {
-			err := mint.ValidateProof(proof)
+			err := mint.ValidateProof(proof, unit)
 			if err != nil {
 				c.JSON(403, "Invalid Proof")
 				return

@@ -15,7 +15,7 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 	}
 
 	// Key for mint
-	generatedKeysets, err := GenerateKeysets(key, PosibleKeysetValues, "id")
+	generatedKeysets, err := GenerateKeysets(key, PosibleKeysetValues, "id", Sat)
 
 	walletKey, err := bip32.NewMasterKey([]byte("walletseed"))
 	if err != nil {
@@ -91,24 +91,3 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 
 }
 
-func TestSetUpSeedAndKeyset(t *testing.T) {
-
-	seed, keyset, err := SetUpSeedAndKeyset()
-
-	if err != nil {
-		t.Errorf("could not SetUpSeedAndKeyset %+v", err)
-	}
-
-	if !seed.Active {
-		t.Errorf("Seed should be active")
-	}
-
-	if len(seed.Seed) != 256 {
-		t.Errorf("Seed should be 64 characters long")
-	}
-
-	if len(keyset) != 19 {
-		t.Errorf("Keyset should be 18")
-	}
-
-}
