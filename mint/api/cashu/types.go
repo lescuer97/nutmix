@@ -15,16 +15,30 @@ var ExpiryTime int64 = time.Now().Add(15 * time.Minute).Unix()
 type Unit int
 
 const Sat Unit = iota + 1
+const Msat Unit = iota + 2
 
 // String - Creating common behavior - give the type a String function
 func (d Unit) String() string {
-	return [...]string{"sat"}[d-1]
+	return [...]string{"sat", "msat"}[d-1]
 }
 
 // EnumIndex - Creating common behavior - give the type a EnumIndex functio
 func (d Unit) EnumIndex() int {
 	return int(d)
 }
+
+func UnitFromString(s string) (Unit, error) {
+	switch s {
+	case "sat":
+		return Sat, nil
+	case "msat":
+		return Msat, nil
+	default:
+		return 0, fmt.Errorf("Invalid unit: %s", s)
+	}
+}
+
+var AvailableSeeds []Unit = []Unit{Sat}
 
 type BlindedMessage struct {
 	Amount int32  `json:"amount"`
@@ -116,6 +130,7 @@ type Seed struct {
 	Seed      []byte
 	Active    bool
 	CreatedAt int64
+	Version   int
 	Unit      string
 	Id        string
 }
@@ -161,6 +176,7 @@ type PostMintQuoteBolt11Response struct {
 	Request string `json:"request"`
 	Paid    bool   `json:"paid"`
 	Expiry  int64  `json:"expiry"`
+    Unit   string `json:"unit"`
 }
 
 type PostMintBolt11Request struct {
