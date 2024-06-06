@@ -4,13 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/tyler-smith/go-bip32"
 )
 
-var PosibleKeysetValues []int = []int{0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072}
 
 func DeriveKeysetId(keysets []Keyset) (string, error) {
 	concatBinaryArray := []byte{}
@@ -25,7 +25,7 @@ func DeriveKeysetId(keysets []Keyset) (string, error) {
 	return "00" + hex[:14], nil
 }
 
-func GenerateKeysets(masterKey *bip32.Key, values []int, id string, unit Unit) ([]Keyset, error) {
+func GenerateKeysets(masterKey *bip32.Key, values []uint64, id string, unit Unit) ([]Keyset, error) {
 	var keysets []Keyset
 
 	// Get the current time
@@ -68,7 +68,7 @@ func SetUpSeedAndKeyset(masterKey *bip32.Key, version int, unit Unit) (Seed, err
 		return Seed{}, fmt.Errorf("Error deriving key from version: %v", err)
 	}
 
-	list_of_keys, err := GenerateKeysets(versionKey, PosibleKeysetValues, "", unit)
+	list_of_keys, err := GenerateKeysets(versionKey, GetAmountsForKeysets(), "", unit)
 
 	if err != nil {
 		return Seed{}, err
@@ -124,6 +124,18 @@ func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) 
 
 	return seeds, nil
 }
+
+const MaxKeysetAmount int = 64
+
+func GetAmountsForKeysets() []uint64 {
+    keys := make([]uint64, MaxKeysetAmount)
+
+	for i := 0; i < MaxKeysetAmount; i++ {
+        keys = append(keys, uint64(math.Pow(2, float64(i))))
+	}
+    return keys
+}
+
 // Given an amount, it returns list of amounts e.g 13 -> [1, 4, 8]
 // that can be used to build blinded messages or split operations.
 // from nutshell implementation

@@ -17,7 +17,7 @@ import (
 	"github.com/tyler-smith/go-bip32"
 )
 
-type KeysetMap map[int]cashu.Keyset
+type KeysetMap map[uint64]cashu.Keyset
 
 type Mint struct {
 	ActiveKeysets map[string]KeysetMap
@@ -83,7 +83,7 @@ func(m *Mint) CheckProofsAreSameUnit( proofs []cashu.Proof) (cashu.Unit, error) 
 func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit) error {
 	var keysetToUse cashu.Keyset
 	for _, keyset := range m.Keysets[unit.String()] {
-		if keyset.Amount == int(proof.Amount) && keyset.Id == proof.Id {
+		if keyset.Amount == proof.Amount && keyset.Id == proof.Id {
 			keysetToUse = keyset
 			break
 		}
@@ -121,7 +121,7 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 
 	for _, output := range outputs {
 
-		correctKeyset := m.ActiveKeysets[unit][int(output.Amount)]
+		correctKeyset := m.ActiveKeysets[unit][output.Amount]
 
         // if correctKeyset == nil {
         //     return nil, ErrKeysetNotFound
@@ -231,7 +231,7 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 			return mint, err
 		}
 
-		keysets, err := cashu.GenerateKeysets(masterKey, cashu.PosibleKeysetValues, seed.Id, unit)
+		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit)
 
 		if err != nil {
 			return mint, fmt.Errorf("GenerateKeysets: %v", err)

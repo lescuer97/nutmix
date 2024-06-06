@@ -15,7 +15,7 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 	}
 
 	// Key for mint
-	generatedKeysets, err := GenerateKeysets(key, PosibleKeysetValues, "id", Sat)
+	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat)
 
 	walletKey, err := bip32.NewMasterKey([]byte("walletseed"))
 	if err != nil {

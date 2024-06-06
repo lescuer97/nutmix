@@ -29,7 +29,7 @@ func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
 
 		for _, keyset := range value {
 
-			keysetResponse.Keys[strconv.Itoa(keyset.Amount)] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
+			keysetResponse.Keys[strconv.FormatUint(keyset.Amount, 10)] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
 		}
 
 		res["keysets"] = append(res["keysets"], keysetResponse)

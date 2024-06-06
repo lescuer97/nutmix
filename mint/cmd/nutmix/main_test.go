@@ -58,6 +58,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
     router, mint := SetupRoutingForTesting()
 
+    // MINTING TESTING STARTS
+
     // request mint quote of 1000 sats
     w := httptest.NewRecorder()
 
@@ -82,8 +84,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
         t.Errorf("Error unmarshalling response: %v", err)
     }
 
-    if !postMintQuoteResponse.Paid {
-        t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponse.Paid)
+    if !postMintQuoteResponse.RequestPaid {
+        t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponse.RequestPaid)
     }
 
     if postMintQuoteResponse.Unit != "sat" {
@@ -102,13 +104,12 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
     err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
-
     if err != nil {
         t.Fatalf("Error unmarshalling response: %v", err)
     }
 
-    if !postMintQuoteResponseTwo.Paid {
-        t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponseTwo.Paid)
+    if !postMintQuoteResponseTwo.RequestPaid {
+        t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponseTwo.RequestPaid)
     }
 
     if postMintQuoteResponseTwo.Unit != "sat" {
@@ -130,7 +131,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
     }
 
     jsonRequestBody, _ = json.Marshal(mintRequest)
-
 
     req = httptest.NewRequest("POST", "/v1/mint/bolt11",strings.NewReader(string(jsonRequestBody)))
 
@@ -164,6 +164,74 @@ func TestMintBolt11FakeWallet(t *testing.T) {
         t.Errorf("Expected id to be %s, got %s", mint.ActiveKeysets[cashu.Sat.String()][0].Id, postMintResponse.Signatures[0].Id)
     }
 
+
+    // try to remint tokens with other blinded signatures
+    reMintBlindedMessages, _,_ ,  err := createBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][0])
+    if err != nil {
+        t.Fatalf("could not createBlind message: %v", err)
+    }
+
+    reMintRequest := cashu.PostMintBolt11Request {
+        Quote: postMintQuoteResponse.Quote,
+        Outputs: reMintBlindedMessages,
+    }
+
+    jsonRequestBody, _ = json.Marshal(reMintRequest)
+
+    req = httptest.NewRequest("POST", "/v1/mint/bolt11",strings.NewReader(string(jsonRequestBody)))
+
+    w = httptest.NewRecorder()
+    router.ServeHTTP(w, req)
+
+    if w.Code != 400 {
+        t.Fatalf("Expected status code 400, got %d", w.Code)
+    }
+
+    if w.Body.String() != "Quote already Minted" {
+        t.Errorf("Expected Quote already used, got %s", w.Body.String())
+    }
+
+    // Mining with a Token that is bigger that what is Available
+    w = httptest.NewRecorder()
+    mintExcessQuoteRequest := cashu.PostMintQuoteBolt11Request {
+        Amount: 10000000,
+        Unit: cashu.Sat.String(),
+    }
+    jsonRequestBody, _ = json.Marshal(mintExcessQuoteRequest)
+
+    req = httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+    router.ServeHTTP(w,req)
+
+    excesMintingBlindMessage, _,_ ,  err := createBlindedMessages(10000000, mint.ActiveKeysets[cashu.Sat.String()][0])
+
+    err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
+
+    if err != nil {
+        t.Errorf("Error unmarshalling response: %v", err)
+    }
+
+    excessMintRequest := cashu.PostMintBolt11Request {
+        Quote: postMintQuoteResponse.Quote,
+        Outputs: excesMintingBlindMessage,
+    }
+
+    jsonRequestBody, _ = json.Marshal(excessMintRequest)
+
+    req = httptest.NewRequest("POST", "/v1/mint/bolt11",strings.NewReader(string(jsonRequestBody)))
+
+    w = httptest.NewRecorder()
+
+    router.ServeHTTP(w, req)
+
+    fmt.Println(w.Body.String())
+
+
+    
+
+    // MINTING TESTING ENDS
+
+    // SWAP TESTING STARTS
 
     // try to swap tokens
     swapProofs, err := generateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
@@ -218,7 +286,10 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
     w.Flush()
 
+    // SWAP TESTING ENDS
 
+
+    // MELTING TESTING STARTS
 
     // test melt tokens
     meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
@@ -300,6 +371,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
     if postMeltResponse.PaymentPreimage != "MockPaymentPreimage" {
         t.Errorf("Expected payment preimage to be empty, got %s", postMeltResponse.PaymentPreimage)
     }
+    // MELTING TESTING ENDS
 
 	// Clean up the container
 	defer func() {

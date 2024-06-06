@@ -288,7 +288,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-			var amount int32 = 0
+			var amount uint64 = 0
 
 			for _, output := range mintRequest.Outputs {
 				amount += output.Amount
@@ -341,7 +341,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		err := c.BindJSON(&swapRequest)
 
-		var AmountProofs, AmountSignature int32
+		var AmountProofs, AmountSignature uint64
 		var CList, SecretsList []string
 
 		if len(swapRequest.Inputs) == 0 || len(swapRequest.Outputs) == 0 {
@@ -468,7 +468,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				Paid:       true,
 				Expiry:     cashu.ExpiryTime,
 				FeeReserve: 1,
-				Amount:     int64(*invoice.MilliSat) / 1000,
+				Amount:     uint64(*invoice.MilliSat) / 1000,
 				Quote:      randUuid.String(),
 			}
 
@@ -505,7 +505,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				Paid:       false,
 				Expiry:     cashu.ExpiryTime,
 				FeeReserve: fee,
-				Amount:     int64(*invoice.MilliSat) / 1000,
+				Amount:     uint64(*invoice.MilliSat) / 1000,
 				Quote:      randUuid.String(),
 			}
 
@@ -584,7 +584,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 
 		var CList, SecretList []string
-		var AmountProofs int32
+		var AmountProofs uint64
 
 		// check proof have the same amount as blindedSignatures
 		for i, proof := range meltRequest.Inputs {
@@ -605,7 +605,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		}
 
-		if AmountProofs < int32(quote.Amount) {
+		if AmountProofs < quote.Amount {
 			log.Printf("Not enought proofs to expend. Needs: %v", quote.Amount)
 			c.JSON(403, "Not enought proofs to expend. Needs: %v")
 			return
