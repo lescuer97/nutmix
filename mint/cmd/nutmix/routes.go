@@ -156,7 +156,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			response = cashu.PostMintQuoteBolt11Response{
 				Quote:   randUuid.String(),
 				Request: payReq,
-				Paid:    true,
+				RequestPaid:    true,
 				Expiry:  cashu.ExpiryTime,
                 Unit:   mintRequest.Unit,
 			}
@@ -174,7 +174,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			response = cashu.PostMintQuoteBolt11Response{
 				Quote:   hash,
 				Request: resInvoice.GetPaymentRequest(),
-				Paid:    false,
+				RequestPaid:    false,
 				Expiry:  cashu.ExpiryTime,
                 Unit:   mintRequest.Unit,
 
@@ -205,7 +205,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-		ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Quote, ModifyQuoteMintPayStatus)
+		ok, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, ModifyQuoteMintPayStatus)
 
 		if err != nil {
 			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
@@ -213,7 +213,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-		quote.Paid = ok
+		quote.RequestPaid = ok
 
 		c.JSON(200, quote)
 	})
@@ -230,11 +230,17 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		}
 
 		quote, err := GetMintQuoteById(pool, mintRequest.Quote)
+
 		if err != nil {
 			log.Printf("Incorrect body: %+v", err)
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+
+        if quote.Minted {
+            c.JSON(400, "Quote already minted")
+            return 
+        }
 
 		blindedSignatures := []cashu.BlindSignature{}
 
@@ -259,6 +265,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
+            fmt.Printf("invoiceDB: %+v \n\n ", invoiceDB)
 
 			if invoiceDB.State == lnrpc.Invoice_SETTLED {
 				err := ModifyQuoteMintPayStatus(pool, true, quote.Quote)
@@ -314,6 +321,14 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		default:
 			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
 		}
+
+        quote.Minted = true
+
+		err = ModifyQuoteMintMintedStatus(pool,quote.Minted,  quote.Quote)
+
+        if err != nil {
+            log.Println(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err))
+        }
 
 		// Store BlidedSignature
 		c.JSON(200, cashu.PostMintBolt11Response{
@@ -464,7 +479,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				Expiry:     response.Expiry,
 				Amount:     response.Amount,
 				FeeReserve: response.FeeReserve,
-				Paid:       response.Paid,
+				RequestPaid:       response.Paid,
 			}
 
 		case comms.LND_WALLET:
@@ -501,7 +516,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				Expiry:     response.Expiry,
 				Amount:     response.Amount,
 				FeeReserve: response.FeeReserve,
-				Paid:       response.Paid,
+				RequestPaid:       response.Paid,
 			}
 
 		default:
@@ -531,7 +546,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-		ok, err := mint.VerifyLightingPaymentHappened(pool, quote.Paid, quote.Quote, ModifyQuoteMeltPayStatus)
+		ok, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, ModifyQuoteMeltPayStatus)
 
 		if err != nil {
 			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
@@ -539,7 +554,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-		quote.Paid = ok
+		quote.RequestPaid = ok
 
 		c.JSON(200, quote.GetPostMeltQuoteResponse())
 	})
@@ -566,6 +581,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+
 
 		var CList, SecretList []string
 		var AmountProofs int32
@@ -631,6 +647,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
 		switch lightningBackendType {
 		case comms.FAKE_WALLET:
+            quote.RequestPaid = true
 			response = cashu.PostMeltBolt11Response{
 				Paid:            true,
 				PaymentPreimage: "MockPaymentPreimage",
@@ -659,7 +676,9 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 
 			}
+            fmt.Printf("Payment: %+v \n\n ", payment)
 
+            quote.RequestPaid = true
 			response = cashu.PostMeltBolt11Response{
 				Paid:            true,
 				PaymentPreimage: string(payment.PaymentPreimage),
@@ -669,6 +688,13 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
 		}
 
+        quote.Melted = true
+		err = ModifyQuoteMeltPayStatusAndMelted(pool, quote.RequestPaid, quote.Melted,  meltRequest.Quote)
+		if err != nil {
+			log.Println(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err))
+			c.JSON(200, response)
+			return
+		}
 		// send proofs to database
 		err = SaveProofs(pool, meltRequest.Inputs)
 
@@ -678,13 +704,8 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			c.JSON(200, response)
 			return
 		}
-		err = ModifyQuoteMeltPayStatus(pool, true, meltRequest.Quote)
+        
 
-		if err != nil {
-			log.Println(fmt.Errorf("ModifyQuoteMeltPayStatus: %w", err))
-			c.JSON(200, response)
-			return
-		}
 
 		newPendingProofs := []cashu.Proof{}
 		// remove proofs from pending proofs

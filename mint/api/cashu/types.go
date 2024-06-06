@@ -173,10 +173,11 @@ type PostMintQuoteBolt11Request struct {
 
 type PostMintQuoteBolt11Response struct {
 	Quote   string `json:"quote"`
-	Request string `json:"request"`
-	Paid    bool   `json:"paid"`
+    Request string `json:"request"`
+    RequestPaid bool `json:"paid" db:"request_paid"`
 	Expiry  int64  `json:"expiry"`
     Unit   string `json:"unit"`
+    Minted bool   `json:"minted"`
 }
 
 type PostMintBolt11Request struct {
@@ -200,8 +201,9 @@ type MeltRequestDB struct {
 	Expiry     int64  `json:"expiry"`
 	Amount     int64  `json:"amount"`
 	FeeReserve int64  `json:"fee_reserve" db:"fee_reserve"`
-	Paid       bool   `json:"paid"`
+	RequestPaid       bool   `json:"paid" db:"request_paid"`
 	Request    string `json:"request"`
+    Melted     bool   `json:"melted"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
@@ -209,7 +211,7 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		Quote:      meltRequest.Quote,
 		Amount:     meltRequest.Amount,
 		FeeReserve: meltRequest.FeeReserve,
-		Paid:       meltRequest.Paid,
+		Paid:       meltRequest.RequestPaid,
 		Expiry:     meltRequest.Expiry,
 	}
 
