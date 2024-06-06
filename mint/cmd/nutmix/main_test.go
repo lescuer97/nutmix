@@ -191,7 +191,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
         t.Errorf("Expected Quote already minted, got %s", w.Body.String())
     }
 
-    // Mining with a Token that is bigger that what is Available
+    // Minting with invalid signatures
     w = httptest.NewRecorder()
     mintExcessQuoteRequest := cashu.PostMintQuoteBolt11Request {
         Amount: 10000000,
@@ -211,6 +211,10 @@ func TestMintBolt11FakeWallet(t *testing.T) {
         t.Errorf("Error unmarshalling response: %v", err)
     }
 
+    // make an erroneus signature
+
+    excesMintingBlindMessage[0].B_ = "badsig"
+
     excessMintRequest := cashu.PostMintBolt11Request {
         Quote: postMintQuoteResponse.Quote,
         Outputs: excesMintingBlindMessage,
@@ -223,9 +227,15 @@ func TestMintBolt11FakeWallet(t *testing.T) {
     w = httptest.NewRecorder()
 
     router.ServeHTTP(w, req)
-
-
     
+    if w.Code != 400 {
+        t.Errorf("Expected status code 400, got %d", w.Code)
+    }
+
+    if w.Body.String() != `"Invalid blind message"` {
+        t.Errorf("Expected Invalid blind message, got %s", w.Body.String())
+    }
+
 
     // MINTING TESTING ENDS
 

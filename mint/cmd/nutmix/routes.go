@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -251,7 +252,13 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			signedSignatures, err := mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
 
 			if err != nil {
+
 				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+                if errors.Is(err, ErrInvalidBlindMessage) {
+				    c.JSON(400, ErrInvalidBlindMessage.Error())
+                    return
+                }
+
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}

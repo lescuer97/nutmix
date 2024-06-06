@@ -35,6 +35,7 @@ var (
 	ErrInvalidProof           = errors.New("Invalid proof")
 	ErrQuoteNotPaid           = errors.New("Quote not paid")
     ErrMessageAmountToBig     = errors.New("Message amount is to big")
+    ErrInvalidBlindMessage    = errors.New("Invalid blind message")
 )
 
 func(m *Mint) CheckProofsAreSameUnit( proofs []cashu.Proof) (cashu.Unit, error) {
@@ -123,14 +124,10 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 
 		correctKeyset := m.ActiveKeysets[unit][output.Amount]
 
-        // if correctKeyset == nil {
-        //     return nil, ErrKeysetNotFound
-        // }
-
 		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
 
 		if err != nil {
-			log.Println(fmt.Errorf("GenerateBlindSignature: %w", err))
+            err = fmt.Errorf("GenerateBlindSignature: %w %w",ErrInvalidBlindMessage, err)
 			return nil, err
 		}
 
