@@ -11,7 +11,6 @@ import (
 	"github.com/tyler-smith/go-bip32"
 )
 
-
 func DeriveKeysetId(keysets []Keyset) (string, error) {
 	concatBinaryArray := []byte{}
 	for _, keyset := range keysets {
@@ -34,8 +33,9 @@ func GenerateKeysets(masterKey *bip32.Key, values []uint64, id string, unit Unit
 	// Format the time as a string
 	formattedTime := currentTime.Unix()
 
-	for i, value := range values {
-		childKey, err := masterKey.NewChildKey(uint32(i))
+	for _, value := range values {
+		// uses the value it represents to derive the key
+		childKey, err := masterKey.NewChildKey(uint32(value))
 		if err != nil {
 			return nil, err
 		}
@@ -128,12 +128,12 @@ func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) 
 const MaxKeysetAmount int = 64
 
 func GetAmountsForKeysets() []uint64 {
-    keys := make([]uint64, MaxKeysetAmount)
+	keys := make([]uint64, 0)
 
 	for i := 0; i < MaxKeysetAmount; i++ {
-        keys = append(keys, uint64(math.Pow(2, float64(i))))
+		keys = append(keys, uint64(math.Pow(2, float64(i))))
 	}
-    return keys
+	return keys
 }
 
 // Given an amount, it returns list of amounts e.g 13 -> [1, 4, 8]

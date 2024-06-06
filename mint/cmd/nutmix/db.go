@@ -124,13 +124,13 @@ func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, requestPaid bool, quote string
 }
 
 func ModifyQuoteMintMintedStatus(pool *pgxpool.Pool, minted bool, quote string) error {
-    // change the paid status of the quote
-    _, err := pool.Exec(context.Background(), "UPDATE mint_request SET minted = $1 WHERE quote = $2", minted, quote)
-    if err != nil {
-        return fmt.Errorf("Inserting to mint_request: %v", err)
+	// change the paid status of the quote
+	_, err := pool.Exec(context.Background(), "UPDATE mint_request SET minted = $1 WHERE quote = $2", minted, quote)
+	if err != nil {
+		return fmt.Errorf("Inserting to mint_request: %v", err)
 
-    }
-    return nil
+	}
+	return nil
 }
 func SaveQuoteMeltRequest(pool *pgxpool.Pool, request cashu.MeltRequestDB) error {
 
@@ -141,16 +141,16 @@ func SaveQuoteMeltRequest(pool *pgxpool.Pool, request cashu.MeltRequestDB) error
 	}
 	return nil
 }
-func ModifyQuoteMeltPayStatus(pool *pgxpool.Pool, paid bool,   request string) error {
+func ModifyQuoteMeltPayStatus(pool *pgxpool.Pool, paid bool, request string) error {
 	// change the paid status of the quote
-    _, err := pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1 WHERE quote = $2", paid, request)
+	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1 WHERE quote = $2", paid, request)
 	if err != nil {
 		return fmt.Errorf("Inserting to mint_request: %v", err)
 
 	}
 	return nil
 }
-func ModifyQuoteMeltPayStatusAndMelted(pool *pgxpool.Pool, paid bool, melted bool,  request string) error {
+func ModifyQuoteMeltPayStatusAndMelted(pool *pgxpool.Pool, paid bool, melted bool, request string) error {
 	// change the paid status of the quote
 	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, melted = $3 WHERE quote = $2", paid, request, melted)
 	if err != nil {
@@ -161,13 +161,13 @@ func ModifyQuoteMeltPayStatusAndMelted(pool *pgxpool.Pool, paid bool, melted boo
 }
 
 func ModifyQuoteMeltMeltedStatus(pool *pgxpool.Pool, melted bool, quote string) error {
-    // change the paid status of the quote
-    _, err := pool.Exec(context.Background(), "UPDATE melt_request SET melted = $1 WHERE quote = $2", melted, quote)
-    if err != nil {
-        return fmt.Errorf("Inserting to mint_request: %v", err)
+	// change the paid status of the quote
+	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET melted = $1 WHERE quote = $2", melted, quote)
+	if err != nil {
+		return fmt.Errorf("Inserting to mint_request: %v", err)
 
-    }
-    return nil
+	}
+	return nil
 }
 
 func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.PostMintQuoteBolt11Response, error) {

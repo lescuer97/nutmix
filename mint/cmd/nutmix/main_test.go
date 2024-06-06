@@ -53,333 +53,328 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	}
 
 	os.Setenv("DATABASE_URL", connUri)
-    os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
 
-    router, mint := SetupRoutingForTesting()
+	router, mint := SetupRoutingForTesting()
 
-    // MINTING TESTING STARTS
+	// MINTING TESTING STARTS
 
-    // request mint quote of 1000 sats
-    w := httptest.NewRecorder()
+	// request mint quote of 1000 sats
+	w := httptest.NewRecorder()
 
-    mintQuoteRequest := cashu.PostMintQuoteBolt11Request {
-        Amount: 1000,
-        Unit: cashu.Sat.String(),
-    }
-    jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+		Amount: 1000,
+		Unit:   cashu.Sat.String(),
+	}
+	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
 
-    req := httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+	req := httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
 
-    router.ServeHTTP(w,req)
+	router.ServeHTTP(w, req)
 
-    if w.Code != 200 {
-        t.Errorf("Expected status code 200, got %d", w.Code)
-    }
+	if w.Code != 200 {
+		t.Errorf("Expected status code 200, got %d", w.Code)
+	}
 
-    var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
-    err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
+	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
-    if err != nil {
-        t.Errorf("Error unmarshalling response: %v", err)
-    }
+	if err != nil {
+		t.Errorf("Error unmarshalling response: %v", err)
+	}
 
-    if !postMintQuoteResponse.RequestPaid {
-        t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponse.RequestPaid)
-    }
+	if !postMintQuoteResponse.RequestPaid {
+		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponse.RequestPaid)
+	}
 
-    if postMintQuoteResponse.Unit != "sat" {
-        t.Errorf("Expected unit to be sat, got %v", postMintQuoteResponse.Unit)
-    }
+	if postMintQuoteResponse.Unit != "sat" {
+		t.Errorf("Expected unit to be sat, got %v", postMintQuoteResponse.Unit)
+	}
 
-    w.Flush()
+	w.Flush()
 
-    // check quote request
-    req = httptest.NewRequest("GET", "/v1/mint/quote/bolt11" + "/" + postMintQuoteResponse.Quote, strings.NewReader(string(jsonRequestBody)))
+	// check quote request
+	req = httptest.NewRequest("GET", "/v1/mint/quote/bolt11"+"/"+postMintQuoteResponse.Quote, strings.NewReader(string(jsonRequestBody)))
 
-    w = httptest.NewRecorder()
+	w = httptest.NewRecorder()
 
-    router.ServeHTTP(w, req)
-    var postMintQuoteResponseTwo cashu.PostMintQuoteBolt11Response
+	router.ServeHTTP(w, req)
+	var postMintQuoteResponseTwo cashu.PostMintQuoteBolt11Response
 
-    err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
+	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
-    if err != nil {
-        t.Fatalf("Error unmarshalling response: %v", err)
-    }
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
 
-    if !postMintQuoteResponseTwo.RequestPaid {
-        t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponseTwo.RequestPaid)
-    }
+	if !postMintQuoteResponseTwo.RequestPaid {
+		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponseTwo.RequestPaid)
+	}
 
-    if postMintQuoteResponseTwo.Unit != "sat" {
-        t.Errorf("Expected unit to be sat, got %v", postMintQuoteResponseTwo.Unit)
-    }
+	if postMintQuoteResponseTwo.Unit != "sat" {
+		t.Errorf("Expected unit to be sat, got %v", postMintQuoteResponseTwo.Unit)
+	}
 
+	w.Flush()
 
-    w.Flush()
+	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
 
-    // ask for minting 
-    blindedMessages, mintingSecrets, mintingSecretKeys,  err := createBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][0])
-    if err != nil {
-        t.Fatalf("could not createBlind message: %v", err)
-    }
+	// ask for minting
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := createBlindedMessages(1000, referenceKeyset)
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
 
-    mintRequest := cashu.PostMintBolt11Request {
-        Quote: postMintQuoteResponse.Quote,
-        Outputs: blindedMessages,
-    }
+	mintRequest := cashu.PostMintBolt11Request{
+		Quote:   postMintQuoteResponse.Quote,
+		Outputs: blindedMessages,
+	}
 
-    jsonRequestBody, _ = json.Marshal(mintRequest)
+	jsonRequestBody, _ = json.Marshal(mintRequest)
 
-    req = httptest.NewRequest("POST", "/v1/mint/bolt11",strings.NewReader(string(jsonRequestBody)))
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
 
-    w = httptest.NewRecorder()
+	w = httptest.NewRecorder()
 
-    router.ServeHTTP(w, req)
+	router.ServeHTTP(w, req)
 
-    var postMintResponse cashu.PostMintBolt11Response
+	var postMintResponse cashu.PostMintBolt11Response
 
-    if w.Code != 200 {
-        t.Fatalf("Expected status code 200, got %d", w.Code)
-    }
+	if w.Code != 200 {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
+	}
 
-    err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
+	err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
 
-    if err != nil {
-        t.Fatalf("Error unmarshalling response: %v", err)
-    }
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
 
-    var totalAmountSigned uint64 = 0
+	var totalAmountSigned uint64 = 0
 
-    for _, output := range postMintResponse.Signatures {
-        totalAmountSigned += output.Amount
-    }
+	for _, output := range postMintResponse.Signatures {
+		totalAmountSigned += output.Amount
+	}
 
-    if totalAmountSigned != 1000 {
-        t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
-    }
+	if totalAmountSigned != 1000 {
+		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
+	}
 
-    if postMintResponse.Signatures[0].Id != mint.ActiveKeysets[cashu.Sat.String()][0].Id {
-        t.Errorf("Expected id to be %s, got %s", mint.ActiveKeysets[cashu.Sat.String()][0].Id, postMintResponse.Signatures[0].Id)
-    }
+	if postMintResponse.Signatures[0].Id != referenceKeyset.Id {
+		t.Errorf("Expected id to be %s, got %s", referenceKeyset.Id, postMintResponse.Signatures[0].Id)
+	}
 
+	// try to remint tokens with other blinded signatures
+	reMintBlindedMessages, _, _, err := createBlindedMessages(1000, referenceKeyset)
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
 
-    // try to remint tokens with other blinded signatures
-    reMintBlindedMessages, _,_ ,  err := createBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][0])
-    if err != nil {
-        t.Fatalf("could not createBlind message: %v", err)
-    }
+	reMintRequest := cashu.PostMintBolt11Request{
+		Quote:   postMintQuoteResponse.Quote,
+		Outputs: reMintBlindedMessages,
+	}
 
-    reMintRequest := cashu.PostMintBolt11Request {
-        Quote: postMintQuoteResponse.Quote,
-        Outputs: reMintBlindedMessages,
-    }
+	jsonRequestBody, _ = json.Marshal(reMintRequest)
 
-    jsonRequestBody, _ = json.Marshal(reMintRequest)
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
 
-    req = httptest.NewRequest("POST", "/v1/mint/bolt11",strings.NewReader(string(jsonRequestBody)))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-    w = httptest.NewRecorder()
-    router.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 400, got %d", w.Code)
+	}
 
-    if w.Code != 400 {
-        t.Fatalf("Expected status code 400, got %d", w.Code)
-    }
+	if w.Body.String() != `"Quote already minted"` {
+		t.Errorf("Expected Quote already minted, got %s", w.Body.String())
+	}
 
-    if w.Body.String() != `"Quote already minted"` {
-        t.Errorf("Expected Quote already minted, got %s", w.Body.String())
-    }
+	// Minting with invalid signatures
+	w = httptest.NewRecorder()
+	mintExcessQuoteRequest := cashu.PostMintQuoteBolt11Request{
+		Amount: 10000000,
+		Unit:   cashu.Sat.String(),
+	}
+	jsonRequestBody, _ = json.Marshal(mintExcessQuoteRequest)
 
-    // Minting with invalid signatures
-    w = httptest.NewRecorder()
-    mintExcessQuoteRequest := cashu.PostMintQuoteBolt11Request {
-        Amount: 10000000,
-        Unit: cashu.Sat.String(),
-    }
-    jsonRequestBody, _ = json.Marshal(mintExcessQuoteRequest)
+	req = httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
 
-    req = httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+	router.ServeHTTP(w, req)
 
-    router.ServeHTTP(w,req)
+	excesMintingBlindMessage, _, _, err := createBlindedMessages(10000000, mint.ActiveKeysets[cashu.Sat.String()][1])
 
-    excesMintingBlindMessage, _,_ ,  err := createBlindedMessages(10000000, mint.ActiveKeysets[cashu.Sat.String()][0])
+	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
-    err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
+	if err != nil {
+		t.Errorf("Error unmarshalling response: %v", err)
+	}
 
-    if err != nil {
-        t.Errorf("Error unmarshalling response: %v", err)
-    }
+	excesMintingBlindMessage[0].B_ = "badsig"
 
-    // make an erroneus signature
+	excessMintRequest := cashu.PostMintBolt11Request{
+		Quote:   postMintQuoteResponse.Quote,
+		Outputs: excesMintingBlindMessage,
+	}
 
-    excesMintingBlindMessage[0].B_ = "badsig"
+	jsonRequestBody, _ = json.Marshal(excessMintRequest)
 
-    excessMintRequest := cashu.PostMintBolt11Request {
-        Quote: postMintQuoteResponse.Quote,
-        Outputs: excesMintingBlindMessage,
-    }
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
 
-    jsonRequestBody, _ = json.Marshal(excessMintRequest)
+	w = httptest.NewRecorder()
 
-    req = httptest.NewRequest("POST", "/v1/mint/bolt11",strings.NewReader(string(jsonRequestBody)))
+	router.ServeHTTP(w, req)
 
-    w = httptest.NewRecorder()
+	if w.Code != 400 {
+		t.Errorf("Expected status code 400, got %d", w.Code)
+	}
 
-    router.ServeHTTP(w, req)
-    
-    if w.Code != 400 {
-        t.Errorf("Expected status code 400, got %d", w.Code)
-    }
+	if w.Body.String() != `"Invalid blind message"` {
+		t.Errorf("Expected Invalid blind message, got %s", w.Body.String())
+	}
 
-    if w.Body.String() != `"Invalid blind message"` {
-        t.Errorf("Expected Invalid blind message, got %s", w.Body.String())
-    }
+	// MINTING TESTING ENDS
 
+	// SWAP TESTING STARTS
 
-    // MINTING TESTING ENDS
+	// try to swap tokens
+	swapProofs, err := generateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
 
-    // SWAP TESTING STARTS
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := createBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
 
-    // try to swap tokens
-    swapProofs, err := generateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+	swapRequest := cashu.PostSwapRequest{
+		Inputs:  swapProofs,
+		Outputs: swapBlindedMessages,
+	}
 
-    if err != nil {
-        t.Fatalf("Error generating proofs: %v", err)
-    }
-    swapBlindedMessages, swapSecrets, swapPrivateKeySecrets,  err := createBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][0])
-    if err != nil {
-        t.Fatalf("could not createBlind message: %v", err)
-    }
+	jsonRequestBody, _ = json.Marshal(swapRequest)
 
-    swapRequest := cashu.PostSwapRequest{
-        Inputs: swapProofs,
-        Outputs: swapBlindedMessages,
-    }
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
 
-    jsonRequestBody, _ = json.Marshal(swapRequest)
+	w = httptest.NewRecorder()
 
-    req = httptest.NewRequest("POST", "/v1/swap",strings.NewReader(string(jsonRequestBody)))
+	router.ServeHTTP(w, req)
 
-    w = httptest.NewRecorder()
+	var postSwapResponse cashu.PostSwapResponse
 
+	if w.Code != 200 {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
+	}
 
-    router.ServeHTTP(w, req)
+	err = json.Unmarshal(w.Body.Bytes(), &postSwapResponse)
 
-    var postSwapResponse cashu.PostSwapResponse
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
 
-    if w.Code != 200 {
-        t.Fatalf("Expected status code 200, got %d", w.Code)
-    }
+	totalAmountSigned = 0
 
-    err = json.Unmarshal(w.Body.Bytes(), &postSwapResponse)
+	for _, output := range postSwapResponse.Signatures {
+		totalAmountSigned += output.Amount
+	}
 
-    if err != nil {
-        t.Fatalf("Error unmarshalling response: %v", err)
-    }
+	if totalAmountSigned != 1000 {
+		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
+	}
 
-     totalAmountSigned  = 0
+	if postSwapResponse.Signatures[0].Id != referenceKeyset.Id {
+		t.Errorf("Expected id to be %s, got %s", referenceKeyset.Id, postSwapResponse.Signatures[0].Id)
+	}
 
-    for _, output := range postSwapResponse.Signatures {
-        totalAmountSigned += output.Amount
-    }
+	w.Flush()
 
-    if totalAmountSigned != 1000 {
-        t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
-    }
+    // Swap with invalid signatures
 
-    if postSwapResponse.Signatures[0].Id != mint.ActiveKeysets[cashu.Sat.String()][0].Id {
-        t.Errorf("Expected id to be %s, got %s", mint.ActiveKeysets[cashu.Sat.String()][0].Id, postSwapResponse.Signatures[0].Id)
-    }
+	// SWAP TESTING ENDS
 
-    w.Flush()
+	// MELTING TESTING STARTS
 
-    // SWAP TESTING ENDS
+	// test melt tokens
+	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
+		Unit:    cashu.Sat.String(),
+		Request: RegtestRequest,
+	}
 
+	jsonRequestBody, _ = json.Marshal(meltQuoteRequest)
 
-    // MELTING TESTING STARTS
+	req = httptest.NewRequest("POST", "/v1/melt/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
 
-    // test melt tokens
-    meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
-        Unit: cashu.Sat.String(),
-        Request: RegtestRequest,
-    }
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-    jsonRequestBody, _ = json.Marshal(meltQuoteRequest)
+	var postMeltQuoteResponse cashu.PostMeltQuoteBolt11Response
+	err = json.Unmarshal(w.Body.Bytes(), &postMeltQuoteResponse)
 
-    req = httptest.NewRequest("POST", "/v1/melt/quote/bolt11",strings.NewReader(string(jsonRequestBody)))
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
 
-    w = httptest.NewRecorder()
-    router.ServeHTTP(w, req)
+	if !postMeltQuoteResponse.Paid {
+		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
+	}
 
-    var postMeltQuoteResponse cashu.PostMeltQuoteBolt11Response
-    err = json.Unmarshal(w.Body.Bytes(), &postMeltQuoteResponse)
+	if postMeltQuoteResponse.Amount != 1000 {
+		t.Errorf("Expected amount to be 1000, got %d", postMeltQuoteResponse.Amount)
+	}
 
+	// test melt tokens quote call
+	req = httptest.NewRequest("GET", "/v1/melt/quote/bolt11"+"/"+postMeltQuoteResponse.Quote, nil)
 
-    if err != nil {
-        t.Fatalf("Error unmarshalling response: %v", err)
-    }
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-    if !postMeltQuoteResponse.Paid {
-        t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
-    }
-    
-    if postMeltQuoteResponse.Amount != 1000 {
-        t.Errorf("Expected amount to be 1000, got %d", postMeltQuoteResponse.Amount)
-    }
+	var postMeltQuoteResponseTwo cashu.PostMeltQuoteBolt11Response
+	err = json.Unmarshal(w.Body.Bytes(), &postMeltQuoteResponseTwo)
 
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
 
-    // test melt tokens quote call
-    req = httptest.NewRequest("GET", "/v1/melt/quote/bolt11" + "/" + postMeltQuoteResponse.Quote, nil)
+	}
 
-    w = httptest.NewRecorder()
-    router.ServeHTTP(w, req)
+	if !postMeltQuoteResponse.Paid {
+		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
+	}
 
-    var postMeltQuoteResponseTwo cashu.PostMeltQuoteBolt11Response
-    err = json.Unmarshal(w.Body.Bytes(), &postMeltQuoteResponseTwo)
+	if postMeltQuoteResponse.Amount != 1000 {
+		t.Errorf("Expected amount to be 1000, got %d", postMeltQuoteResponse.Amount)
+	}
 
-    if err != nil {
-        t.Fatalf("Error unmarshalling response: %v", err)
+	meltProofs, err := generateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
 
-    }
+	// test melt tokens
+	meltRequest := cashu.PostMeltBolt11Request{
+		Quote:  postMeltQuoteResponse.Quote,
+		Inputs: meltProofs,
+	}
 
-    if !postMeltQuoteResponse.Paid {
-        t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
-    }
-    
-    if postMeltQuoteResponse.Amount != 1000 {
-        t.Errorf("Expected amount to be 1000, got %d", postMeltQuoteResponse.Amount)
-    }
+	jsonRequestBody, _ = json.Marshal(meltRequest)
 
-    meltProofs, err := generateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
 
-    // test melt tokens
-    meltRequest := cashu.PostMeltBolt11Request{
-        Quote: postMeltQuoteResponse.Quote,
-        Inputs: meltProofs,
-    }
+	var postMeltResponse cashu.PostMeltBolt11Response
 
-    jsonRequestBody, _ = json.Marshal(meltRequest)
+	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 
-    req = httptest.NewRequest("POST", "/v1/melt/bolt11",strings.NewReader(string(jsonRequestBody)))
-    w = httptest.NewRecorder()
-    router.ServeHTTP(w, req)
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
 
-    var postMeltResponse cashu.PostMeltBolt11Response
-
-    err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
-
-    if err != nil {
-        t.Fatalf("Error unmarshalling response: %v", err)
-    }
-
-    if !postMeltResponse.Paid {
-        t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
-    }
-    if postMeltResponse.PaymentPreimage != "MockPaymentPreimage" {
-        t.Errorf("Expected payment preimage to be empty, got %s", postMeltResponse.PaymentPreimage)
-    }
-    // MELTING TESTING ENDS
+	if !postMeltResponse.Paid {
+		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
+	}
+	if postMeltResponse.PaymentPreimage != "MockPaymentPreimage" {
+		t.Errorf("Expected payment preimage to be empty, got %s", postMeltResponse.PaymentPreimage)
+	}
+	// MELTING TESTING ENDS
 
 	// Clean up the container
 	defer func() {
@@ -392,7 +387,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 }
 
 func SetupRoutingForTesting() (*gin.Engine, Mint) {
-    os.Setenv("NETWORK", "regtest")
+	os.Setenv("NETWORK", "regtest")
 
 	pool, err := DatabaseSetup("../../migrations/")
 
@@ -436,7 +431,7 @@ func SetupRoutingForTesting() (*gin.Engine, Mint) {
 
 	V1Routes(r, pool, mint)
 
-    return r, mint
+	return r, mint
 }
 
 func newBlindedMessage(id string, amount uint64, B_ *secp256k1.PublicKey) cashu.BlindedMessage {
@@ -487,32 +482,31 @@ func createBlindedMessages(amount uint64, keyset cashu.Keyset) ([]cashu.BlindedM
 
 func generateProofs(signatures []cashu.BlindSignature, keysets map[string]KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 
-    // try to swap tokens
-    var proofs []cashu.Proof
-    // unblid the signatures and make proofs
-    for i, output := range signatures {
+	// try to swap tokens
+	var proofs []cashu.Proof
+	// unblid the signatures and make proofs
+	for i, output := range signatures {
 
-        parsedBlindFactor, err := hex.DecodeString(output.C_)
-        if err != nil {
-            return nil, fmt.Errorf("Error decoding hex: %v", err)
-        }
-        blindedFactor, err :=secp256k1.ParsePubKey(parsedBlindFactor)
-        if err != nil {
-            return nil, fmt.Errorf("Error parsing pubkey: %v", err)
-        }
+		parsedBlindFactor, err := hex.DecodeString(output.C_)
+		if err != nil {
+			return nil, fmt.Errorf("Error decoding hex: %v", err)
+		}
+		blindedFactor, err := secp256k1.ParsePubKey(parsedBlindFactor)
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing pubkey: %v", err)
+		}
 
+		mintPublicKey, err := secp256k1.ParsePubKey(keysets[cashu.Sat.String()][output.Amount].PrivKey.PubKey().SerializeCompressed())
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing pubkey: %v", err)
+		}
 
-        mintPublicKey, err :=secp256k1.ParsePubKey(keysets[cashu.Sat.String()][output.Amount].PrivKey.PubKey().SerializeCompressed())
-        if err != nil {
-            return nil, fmt.Errorf("Error parsing pubkey: %v", err)
-        }
+		C := crypto.UnblindSignature(blindedFactor, secretsKey[i], mintPublicKey)
 
-        C  := crypto.UnblindSignature(blindedFactor, secretsKey[i], mintPublicKey )
+		hexC := hex.EncodeToString(C.SerializeCompressed())
 
-        hexC := hex.EncodeToString(C.SerializeCompressed())
+		proofs = append(proofs, cashu.Proof{Id: output.Id, Amount: output.Amount, C: hexC, Secret: secrets[i]})
+	}
 
-        proofs = append(proofs, cashu.Proof{Id: output.Id, Amount: output.Amount, C: hexC, Secret: secrets[i]})
-    }
-
-    return proofs, nil
+	return proofs, nil
 }

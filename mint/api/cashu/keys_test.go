@@ -3,6 +3,7 @@ package cashu
 import (
 	"encoding/hex"
 	"testing"
+
 	"github.com/tyler-smith/go-bip32"
 )
 
@@ -14,7 +15,7 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 		t.Errorf("could not setup master key %+v", err)
 	}
 
-	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets() , "id", Sat)
+	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat)
 
 	if err != nil {
 		t.Errorf("could not generate keyset %+v", err)
@@ -25,15 +26,15 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 	}
 
 	// check if the keyset amount is 0
-	if generatedKeysets[0].Amount != 0 {
+	if generatedKeysets[0].Amount != 1 {
 		t.Errorf("keyset amount is not 0")
 	}
 	if generatedKeysets[0].Unit != Sat.String() {
 		t.Errorf("keyset unit is not Sat")
 	}
 
-	if generatedKeysets[0].PrivKey.Key.String() != "c4ed3e54b91e7a49cfecbdfc9c9305fa3f51aecaeeac670cec752c32b381f917" {
-		t.Errorf("keyset id is not id")
+	if hex.EncodeToString(generatedKeysets[0].PrivKey.PubKey().SerializeCompressed()) != "0368a33e7aad5f9983dccd05b5792d8c5f3c9e28d5cad4e448a69eead5b84b3869" {
+		t.Errorf("keyset id PrivKEy is not correct. %+v", hex.EncodeToString(generatedKeysets[0].PrivKey.PubKey().SerializeCompressed()))
 	}
 
 	keysetId, err := DeriveKeysetId(generatedKeysets)
@@ -41,7 +42,8 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not derive keyset id %+v", err)
 	}
-	if keysetId != "00fc7e7881e44faa" {
+
+	if keysetId != "00b7413b33e713ea" {
 		t.Errorf("keyset id is not correct")
 	}
 
@@ -62,16 +64,15 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 	}
 
 	if hex.EncodeToString(generatedSeeds[0].Seed) != "0f451868e048a61dcf274af7c3a463f48d32dbabb47bfd3f4da850f4d6525975" {
-		t.Errorf("seed 0 is not correct")
+		t.Errorf("seed 0 is not correct %v", hex.EncodeToString(generatedSeeds[0].Seed))
 	}
-
 
 	if generatedSeeds[0].Unit != Sat.String() {
 		t.Errorf("seed 0 unit is not correct")
 	}
 
-	if generatedSeeds[0].Id != "00516525c0c0508e" {
-		t.Errorf("seed 0 id is not correct")
+	if generatedSeeds[0].Id != "00178484f5e74df9" {
+		t.Errorf("seed 0 id is not correct %v", generatedSeeds[0].Id)
 	}
 
 }

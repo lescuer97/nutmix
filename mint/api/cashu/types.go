@@ -41,7 +41,7 @@ func UnitFromString(s string) (Unit, error) {
 var AvailableSeeds []Unit = []Unit{Sat}
 
 type BlindedMessage struct {
-	Amount uint64  `json:"amount"`
+	Amount uint64 `json:"amount"`
 	Id     string `json:"id"`
 	B_     string `json:"B_"`
 }
@@ -71,7 +71,7 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 }
 
 type BlindSignature struct {
-	Amount uint64  `json:"amount"`
+	Amount uint64 `json:"amount"`
 	Id     string `json:"id"`
 	C_     string `json:"C_"`
 }
@@ -83,7 +83,7 @@ const SPENT ProofState = "SPENT"
 const PENDING ProofState = "PENDING"
 
 type Proof struct {
-	Amount uint64  `json:"amount"`
+	Amount uint64 `json:"amount"`
 	Id     string `json:"id"`
 	Secret string `json:"secret"`
 	C      string `json:"C" db:"c"`
@@ -116,7 +116,7 @@ type Keyset struct {
 	Id        string                `json:"id"`
 	Active    bool                  `json:"active" db:"active"`
 	Unit      string                `json:"unit"`
-	Amount    uint64                   `json:"amount"`
+	Amount    uint64                `json:"amount"`
 	PrivKey   *secp256k1.PrivateKey `json:"priv_key"`
 	CreatedAt int64                 `json:"created_at"`
 }
@@ -172,12 +172,12 @@ type PostMintQuoteBolt11Request struct {
 }
 
 type PostMintQuoteBolt11Response struct {
-	Quote   string `json:"quote"`
-    Request string `json:"request"`
-    RequestPaid bool `json:"paid" db:"request_paid"`
-	Expiry  int64  `json:"expiry"`
-    Unit   string `json:"unit"`
-    Minted bool   `json:"minted"`
+	Quote       string `json:"quote"`
+	Request     string `json:"request"`
+	RequestPaid bool   `json:"paid" db:"request_paid"`
+	Expiry      int64  `json:"expiry"`
+	Unit        string `json:"unit"`
+	Minted      bool   `json:"minted"`
 }
 
 type PostMintBolt11Request struct {
@@ -196,14 +196,14 @@ type BasicKeysetResponse struct {
 }
 
 type MeltRequestDB struct {
-	Quote      string `json:"quote"`
-	Unit       string `json:"unit"`
-	Expiry     int64  `json:"expiry"`
-	Amount     uint64  `json:"amount"`
-	FeeReserve uint64  `json:"fee_reserve" db:"fee_reserve"`
-	RequestPaid       bool   `json:"paid" db:"request_paid"`
-	Request    string `json:"request"`
-    Melted     bool   `json:"melted"`
+	Quote       string `json:"quote"`
+	Unit        string `json:"unit"`
+	Expiry      int64  `json:"expiry"`
+	Amount      uint64 `json:"amount"`
+	FeeReserve  uint64 `json:"fee_reserve" db:"fee_reserve"`
+	RequestPaid bool   `json:"paid" db:"request_paid"`
+	Request     string `json:"request"`
+	Melted      bool   `json:"melted"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
@@ -224,8 +224,8 @@ type PostMeltQuoteBolt11Request struct {
 
 type PostMeltQuoteBolt11Response struct {
 	Quote      string `json:"quote"`
-	Amount     uint64  `json:"amount"`
-	FeeReserve uint64  `json:"fee_reserve"`
+	Amount     uint64 `json:"amount"`
+	FeeReserve uint64 `json:"fee_reserve"`
 	Paid       bool   `json:"paid"`
 	Expiry     int64  `json:"expiry"`
 }

@@ -34,50 +34,46 @@ var (
 	ErrKeysetForProofNotFound = errors.New("Keyset for proof not found")
 	ErrInvalidProof           = errors.New("Invalid proof")
 	ErrQuoteNotPaid           = errors.New("Quote not paid")
-    ErrMessageAmountToBig     = errors.New("Message amount is to big")
-    ErrInvalidBlindMessage    = errors.New("Invalid blind message")
+	ErrMessageAmountToBig     = errors.New("Message amount is to big")
+	ErrInvalidBlindMessage    = errors.New("Invalid blind message")
 )
 
-func(m *Mint) CheckProofsAreSameUnit( proofs []cashu.Proof) (cashu.Unit, error) {
+func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof) (cashu.Unit, error) {
 
+	units := make(map[string]bool)
 
-    units := make(map[string]bool)
+	for _, proof := range proofs {
 
+		keyset, err := m.GetKeysetById(proof.Id)
+		if err != nil {
+			return cashu.Sat, fmt.Errorf("GetKeysetById: %w", err)
+		}
 
-    for _, proof := range proofs {
-         
+		if len(keyset) == 0 {
+			return cashu.Sat, ErrKeysetForProofNotFound
+		}
 
-        keyset, err := m.GetKeysetById(proof.Id)
-        if err != nil {
-            return cashu.Sat, fmt.Errorf("GetKeysetById: %w", err)
-        }
+		units[keyset[0].Unit] = true
+		if len(units) > 1 {
+			return cashu.Sat, fmt.Errorf("Proofs are not the same unit")
+		}
+	}
 
-        if len(keyset) == 0 {
-            return cashu.Sat, ErrKeysetForProofNotFound
-        }
+	if len(units) == 0 {
+		return cashu.Sat, fmt.Errorf("No units found")
+	}
 
-        units[keyset[0].Unit] = true
-        if len(units) > 1 {
-            return cashu.Sat, fmt.Errorf("Proofs are not the same unit")
-        }
-    }
+	var returnedUnit cashu.Unit
+	for unit := range units {
+		finalUnit, err := cashu.UnitFromString(unit)
+		if err != nil {
+			return cashu.Sat, fmt.Errorf("UnitFromString: %w", err)
+		}
 
-    if len(units) == 0 {
-        return cashu.Sat, fmt.Errorf("No units found")
-    }
+		returnedUnit = finalUnit
+	}
 
-    var returnedUnit cashu.Unit
-    for unit := range units {
-
-        finalUnit, err := cashu.UnitFromString(unit)
-        if err != nil {
-            return cashu.Sat, fmt.Errorf("UnitFromString: %w", err)
-        }
-
-        returnedUnit = finalUnit
-    }
-
-    return returnedUnit, nil
+	return returnedUnit, nil
 
 }
 
@@ -127,7 +123,7 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
 
 		if err != nil {
-            err = fmt.Errorf("GenerateBlindSignature: %w %w",ErrInvalidBlindMessage, err)
+			err = fmt.Errorf("GenerateBlindSignature: %w %w", ErrInvalidBlindMessage, err)
 			return nil, err
 		}
 
@@ -137,9 +133,10 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 	return blindedSignatures, nil
 }
 
-func (m *Mint) GetKeysetById( id string) ([]cashu.Keyset, error) {
+func (m *Mint) GetKeysetById(id string) ([]cashu.Keyset, error) {
 
-    allKeys := m.GetAllKeysets()
+	allKeys := m.GetAllKeysets()
+
 	var keyset []cashu.Keyset
 
 	for _, key := range allKeys {
@@ -153,13 +150,13 @@ func (m *Mint) GetKeysetById( id string) ([]cashu.Keyset, error) {
 }
 
 func (m *Mint) GetAllKeysets() []cashu.Keyset {
-    var allKeys []cashu.Keyset
+	var allKeys []cashu.Keyset
 
-    for _, keyset := range m.Keysets {
-        allKeys = append(allKeys, keyset...)
-    }
+	for _, keyset := range m.Keysets {
+		allKeys = append(allKeys, keyset...)
+	}
 
-    return allKeys
+	return allKeys
 }
 
 func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
@@ -247,8 +244,6 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 
 	return mint, nil
 }
-
-
 
 type AddToDBFunc func(*pgxpool.Pool, bool, string) error
 

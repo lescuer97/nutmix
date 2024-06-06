@@ -70,7 +70,7 @@ func TestSetUpMint(t *testing.T) {
 	}
 
 	// checks for the last key available in the keyset
-	childKeyLast, err := masterKey.NewChildKey(18)
+	childKeyLast, err := masterKey.NewChildKey(131072)
 	if err != nil {
 		t.Errorf("could not set lightning backend %v", err)
 	}

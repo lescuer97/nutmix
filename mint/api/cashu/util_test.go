@@ -24,7 +24,7 @@ func TestOrderKeysetByUnit(t *testing.T) {
 
 	firstOrdKey := orderedKeys["keysets"][0]
 
-	if firstOrdKey.Keys["0"] != "03fbf65684a42313691fe562aa315f26409a19aaaaa8ef0163fc8d8598f16fe003" {
+	if firstOrdKey.Keys["1"] != "0368a33e7aad5f9983dccd05b5792d8c5f3c9e28d5cad4e448a69eead5b84b3869" {
 		t.Errorf("keyset is not correct")
 	}
 

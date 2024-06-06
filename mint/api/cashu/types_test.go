@@ -2,10 +2,11 @@ package cashu
 
 import (
 	"encoding/hex"
+	"testing"
+
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/tyler-smith/go-bip32"
-	"testing"
 )
 
 func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
@@ -52,11 +53,11 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		t.Errorf("could GenerateBlindSignature %+v", err)
 	}
 
-	if blindSignature.C_ != "024b60ff45c5a4ef4630072a03eaabcb948beae56d034a3bba68dc8cda68845c5d" {
+	if blindSignature.C_ != "02911a413c227c35f235517dc87432c2d9b0cba66766245f632be8e185de58af92" {
 		t.Errorf("blindSignature is not correct")
 	}
 
-	if blindSignature.Id != "00fc7e7881e44faa" {
+	if blindSignature.Id != "00b7413b33e713ea" {
 		t.Errorf("blindSignature id is not correct")
 	}
 
@@ -90,4 +91,3 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 	}
 
 }
-
