@@ -124,3 +124,16 @@ func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) 
 
 	return seeds, nil
 }
+// Given an amount, it returns list of amounts e.g 13 -> [1, 4, 8]
+// that can be used to build blinded messages or split operations.
+// from nutshell implementation
+func AmountSplit(amount int32) []int32 {
+	rv := make([]int32, 0)
+	for pos := 0; amount > 0; pos++ {
+		if amount&1 == 1 {
+			rv = append(rv, 1<<pos)
+		}
+		amount >>= 1
+	}
+	return rv
+}

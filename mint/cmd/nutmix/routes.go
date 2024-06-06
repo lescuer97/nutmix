@@ -158,6 +158,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				Request: payReq,
 				Paid:    true,
 				Expiry:  cashu.ExpiryTime,
+                Unit:   mintRequest.Unit,
 			}
 
 		case comms.LND_WALLET:
@@ -213,10 +214,6 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		}
 
 		quote.Paid = ok
-		if !ok {
-			c.JSON(400, "Quote not paid")
-			return
-		}
 
 		c.JSON(200, quote)
 	})
@@ -453,7 +450,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			}
 
 			response = cashu.PostMeltQuoteBolt11Response{
-				Paid:       false,
+				Paid:       true,
 				Expiry:     cashu.ExpiryTime,
 				FeeReserve: 1,
 				Amount:     int64(*invoice.MilliSat) / 1000,
@@ -543,10 +540,6 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		}
 
 		quote.Paid = ok
-		if !ok {
-			c.JSON(400, "Quote not paid")
-			return
-		}
 
 		c.JSON(200, quote.GetPostMeltQuoteResponse())
 	})

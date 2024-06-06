@@ -17,7 +17,7 @@ import (
 
 // This is used for testing purpose
 // returns alice, bob, mint
-func SetUpLightingNetworkEnviroment(ctx context.Context) (testcontainers.Container, testcontainers.Container, testcontainers.Container, error) {
+func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Container, testcontainers.Container, testcontainers.Container, error) {
 	// setup
 	net, err := network.New(ctx,
 		network.WithCheckDuplicate(),
