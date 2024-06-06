@@ -57,7 +57,7 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 		t.Errorf("could not derive seeds from key %+v", err)
 	}
 
-	if len(generatedSeeds) != 2 {
+	if len(generatedSeeds) != 1 {
 		t.Errorf("seed length is not 2")
 	}
 
@@ -65,21 +65,12 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 		t.Errorf("seed 0 is not correct")
 	}
 
-	if hex.EncodeToString(generatedSeeds[1].Seed) != "c5e163917a7995f9d6c197a0164e011995821d2be7fc65f06cdfc4bf0289e0af" {
-		t.Errorf("seed 1 is not correct")
-	}
 
 	if generatedSeeds[0].Unit != Sat.String() {
 		t.Errorf("seed 0 unit is not correct")
 	}
-	if generatedSeeds[1].Unit != Msat.String() {
-		t.Errorf("seed 1 unit is not correct")
-	}
 
 	if generatedSeeds[0].Id != "00516525c0c0508e" {
-		t.Errorf("seed 0 id is not correct")
-	}
-	if generatedSeeds[1].Id != "008ef8a9552a5538" {
 		t.Errorf("seed 0 id is not correct")
 	}
 

@@ -8,7 +8,7 @@ import (
 func TestSetupLightingComms(t *testing.T) {
 	// setup
 	ctx := context.Background()
-	_, _, _, err := SetUpLightingNetworkEnviroment(ctx)
+	_, _, _, err := SetUpLightingNetworkTestEnviroment(ctx)
 
 	if err != nil {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
