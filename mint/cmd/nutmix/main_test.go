@@ -150,7 +150,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
         t.Fatalf("Error unmarshalling response: %v", err)
     }
 
-    var totalAmountSigned int32 = 0
+    var totalAmountSigned uint64 = 0
 
     for _, output := range postMintResponse.Signatures {
         totalAmountSigned += output.Amount
@@ -187,8 +187,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
         t.Fatalf("Expected status code 400, got %d", w.Code)
     }
 
-    if w.Body.String() != "Quote already Minted" {
-        t.Errorf("Expected Quote already used, got %s", w.Body.String())
+    if w.Body.String() != `"Quote already minted"` {
+        t.Errorf("Expected Quote already minted, got %s", w.Body.String())
     }
 
     // Mining with a Token that is bigger that what is Available
@@ -223,8 +223,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
     w = httptest.NewRecorder()
 
     router.ServeHTTP(w, req)
-
-    fmt.Println(w.Body.String())
 
 
     
@@ -431,13 +429,13 @@ func SetupRoutingForTesting() (*gin.Engine, Mint) {
     return r, mint
 }
 
-func newBlindedMessage(id string, amount int32, B_ *secp256k1.PublicKey) cashu.BlindedMessage {
+func newBlindedMessage(id string, amount uint64, B_ *secp256k1.PublicKey) cashu.BlindedMessage {
 	B_str := hex.EncodeToString(B_.SerializeCompressed())
 	return cashu.BlindedMessage{Amount: amount, B_: B_str, Id: id}
 }
 
 // returns Blinded messages, secrets - [][]byte, and list of r
-func createBlindedMessages(amount int32, keyset cashu.Keyset) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
+func createBlindedMessages(amount uint64, keyset cashu.Keyset) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
 	splitAmounts := cashu.AmountSplit(amount)
 	splitLen := len(splitAmounts)
 
@@ -494,7 +492,7 @@ func generateProofs(signatures []cashu.BlindSignature, keysets map[string]Keyset
         }
 
 
-        mintPublicKey, err :=secp256k1.ParsePubKey(keysets[cashu.Sat.String()][int(output.Amount)].PrivKey.PubKey().SerializeCompressed())
+        mintPublicKey, err :=secp256k1.ParsePubKey(keysets[cashu.Sat.String()][output.Amount].PrivKey.PubKey().SerializeCompressed())
         if err != nil {
             return nil, fmt.Errorf("Error parsing pubkey: %v", err)
         }

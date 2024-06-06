@@ -139,8 +139,8 @@ func GetAmountsForKeysets() []uint64 {
 // Given an amount, it returns list of amounts e.g 13 -> [1, 4, 8]
 // that can be used to build blinded messages or split operations.
 // from nutshell implementation
-func AmountSplit(amount int32) []int32 {
-	rv := make([]int32, 0)
+func AmountSplit(amount uint64) []uint64 {
+	rv := make([]uint64, 0)
 	for pos := 0; amount > 0; pos++ {
 		if amount&1 == 1 {
 			rv = append(rv, 1<<pos)
