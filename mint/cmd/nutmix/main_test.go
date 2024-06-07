@@ -290,7 +290,72 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	w.Flush()
 
-    // Swap with invalid signatures
+	// Swap with invalid Proofs
+	invalidSignatureProofs, err := generateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+	swapInvalidSigBlindedMessages, _, _, err := createBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	invalidSignatureProofs[0].C = "badSig"
+	invalidSignatureProofs[len(invalidSignatureProofs)-1].C = "badSig"
+
+	invalidSwapRequest := cashu.PostSwapRequest{
+		Inputs:  invalidSignatureProofs,
+		Outputs: swapInvalidSigBlindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(invalidSwapRequest)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Errorf("Expected status code 403, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Invalid Proof"` {
+		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	}
+	w.Flush()
+
+	// swap with  not enought proofs for compared to signatures
+	proofsForRemoving, err := generateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+	signaturesForRemoving, _, _, err := createBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	notEnoughtProofsSwapRequest := cashu.PostSwapRequest{
+		Inputs:  proofsForRemoving[:len(proofsForRemoving)-2],
+		Outputs: signaturesForRemoving,
+	}
+
+	jsonRequestBody, _ = json.Marshal(notEnoughtProofsSwapRequest)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Errorf("Expected status code 403, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Not enough proofs for signatures"` {
+		t.Errorf("Not enough proofs for signatures, got %s", w.Body.String())
+	}
+	w.Flush()
 
 	// SWAP TESTING ENDS
 
@@ -348,11 +413,43 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	meltProofs, err := generateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
 
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+
+	// test melt with invalid proofs
+	InvalidProofsMeltRequest := cashu.PostMeltBolt11Request{
+		Quote:  postMeltQuoteResponse.Quote,
+		Inputs: meltProofs,
+	}
+
+	InvalidProofsMeltRequest.Inputs[0].C = "badSig"
+
+	jsonRequestBody, _ = json.Marshal(InvalidProofsMeltRequest)
+
+	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Errorf("Expected status code 403, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Invalid Proof"` {
+		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	}
+
+	w.Flush()
+
+	meltProofs, err = generateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
 		Quote:  postMeltQuoteResponse.Quote,
 		Inputs: meltProofs,
 	}
+
+	fmt.Printf("meltRequest: %+v", meltRequest)
 
 	jsonRequestBody, _ = json.Marshal(meltRequest)
 
@@ -364,6 +461,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 
+	fmt.Println("body: ", w.Body.String())
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
@@ -374,6 +472,20 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if postMeltResponse.PaymentPreimage != "MockPaymentPreimage" {
 		t.Errorf("Expected payment preimage to be empty, got %s", postMeltResponse.PaymentPreimage)
 	}
+
+	// Test melt that has already been melted
+
+	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Errorf("Expected status code 400, got %d", w.Code)
+	}
+	if w.Body.String() != `"Quote already melted"` {
+		t.Errorf("Expected Quote already melted, got %s", w.Body.String())
+	}
+
 	// MELTING TESTING ENDS
 
 	// Clean up the container

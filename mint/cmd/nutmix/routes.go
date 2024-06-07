@@ -586,6 +586,10 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+		if quote.Melted {
+			c.JSON(400, "Quote already melted")
+			return
+		}
 
 		var CList, SecretList []string
 		var AmountProofs uint64
@@ -641,6 +645,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		for _, proof := range meltRequest.Inputs {
 			err := mint.ValidateProof(proof, unit)
 			if err != nil {
+				log.Println(fmt.Errorf("ValidateProof: %w", err))
 				c.JSON(403, "Invalid Proof")
 				return
 			}
