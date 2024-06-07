@@ -262,8 +262,10 @@ func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quot
 	case comms.LND_WALLET:
 		invoiceDB, err := m.LightningComs.CheckIfInvoicePayed(quote)
 		if err != nil {
+
 			return false, fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
 		}
+		// if invoiceDB.
 		if invoiceDB.State == lnrpc.Invoice_SETTLED {
 			err := dbCall(pool, true, quote)
 			if err != nil {

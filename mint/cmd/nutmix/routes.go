@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"github.com/tyler-smith/go-bip32"
@@ -271,7 +273,6 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
-			fmt.Printf("invoiceDB: %+v \n\n ", invoiceDB)
 
 			if invoiceDB.State == lnrpc.Invoice_SETTLED {
 				err := ModifyQuoteMintPayStatus(pool, true, quote.Quote)
@@ -319,6 +320,11 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 			if err != nil {
 				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+				if errors.Is(err, ErrInvalidBlindMessage) {
+					c.JSON(400, ErrInvalidBlindMessage.Error())
+					return
+				}
+
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -447,6 +453,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		err := c.BindJSON(&meltRequest)
 
 		invoice, err := zpay32.Decode(meltRequest.Request, &mint.Network)
+		// hash := hex.EncodeToString(*invoice.PaymentHash[:])
 		if err != nil {
 			log.Println(fmt.Errorf("zpay32.Decode: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
@@ -497,7 +504,8 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			}
 
 			fee := lightning.GetAverageRouteFee(query.Routes) / 1000
-			randUuid, err := uuid.NewRandom()
+			// randUuid, err := uuid.NewRandom()
+			hexHash := hex.EncodeToString(invoice.PaymentHash[:])
 
 			if err != nil {
 				log.Println(fmt.Errorf("NewRamdom: %w", err))
@@ -511,7 +519,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				Expiry:     cashu.ExpiryTime,
 				FeeReserve: fee,
 				Amount:     uint64(*invoice.MilliSat) / 1000,
-				Quote:      randUuid.String(),
+				Quote:      hexHash,
 			}
 
 			dbRequest = cashu.MeltRequestDB{
@@ -554,6 +562,12 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		ok, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, ModifyQuoteMeltPayStatus)
 
 		if err != nil {
+			if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
+				c.JSON(200, quote.GetPostMeltQuoteResponse())
+				return
+				// c.JSON(400, "Invoice not found")
+				// return
+			}
 			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return

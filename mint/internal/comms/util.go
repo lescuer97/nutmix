@@ -16,7 +16,7 @@ import (
 )
 
 // This is used for testing purpose
-// returns alice, bob, mint
+// returns alice, bob, btcNode, error
 func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Container, testcontainers.Container, testcontainers.Container, error) {
 	// setup
 	net, err := network.New(ctx,
@@ -75,7 +75,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 	reqlndAlice := testcontainers.ContainerRequest{
 		Image:        "polarlightning/lnd:0.17.5-beta",
 		WaitingFor:   wait.ForLog("Server listening on"),
-		ExposedPorts: []string{"18445/tcp", "10009/tcp"},
+		ExposedPorts: []string{"18445/tcp", "10009/tcp", "8080/tcp", "9735/tcp"},
 
 		Networks: []string{net.Name},
 		Cmd:      []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=alice" /* "--externalip=alice", */, "--tlsextradomain=alice", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9735", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8080", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
@@ -122,7 +122,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 		return nil, nil, nil, fmt.Errorf("could not fund Alice's wallet  %+v", err)
 	}
 
-	_, _, err = btcdC.Exec(ctx, []string{"bitcoin-cli", "-regtest", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "-generate", "5"})
+	_, _, err = btcdC.Exec(ctx, []string{"bitcoin-cli", "-regtest", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "-generate", "10"})
 
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not create blocks  %+v", err)
@@ -139,10 +139,10 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 	reqLndBob := testcontainers.ContainerRequest{
 		Image:        "polarlightning/lnd:0.17.5-beta",
 		WaitingFor:   wait.ForLog("Server listening on"),
-		ExposedPorts: []string{"18446/tcp", "9736/tcp", "10009/tcp", "8080/tcp"},
+		ExposedPorts: []string{"18446/tcp", "9736/tcp", "10009/tcp", "8081/tcp"},
 
 		Networks: []string{net.Name},
-		Cmd:      []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=bob" /* "--externalip=alice", */, "--tlsextradomain=bob", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9736", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8080", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
+		Cmd:      []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=bob" /* "--externalip=alice", */, "--tlsextradomain=bob", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9736", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8081", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
 	}
 
 	LndBobC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -187,7 +187,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 		}
 	}
 
-	// open channel between Alice and Bob
+	// peer connect between Alice and Bob
 	connectionStr := bobInfo.IdentityPubkey + "@" + lndBobIp + ":" + "9736"
 	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "connect", connectionStr})
 
@@ -196,13 +196,13 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 	}
 
 	// open channel between Alice and Bob
-	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "openchannel", "--node_key", bobInfo.IdentityPubkey, "--fundmax"})
+	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "openchannel", "--node_key", bobInfo.IdentityPubkey, "--fundmax", "--push_amt", "10000000"})
 
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not get nodeInfo  %+v ", err)
 	}
 
-	_, _, err = btcdC.Exec(ctx, []string{"bitcoin-cli", "-regtest", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "-generate", "10"})
+	_, _, err = btcdC.Exec(ctx, []string{"bitcoin-cli", "-regtest", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "-generate", "50"})
 
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not create blocks  %+v", err)
@@ -235,7 +235,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 		return nil, nil, nil, fmt.Errorf("could not open channel  %+v", err)
 	}
 	// connect mint to Alice
-	macaroon, err := extractInternalFile(ctx, lndAliceC, "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon")
+	macaroon, err := ExtractInternalFile(ctx, lndAliceC, "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon")
 
 	macaroonHex := hex.EncodeToString([]byte(macaroon))
 
@@ -243,7 +243,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 		return nil, nil, nil, fmt.Errorf("could not extract macaroon %+v", err)
 	}
 
-	tlsCert, err := extractInternalFile(ctx, lndAliceC, "/home/lnd/.lnd/tls.cert")
+	tlsCert, err := ExtractInternalFile(ctx, lndAliceC, "/home/lnd/.lnd/tls.cert")
 
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not extract tls %+v", err)
@@ -263,11 +263,11 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 		return nil, nil, nil, fmt.Errorf("could not set env %+v", err)
 	}
 
-	// return alice, bob, mint
+	// return alice, bob, btcNode, error
 	return lndAliceC, LndBobC, btcdC, nil
 
 }
-func extractInternalFile(ctx context.Context, container testcontainers.Container, path string) (string, error) {
+func ExtractInternalFile(ctx context.Context, container testcontainers.Container, path string) (string, error) {
 	catData, err := container.CopyFileFromContainer(ctx, path)
 
 	if err != nil {
@@ -292,7 +292,7 @@ func extractInternalFile(ctx context.Context, container testcontainers.Container
 	return data, nil
 }
 
-func readDataFromReader(reader io.Reader) (string, error) {
+func ReadDataFromReader(reader io.Reader) (string, error) {
 	buf := make([]byte, 1024)
 
 	var data string
