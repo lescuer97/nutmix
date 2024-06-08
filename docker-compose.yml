@@ -20,7 +20,7 @@ services:
       - "./letsencrypt:/letsencrypt"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
   db:
-    image: postgres
+    image: postgres:16.2
     restart: always
     ports:
       - 5432:5432

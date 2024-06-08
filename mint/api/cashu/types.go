@@ -15,10 +15,11 @@ var ExpiryTime int64 = time.Now().Add(15 * time.Minute).Unix()
 type Unit int
 
 const Sat Unit = iota + 1
+const Msat Unit = iota + 2
 
 // String - Creating common behavior - give the type a String function
 func (d Unit) String() string {
-	return [...]string{"sat"}[d-1]
+	return [...]string{"sat", "msat"}[d-1]
 }
 
 // EnumIndex - Creating common behavior - give the type a EnumIndex functio
@@ -26,8 +27,21 @@ func (d Unit) EnumIndex() int {
 	return int(d)
 }
 
+func UnitFromString(s string) (Unit, error) {
+	switch s {
+	case "sat":
+		return Sat, nil
+	case "msat":
+		return Msat, nil
+	default:
+		return 0, fmt.Errorf("Invalid unit: %s", s)
+	}
+}
+
+var AvailableSeeds []Unit = []Unit{Sat}
+
 type BlindedMessage struct {
-	Amount int32  `json:"amount"`
+	Amount uint64 `json:"amount"`
 	Id     string `json:"id"`
 	B_     string `json:"B_"`
 }
@@ -57,7 +71,7 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 }
 
 type BlindSignature struct {
-	Amount int32  `json:"amount"`
+	Amount uint64 `json:"amount"`
 	Id     string `json:"id"`
 	C_     string `json:"C_"`
 }
@@ -69,7 +83,7 @@ const SPENT ProofState = "SPENT"
 const PENDING ProofState = "PENDING"
 
 type Proof struct {
-	Amount int32  `json:"amount"`
+	Amount uint64 `json:"amount"`
 	Id     string `json:"id"`
 	Secret string `json:"secret"`
 	C      string `json:"C" db:"c"`
@@ -102,7 +116,7 @@ type Keyset struct {
 	Id        string                `json:"id"`
 	Active    bool                  `json:"active" db:"active"`
 	Unit      string                `json:"unit"`
-	Amount    int                   `json:"amount"`
+	Amount    uint64                `json:"amount"`
 	PrivKey   *secp256k1.PrivateKey `json:"priv_key"`
 	CreatedAt int64                 `json:"created_at"`
 }
@@ -116,6 +130,7 @@ type Seed struct {
 	Seed      []byte
 	Active    bool
 	CreatedAt int64
+	Version   int
 	Unit      string
 	Id        string
 }
@@ -157,10 +172,12 @@ type PostMintQuoteBolt11Request struct {
 }
 
 type PostMintQuoteBolt11Response struct {
-	Quote   string `json:"quote"`
-	Request string `json:"request"`
-	Paid    bool   `json:"paid"`
-	Expiry  int64  `json:"expiry"`
+	Quote       string `json:"quote"`
+	Request     string `json:"request"`
+	RequestPaid bool   `json:"paid" db:"request_paid"`
+	Expiry      int64  `json:"expiry"`
+	Unit        string `json:"unit"`
+	Minted      bool   `json:"minted"`
 }
 
 type PostMintBolt11Request struct {
@@ -179,13 +196,14 @@ type BasicKeysetResponse struct {
 }
 
 type MeltRequestDB struct {
-	Quote      string `json:"quote"`
-	Unit       string `json:"unit"`
-	Expiry     int64  `json:"expiry"`
-	Amount     int64  `json:"amount"`
-	FeeReserve int64  `json:"fee_reserve" db:"fee_reserve"`
-	Paid       bool   `json:"paid"`
-	Request    string `json:"request"`
+	Quote       string `json:"quote"`
+	Unit        string `json:"unit"`
+	Expiry      int64  `json:"expiry"`
+	Amount      uint64 `json:"amount"`
+	FeeReserve  uint64 `json:"fee_reserve" db:"fee_reserve"`
+	RequestPaid bool   `json:"paid" db:"request_paid"`
+	Request     string `json:"request"`
+	Melted      bool   `json:"melted"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
@@ -193,7 +211,7 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		Quote:      meltRequest.Quote,
 		Amount:     meltRequest.Amount,
 		FeeReserve: meltRequest.FeeReserve,
-		Paid:       meltRequest.Paid,
+		Paid:       meltRequest.RequestPaid,
 		Expiry:     meltRequest.Expiry,
 	}
 
@@ -206,8 +224,8 @@ type PostMeltQuoteBolt11Request struct {
 
 type PostMeltQuoteBolt11Response struct {
 	Quote      string `json:"quote"`
-	Amount     int64  `json:"amount"`
-	FeeReserve int64  `json:"fee_reserve"`
+	Amount     uint64 `json:"amount"`
+	FeeReserve uint64 `json:"fee_reserve"`
 	Paid       bool   `json:"paid"`
 	Expiry     int64  `json:"expiry"`
 }

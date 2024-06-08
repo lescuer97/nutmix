@@ -1,12 +1,13 @@
 package main
 
 import (
+	"log"
+	"os"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"log"
-	"os"
 )
 
 func main() {
@@ -22,7 +23,7 @@ func main() {
 		}
 	}
 
-	pool, err := DatabaseSetup()
+	pool, err := DatabaseSetup("migrations")
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
@@ -36,21 +37,17 @@ func main() {
 
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
-		seed, list_of_keys, err := cashu.SetUpSeedAndKeyset()
+		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 
-		id, err := cashu.DeriveKeysetId(list_of_keys)
-
-		if err != nil {
-			log.Fatalf("Error DeriveKeysetId: %+v ", err)
+		if mint_privkey == "" {
+			log.Fatalf("No mint private key found in env")
 		}
 
-		for i := range list_of_keys {
-			list_of_keys[i].Id = id
-		}
+		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
 
-		err = SaveNewSeed(pool, &seed)
+		err = SaveNewSeeds(pool, generatedSeeds)
 
-		seeds = append(seeds, seed)
+		seeds = append(seeds, generatedSeeds...)
 
 		if err != nil {
 			log.Fatalf("SaveNewSeed: %+v ", err)
