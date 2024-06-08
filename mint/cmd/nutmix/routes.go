@@ -274,6 +274,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
+			fmt.Printf("invoiceDB: %v\n", invoiceDB)
 			if invoiceDB.State == lnrpc.Invoice_SETTLED {
 				err := ModifyQuoteMintPayStatus(pool, true, quote.Quote)
 				if err != nil {
@@ -565,8 +566,6 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 				c.JSON(200, quote.GetPostMeltQuoteResponse())
 				return
-				// c.JSON(400, "Invoice not found")
-				// return
 			}
 			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
 			c.JSON(500, "Opps!, something went wrong")

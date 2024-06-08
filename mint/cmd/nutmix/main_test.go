@@ -689,6 +689,37 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	w.Flush()
 
+	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+
+	// try minting before payment being done
+	beforeMintBlindedMessages, _, _, err := createBlindedMessages(1000, referenceKeyset)
+
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	mintRequest := cashu.PostMintBolt11Request{
+		Quote:   postMintQuoteResponse.Quote,
+		Outputs: beforeMintBlindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(mintRequest)
+
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	fmt.Println(w.Body.String())
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Quote not paid"` {
+		t.Errorf("Expected Invoice not paid, got %s", w.Body.String())
+	}
+
 	// needs to wait a second for the containers to catch up
 	time.Sleep(300 * time.Millisecond)
 	// Lnd BOB pays the invoice
@@ -700,12 +731,6 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	excesMintingBlindMessage, _, _, err := createBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
-
-	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
-
-	if err != nil {
-		t.Errorf("Error unmarshalling response: %v", err)
-	}
 
 	excesMintingBlindMessage[0].B_ = "badsig"
 
@@ -730,15 +755,13 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 		t.Errorf("Expected Invalid blind message, got %s", w.Body.String())
 	}
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
-
 	// ask for minting
 	blindedMessages, mintingSecrets, mintingSecretKeys, err := createBlindedMessages(1000, referenceKeyset)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
 
-	mintRequest := cashu.PostMintBolt11Request{
+	mintRequest = cashu.PostMintBolt11Request{
 		Quote:   postMintQuoteResponse.Quote,
 		Outputs: blindedMessages,
 	}
