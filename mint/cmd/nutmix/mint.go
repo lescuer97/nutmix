@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -113,8 +114,9 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit) error {
 	return nil
 }
 
-func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) ([]cashu.BlindSignature, error) {
+func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
 	var blindedSignatures []cashu.BlindSignature
+	var recoverSigDB []cashu.RecoverSigDB
 
 	for _, output := range outputs {
 
@@ -122,15 +124,24 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 
 		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
 
+		recoverySig := cashu.RecoverSigDB{
+			Amount:    output.Amount,
+			Id:        output.Id,
+			C_:        blindSignature.C_,
+			B_:        output.B_,
+			CreatedAt: time.Now().Unix(),
+		}
+
 		if err != nil {
 			err = fmt.Errorf("GenerateBlindSignature: %w %w", ErrInvalidBlindMessage, err)
-			return nil, err
+			return nil, nil, err
 		}
 
 		blindedSignatures = append(blindedSignatures, blindSignature)
+		recoverSigDB = append(recoverSigDB, recoverySig)
 
 	}
-	return blindedSignatures, nil
+	return blindedSignatures, recoverSigDB, nil
 }
 
 func (m *Mint) GetKeysetById(id string) ([]cashu.Keyset, error) {

@@ -711,7 +711,6 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	fmt.Println(w.Body.String())
 	if w.Code != 400 {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
