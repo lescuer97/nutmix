@@ -276,3 +276,47 @@ func CheckListOfProofsBySecretCurve(pool *pgxpool.Pool, Ys []string) ([]cashu.Pr
 
 	return proofList, nil
 }
+
+func GetRestoreSigsFromBlindedMessages(pool *pgxpool.Pool, B_ []string) ([]cashu.RecoverSigDB, error) {
+
+	var signaturesList []cashu.RecoverSigDB
+
+	rows, err := pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at  FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return signaturesList, nil
+		}
+		return signaturesList, fmt.Errorf("pool.Query: %v", err)
+	}
+
+	signatures, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.RecoverSigDB])
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return signaturesList, nil
+		}
+		return signaturesList, fmt.Errorf("CollectOneRow: %v", err)
+	}
+
+	signaturesList = signatures
+
+	return signaturesList, nil
+}
+
+func SetRestoreSigs(pool *pgxpool.Pool, recover_sigs []cashu.RecoverSigDB) error {
+	entries := [][]any{}
+	columns := []string{"id", "amount", "B_", "C_", "created_at"}
+	tableName := "recovery_signature"
+
+	for _, sig := range recover_sigs {
+		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt})
+	}
+
+	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
+
+	if err != nil {
+		return fmt.Errorf("inserting to DB: %v", err)
+	}
+	return nil
+}

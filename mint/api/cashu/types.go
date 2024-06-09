@@ -262,3 +262,39 @@ type CheckState struct {
 type PostCheckStateResponse struct {
 	States []CheckState `json:"states"`
 }
+
+type RecoverSigDB struct {
+	Amount    uint64 `json:"amount"`
+	Id        string `json:"id"`
+	B_        string `json:"B_" db:"B_"`
+	C_        string `json:"C_" db:"C_"`
+	CreatedAt int64  `json:"created_at" db:"created_at"`
+}
+
+func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
+	return r.GetBlindSignature(), r.GetBlindedMessage()
+}
+func (r RecoverSigDB) GetBlindedMessage() BlindedMessage {
+	return BlindedMessage{
+		Amount: r.Amount,
+		Id:     r.Id,
+		B_:     r.B_,
+	}
+}
+
+func (r RecoverSigDB) GetBlindSignature() BlindSignature {
+	return BlindSignature{
+		Amount: r.Amount,
+		Id:     r.Id,
+		C_:     r.C_,
+	}
+}
+
+type PostRestoreRequest struct {
+	Outputs []BlindedMessage `json:"outputs"`
+}
+
+type PostRestoreResponse struct {
+	Outputs    []BlindedMessage `json:"outputs"`
+	Signatures []BlindSignature `json:"signatures"`
+}
