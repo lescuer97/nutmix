@@ -127,7 +127,13 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 	v1.POST("/mint/quote/bolt11", func(c *gin.Context) {
 		var mintRequest cashu.PostMintQuoteBolt11Request
-		c.BindJSON(&mintRequest)
+		err := c.BindJSON(&mintRequest)
+
+		if err != nil {
+			log.Printf("Incorrect body: %+v", err)
+			c.JSON(400, "Malformed body request")
+			return
+		}
 
 		if mintRequest.Amount == 0 {
 			c.JSON(400, "amount missing")
@@ -186,7 +192,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
 		}
 
-		err := SaveQuoteMintRequest(pool, response)
+		err = SaveQuoteMintRequest(pool, response)
 
 		if err != nil {
 			log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
@@ -246,11 +252,13 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		blindedSignatures := []cashu.BlindSignature{}
 
+		recoverySigsDb := []cashu.RecoverSigDB{}
 		lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
+
 		switch lightningBackendType {
 
 		case comms.FAKE_WALLET:
-			signedSignatures, err := mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
+			blindedSignatures, recoverySigsDb, err = mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
 
 			if err != nil {
 
@@ -263,7 +271,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
-			blindedSignatures = signedSignatures
+			// blindedSignatures = signedSignatures
 
 		case comms.LND_WALLET:
 			invoiceDB, err := mint.LightningComs.CheckIfInvoicePayed(quote.Quote)
@@ -274,7 +282,6 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-			fmt.Printf("invoiceDB: %v\n", invoiceDB)
 			if invoiceDB.State == lnrpc.Invoice_SETTLED {
 				err := ModifyQuoteMintPayStatus(pool, true, quote.Quote)
 				if err != nil {
@@ -317,7 +324,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-			signedSignatures, err := mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
+			blindedSignatures, recoverySigsDb, err = mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
 
 			if err != nil {
 				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
@@ -329,7 +336,6 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
-			blindedSignatures = signedSignatures
 
 		default:
 			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
@@ -342,6 +348,12 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		if err != nil {
 			log.Println(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err))
 		}
+		err = SetRestoreSigs(pool, recoverySigsDb)
+		if err != nil {
+			log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
+			log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
+			return
+		}
 
 		// Store BlidedSignature
 		c.JSON(200, cashu.PostMintBolt11Response{
@@ -353,6 +365,11 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		var swapRequest cashu.PostSwapRequest
 
 		err := c.BindJSON(&swapRequest)
+		if err != nil {
+			log.Printf("Incorrect body: %+v", err)
+			c.JSON(400, "Malformed body request")
+			return
+		}
 
 		var AmountProofs, AmountSignature uint64
 		var CList, SecretsList []string
@@ -424,7 +441,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		}
 
 		// sign the outputs
-		blindedSignatures, err := mint.SignBlindedMessages(swapRequest.Outputs, cashu.Sat.String())
+		blindedSignatures, recoverySigsDb, err := mint.SignBlindedMessages(swapRequest.Outputs, cashu.Sat.String())
 
 		if err != nil {
 			log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
@@ -446,12 +463,26 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
+		err = SetRestoreSigs(pool, recoverySigsDb)
+		if err != nil {
+			log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
+			log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
+			c.JSON(200, response)
+			return
+		}
+
 		c.JSON(200, response)
 	})
 
 	v1.POST("/melt/quote/bolt11", func(c *gin.Context) {
 		var meltRequest cashu.PostMeltQuoteBolt11Request
 		err := c.BindJSON(&meltRequest)
+
+		if err != nil {
+			log.Printf("Incorrect body: %+v", err)
+			c.JSON(400, "Malformed body request")
+			return
+		}
 
 		invoice, err := zpay32.Decode(meltRequest.Request, &mint.Network)
 		// hash := hex.EncodeToString(*invoice.PaymentHash[:])
@@ -580,10 +611,9 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 	v1.POST("/melt/bolt11", func(c *gin.Context) {
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
-
 		if err != nil {
-			log.Println(fmt.Errorf("c.BindJSON: %w", err))
-			c.JSON(500, "Opps!, something went wrong")
+			log.Printf("Incorrect body: %+v", err)
+			c.JSON(400, "Malformed body request")
 			return
 		}
 
@@ -801,5 +831,42 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		c.JSON(200, checkStateResponse)
 
+	})
+	v1.POST("/restore", func(c *gin.Context) {
+		var restoreRequest cashu.PostRestoreRequest
+		err := c.BindJSON(&restoreRequest)
+
+		if err != nil {
+			log.Println(fmt.Errorf("c.BindJSON: %w", err))
+			c.JSON(400, "Malformed body request")
+			return
+		}
+
+		blindingFactors := []string{}
+
+		for _, output := range restoreRequest.Outputs {
+			blindingFactors = append(blindingFactors, output.B_)
+		}
+
+		blindRecoverySigs, err := GetRestoreSigsFromBlindedMessages(pool, blindingFactors)
+		if err != nil {
+			log.Println(fmt.Errorf("GetRestoreSigsFromBlindedMessages: %w", err))
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
+		restoredBlindSigs := []cashu.BlindSignature{}
+		restoredBlindMessage := []cashu.BlindedMessage{}
+
+		for _, sigRecover := range blindRecoverySigs {
+			restoredSig, restoredMessage := sigRecover.GetSigAndMessage()
+			restoredBlindSigs = append(restoredBlindSigs, restoredSig)
+			restoredBlindMessage = append(restoredBlindMessage, restoredMessage)
+		}
+
+		c.JSON(200, cashu.PostRestoreResponse{
+			Outputs:    restoredBlindMessage,
+			Signatures: restoredBlindSigs,
+		})
 	})
 }
