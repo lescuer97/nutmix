@@ -41,9 +41,10 @@ func UnitFromString(s string) (Unit, error) {
 var AvailableSeeds []Unit = []Unit{Sat}
 
 type BlindedMessage struct {
-	Amount uint64 `json:"amount"`
-	Id     string `json:"id"`
-	B_     string `json:"B_"`
+	Amount  uint64 `json:"amount"`
+	Id      string `json:"id"`
+	B_      string `json:"B_"`
+	Witness string `json:"witness" db:"witness"`
 }
 
 func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
@@ -83,11 +84,12 @@ const SPENT ProofState = "SPENT"
 const PENDING ProofState = "PENDING"
 
 type Proof struct {
-	Amount uint64 `json:"amount"`
-	Id     string `json:"id"`
-	Secret string `json:"secret"`
-	C      string `json:"C" db:"c"`
-	Y      string `json:"Y" db:"Y"`
+	Amount  uint64 `json:"amount"`
+	Id      string `json:"id"`
+	Secret  string `json:"secret"`
+	C       string `json:"C" db:"c"`
+	Y       string `json:"Y" db:"Y"`
+	Witness string `json:"witness" db:"witness"`
 }
 
 func (p Proof) HashSecretToCurve() (Proof, error) {
