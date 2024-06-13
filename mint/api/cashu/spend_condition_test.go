@@ -1,12 +1,13 @@
 package cashu
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"testing"
 )
 
-const singleProofWithP2PK string = `{"amount":2,"C":"03952d912e6e8ba9f60c26a6120af9b50276b11b507aa09c66c3a5651c8521e819","id":"009a1f293253e41e","secret":"[\"P2PK\",{\"nonce\":\"ed8e7194f78cf3634e2dcf39e3fb8a263789cf9df3d5563347b8ce07c4c1f457\",\"data\":\"0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae\"}]","witness":"{\"signatures\":[\"83b585b5d719e95c1cef8514b14b3a027a2053fe174a1b693051c6e2dcbcf6478b4759e5a25a36a0fd67eae392b3a73afa6677b80d1edbbb6b0a9837ef8c413d\"]}"}`
+const singleProofWithP2PK string = `{"amount":2,"C":"03952d912e6e8ba9f60c26a6120af9b50276b11b507aa09c66c3a5651c8521e819","id":"009a1f293253e41e","secret":"[\"P2PK\",{\"nonce\":\"ed8e7194f78cf3634e2dcf39e3fb8a263789cf9df3d5563347b8ce07c4c1f457\",\"data\":\"0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae\",\"tags\": [[\"sigflag\",\"SIG_ALL\"],[\"n_sigs\",\"2\"],[\"locktime\",\"1689418329\"],[\"refund\",\"033281c37677ea273eb7183b783067f5244933ef78d8c3f15b1a77cb246099c26e\"],[\"pubkeys\",\"02698c4e2b5f9534cd0687d87513c759790cf829aa5739184a3e3735471fbda904\",\"023192200a0cfd3867e48eb63b03ff599c7e46c8f4e41146b2d281173ca6c50c54\"]]}]","witness":"{\"signatures\":[\"83b585b5d719e95c1cef8514b14b3a027a2053fe174a1b693051c6e2dcbcf6478b4759e5a25a36a0fd67eae392b3a73afa6677b80d1edbbb6b0a9837ef8c413d\"]}"}`
 
 // this is the private key for public key: 0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae
 const receiverPrivateKey string = "1f369c114315e02945ad9858f1e0e826013d0bfd5d294b274b530613a8975e75"
@@ -22,12 +23,10 @@ func TestParseProofWithP2PK(t *testing.T) {
 	}
 
 	if proof.Witness != `{"signatures":["83b585b5d719e95c1cef8514b14b3a027a2053fe174a1b693051c6e2dcbcf6478b4759e5a25a36a0fd67eae392b3a73afa6677b80d1edbbb6b0a9837ef8c413d"]}` {
-
 		t.Errorf("incorrect Witness: %s", proof.Witness)
-
 	}
 
-	if proof.Secret != `["P2PK",{"nonce":"ed8e7194f78cf3634e2dcf39e3fb8a263789cf9df3d5563347b8ce07c4c1f457","data":"0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae"}]` {
+	if proof.Secret != `["P2PK",{"nonce":"ed8e7194f78cf3634e2dcf39e3fb8a263789cf9df3d5563347b8ce07c4c1f457","data":"0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae","tags": [["sigflag","SIG_ALL"],["n_sigs","2"],["locktime","1689418329"],["refund","033281c37677ea273eb7183b783067f5244933ef78d8c3f15b1a77cb246099c26e"],["pubkeys","02698c4e2b5f9534cd0687d87513c759790cf829aa5739184a3e3735471fbda904","023192200a0cfd3867e48eb63b03ff599c7e46c8f4e41146b2d281173ca6c50c54"]]}]` {
 		t.Errorf("incorrect Secret %s", proof.Secret)
 	}
 
@@ -36,18 +35,39 @@ func TestParseProofWithP2PK(t *testing.T) {
 
 	err = json.Unmarshal([]byte(proof.Secret), &spendCondition)
 
-	fmt.Printf("spendCondition %+v", spendCondition)
-
 	if err != nil {
-		t.Errorf("could not pass spend condition %+v \n\n", err)
+		t.Errorf("could not parse spend condition %+v \n\n", err)
 	}
+	fmt.Printf("spendCondition %+v", spendCondition)
 
 	if spendCondition.Type != P2PK {
 		t.Errorf("Error in spend condition type %+v", spendCondition.Type)
 	}
 
-	// json.Unmarshal()
+	if hex.EncodeToString(spendCondition.Data.Data.SerializeCompressed()) != "0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae" {
+		t.Errorf("Error in spend condition data %+v", hex.EncodeToString(spendCondition.Data.Data.SerializeUncompressed()))
+	}
 
-	// parse witness to golang data struct
+	if hex.EncodeToString(spendCondition.Data.Tags.Pubkeys[0].SerializeCompressed()) != "02698c4e2b5f9534cd0687d87513c759790cf829aa5739184a3e3735471fbda904" {
+		t.Errorf("Error in spend condition pubkey %+v", hex.EncodeToString(spendCondition.Data.Tags.Pubkeys[0].SerializeUncompressed()))
+	}
+
+	if hex.EncodeToString(spendCondition.Data.Tags.Refund[0].SerializeCompressed()) != "033281c37677ea273eb7183b783067f5244933ef78d8c3f15b1a77cb246099c26e" {
+		t.Errorf("Error in spend condition refund %+v", hex.EncodeToString(spendCondition.Data.Tags.Refund[0].SerializeUncompressed()))
+	}
+
+	var p2pkWitness P2PKWitness
+	// parse witness
+	err = json.Unmarshal([]byte(proof.Witness), &p2pkWitness)
+
+	if err != nil {
+		t.Errorf("could not pass P2PKWitness %+v \n\n", err)
+	}
+
+	if hex.EncodeToString(p2pkWitness.Signatures[0].Serialize()) != "83b585b5d719e95c1cef8514b14b3a027a2053fe174a1b693051c6e2dcbcf6478b4759e5a25a36a0fd67eae392b3a73afa6677b80d1edbbb6b0a9837ef8c413d" {
+
+		t.Errorf("Error in p2pkWitness[0] %+v", p2pkWitness.Signatures[0])
+
+	}
 
 }

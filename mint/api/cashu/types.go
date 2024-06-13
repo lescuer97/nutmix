@@ -2,6 +2,7 @@ package cashu
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -90,6 +91,60 @@ type Proof struct {
 	C       string `json:"C" db:"c"`
 	Y       string `json:"Y" db:"Y"`
 	Witness string `json:"witness" db:"witness"`
+}
+
+func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWitness) (bool, error) {
+
+	ok, err := spendCondition.VerifySignatures(witness, p.Secret)
+
+	if err != nil {
+		return false, fmt.Errorf("spendCondition.VerifySignatures  %+v ", err)
+	}
+
+	return ok, nil
+
+}
+
+func (p Proof) parseWitnessAndSecret() (*SpendCondition, *P2PKWitness, error) {
+
+	var spendCondition SpendCondition
+	var witness P2PKWitness
+
+	err := json.Unmarshal([]byte(p.Secret), &spendCondition)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Secret), &spendCondition)  %+v, %+v", ErrCouldNotParseSpendCondition, err)
+
+	}
+
+	err = json.Unmarshal([]byte(p.Witness), &witness)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %+v, %+v", ErrCouldNotParseWitness, err)
+
+	}
+
+	return &spendCondition, &witness, nil
+}
+
+func (p Proof) IsProofSpendConditioned() (bool, *SpendCondition, *P2PKWitness, error) {
+	var witness P2PKWitness
+	witnessErr := json.Unmarshal([]byte(p.Witness), &witness)
+
+	var spendCondition SpendCondition
+
+	spendConditionErr := json.Unmarshal([]byte(p.Secret), &spendCondition)
+
+	switch {
+	case witnessErr == nil && spendConditionErr == nil:
+		return true, &spendCondition, &witness, nil
+	case witnessErr != nil && spendConditionErr == nil:
+		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %+v, %+v", ErrCouldNotParseWitness, witnessErr)
+	case spendConditionErr != nil && witnessErr == nil:
+		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %+v, %+v", ErrCouldNotParseSpendCondition, spendConditionErr)
+	default:
+		return false, nil, nil, nil
+	}
 }
 
 func (p Proof) HashSecretToCurve() (Proof, error) {
@@ -271,6 +326,7 @@ type RecoverSigDB struct {
 	B_        string `json:"B_" db:"B_"`
 	C_        string `json:"C_" db:"C_"`
 	CreatedAt int64  `json:"created_at" db:"created_at"`
+	Witness   string `json:"witness"`
 }
 
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {

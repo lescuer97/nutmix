@@ -1,12 +1,16 @@
 package cashu
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"strconv"
+	"time"
+
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
 
 const (
@@ -18,6 +22,8 @@ const (
 	ErrInvalidSigFlag                = "Invalid sig flag"
 	ErrConvertSigFlagToString        = "Failed to convert sig flag to string"
 	ErrMalformedTag                  = "Malformed tag"
+	ErrCouldNotParseSpendCondition   = "Could not parse spend condition"
+	ErrCouldNotParseWitness          = "Could not parse witness"
 )
 
 type SpendCondition struct {
@@ -53,58 +59,34 @@ func (sc *SpendConditionType) UnmarshalJSON(b []byte) error {
 
 }
 
-type TagsInfo map[Tags][]string
+type TagsInfo struct {
+	Sigflag  SigFlag
+	Pubkeys  []*btcec.PublicKey
+	NSigs    int
+	Locktime int
+	Refund   []*btcec.PublicKey
+}
 
 func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 
-	tagsInfo, err := GetTagsInfo(b)
-
-	if err != nil {
-		return err
-	}
-
-	*tags = tagsInfo
-	return nil
-}
-
-type SpendConditionData struct {
-	Nonce string
-	Data  string
-	Tags  TagsInfo
-}
-
-// func (scp *SpendConditionData) UnmarshalJSON(b []byte) error {
-// 	// a := []interface{}{&scp.Nonce, &scp.Data /* , &scp.Tags */ }
-// 	a := []interface{}{&scp.Nonce, &scp.Data  , &scp.Tags  }
-// 	return json.Unmarshal(b, &a)
-// }
-
-func GetTagsInfo(b []byte) (TagsInfo, error) {
-
-	tagsInfo := make(TagsInfo)
-
 	var arrayToCheck [][]string
 
-	fmt.Printf("b %+v", string(b))
 	err := json.Unmarshal(b, &arrayToCheck)
 
 	if err != nil {
-		return nil, fmt.Errorf("json.Unmarshal(b, &arrayToCheck): %+v", err)
-
+		return fmt.Errorf("json.Unmarshal(b, &arrayToCheck): %+v", err)
 	}
-
-	fmt.Printf("arrayToCheck %+v: ", arrayToCheck)
 
 	for _, tag := range arrayToCheck {
 
 		if len(tag) < 2 {
-			return nil, errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+			return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
 		}
 
 		tagName, err := TagFromString(tag[0])
 
 		if err != nil {
-			return nil, errors.New(fmt.Sprintf("%s: %s", ErrInvalidTagName, tag[0]))
+			return errors.New(fmt.Sprintf("%s: %s", ErrInvalidTagName, tag[0]))
 		}
 
 		tagInfo := tag[1:]
@@ -112,65 +94,152 @@ func GetTagsInfo(b []byte) (TagsInfo, error) {
 
 		case Sigflag:
 			if len(tagInfo) != 1 {
-				return nil, errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+				return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
 			}
 
 			sigFlag, err := SigFlagFromString(tagInfo[0])
 			if err != nil {
-				return nil, errors.New(fmt.Sprintf("%s: %s", ErrInvalidSigFlag, tagInfo[0]))
+				return errors.New(fmt.Sprintf("%s: %s", ErrInvalidSigFlag, tagInfo[0]))
 			}
-			tagsInfo[tagName] = append(tagsInfo[tagName], sigFlag.String())
+
+			tags.Sigflag = sigFlag
 
 		case Pubkeys, Refund:
 			if len(tagInfo) < 1 {
-				return nil, errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+				return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
 			}
 
 			for _, pubkey := range tagInfo {
 				bytesPubkey, err := hex.DecodeString(pubkey)
 				if err != nil {
-					return nil, fmt.Errorf("hex.DecodeString: %s", pubkey)
+					return fmt.Errorf("hex.DecodeString: %s", pubkey)
 				}
 
-				parsedPubkey, err := secp256k1.ParsePubKey(bytesPubkey)
+				parsedPubkey, err := btcec.ParsePubKey(bytesPubkey)
 				if err != nil {
-					return nil, fmt.Errorf("secp256k1.ParsePubKey: %s", err)
+					return fmt.Errorf("secp256k1.ParsePubKey: %s", err)
 				}
 
-				tagsInfo[tagName] = append(tagsInfo[tagName], hex.EncodeToString(parsedPubkey.SerializeCompressed()))
+				switch tagName {
+				case Pubkeys:
+					tags.Pubkeys = append(tags.Pubkeys, parsedPubkey)
+
+				case Refund:
+					tags.Refund = append(tags.Refund, parsedPubkey)
+				}
 
 			}
 
 		case NSigs:
 			if len(tagInfo) != 1 {
-				return nil, errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+				return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
 			}
 
 			nSigs, err := strconv.Atoi(tagInfo[0])
 			if err != nil {
-				return nil, errors.New(fmt.Sprintf("strconv.Atoi: %s", tagInfo[0]))
+				return errors.New(fmt.Sprintf("strconv.Atoi: %s", tagInfo[0]))
 			}
 
-			tagsInfo[tagName] = append(tagsInfo[tagName], strconv.Itoa(nSigs))
+			tags.NSigs = nSigs
 
 		case Locktime:
 			if len(tagInfo) != 1 {
-				return nil, errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+				return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
 			}
 
 			locktime, err := strconv.Atoi(tagInfo[0])
 			if err != nil {
-				return nil, errors.New(fmt.Sprintf("strconv.Atoi: %s", tagInfo[0]))
+				return errors.New(fmt.Sprintf("strconv.Atoi: %s", tagInfo[0]))
 			}
-			tagsInfo[tagName] = append(tagsInfo[tagName], strconv.Itoa(locktime))
+
+			tags.Locktime = locktime
 		}
 
 	}
 
-	fmt.Printf("tagsInfo %+v: ", tagsInfo)
+	return nil
 
-	return tagsInfo, nil
+}
 
+type SpendConditionData struct {
+	Nonce string
+	Data  *btcec.PublicKey
+	Tags  TagsInfo
+}
+
+func (scd *SpendConditionData) UnmarshalJSON(b []byte) error {
+
+	var info = struct {
+		Nonce string
+		Data  string
+		Tags  TagsInfo
+	}{}
+
+	err := json.Unmarshal(b, &info)
+
+	if err != nil {
+		return fmt.Errorf("json.Unmarshal(b, &info): %+v", err)
+	}
+
+	pubkey, err := hex.DecodeString(info.Data)
+	if err != nil {
+		return fmt.Errorf("hex.DecodeString: %s", info.Data)
+	}
+
+	parsedPubkey, err := btcec.ParsePubKey(pubkey)
+	if err != nil {
+		return fmt.Errorf("secp256k1.ParsePubKey: %s", err)
+	}
+
+	scd.Data = parsedPubkey
+	scd.Tags = info.Tags
+	scd.Nonce = info.Nonce
+
+	return nil
+
+}
+
+func (sc *SpendCondition) VerifySignatures(witness *P2PKWitness, message string) (bool, error) {
+
+	currentTime := time.Now().Unix()
+
+	hashMessage := sha256.Sum256([]byte(message))
+
+	// check if locktime has passed and if there are refund keys
+	if sc.Data.Tags.Locktime != 0 && currentTime > int64(sc.Data.Tags.Locktime) && len(sc.Data.Tags.Refund) > 0 {
+		for _, sig := range witness.Signatures {
+			for _, pubkey := range sc.Data.Tags.Refund {
+				if sig.Verify(hashMessage[:], pubkey) {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	// append all posibles keys for signing
+	amountValidSigs := 0
+	signaturesToTry := append(sc.Data.Tags.Pubkeys, sc.Data.Data)
+
+	for _, sig := range witness.Signatures {
+		for _, pubkey := range signaturesToTry {
+			if sig.Verify(hashMessage[:], pubkey) {
+				amountValidSigs += 1
+			}
+		}
+	}
+
+	// check if there is a multisig set up if not check if there is only one valid signature
+	switch {
+	case sc.Data.Tags.NSigs > 0 && amountValidSigs >= sc.Data.Tags.NSigs:
+		return true, nil
+
+	case amountValidSigs >= 1:
+		return true, nil
+
+	default:
+		return false, nil
+
+	}
 }
 
 type Tags int
@@ -242,4 +311,44 @@ func SigFlagFromString(s string) (SigFlag, error) {
 	default:
 		return 0, errors.New(fmt.Sprintf("%s: %s", ErrInvalidTagValue, s))
 	}
+}
+
+type P2PKWitness struct {
+	Signatures []*schnorr.Signature
+}
+
+func (wit *P2PKWitness) UnmarshalJSON(b []byte) error {
+
+	var sigs = struct {
+		Signatures []string
+	}{}
+
+	err := json.Unmarshal(b, &sigs)
+
+	if err != nil {
+		return fmt.Errorf("json.Unmarshal(b, &info): %+v", err)
+	}
+
+	witness := P2PKWitness{
+		Signatures: make([]*schnorr.Signature, 0),
+	}
+
+	for _, sig := range sigs.Signatures {
+		sigBytes, err := hex.DecodeString(sig)
+		if err != nil {
+			return fmt.Errorf("hex.DecodeString: %s", sigBytes)
+		}
+		signature, err := schnorr.ParseSignature(sigBytes)
+		if err != nil {
+			return fmt.Errorf("schnorr.ParseSignature(sigBytes): %s", err)
+		}
+
+		witness.Signatures = append(witness.Signatures, signature)
+
+	}
+
+	*wit = witness
+
+	return nil
+
 }

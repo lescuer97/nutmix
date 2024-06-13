@@ -77,6 +77,16 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof) (cashu.Unit, error) 
 	return returnedUnit, nil
 
 }
+func (m *Mint) VerifyListOfProofs(proofs []cashu.Proof, unit cashu.Unit) error {
+
+	for _, proof := range proofs {
+		err := m.ValidateProof(proof, unit)
+		if err != nil {
+			return fmt.Errorf("ValidateProof: %w", err)
+		}
+	}
+	return nil
+}
 
 func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit) error {
 	var keysetToUse cashu.Keyset
@@ -90,6 +100,28 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit) error {
 	// check if keysetToUse is not assigned
 	if keysetToUse.Id == "" {
 		return ErrKeysetForProofNotFound
+	}
+
+	// check if a proof is locked to a spend condition and verifies it
+	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned()
+
+	if err != nil {
+		log.Printf("proof.IsProofSpendConditioned(): %+v", err)
+		return fmt.Errorf("proof.IsProofSpendConditioned(): %+v", err)
+	}
+
+	if isProofLocked {
+		ok, err := proof.VerifyWitnessSig(spendCondition, witness)
+
+		if err != nil {
+			log.Printf("proof.VerifyWitnessSig(): %+v", err)
+			return fmt.Errorf("proof.VerifyWitnessSig(): %+v", err)
+		}
+
+		if !ok {
+			return ErrInvalidProof
+		}
+
 	}
 
 	parsedBlinding, err := hex.DecodeString(proof.C)
@@ -130,6 +162,7 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 			C_:        blindSignature.C_,
 			B_:        output.B_,
 			CreatedAt: time.Now().Unix(),
+			Witness:   output.Witness,
 		}
 
 		if err != nil {
