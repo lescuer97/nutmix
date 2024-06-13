@@ -1,14 +1,15 @@
 package cashu
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
-	"time"
-
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
+	"log"
+	"time"
 )
 
 var ExpiryTime int64 = time.Now().Add(15 * time.Minute).Unix()
@@ -46,6 +47,39 @@ type BlindedMessage struct {
 	Id      string `json:"id"`
 	B_      string `json:"B_"`
 	Witness string `json:"witness" db:"witness"`
+}
+
+func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys []*btcec.PublicKey) error {
+	if b.Witness == "" {
+		return ErrEmptyWitness
+	}
+	var p2pkWitness P2PKWitness
+
+	err := json.Unmarshal([]byte(b.Witness), &p2pkWitness)
+
+	if err != nil {
+		return fmt.Errorf("json.Unmarshal([]byte(b.Witness), &p2pkWitness)  %+v", err)
+	}
+
+	decodedBlindFactor, err := hex.DecodeString(b.B_)
+
+	if err != nil {
+		return fmt.Errorf("hex.DecodeString(b.B_)  %+v", err)
+	}
+
+	hash := sha256.Sum256(decodedBlindFactor)
+
+	for _, sig := range p2pkWitness.Signatures {
+		for _, pubkey := range pubkeys {
+
+			ok := sig.Verify(hash[:], pubkey)
+			if !ok {
+				return nil
+			}
+		}
+	}
+
+	return nil
 }
 
 func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
@@ -93,13 +127,15 @@ type Proof struct {
 	Witness string `json:"witness" db:"witness"`
 }
 
-func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWitness) (bool, error) {
+func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWitness, pubkeysFromProofs *[]*btcec.PublicKey) (bool, error) {
 
-	ok, err := spendCondition.VerifySignatures(witness, p.Secret)
+	ok, pubkeys, err := spendCondition.VerifySignatures(witness, p.Secret)
 
 	if err != nil {
 		return false, fmt.Errorf("spendCondition.VerifySignatures  %+v ", err)
 	}
+
+	*pubkeysFromProofs = append(*pubkeysFromProofs, pubkeys...)
 
 	return ok, nil
 
@@ -127,7 +163,7 @@ func (p Proof) parseWitnessAndSecret() (*SpendCondition, *P2PKWitness, error) {
 	return &spendCondition, &witness, nil
 }
 
-func (p Proof) IsProofSpendConditioned() (bool, *SpendCondition, *P2PKWitness, error) {
+func (p Proof) IsProofSpendConditioned(checkOutputs *bool) (bool, *SpendCondition, *P2PKWitness, error) {
 	var witness P2PKWitness
 	witnessErr := json.Unmarshal([]byte(p.Witness), &witness)
 
@@ -137,6 +173,10 @@ func (p Proof) IsProofSpendConditioned() (bool, *SpendCondition, *P2PKWitness, e
 
 	switch {
 	case witnessErr == nil && spendConditionErr == nil:
+		// if sigflag is SigAll, then we need to check the outputs
+		if spendCondition.Data.Tags.Sigflag == SigAll {
+			*checkOutputs = true
+		}
 		return true, &spendCondition, &witness, nil
 	case witnessErr != nil && spendConditionErr == nil:
 		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %+v, %+v", ErrCouldNotParseWitness, witnessErr)

@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -77,18 +78,34 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof) (cashu.Unit, error) 
 	return returnedUnit, nil
 
 }
-func (m *Mint) VerifyListOfProofs(proofs []cashu.Proof, unit cashu.Unit) error {
+func (m *Mint) VerifyListOfProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage, unit cashu.Unit) error {
+	checkOutputs := false
+
+	var pubkeysFromProofs []*btcec.PublicKey
 
 	for _, proof := range proofs {
-		err := m.ValidateProof(proof, unit)
+		err := m.ValidateProof(proof, unit, &checkOutputs, &pubkeysFromProofs)
 		if err != nil {
 			return fmt.Errorf("ValidateProof: %w", err)
 		}
 	}
+
+	// if any sig allis present all outputs also need to be check with the pubkeys from the proofs
+	if checkOutputs {
+		for _, blindMessage := range blindMessages {
+
+			err := blindMessage.VerifyBlindMessageSignature(pubkeysFromProofs)
+			if err != nil {
+				return fmt.Errorf("ValidateProof: %w", err)
+			}
+
+		}
+	}
+
 	return nil
 }
 
-func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit) error {
+func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *bool, pubkeysFromProofs *[]*btcec.PublicKey) error {
 	var keysetToUse cashu.Keyset
 	for _, keyset := range m.Keysets[unit.String()] {
 		if keyset.Amount == proof.Amount && keyset.Id == proof.Id {
@@ -103,7 +120,7 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit) error {
 	}
 
 	// check if a proof is locked to a spend condition and verifies it
-	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned()
+	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
 
 	if err != nil {
 		log.Printf("proof.IsProofSpendConditioned(): %+v", err)
@@ -111,7 +128,7 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit) error {
 	}
 
 	if isProofLocked {
-		ok, err := proof.VerifyWitnessSig(spendCondition, witness)
+		ok, err := proof.VerifyWitnessSig(spendCondition, witness, pubkeysFromProofs)
 
 		if err != nil {
 			log.Printf("proof.VerifyWitnessSig(): %+v", err)

@@ -13,17 +13,18 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
 
-const (
-	ErrInvalidSpendCondition         = "Invalid spend condition"
-	ErrConvertSpendConditionToString = "Failed to convert spend condition to string"
-	ErrInvalidTagName                = "Invalid tag name"
-	ErrConvertTagToString            = "Failed to convert tag to string"
-	ErrInvalidTagValue               = "Invalid tag value"
-	ErrInvalidSigFlag                = "Invalid sig flag"
-	ErrConvertSigFlagToString        = "Failed to convert sig flag to string"
-	ErrMalformedTag                  = "Malformed tag"
-	ErrCouldNotParseSpendCondition   = "Could not parse spend condition"
-	ErrCouldNotParseWitness          = "Could not parse witness"
+var (
+	ErrInvalidSpendCondition         = errors.New("Invalid spend condition")
+	ErrConvertSpendConditionToString = errors.New("Failed to convert spend condition to string")
+	ErrInvalidTagName                = errors.New("Invalid tag name")
+	ErrConvertTagToString            = errors.New("Failed to convert tag to string")
+	ErrInvalidTagValue               = errors.New("Invalid tag value")
+	ErrInvalidSigFlag                = errors.New("Invalid sig flag")
+	ErrConvertSigFlagToString        = errors.New("Failed to convert sig flag to string")
+	ErrMalformedTag                  = errors.New("Malformed tag")
+	ErrCouldNotParseSpendCondition   = errors.New("Could not parse spend condition")
+	ErrCouldNotParseWitness          = errors.New("Could not parse witness")
+	ErrEmptyWitness                  = errors.New("Witness is empty")
 )
 
 type SpendCondition struct {
@@ -53,7 +54,7 @@ func (sc *SpendConditionType) UnmarshalJSON(b []byte) error {
 		break
 
 	default:
-		return errors.New(ErrInvalidSpendCondition)
+		return ErrInvalidSpendCondition
 	}
 	return nil
 
@@ -199,18 +200,19 @@ func (scd *SpendConditionData) UnmarshalJSON(b []byte) error {
 
 }
 
-func (sc *SpendCondition) VerifySignatures(witness *P2PKWitness, message string) (bool, error) {
+func (sc *SpendCondition) VerifySignatures(witness *P2PKWitness, message string) (bool, []*btcec.PublicKey, error) {
 
 	currentTime := time.Now().Unix()
 
 	hashMessage := sha256.Sum256([]byte(message))
+	signaturesToTry := append(sc.Data.Tags.Pubkeys, sc.Data.Data)
 
 	// check if locktime has passed and if there are refund keys
 	if sc.Data.Tags.Locktime != 0 && currentTime > int64(sc.Data.Tags.Locktime) && len(sc.Data.Tags.Refund) > 0 {
 		for _, sig := range witness.Signatures {
 			for _, pubkey := range sc.Data.Tags.Refund {
 				if sig.Verify(hashMessage[:], pubkey) {
-					return true, nil
+					return true, signaturesToTry, nil
 				}
 			}
 		}
@@ -218,7 +220,6 @@ func (sc *SpendCondition) VerifySignatures(witness *P2PKWitness, message string)
 
 	// append all posibles keys for signing
 	amountValidSigs := 0
-	signaturesToTry := append(sc.Data.Tags.Pubkeys, sc.Data.Data)
 
 	for _, sig := range witness.Signatures {
 		for _, pubkey := range signaturesToTry {
@@ -231,13 +232,13 @@ func (sc *SpendCondition) VerifySignatures(witness *P2PKWitness, message string)
 	// check if there is a multisig set up if not check if there is only one valid signature
 	switch {
 	case sc.Data.Tags.NSigs > 0 && amountValidSigs >= sc.Data.Tags.NSigs:
-		return true, nil
+		return true, signaturesToTry, nil
 
 	case amountValidSigs >= 1:
-		return true, nil
+		return true, signaturesToTry, nil
 
 	default:
-		return false, nil
+		return false, signaturesToTry, nil
 
 	}
 }
@@ -281,7 +282,7 @@ func TagFromString(s string) (Tags, error) {
 	case "refund":
 		return Refund, nil
 	default:
-		return 0, errors.New(ErrInvalidTagName)
+		return 0, ErrInvalidTagName
 	}
 }
 

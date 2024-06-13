@@ -427,10 +427,15 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			c.JSON(400, "Proofs are not the same unit")
 			return
 		}
-		err = mint.VerifyListOfProofs(swapRequest.Inputs, unit)
+		err = mint.VerifyListOfProofs(swapRequest.Inputs, swapRequest.Outputs, unit)
 
 		if err != nil {
 			log.Println(fmt.Errorf("mint.VerifyListOfProofs: %w", err))
+			if errors.Is(err, cashu.ErrEmptyWitness) {
+				c.JSON(403, "Empty Witness")
+				return
+			}
+
 			c.JSON(403, "Invalid Proof")
 			return
 		}
@@ -679,7 +684,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-		err = mint.VerifyListOfProofs(meltRequest.Inputs, unit)
+		err = mint.VerifyListOfProofs(meltRequest.Inputs, []cashu.BlindedMessage{}, unit)
 
 		if err != nil {
 			log.Println(fmt.Errorf("mint.VerifyListOfProofs: %w", err))
