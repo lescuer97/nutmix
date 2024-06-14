@@ -17,7 +17,7 @@ import (
 
 // This is used for testing purpose
 // returns alice, bob, btcNode, error
-func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Container, testcontainers.Container, testcontainers.Container, error) {
+func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (testcontainers.Container, testcontainers.Container, testcontainers.Container, error) {
 	// setup
 	net, err := network.New(ctx,
 		network.WithCheckDuplicate(),
@@ -37,7 +37,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 	// Create bitcoind regtest node
 	reqbtcd := testcontainers.ContainerRequest{
 		Image:        "polarlightning/bitcoind:26.0",
-		Name:         "bitcoindbackend",
+		Name:         "bitcoindbackend" + names,
 		WaitingFor:   wait.ForLog("Initialized HTTP server"),
 		ExposedPorts: []string{"18443/tcp", "18444/tcp", "28334/tcp", "28335/tcp", "28336/tcp"},
 		Networks:     []string{net.Name},
@@ -76,6 +76,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 		Image:        "polarlightning/lnd:0.17.5-beta",
 		WaitingFor:   wait.ForLog("Server listening on"),
 		ExposedPorts: []string{"18445/tcp", "10009/tcp", "8080/tcp", "9735/tcp"},
+		Name:         "lndAlice" + names,
 
 		Networks: []string{net.Name},
 		Cmd:      []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=alice" /* "--externalip=alice", */, "--tlsextradomain=alice", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9735", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8080", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
@@ -140,6 +141,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context) (testcontainers.Con
 		Image:        "polarlightning/lnd:0.17.5-beta",
 		WaitingFor:   wait.ForLog("Server listening on"),
 		ExposedPorts: []string{"18446/tcp", "9736/tcp", "10009/tcp", "8081/tcp"},
+		Name:         "lndBob" + names,
 
 		Networks: []string{net.Name},
 		Cmd:      []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=bob" /* "--externalip=alice", */, "--tlsextradomain=bob", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9736", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8081", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},

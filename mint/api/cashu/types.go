@@ -135,10 +135,9 @@ func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWit
 		return false, fmt.Errorf("spendCondition.VerifySignatures  %+v ", err)
 	}
 
-    for _, pubkey := range pubkeys {
-        (*pubkeysFromProofs)[pubkey] = true
-    }
-
+	for _, pubkey := range pubkeys {
+		(*pubkeysFromProofs)[pubkey] = true
+	}
 
 	return ok, nil
 

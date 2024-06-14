@@ -621,7 +621,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	os.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
 
-	_, bobLnd, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx)
+	_, bobLnd, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
 
 	if err != nil {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)

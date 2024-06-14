@@ -81,7 +81,7 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof) (cashu.Unit, error) 
 func (m *Mint) VerifyListOfProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage, unit cashu.Unit) error {
 	checkOutputs := false
 
-    pubkeysFromProofs := make(map[*btcec.PublicKey]bool)
+	pubkeysFromProofs := make(map[*btcec.PublicKey]bool)
 
 	for _, proof := range proofs {
 		err := m.ValidateProof(proof, unit, &checkOutputs, &pubkeysFromProofs)
