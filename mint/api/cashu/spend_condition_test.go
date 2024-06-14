@@ -3,7 +3,6 @@ package cashu
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"testing"
 )
 
@@ -38,7 +37,6 @@ func TestParseProofWithP2PK(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not parse spend condition %+v \n\n", err)
 	}
-	fmt.Printf("spendCondition %+v", spendCondition)
 
 	if spendCondition.Type != P2PK {
 		t.Errorf("Error in spend condition type %+v", spendCondition.Type)

@@ -81,7 +81,7 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof) (cashu.Unit, error) 
 func (m *Mint) VerifyListOfProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage, unit cashu.Unit) error {
 	checkOutputs := false
 
-	var pubkeysFromProofs []*btcec.PublicKey
+    pubkeysFromProofs := make(map[*btcec.PublicKey]bool)
 
 	for _, proof := range proofs {
 		err := m.ValidateProof(proof, unit, &checkOutputs, &pubkeysFromProofs)
@@ -105,7 +105,7 @@ func (m *Mint) VerifyListOfProofs(proofs []cashu.Proof, blindMessages []cashu.Bl
 	return nil
 }
 
-func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *bool, pubkeysFromProofs *[]*btcec.PublicKey) error {
+func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
 	var keysetToUse cashu.Keyset
 	for _, keyset := range m.Keysets[unit.String()] {
 		if keyset.Amount == proof.Amount && keyset.Id == proof.Id {

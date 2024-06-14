@@ -49,7 +49,7 @@ type BlindedMessage struct {
 	Witness string `json:"witness" db:"witness"`
 }
 
-func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys []*btcec.PublicKey) error {
+func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey]bool) error {
 	if b.Witness == "" {
 		return ErrEmptyWitness
 	}
@@ -70,7 +70,7 @@ func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys []*btcec.PublicKey) 
 	hash := sha256.Sum256(decodedBlindFactor)
 
 	for _, sig := range p2pkWitness.Signatures {
-		for _, pubkey := range pubkeys {
+		for pubkey := range pubkeys {
 
 			ok := sig.Verify(hash[:], pubkey)
 			if !ok {
@@ -127,7 +127,7 @@ type Proof struct {
 	Witness string `json:"witness" db:"witness"`
 }
 
-func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWitness, pubkeysFromProofs *[]*btcec.PublicKey) (bool, error) {
+func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWitness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
 
 	ok, pubkeys, err := spendCondition.VerifySignatures(witness, p.Secret)
 
@@ -135,7 +135,10 @@ func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWit
 		return false, fmt.Errorf("spendCondition.VerifySignatures  %+v ", err)
 	}
 
-	*pubkeysFromProofs = append(*pubkeysFromProofs, pubkeys...)
+    for _, pubkey := range pubkeys {
+        (*pubkeysFromProofs)[pubkey] = true
+    }
+
 
 	return ok, nil
 
