@@ -11,6 +11,7 @@ const singleProofWithP2PK string = `{"amount":2,"C":"03952d912e6e8ba9f60c26a6120
 // this is the private key for public key: 0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae
 const receiverPrivateKey string = "1f369c114315e02945ad9858f1e0e826013d0bfd5d294b274b530613a8975e75"
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
+const RegtestRequest string = "lnbcrt10u1pnxrpvhpp535rl7p9ze2dpgn9mm0tljyxsm980quy8kz2eydj7p4awra453u9qdqqcqzzsxqyz5vqsp55mdr2l90rhluaz9v3cmrt0qgjusy2dxsempmees6spapqjuj9m5q9qyyssq863hqzs6lcptdt7z5w82m4lg09l2d27al2wtlade6n4xu05u0gaxfjxspns84a73tl04u3t0pv4lveya8j0eaf9w7y5pstu70grpxtcqla7sxq"
 
 func TestParseProofWithP2PK(t *testing.T) {
 
@@ -67,5 +68,4 @@ func TestParseProofWithP2PK(t *testing.T) {
 		t.Errorf("Error in p2pkWitness[0] %+v", p2pkWitness.Signatures[0])
 
 	}
-
 }

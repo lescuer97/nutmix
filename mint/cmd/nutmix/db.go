@@ -53,13 +53,13 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 
 	defer rows.Close()
 
-	keysets_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
+	seeds_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
 
 	if err != nil {
-		return keysets_collect, fmt.Errorf("Collecting rows: %v", err)
+		return seeds_collect, fmt.Errorf("Collecting rows: %v", err)
 	}
 
-	return keysets_collect, nil
+	return seeds_collect, nil
 }
 
 func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {

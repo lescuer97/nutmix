@@ -96,7 +96,7 @@ func (m *Mint) VerifyListOfProofs(proofs []cashu.Proof, blindMessages []cashu.Bl
 
 			err := blindMessage.VerifyBlindMessageSignature(pubkeysFromProofs)
 			if err != nil {
-				return fmt.Errorf("ValidateProof: %w", err)
+				return fmt.Errorf("blindMessage.VerifyBlindMessageSignature: %w", err)
 			}
 
 		}
@@ -131,8 +131,7 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 		ok, err := proof.VerifyWitnessSig(spendCondition, witness, pubkeysFromProofs)
 
 		if err != nil {
-			log.Printf("proof.VerifyWitnessSig(): %+v", err)
-			return fmt.Errorf("proof.VerifyWitnessSig(): %+v", err)
+			return fmt.Errorf("proof.VerifyWitnessSig(): %w", err)
 		}
 
 		if !ok {

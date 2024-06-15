@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lescuer97/nutmix/pkg/crypto"
 	"log"
 	"time"
+
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lescuer97/nutmix/pkg/crypto"
 )
 
 var ExpiryTime int64 = time.Now().Add(15 * time.Minute).Unix()
@@ -132,7 +134,7 @@ func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWit
 	ok, pubkeys, err := spendCondition.VerifySignatures(witness, p.Secret)
 
 	if err != nil {
-		return false, fmt.Errorf("spendCondition.VerifySignatures  %+v ", err)
+		return false, fmt.Errorf("spendCondition.VerifySignatures  %w ", err)
 	}
 
 	for _, pubkey := range pubkeys {
@@ -204,6 +206,35 @@ func (p Proof) HashSecretToCurve() (Proof, error) {
 	Y_hex := hex.EncodeToString(y.SerializeCompressed())
 	p.Y = Y_hex
 	return p, nil
+}
+func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
+	hash := sha256.Sum256([]byte(p.Secret))
+
+	sig, err := schnorr.Sign(privkey, hash[:])
+	if err != nil {
+		return fmt.Errorf("schnorr.Sign: %+v", err)
+	}
+
+	var witness P2PKWitness
+	if p.Witness == "" {
+		witness = P2PKWitness{}
+	} else {
+		err = json.Unmarshal([]byte(p.Witness), &witness)
+		if err != nil {
+			return fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %+v, %+v", ErrCouldNotParseWitness, err)
+		}
+	}
+
+	witness.Signatures = append(witness.Signatures, sig)
+
+	witnessStr, err := witness.String()
+
+	if err != nil {
+		return fmt.Errorf("witness.String: %+v", err)
+	}
+
+	p.Witness = witnessStr
+	return nil
 }
 
 type MintError struct {

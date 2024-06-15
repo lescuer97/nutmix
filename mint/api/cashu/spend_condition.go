@@ -25,6 +25,8 @@ var (
 	ErrCouldNotParseSpendCondition   = errors.New("Could not parse spend condition")
 	ErrCouldNotParseWitness          = errors.New("Could not parse witness")
 	ErrEmptyWitness                  = errors.New("Witness is empty")
+	ErrNoValidSignatures             = errors.New("No valid signatures found")
+	ErrNotEnoughSignatures           = errors.New("Not enought signatures")
 )
 
 type SpendCondition struct {
@@ -35,6 +37,52 @@ type SpendCondition struct {
 func (s *SpendCondition) UnmarshalJSON(b []byte) error {
 	a := []interface{}{&s.Type, &s.Data}
 	return json.Unmarshal(b, &a)
+}
+
+// ["P2PK",{"nonce":"3229136a6627050449e85dcdf90315f87519f172b2af80b2e1d460695db511ab","data":"0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae"}]
+func (sc *SpendCondition) MarshalJSON() ([]byte, error) {
+	str := "["
+
+	typestr, err := sc.Type.String()
+
+	if err != nil {
+		return nil, err
+	}
+
+	str += fmt.Sprintf("\"%s\",", typestr)
+
+	str += "{"
+	str += fmt.Sprintf("\"%s\",", sc.Data.Nonce)
+
+	return []byte(str), nil
+}
+
+func (sc *SpendCondition) String() (string, error) {
+	str := "["
+
+	typestr, err := sc.Type.String()
+
+	if err != nil {
+		return "", err
+	}
+
+	str += fmt.Sprintf("\"%s\",", typestr)
+	str += fmt.Sprintf(`{"nonce":"%s",`, sc.Data.Nonce)
+	str += fmt.Sprintf(`"data":"%s",`, hex.EncodeToString(sc.Data.Data.SerializeCompressed()))
+	str += fmt.Sprintf(`"tags":[`)
+	str += fmt.Sprintf(`["sigflag","%s"],`, sc.Data.Tags.Sigflag.String())
+	str += fmt.Sprintf(`["n_sigs","%s"],`, strconv.Itoa(sc.Data.Tags.NSigs))
+	str += fmt.Sprintf(`["locktime","%s"],`, strconv.Itoa(sc.Data.Tags.Locktime))
+	if len(sc.Data.Tags.Refund) > 0 {
+		str += fmt.Sprintf(`["refund","%s"],`, hex.EncodeToString(sc.Data.Tags.Refund[0].SerializeCompressed()))
+	}
+	if len(sc.Data.Tags.Pubkeys) > 0 {
+		str += fmt.Sprintf(`["pubkeys","%s"]`, hex.EncodeToString(sc.Data.Tags.Pubkeys[0].SerializeCompressed()))
+	}
+
+	str += fmt.Sprintf(`]}]`)
+
+	return str, nil
 }
 
 type SpendConditionType int
@@ -58,6 +106,16 @@ func (sc *SpendConditionType) UnmarshalJSON(b []byte) error {
 	}
 	return nil
 
+}
+func (sc SpendConditionType) String() (string, error) {
+	switch sc {
+	case P2PK:
+		return "P2PK", nil
+	case HTLC:
+		return "HTLC", nil
+	default:
+		return "", ErrConvertSpendConditionToString
+	}
 }
 
 type TagsInfo struct {
@@ -237,6 +295,12 @@ func (sc *SpendCondition) VerifySignatures(witness *P2PKWitness, message string)
 	case amountValidSigs >= 1:
 		return true, signaturesToTry, nil
 
+	case amountValidSigs == 0:
+		return false, signaturesToTry, ErrNoValidSignatures
+
+	case sc.Data.Tags.NSigs > 0 && amountValidSigs < sc.Data.Tags.NSigs:
+		return false, signaturesToTry, ErrNotEnoughSignatures
+
 	default:
 		return false, signaturesToTry, nil
 
@@ -316,6 +380,22 @@ func SigFlagFromString(s string) (SigFlag, error) {
 
 type P2PKWitness struct {
 	Signatures []*schnorr.Signature
+}
+
+func (wit *P2PKWitness) String() (string, error) {
+	var singatures = struct {
+		Signatures []string
+	}{}
+
+	for _, sig := range wit.Signatures {
+		singatures.Signatures = append(singatures.Signatures, hex.EncodeToString(sig.Serialize()))
+	}
+
+	b, err := json.Marshal(singatures)
+	if err != nil {
+		return "", fmt.Errorf("json.Marshal(singatures): %+v", err)
+	}
+	return string(b), nil
 }
 
 func (wit *P2PKWitness) UnmarshalJSON(b []byte) error {

@@ -431,9 +431,15 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		if err != nil {
 			log.Println(fmt.Errorf("mint.VerifyListOfProofs: %w", err))
-			if errors.Is(err, cashu.ErrEmptyWitness) {
+
+			switch {
+			case errors.Is(err, cashu.ErrEmptyWitness):
 				c.JSON(403, "Empty Witness")
 				return
+			case errors.Is(err, cashu.ErrNoValidSignatures):
+				c.JSON(403, "No valid signatures")
+				return
+
 			}
 
 			c.JSON(403, "Invalid Proof")
@@ -688,6 +694,17 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		if err != nil {
 			log.Println(fmt.Errorf("mint.VerifyListOfProofs: %w", err))
+
+			switch {
+			case errors.Is(err, cashu.ErrEmptyWitness):
+				c.JSON(403, "Empty Witness")
+				return
+			case errors.Is(err, cashu.ErrNoValidSignatures):
+				c.JSON(403, "No valid signatures")
+				return
+
+			}
+
 			c.JSON(403, "Invalid Proof")
 			return
 		}
