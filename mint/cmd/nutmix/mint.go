@@ -124,7 +124,7 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 
 	if err != nil {
 		log.Printf("proof.IsProofSpendConditioned(): %+v", err)
-		return fmt.Errorf("proof.IsProofSpendConditioned(): %+v", err)
+		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", err)
 	}
 
 	if isProofLocked {
@@ -275,20 +275,20 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 	for _, seed := range seeds {
 		masterKey, err := bip32.NewMasterKey(seed.Seed)
 		if err != nil {
-			log.Println(fmt.Errorf("NewMasterKey: %v", err))
+			log.Println(fmt.Errorf("NewMasterKey: %w", err))
 			return mint, err
 		}
 
 		unit, err := cashu.UnitFromString(seed.Unit)
 		if err != nil {
-			log.Println(fmt.Errorf("cashu.UnitFromString: %v", err))
+			log.Println(fmt.Errorf("cashu.UnitFromString: %w", err))
 			return mint, err
 		}
 
 		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit)
 
 		if err != nil {
-			return mint, fmt.Errorf("GenerateKeysets: %v", err)
+			return mint, fmt.Errorf("GenerateKeysets: %w", err)
 		}
 
 		if seed.Active {

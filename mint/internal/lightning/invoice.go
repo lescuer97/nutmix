@@ -59,7 +59,7 @@ func mppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Preimage
 func CreateMockInvoice(amountSats int64, description string, network chaincfg.Params) (string, error) {
 	milsats, err := lnrpc.UnmarshallAmt(amountSats, 0)
 	if err != nil {
-		return "", fmt.Errorf("UnmarshallAmt: %v", err)
+		return "", fmt.Errorf("UnmarshallAmt: %w", err)
 	}
 
 	invoiceData := invoicesrpc.AddInvoiceData{
@@ -84,7 +84,7 @@ func CreateMockInvoice(amountSats int64, description string, network chaincfg.Pa
 	// intermediaries probing the receiver.
 	var paymentAddr [32]byte
 	if _, err := rand.Read(paymentAddr[:]); err != nil {
-		return "", fmt.Errorf("paymentAddres Creation: %v", err)
+		return "", fmt.Errorf("paymentAddres Creation: %w", err)
 	}
 	options = append(options, zpay32.PaymentAddr(paymentAddr))
 
@@ -105,7 +105,7 @@ func CreateMockInvoice(amountSats int64, description string, network chaincfg.Pa
 			key, err := secp256k1.GeneratePrivateKey()
 
 			if err != nil {
-				return make([]byte, 0), fmt.Errorf("GeneratePrivateKey: %v ", err)
+				return make([]byte, 0), fmt.Errorf("GeneratePrivateKey: %w ", err)
 			}
 
 			return ecdsa.SignCompact(key, msg, true), nil
@@ -113,7 +113,7 @@ func CreateMockInvoice(amountSats int64, description string, network chaincfg.Pa
 	})
 
 	if err != nil {
-		return "", fmt.Errorf("SignMessage: %v", err)
+		return "", fmt.Errorf("SignMessage: %w", err)
 	}
 
 	return payReqString, nil

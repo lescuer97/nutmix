@@ -32,7 +32,7 @@ func DatabaseSetup(migrationDir string) (*pgxpool.Pool, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("Error connecting to database: %v", err)
+		return nil, fmt.Errorf("Error connecting to database: %w", err)
 	}
 
 	return pool, nil
@@ -45,10 +45,10 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return seeds, fmt.Errorf("No rows found: %v", err)
+			return seeds, fmt.Errorf("No rows found: %w", err)
 		}
 
-		return seeds, fmt.Errorf("Error checking for  seeds: %+v", err)
+		return seeds, fmt.Errorf("Error checking for  seeds: %w", err)
 	}
 
 	defer rows.Close()
@@ -56,7 +56,7 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 	seeds_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
 
 	if err != nil {
-		return seeds_collect, fmt.Errorf("Collecting rows: %v", err)
+		return seeds_collect, fmt.Errorf("Collecting rows: %w", err)
 	}
 
 	return seeds_collect, nil
@@ -65,14 +65,14 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
 	rows, err := pool.Query(context.Background(), "SELECT * FROM seeds WHERE active")
 	if err != nil {
-		return cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %+v", err)
+		return cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
 	defer rows.Close()
 
 	seed, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.Seed])
 
 	if err != nil {
-		return seed, fmt.Errorf("GetActiveSeed: %v", err)
+		return seed, fmt.Errorf("GetActiveSeed: %w", err)
 	}
 
 	return seed, nil
@@ -82,7 +82,7 @@ func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
 	_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id, version) VALUES ($1, $2, $3, $4, $5, $6)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version)
 
 	if err != nil {
-		return fmt.Errorf("inserting to DB: %v", err)
+		return fmt.Errorf("inserting to DB: %w", err)
 	}
 	return nil
 }
@@ -99,7 +99,7 @@ func SaveNewSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
 	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
 	if err != nil {
-		return fmt.Errorf("inserting to DB: %v", err)
+		return fmt.Errorf("inserting to DB: %w", err)
 	}
 	return nil
 }
@@ -108,7 +108,7 @@ func SaveQuoteMintRequest(pool *pgxpool.Pool, request cashu.PostMintQuoteBolt11R
 
 	_, err := pool.Exec(context.Background(), "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted) VALUES ($1, $2, $3, $4, $5, $6)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted)
 	if err != nil {
-		return fmt.Errorf("Inserting to mint_request: %v", err)
+		return fmt.Errorf("Inserting to mint_request: %w", err)
 
 	}
 	return nil
@@ -117,7 +117,7 @@ func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, requestPaid bool, quote string
 	// change the paid status of the quote
 	_, err := pool.Exec(context.Background(), "UPDATE mint_request SET request_paid = $1 WHERE quote = $2", requestPaid, quote)
 	if err != nil {
-		return fmt.Errorf("Inserting to mint_request: %v", err)
+		return fmt.Errorf("Inserting to mint_request: %w", err)
 
 	}
 	return nil
@@ -127,7 +127,7 @@ func ModifyQuoteMintMintedStatus(pool *pgxpool.Pool, minted bool, quote string) 
 	// change the paid status of the quote
 	_, err := pool.Exec(context.Background(), "UPDATE mint_request SET minted = $1 WHERE quote = $2", minted, quote)
 	if err != nil {
-		return fmt.Errorf("Inserting to mint_request: %v", err)
+		return fmt.Errorf("Inserting to mint_request: %w", err)
 
 	}
 	return nil
@@ -136,7 +136,7 @@ func SaveQuoteMeltRequest(pool *pgxpool.Pool, request cashu.MeltRequestDB) error
 
 	_, err := pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted)
 	if err != nil {
-		return fmt.Errorf("Inserting to mint_request: %v", err)
+		return fmt.Errorf("Inserting to mint_request: %w", err)
 
 	}
 	return nil
@@ -154,7 +154,7 @@ func ModifyQuoteMeltPayStatusAndMelted(pool *pgxpool.Pool, paid bool, melted boo
 	// change the paid status of the quote
 	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, melted = $3 WHERE quote = $2", paid, request, melted)
 	if err != nil {
-		return fmt.Errorf("Inserting to mint_request: %v", err)
+		return fmt.Errorf("Inserting to mint_request: %w", err)
 
 	}
 	return nil
@@ -164,7 +164,7 @@ func ModifyQuoteMeltMeltedStatus(pool *pgxpool.Pool, melted bool, quote string) 
 	// change the paid status of the quote
 	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET melted = $1 WHERE quote = $2", melted, quote)
 	if err != nil {
-		return fmt.Errorf("Inserting to mint_request: %v", err)
+		return fmt.Errorf("Inserting to mint_request: %w", err)
 
 	}
 	return nil
@@ -186,7 +186,7 @@ func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.PostMintQuoteBolt11R
 		if err == pgx.ErrNoRows {
 			return cashu.PostMintQuoteBolt11Response{}, err
 		}
-		return quote, fmt.Errorf("CollectOneRow: %v", err)
+		return quote, fmt.Errorf("CollectOneRow: %w", err)
 	}
 
 	return quote, nil
@@ -207,7 +207,7 @@ func GetMeltQuoteById(pool *pgxpool.Pool, id string) (cashu.MeltRequestDB, error
 		if err == pgx.ErrNoRows {
 			return cashu.MeltRequestDB{}, err
 		}
-		return quote, fmt.Errorf("CollectOneRow: %v", err)
+		return quote, fmt.Errorf("CollectOneRow: %w", err)
 	}
 
 	return quote, nil
@@ -232,7 +232,7 @@ func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) 
 		if err == pgx.ErrNoRows {
 			return proofList, nil
 		}
-		return proofList, fmt.Errorf("CollectOneRow: %v", err)
+		return proofList, fmt.Errorf("CollectOneRow: %w", err)
 	}
 
 	proofList = proof
@@ -252,7 +252,7 @@ func SaveProofs(pool *pgxpool.Pool, proofs []cashu.Proof) error {
 	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
 	if err != nil {
-		return fmt.Errorf("inserting to DB: %v", err)
+		return fmt.Errorf("inserting to DB: %w", err)
 	}
 	return nil
 }
@@ -276,7 +276,7 @@ func CheckListOfProofsBySecretCurve(pool *pgxpool.Pool, Ys []string) ([]cashu.Pr
 		if err == pgx.ErrNoRows {
 			return proofList, nil
 		}
-		return proofList, fmt.Errorf("CollectOneRow: %v", err)
+		return proofList, fmt.Errorf("CollectOneRow: %w", err)
 	}
 
 	proofList = proof
@@ -294,7 +294,7 @@ func GetRestoreSigsFromBlindedMessages(pool *pgxpool.Pool, B_ []string) ([]cashu
 		if err == pgx.ErrNoRows {
 			return signaturesList, nil
 		}
-		return signaturesList, fmt.Errorf("pool.Query: %v", err)
+		return signaturesList, fmt.Errorf("pool.Query: %w", err)
 	}
 
 	signatures, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.RecoverSigDB])
@@ -303,7 +303,7 @@ func GetRestoreSigsFromBlindedMessages(pool *pgxpool.Pool, B_ []string) ([]cashu
 		if err == pgx.ErrNoRows {
 			return signaturesList, nil
 		}
-		return signaturesList, fmt.Errorf("CollectOneRow: %v", err)
+		return signaturesList, fmt.Errorf("CollectOneRow: %w", err)
 	}
 
 	signaturesList = signatures
@@ -323,7 +323,7 @@ func SetRestoreSigs(pool *pgxpool.Pool, recover_sigs []cashu.RecoverSigDB) error
 	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
 	if err != nil {
-		return fmt.Errorf("inserting to DB: %v", err)
+		return fmt.Errorf("inserting to DB: %w", err)
 	}
 	return nil
 }

@@ -65,7 +65,7 @@ func SetUpSeedAndKeyset(masterKey *bip32.Key, version int, unit Unit) (Seed, err
 	versionKey, err := masterKey.NewChildKey(uint32(version))
 
 	if err != nil {
-		return Seed{}, fmt.Errorf("Error deriving key from version: %v", err)
+		return Seed{}, fmt.Errorf("Error deriving key from version: %w", err)
 	}
 
 	list_of_keys, err := GenerateKeysets(versionKey, GetAmountsForKeysets(), "", unit)
@@ -104,7 +104,7 @@ func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) 
 	masterKey, err := bip32.NewMasterKey(key_bytes)
 
 	if err != nil {
-		return nil, fmt.Errorf("Error creating master key: %+v ", err)
+		return nil, fmt.Errorf("Error creating master key: %w ", err)
 	}
 
 	for _, seedDerivationPath := range availableSeeds {
@@ -113,7 +113,7 @@ func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) 
 		seedKey, err := masterKey.NewChildKey(uint32(seedDerivationPath))
 
 		if err != nil {
-			return nil, fmt.Errorf("could not generate derivation por seed: %+v ", err)
+			return nil, fmt.Errorf("could not generate derivation por seed: %w ", err)
 		}
 
 		seed, err := SetUpSeedAndKeyset(seedKey, version, seedDerivationPath)

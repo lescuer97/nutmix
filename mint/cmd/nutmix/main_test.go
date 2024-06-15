@@ -51,7 +51,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	connUri, err := postgresContainer.ConnectionString(ctx)
 
 	if err != nil {
-		t.Fatal(fmt.Errorf("failed to get connection string: %s", err))
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
 	os.Setenv("DATABASE_URL", connUri)
@@ -614,7 +614,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	connUri, err := postgresContainer.ConnectionString(ctx)
 
 	if err != nil {
-		t.Fatal(fmt.Errorf("failed to get connection string: %s", err))
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
 	os.Setenv("DATABASE_URL", connUri)
@@ -1119,16 +1119,16 @@ func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]Keyset
 
 		parsedBlindFactor, err := hex.DecodeString(output.C_)
 		if err != nil {
-			return nil, fmt.Errorf("Error decoding hex: %v", err)
+			return nil, fmt.Errorf("Error decoding hex: %w", err)
 		}
 		blindedFactor, err := secp256k1.ParsePubKey(parsedBlindFactor)
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing pubkey: %v", err)
+			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
 		mintPublicKey, err := secp256k1.ParsePubKey(keysets[cashu.Sat.String()][output.Amount].PrivKey.PubKey().SerializeCompressed())
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing pubkey: %v", err)
+			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
 		C := crypto.UnblindSignature(blindedFactor, secretsKey[i], mintPublicKey)

@@ -51,24 +51,24 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	})
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not setup bitcoind %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not setup bitcoind %w", err)
 	}
 
 	btcdIP, err := btcdC.ContainerIP(ctx)
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not get ContainerIP %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not get ContainerIP %w", err)
 	}
 
 	_, _, err = btcdC.Exec(ctx, []string{"bitcoin-cli", "-regtest", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "createwallet", "wallet"})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not create wallet  %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not create wallet  %w", err)
 	}
 
 	_, _, err = btcdC.Exec(ctx, []string{"bitcoin-cli", "-regtest", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "-generate", "101"})
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not create blocks  %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not create blocks  %w", err)
 	}
 
 	// create Alice node LND
@@ -88,7 +88,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	})
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not create Alice lnd container  %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not create Alice lnd container  %w", err)
 	}
 
 	_, addressReader, err := lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "newaddress", "p2tr"})
@@ -120,19 +120,19 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	_, _, err = btcdC.Exec(ctx, []string{"bitcoin-cli", "-regtest", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "sendtoaddress", address.Address, "10"})
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not fund Alice's wallet  %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not fund Alice's wallet  %w", err)
 	}
 
 	_, _, err = btcdC.Exec(ctx, []string{"bitcoin-cli", "-regtest", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "-generate", "10"})
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not create blocks  %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not create blocks  %w", err)
 	}
 
 	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "listunspent"})
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not check balance  %+v ", err)
+		return nil, nil, nil, fmt.Errorf("could not check balance  %w ", err)
 	}
 
 	// create bob node LND
@@ -155,12 +155,12 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	lndBobIp, err := LndBobC.ContainerIP(ctx)
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not get lndAliceC.ContainerIP %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not get lndAliceC.ContainerIP %w", err)
 	}
 
 	_, getInfoBobReader, err := LndBobC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "getinfo"})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not get nodeInfo  %+v ", err)
+		return nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
 	}
 
 	reader = io.Reader(getInfoBobReader)
@@ -194,26 +194,26 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "connect", connectionStr})
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not get nodeInfo  %+v ", err)
+		return nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
 	}
 
 	// open channel between Alice and Bob
 	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "openchannel", "--node_key", bobInfo.IdentityPubkey, "--fundmax", "--push_amt", "10000000"})
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not get nodeInfo  %+v ", err)
+		return nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
 	}
 
 	_, _, err = btcdC.Exec(ctx, []string{"bitcoin-cli", "-regtest", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "-generate", "50"})
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not create blocks  %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not create blocks  %w", err)
 	}
 
 	// Get info of bob
 	_, getInfoBobReaderTwo, err := LndBobC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "getinfo"})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not get nodeInfo  %+v ", err)
+		return nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
 	}
 
 	reader = io.Reader(getInfoBobReaderTwo)
@@ -234,7 +234,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	}
 
 	if bobInfoTwo.NumActiveChannels == 0 {
-		return nil, nil, nil, fmt.Errorf("could not open channel  %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not open channel  %w", err)
 	}
 	// connect mint to Alice
 	macaroon, err := ExtractInternalFile(ctx, lndAliceC, "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon")
@@ -242,19 +242,19 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	macaroonHex := hex.EncodeToString([]byte(macaroon))
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not extract macaroon %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not extract macaroon %w", err)
 	}
 
 	tlsCert, err := ExtractInternalFile(ctx, lndAliceC, "/home/lnd/.lnd/tls.cert")
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not extract tls %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not extract tls %w", err)
 	}
 
 	lndAliceIp, err := lndAliceC.ContainerIP(ctx)
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not get lndAliceC.ContainerIP %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not get lndAliceC.ContainerIP %w", err)
 	}
 
 	err = os.Setenv(LND_HOST, lndAliceIp+":"+"10009")
@@ -262,7 +262,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	err = os.Setenv(LND_MACAROON, macaroonHex)
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not set env %+v", err)
+		return nil, nil, nil, fmt.Errorf("could not set env %w", err)
 	}
 
 	// return alice, bob, btcNode, error
