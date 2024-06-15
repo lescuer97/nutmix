@@ -151,7 +151,7 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 	err := json.Unmarshal(b, &arrayToCheck)
 
 	if err != nil {
-		return fmt.Errorf("json.Unmarshal(b, &arrayToCheck): %+v", err)
+		return fmt.Errorf("json.Unmarshal(b, &arrayToCheck): %w", err)
 	}
 
 	for _, tag := range arrayToCheck {
@@ -189,12 +189,12 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 			for _, pubkey := range tagInfo {
 				bytesPubkey, err := hex.DecodeString(pubkey)
 				if err != nil {
-					return fmt.Errorf("hex.DecodeString: %s", pubkey)
+					return fmt.Errorf("hex.DecodeString: %w", err)
 				}
 
 				parsedPubkey, err := btcec.ParsePubKey(bytesPubkey)
 				if err != nil {
-					return fmt.Errorf("secp256k1.ParsePubKey: %s", err)
+					return fmt.Errorf("secp256k1.ParsePubKey: %w", err)
 				}
 
 				switch tagName {
@@ -255,17 +255,17 @@ func (scd *SpendConditionData) UnmarshalJSON(b []byte) error {
 	err := json.Unmarshal(b, &info)
 
 	if err != nil {
-		return fmt.Errorf("json.Unmarshal(b, &info): %+v", err)
+		return fmt.Errorf("json.Unmarshal(b, &info): %w", err)
 	}
 
 	pubkey, err := hex.DecodeString(info.Data)
 	if err != nil {
-		return fmt.Errorf("hex.DecodeString: %s", info.Data)
+		return fmt.Errorf("hex.DecodeString: %s %w", info.Data, err)
 	}
 
 	parsedPubkey, err := btcec.ParsePubKey(pubkey)
 	if err != nil {
-		return fmt.Errorf("secp256k1.ParsePubKey: %s", err)
+		return fmt.Errorf("secp256k1.ParsePubKey: %w", err)
 	}
 
 	scd.Data = parsedPubkey
@@ -412,7 +412,7 @@ func (wit *P2PKWitness) String() (string, error) {
 
 	b, err := json.Marshal(singatures)
 	if err != nil {
-		return "", fmt.Errorf("json.Marshal(singatures): %+v", err)
+		return "", fmt.Errorf("json.Marshal(singatures): %w", err)
 	}
 	return string(b), nil
 }
@@ -426,7 +426,7 @@ func (wit *P2PKWitness) UnmarshalJSON(b []byte) error {
 	err := json.Unmarshal(b, &sigs)
 
 	if err != nil {
-		return fmt.Errorf("json.Unmarshal(b, &info): %+v", err)
+		return fmt.Errorf("json.Unmarshal(b, &info): %w", err)
 	}
 
 	witness := P2PKWitness{
@@ -436,11 +436,11 @@ func (wit *P2PKWitness) UnmarshalJSON(b []byte) error {
 	for _, sig := range sigs.Signatures {
 		sigBytes, err := hex.DecodeString(sig)
 		if err != nil {
-			return fmt.Errorf("hex.DecodeString: %s", sigBytes)
+			return fmt.Errorf("hex.DecodeString: %w", err)
 		}
 		signature, err := schnorr.ParseSignature(sigBytes)
 		if err != nil {
-			return fmt.Errorf("schnorr.ParseSignature(sigBytes): %s", err)
+			return fmt.Errorf("schnorr.ParseSignature(sigBytes): %w", err)
 		}
 
 		witness.Signatures = append(witness.Signatures, signature)

@@ -60,13 +60,13 @@ func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey
 	err := json.Unmarshal([]byte(b.Witness), &p2pkWitness)
 
 	if err != nil {
-		return fmt.Errorf("json.Unmarshal([]byte(b.Witness), &p2pkWitness)  %+v", err)
+		return fmt.Errorf("json.Unmarshal([]byte(b.Witness), &p2pkWitness)  %w", err)
 	}
 
 	decodedBlindFactor, err := hex.DecodeString(b.B_)
 
 	if err != nil {
-		return fmt.Errorf("hex.DecodeString(b.B_)  %+v", err)
+		return fmt.Errorf("hex.DecodeString(b.B_)  %w", err)
 	}
 
 	hash := sha256.Sum256(decodedBlindFactor)
@@ -88,14 +88,14 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 	decodedBlindFactor, err := hex.DecodeString(b.B_)
 
 	if err != nil {
-		log.Println(fmt.Errorf("DecodeString: %v", err))
+		log.Println(fmt.Errorf("DecodeString: %w", err))
 		return BlindSignature{}, err
 	}
 
 	B_, err := secp256k1.ParsePubKey(decodedBlindFactor)
 
 	if err != nil {
-		log.Println(fmt.Errorf("ParsePubKey: %v", err))
+		log.Println(fmt.Errorf("ParsePubKey: %w", err))
 		return BlindSignature{}, err
 	}
 
@@ -153,14 +153,14 @@ func (p Proof) parseWitnessAndSecret() (*SpendCondition, *P2PKWitness, error) {
 	err := json.Unmarshal([]byte(p.Secret), &spendCondition)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Secret), &spendCondition)  %+v, %+v", ErrCouldNotParseSpendCondition, err)
+		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Secret), &spendCondition)  %w, %w", ErrCouldNotParseSpendCondition, err)
 
 	}
 
 	err = json.Unmarshal([]byte(p.Witness), &witness)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %+v, %+v", ErrCouldNotParseWitness, err)
+		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w, %w", ErrCouldNotParseWitness, err)
 
 	}
 
@@ -183,9 +183,9 @@ func (p Proof) IsProofSpendConditioned(checkOutputs *bool) (bool, *SpendConditio
 		}
 		return true, &spendCondition, &witness, nil
 	case witnessErr != nil && spendConditionErr == nil:
-		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %+v, %+v", ErrCouldNotParseWitness, witnessErr)
+		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %w, %w", ErrCouldNotParseWitness, witnessErr)
 	case spendConditionErr != nil && witnessErr == nil:
-		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %+v, %+v", ErrCouldNotParseSpendCondition, spendConditionErr)
+		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %w, %w", ErrCouldNotParseSpendCondition, spendConditionErr)
 	default:
 		return false, nil, nil, nil
 	}
@@ -212,7 +212,7 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 
 	sig, err := schnorr.Sign(privkey, hash[:])
 	if err != nil {
-		return fmt.Errorf("schnorr.Sign: %+v", err)
+		return fmt.Errorf("schnorr.Sign: %w", err)
 	}
 
 	var witness P2PKWitness
@@ -221,7 +221,7 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 	} else {
 		err = json.Unmarshal([]byte(p.Witness), &witness)
 		if err != nil {
-			return fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %+v, %+v", ErrCouldNotParseWitness, err)
+			return fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w, %w", ErrCouldNotParseWitness, err)
 		}
 	}
 
@@ -230,7 +230,7 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 	witnessStr, err := witness.String()
 
 	if err != nil {
-		return fmt.Errorf("witness.String: %+v", err)
+		return fmt.Errorf("witness.String: %w", err)
 	}
 
 	p.Witness = witnessStr

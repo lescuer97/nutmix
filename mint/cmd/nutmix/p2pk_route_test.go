@@ -42,7 +42,7 @@ func TestRoutesSwapMelt(t *testing.T) {
 	connUri, err := postgresContainer.ConnectionString(ctx)
 
 	if err != nil {
-		t.Fatal(fmt.Errorf("failed to get connection string: %s", err))
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
 	os.Setenv("DATABASE_URL", connUri)
@@ -207,13 +207,13 @@ func CreateP2PKBlindedMessages(amount uint64, keyset cashu.Keyset, pubkey *secp2
 		spendCond, err := makeP2PKSpendCondition(pubkey, nSigs, pubkeys, refundPubkey, locktime, sigflag)
 
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("MakeP2PKSpendCondition: %+v", err)
+			return nil, nil, nil, fmt.Errorf("MakeP2PKSpendCondition: %w", err)
 		}
 
 		jsonSpend, err := spendCond.String()
 
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("json.Marshal(spendCond): %+v", err)
+			return nil, nil, nil, fmt.Errorf("json.Marshal(spendCond): %w", err)
 		}
 
 		// generate new private key r
@@ -270,16 +270,16 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]Ke
 
 		parsedBlindFactor, err := hex.DecodeString(output.C_)
 		if err != nil {
-			return nil, fmt.Errorf("Error decoding hex: %v", err)
+			return nil, fmt.Errorf("Error decoding hex: %w", err)
 		}
 		blindedFactor, err := secp256k1.ParsePubKey(parsedBlindFactor)
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing pubkey: %v", err)
+			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
 		mintPublicKey, err := secp256k1.ParsePubKey(keysets[cashu.Sat.String()][output.Amount].PrivKey.PubKey().SerializeCompressed())
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing pubkey: %v", err)
+			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
 		C := crypto.UnblindSignature(blindedFactor, secretsKey[i], mintPublicKey)
@@ -291,12 +291,12 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]Ke
 		for _, privkey := range privkeys {
 			err = proof.Sign(privkey)
 			if err != nil {
-				return nil, fmt.Errorf("Error signing proof: %v", err)
+				return nil, fmt.Errorf("Error signing proof: %w", err)
 			}
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("Error signing proof: %v", err)
+			return nil, fmt.Errorf("Error signing proof: %w", err)
 		}
 
 		proofs = append(proofs, proof)
@@ -327,7 +327,7 @@ func TestMultisigSigning(t *testing.T) {
 	connUri, err := postgresContainer.ConnectionString(ctx)
 
 	if err != nil {
-		t.Fatal(fmt.Errorf("failed to get connection string: %s", err))
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
 	os.Setenv("DATABASE_URL", connUri)
