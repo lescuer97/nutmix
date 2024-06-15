@@ -32,7 +32,7 @@ func main() {
 	seeds, err := GetAllSeeds(pool)
 
 	if err != nil {
-		log.Fatalf("Could not keysets: %v", err)
+		log.Fatalf("Could not GetAllSeeds: %v", err)
 	}
 
 	// incase there are no seeds in the db we create a new one

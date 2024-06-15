@@ -89,7 +89,7 @@ func CreateMockInvoice(amountSats int64, description string, network chaincfg.Pa
 	options = append(options, zpay32.PaymentAddr(paymentAddr))
 
 	creationTime := time.Now()
-	payReq, err := zpay32.NewInvoice(&chaincfg.MainNetParams, paymentHash, creationTime, options...)
+	payReq, err := zpay32.NewInvoice(&network, paymentHash, creationTime, options...)
 
 	// Set our desired invoice features and add them to our list of options.
 	var invoiceFeatures *lnwire.FeatureVector

@@ -53,13 +53,13 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 
 	defer rows.Close()
 
-	keysets_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
+	seeds_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
 
 	if err != nil {
-		return keysets_collect, fmt.Errorf("Collecting rows: %v", err)
+		return seeds_collect, fmt.Errorf("Collecting rows: %v", err)
 	}
 
-	return keysets_collect, nil
+	return seeds_collect, nil
 }
 
 func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
@@ -241,11 +241,18 @@ func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) 
 }
 
 func SaveProofs(pool *pgxpool.Pool, proofs []cashu.Proof) error {
+	entries := [][]any{}
+	columns := []string{"c", "secret", "amount", "id", "y", "witness"}
+	tableName := "proofs"
+
 	for _, proof := range proofs {
-		_, err := pool.Exec(context.Background(), "INSERT INTO proofs (C, secret, amount, id, Y) VALUES ($1, $2, $3, $4, $5)", proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y)
-		if err != nil {
-			return fmt.Errorf("Inserting to proofs: %v", err)
-		}
+		entries = append(entries, []any{proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness})
+	}
+
+	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
+
+	if err != nil {
+		return fmt.Errorf("inserting to DB: %v", err)
 	}
 	return nil
 }
@@ -281,7 +288,7 @@ func GetRestoreSigsFromBlindedMessages(pool *pgxpool.Pool, B_ []string) ([]cashu
 
 	var signaturesList []cashu.RecoverSigDB
 
-	rows, err := pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at  FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
+	rows, err := pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, witness  FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -306,11 +313,11 @@ func GetRestoreSigsFromBlindedMessages(pool *pgxpool.Pool, B_ []string) ([]cashu
 
 func SetRestoreSigs(pool *pgxpool.Pool, recover_sigs []cashu.RecoverSigDB) error {
 	entries := [][]any{}
-	columns := []string{"id", "amount", "B_", "C_", "created_at"}
+	columns := []string{"id", "amount", "B_", "C_", "created_at", "witness"}
 	tableName := "recovery_signature"
 
 	for _, sig := range recover_sigs {
-		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt})
+		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, sig.Witness})
 	}
 
 	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))

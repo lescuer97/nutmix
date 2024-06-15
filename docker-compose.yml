@@ -13,9 +13,6 @@ services:
       - "--certificatesresolvers.selfhostedservices.acme.tlschallenge=true"
       - "--certificatesresolvers.selfhostedservices.acme.email=${LE_EMAIL_ADDRESS}"
       - "--certificatesresolvers.selfhostedservices.acme.storage=/letsencrypt/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - "./letsencrypt:/letsencrypt"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
@@ -23,7 +20,7 @@ services:
     image: postgres:16.2
     restart: always
     ports:
-      - 5432:5432
+      - 127.0.0.1:5432:5432
     volumes: 
       - db:/var/lib/postgresql/data
     environment:

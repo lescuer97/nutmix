@@ -427,17 +427,26 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			c.JSON(400, "Proofs are not the same unit")
 			return
 		}
+		err = mint.VerifyListOfProofs(swapRequest.Inputs, swapRequest.Outputs, unit)
 
-		// verify the proofs signatures are correct
-		for _, proof := range swapRequest.Inputs {
+		if err != nil {
+			log.Println(fmt.Errorf("mint.VerifyListOfProofs: %w", err))
 
-			err := mint.ValidateProof(proof, unit)
-			if err != nil {
-				log.Println(fmt.Errorf("ValidateProof: %w", err))
-				c.JSON(403, "Invalid Proof")
+			switch {
+			case errors.Is(err, cashu.ErrEmptyWitness):
+				c.JSON(403, "Empty Witness")
 				return
+			case errors.Is(err, cashu.ErrNoValidSignatures):
+				c.JSON(403, "No valid signatures")
+				return
+			case errors.Is(err, cashu.ErrNotEnoughSignatures):
+				c.JSON(403, cashu.ErrNotEnoughSignatures.Error())
+				return
+
 			}
 
+			c.JSON(403, "Invalid Proof")
+			return
 		}
 
 		// sign the outputs
@@ -684,14 +693,26 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-		// verify the proofs signatures are correct
-		for _, proof := range meltRequest.Inputs {
-			err := mint.ValidateProof(proof, unit)
-			if err != nil {
-				log.Println(fmt.Errorf("ValidateProof: %w", err))
-				c.JSON(403, "Invalid Proof")
+		err = mint.VerifyListOfProofs(meltRequest.Inputs, []cashu.BlindedMessage{}, unit)
+
+		if err != nil {
+			log.Println(fmt.Errorf("mint.VerifyListOfProofs: %w", err))
+
+			switch {
+			case errors.Is(err, cashu.ErrEmptyWitness):
+				c.JSON(403, "Empty Witness")
 				return
+			case errors.Is(err, cashu.ErrNoValidSignatures):
+				c.JSON(403, "No valid signatures")
+				return
+			case errors.Is(err, cashu.ErrNotEnoughSignatures):
+				c.JSON(403, cashu.ErrNotEnoughSignatures.Error())
+				return
+
 			}
+
+			c.JSON(403, "Invalid Proof")
+			return
 		}
 
 		response := cashu.PostMeltBolt11Response{}
@@ -800,6 +821,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			switch {
 			// check if is in list of pending proofs
 			case slices.ContainsFunc(mint.PendingProofs, func(p cashu.Proof) bool {
+				checkState.Witness = &p.Witness
 				return p.Y == state
 			}):
 				pendingAndSpent = true
@@ -807,6 +829,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			// Check if is in list of spents and if its also pending add it for removal of pending list
 			case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
 				compare := p.Y == state
+				checkState.Witness = &p.Witness
 				if compare && pendingAndSpent {
 
 					proofsForRemoval = append(proofsForRemoval, p)

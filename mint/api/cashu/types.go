@@ -1,11 +1,15 @@
 package cashu
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 )
@@ -41,9 +45,43 @@ func UnitFromString(s string) (Unit, error) {
 var AvailableSeeds []Unit = []Unit{Sat}
 
 type BlindedMessage struct {
-	Amount uint64 `json:"amount"`
-	Id     string `json:"id"`
-	B_     string `json:"B_"`
+	Amount  uint64 `json:"amount"`
+	Id      string `json:"id"`
+	B_      string `json:"B_"`
+	Witness string `json:"witness" db:"witness"`
+}
+
+func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey]bool) error {
+	if b.Witness == "" {
+		return ErrEmptyWitness
+	}
+	var p2pkWitness P2PKWitness
+
+	err := json.Unmarshal([]byte(b.Witness), &p2pkWitness)
+
+	if err != nil {
+		return fmt.Errorf("json.Unmarshal([]byte(b.Witness), &p2pkWitness)  %+v", err)
+	}
+
+	decodedBlindFactor, err := hex.DecodeString(b.B_)
+
+	if err != nil {
+		return fmt.Errorf("hex.DecodeString(b.B_)  %+v", err)
+	}
+
+	hash := sha256.Sum256(decodedBlindFactor)
+
+	for _, sig := range p2pkWitness.Signatures {
+		for pubkey := range pubkeys {
+
+			ok := sig.Verify(hash[:], pubkey)
+			if !ok {
+				return nil
+			}
+		}
+	}
+
+	return nil
 }
 
 func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
@@ -83,11 +121,74 @@ const SPENT ProofState = "SPENT"
 const PENDING ProofState = "PENDING"
 
 type Proof struct {
-	Amount uint64 `json:"amount"`
-	Id     string `json:"id"`
-	Secret string `json:"secret"`
-	C      string `json:"C" db:"c"`
-	Y      string `json:"Y" db:"Y"`
+	Amount  uint64 `json:"amount"`
+	Id      string `json:"id"`
+	Secret  string `json:"secret"`
+	C       string `json:"C" db:"c"`
+	Y       string `json:"Y" db:"Y"`
+	Witness string `json:"witness" db:"witness"`
+}
+
+func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWitness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
+
+	ok, pubkeys, err := spendCondition.VerifySignatures(witness, p.Secret)
+
+	if err != nil {
+		return false, fmt.Errorf("spendCondition.VerifySignatures  %w ", err)
+	}
+
+	for _, pubkey := range pubkeys {
+		(*pubkeysFromProofs)[pubkey] = true
+	}
+
+	return ok, nil
+
+}
+
+func (p Proof) parseWitnessAndSecret() (*SpendCondition, *P2PKWitness, error) {
+
+	var spendCondition SpendCondition
+	var witness P2PKWitness
+
+	err := json.Unmarshal([]byte(p.Secret), &spendCondition)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Secret), &spendCondition)  %+v, %+v", ErrCouldNotParseSpendCondition, err)
+
+	}
+
+	err = json.Unmarshal([]byte(p.Witness), &witness)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %+v, %+v", ErrCouldNotParseWitness, err)
+
+	}
+
+	return &spendCondition, &witness, nil
+}
+
+func (p Proof) IsProofSpendConditioned(checkOutputs *bool) (bool, *SpendCondition, *P2PKWitness, error) {
+	var witness P2PKWitness
+	witnessErr := json.Unmarshal([]byte(p.Witness), &witness)
+
+	var spendCondition SpendCondition
+
+	spendConditionErr := json.Unmarshal([]byte(p.Secret), &spendCondition)
+
+	switch {
+	case witnessErr == nil && spendConditionErr == nil:
+		// if sigflag is SigAll, then we need to check the outputs
+		if spendCondition.Data.Tags.Sigflag == SigAll {
+			*checkOutputs = true
+		}
+		return true, &spendCondition, &witness, nil
+	case witnessErr != nil && spendConditionErr == nil:
+		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %+v, %+v", ErrCouldNotParseWitness, witnessErr)
+	case spendConditionErr != nil && witnessErr == nil:
+		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %+v, %+v", ErrCouldNotParseSpendCondition, spendConditionErr)
+	default:
+		return false, nil, nil, nil
+	}
 }
 
 func (p Proof) HashSecretToCurve() (Proof, error) {
@@ -105,6 +206,35 @@ func (p Proof) HashSecretToCurve() (Proof, error) {
 	Y_hex := hex.EncodeToString(y.SerializeCompressed())
 	p.Y = Y_hex
 	return p, nil
+}
+func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
+	hash := sha256.Sum256([]byte(p.Secret))
+
+	sig, err := schnorr.Sign(privkey, hash[:])
+	if err != nil {
+		return fmt.Errorf("schnorr.Sign: %+v", err)
+	}
+
+	var witness P2PKWitness
+	if p.Witness == "" {
+		witness = P2PKWitness{}
+	} else {
+		err = json.Unmarshal([]byte(p.Witness), &witness)
+		if err != nil {
+			return fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %+v, %+v", ErrCouldNotParseWitness, err)
+		}
+	}
+
+	witness.Signatures = append(witness.Signatures, sig)
+
+	witnessStr, err := witness.String()
+
+	if err != nil {
+		return fmt.Errorf("witness.String: %+v", err)
+	}
+
+	p.Witness = witnessStr
+	return nil
 }
 
 type MintError struct {
@@ -269,6 +399,7 @@ type RecoverSigDB struct {
 	B_        string `json:"B_" db:"B_"`
 	C_        string `json:"C_" db:"C_"`
 	CreatedAt int64  `json:"created_at" db:"created_at"`
+	Witness   string `json:"witness"`
 }
 
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
