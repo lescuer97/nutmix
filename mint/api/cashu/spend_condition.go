@@ -26,7 +26,7 @@ var (
 	ErrCouldNotParseWitness          = errors.New("Could not parse witness")
 	ErrEmptyWitness                  = errors.New("Witness is empty")
 	ErrNoValidSignatures             = errors.New("No valid signatures found")
-	ErrNotEnoughSignatures           = errors.New("Not enought signatures")
+	ErrNotEnoughSignatures           = errors.New("Not enough signatures")
 )
 
 type SpendCondition struct {
@@ -74,10 +74,28 @@ func (sc *SpendCondition) String() (string, error) {
 	str += fmt.Sprintf(`["n_sigs","%s"],`, strconv.Itoa(sc.Data.Tags.NSigs))
 	str += fmt.Sprintf(`["locktime","%s"],`, strconv.Itoa(sc.Data.Tags.Locktime))
 	if len(sc.Data.Tags.Refund) > 0 {
-		str += fmt.Sprintf(`["refund","%s"],`, hex.EncodeToString(sc.Data.Tags.Refund[0].SerializeCompressed()))
+
+		str += fmt.Sprintf(`["refund"`)
+
+		for _, pubkey := range sc.Data.Tags.Refund {
+
+			str += fmt.Sprintf(`,"%s"`, hex.EncodeToString(pubkey.SerializeCompressed()))
+		}
+
+		str += fmt.Sprintf(`],`)
+
 	}
 	if len(sc.Data.Tags.Pubkeys) > 0 {
-		str += fmt.Sprintf(`["pubkeys","%s"]`, hex.EncodeToString(sc.Data.Tags.Pubkeys[0].SerializeCompressed()))
+
+		str += fmt.Sprintf(`["pubkeys"`)
+
+		for _, pubkey := range sc.Data.Tags.Pubkeys {
+
+			str += fmt.Sprintf(`,"%s"`, hex.EncodeToString(pubkey.SerializeCompressed()))
+		}
+
+		str += fmt.Sprintf(`]`)
+
 	}
 
 	str += fmt.Sprintf(`]}]`)
@@ -289,17 +307,18 @@ func (sc *SpendCondition) VerifySignatures(witness *P2PKWitness, message string)
 
 	// check if there is a multisig set up if not check if there is only one valid signature
 	switch {
-	case sc.Data.Tags.NSigs > 0 && amountValidSigs >= sc.Data.Tags.NSigs:
-		return true, signaturesToTry, nil
-
-	case amountValidSigs >= 1:
-		return true, signaturesToTry, nil
 
 	case amountValidSigs == 0:
 		return false, signaturesToTry, ErrNoValidSignatures
 
 	case sc.Data.Tags.NSigs > 0 && amountValidSigs < sc.Data.Tags.NSigs:
 		return false, signaturesToTry, ErrNotEnoughSignatures
+
+	case sc.Data.Tags.NSigs > 0 && amountValidSigs >= sc.Data.Tags.NSigs:
+		return true, signaturesToTry, nil
+
+	case amountValidSigs >= 1:
+		return true, signaturesToTry, nil
 
 	default:
 		return false, signaturesToTry, nil

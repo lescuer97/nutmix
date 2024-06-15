@@ -439,6 +439,9 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			case errors.Is(err, cashu.ErrNoValidSignatures):
 				c.JSON(403, "No valid signatures")
 				return
+			case errors.Is(err, cashu.ErrNotEnoughSignatures):
+				c.JSON(403, cashu.ErrNotEnoughSignatures.Error())
+				return
 
 			}
 
@@ -701,6 +704,9 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			case errors.Is(err, cashu.ErrNoValidSignatures):
 				c.JSON(403, "No valid signatures")
+				return
+			case errors.Is(err, cashu.ErrNotEnoughSignatures):
+				c.JSON(403, cashu.ErrNotEnoughSignatures.Error())
 				return
 
 			}
