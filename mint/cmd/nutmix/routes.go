@@ -550,7 +550,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			response = cashu.PostMeltQuoteBolt11Response{
 				Paid:       false,
 				Expiry:     cashu.ExpiryTime,
-				FeeReserve: fee,
+				FeeReserve: (fee + 1),
 				Amount:     uint64(*invoice.MilliSat) / 1000,
 				Quote:      hexHash,
 			}
@@ -719,7 +719,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			}
 
 		case comms.LND_WALLET:
-			payment, err := mint.LightningComs.PayInvoice(quote.Request)
+			payment, err := mint.LightningComs.PayInvoice(quote.Request, quote.FeeReserve)
 
 			if err != nil {
 				log.Printf("mint.LightningComs.PayInvoice %+v", err)
@@ -748,6 +748,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 			// if fees where lower than expected return sats to the user
 			feesInSat := uint64(payment.PaymentRoute.TotalFeesMsat / 1000)
+
 			if feesInSat < quote.FeeReserve && len(meltRequest.Outputs) > 0 {
 
 				overpaidFees := quote.FeeReserve - feesInSat
