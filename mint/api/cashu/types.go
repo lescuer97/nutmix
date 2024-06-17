@@ -370,13 +370,15 @@ type PostSwapResponse struct {
 }
 
 type PostMeltBolt11Request struct {
-	Quote  string  `json:"quote"`
-	Inputs []Proof `json:"inputs"`
+	Quote   string           `json:"quote"`
+	Inputs  []Proof          `json:"inputs"`
+	Outputs []BlindedMessage `json:"outputs"`
 }
 
 type PostMeltBolt11Response struct {
-	Paid            bool   `json:"paid"`
-	PaymentPreimage string `json:"payment_preimage"`
+	Paid            bool             `json:"paid"`
+	PaymentPreimage string           `json:"payment_preimage"`
+	Change          []BlindSignature `json:"change"`
 }
 
 type PostCheckStateRequest struct {

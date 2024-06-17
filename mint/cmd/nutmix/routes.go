@@ -103,7 +103,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		}
 
 		nuts := make(map[string]cashu.SwapMintInfo)
-		var activeNuts []string = []string{"1", "2", "3", "4", "5", "6"}
+		var activeNuts []string = []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"}
 
 		for _, nut := range activeNuts {
 			nuts[nut] = cashu.SwapMintInfo{
@@ -545,15 +545,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			}
 
 			fee := lightning.GetAverageRouteFee(query.Routes) / 1000
-			// randUuid, err := uuid.NewRandom()
 			hexHash := hex.EncodeToString(invoice.PaymentHash[:])
-
-			if err != nil {
-				log.Println(fmt.Errorf("NewRamdom: %w", err))
-
-				c.JSON(500, "Opps!, something went wrong")
-				return
-			}
 
 			response = cashu.PostMeltQuoteBolt11Response{
 				Paid:       false,
@@ -665,7 +657,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		}
 
-		if AmountProofs < quote.Amount {
+		if AmountProofs < quote.Amount+quote.FeeReserve {
 			log.Printf("Not enought proofs to expend. Needs: %v", quote.Amount)
 			c.JSON(403, "Not enought proofs to expend. Needs: %v")
 			return
@@ -735,7 +727,6 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-			// catch the comm
 			switch {
 			case payment.PaymentError == "invoice is already paid":
 				c.JSON(400, "invoice is already paid")
@@ -749,11 +740,50 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 
 			}
-
 			quote.RequestPaid = true
 			response = cashu.PostMeltBolt11Response{
 				Paid:            true,
 				PaymentPreimage: string(payment.PaymentPreimage),
+			}
+
+			// if fees where lower than expected return sats to the user
+			feesInSat := uint64(payment.PaymentRoute.TotalFeesMsat / 1000)
+			if feesInSat < quote.FeeReserve && len(meltRequest.Outputs) > 0 {
+
+				overpaidFees := quote.FeeReserve - feesInSat
+				amounts := cashu.AmountSplit(overpaidFees)
+				change := meltRequest.Outputs
+				switch {
+				case len(amounts) > len(meltRequest.Outputs):
+					for i := range change {
+						change[i].Amount = amounts[i]
+					}
+
+				default:
+					change = change[:len(amounts)]
+
+					for i := range change {
+						change[i].Amount = amounts[i]
+					}
+
+				}
+				blindSignatures, recoverySigsDb, err := mint.SignBlindedMessages(change, quote.Unit)
+
+				if err != nil {
+					log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+					c.JSON(500, "Opps!, something went wrong")
+					return
+				}
+
+				err = SetRestoreSigs(pool, recoverySigsDb)
+
+				if err != nil {
+					log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
+					log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
+				}
+
+				response.Change = blindSignatures
+
 			}
 
 		default:
