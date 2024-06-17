@@ -267,8 +267,40 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	// SWAP TESTING STARTS
 
-	// try to swap tokens
+	// TRY TO SWAP WITH TOO MANY BLINDED MESSAGES
 	swapProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+	swapBlindedMessages, _, _, err := CreateBlindedMessages(1032843, mint.ActiveKeysets[cashu.Sat.String()][1])
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	swapRequestToManyBlindMessages := cashu.PostSwapRequest{
+		Inputs:  swapProofs,
+		Outputs: swapBlindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(swapRequestToManyBlindMessages)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 400, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Not enough proofs for signatures"` {
+		t.Errorf("Expected Not enough proofs for signatures, got %s", w.Body.String())
+	}
+
+	// TRY TO SWAP SUCCESSFULLY
+	swapProofs, err = GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
@@ -319,7 +351,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	w.Flush()
 
-	// Swap with invalid Proofs
+	// SWAP WITH INVALID PROOFS
 	invalidSignatureProofs, err := GenerateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
@@ -888,8 +920,40 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	// SWAP TESTING STARTS
 
-	// try to swap tokens
+	// TRY TO SWAP WITH TOO MANY BLINDED MESSAGES
 	swapProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+	swapBlindedMessages, _, _, err := CreateBlindedMessages(1032843, mint.ActiveKeysets[cashu.Sat.String()][1])
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	swapRequestToManyBlindMessages := cashu.PostSwapRequest{
+		Inputs:  swapProofs,
+		Outputs: swapBlindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(swapRequestToManyBlindMessages)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 400, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Not enough proofs for signatures"` {
+		t.Errorf("Expected Not enough proofs for signatures, got %s", w.Body.String())
+	}
+
+	// try to swap tokens
+	swapProofs, err = GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
