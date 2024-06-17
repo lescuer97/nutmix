@@ -250,19 +250,44 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-		blindedSignatures := []cashu.BlindSignature{}
+		amountBlindMessages := uint64(0)
 
+		for _, blindMessage := range mintRequest.Outputs {
+			amountBlindMessages += blindMessage.Amount
+		}
+		blindedSignatures := []cashu.BlindSignature{}
 		recoverySigsDb := []cashu.RecoverSigDB{}
 		lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
 
 		switch lightningBackendType {
 
 		case comms.FAKE_WALLET:
+			invoice, err := zpay32.Decode(quote.Request, &mint.Network)
+
+			if err != nil {
+				log.Println(fmt.Errorf("zpay32.Decode: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
+			amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
+
+			if err != nil {
+				log.Println(fmt.Errorf("UnmarshallAmt: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
+			// check the amount in outputs are the same as the quote
+			if int32(*invoice.MilliSat) != int32(amountMilsats) {
+				log.Println(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)))
+				c.JSON(403, "Amounts in outputs are not the same")
+				return
+			}
 			blindedSignatures, recoverySigsDb, err = mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
 
 			if err != nil {
 
-				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
 				if errors.Is(err, ErrInvalidBlindMessage) {
 					c.JSON(400, ErrInvalidBlindMessage.Error())
 					return
@@ -303,13 +328,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-			var amount uint64 = 0
-
-			for _, output := range mintRequest.Outputs {
-				amount += output.Amount
-			}
-
-			amountMilsats, err := lnrpc.UnmarshallAmt(int64(amount), 0)
+			amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
 
 			if err != nil {
 				log.Println(fmt.Errorf("UnmarshallAmt: %w", err))
@@ -320,7 +339,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			// check the amount in outputs are the same as the quote
 			if int32(*invoice.MilliSat) != int32(amountMilsats) {
 				log.Println(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)))
-				c.JSON(400, "Amounts in outputs are not the same")
+				c.JSON(403, "Amounts in outputs are not the same")
 				return
 			}
 
@@ -329,7 +348,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			if err != nil {
 				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
 				if errors.Is(err, ErrInvalidBlindMessage) {
-					c.JSON(400, ErrInvalidBlindMessage.Error())
+					c.JSON(403, ErrInvalidBlindMessage.Error())
 					return
 				}
 

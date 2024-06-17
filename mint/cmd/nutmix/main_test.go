@@ -122,7 +122,34 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
 
-	// ask for minting
+	// ASK FOR MINTING WITH TOO MANY BLINDED MESSAGES
+	blindedMessages, _, _, err := CreateBlindedMessages(999999, referenceKeyset)
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	mintRequestTooManyBlindMessages := cashu.PostMintBolt11Request{
+		Quote:   postMintQuoteResponse.Quote,
+		Outputs: blindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(mintRequestTooManyBlindMessages)
+
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Amounts in outputs are not the same"` {
+		t.Errorf("Expected Amounts in outputs are not the same, got %s", w.Body.String())
+	}
+
+	// ASK FOR SUCCESSFUL MINTING
 	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, referenceKeyset)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -148,8 +175,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	}
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
-
-	fmt.Printf("BODY %+v", w)
 
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
@@ -694,7 +719,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
 
-	// try minting before payment being done
+	// MINTING WITHOUT PAYING THE INVOICE
 	beforeMintBlindedMessages, _, _, err := CreateBlindedMessages(1000, referenceKeyset)
 
 	if err != nil {
@@ -723,9 +748,13 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	}
 
 	// needs to wait a second for the containers to catch up
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 	// Lnd BOB pays the invoice
 	_, _, err = bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "payinvoice", postMintQuoteResponse.Request, "--force"})
+
+	if err != nil {
+		fmt.Errorf("Error paying invoice %+v", err)
+	}
 
 	// Minting with invalid signatures
 	w = httptest.NewRecorder()
@@ -749,15 +778,42 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 400, got %d", w.Code)
+	if w.Code != 403 {
+		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
 
 	if w.Body.String() != `"Invalid blind message"` {
 		t.Errorf("Expected Invalid blind message, got %s", w.Body.String())
 	}
 
-	// ask for minting
+	// ASK FOR MINTING WITH TOO MANY BLINDED MESSAGES
+	blindedMessages, _, _, err := CreateBlindedMessages(999999, referenceKeyset)
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	mintRequestTooManyBlindMessages := cashu.PostMintBolt11Request{
+		Quote:   postMintQuoteResponse.Quote,
+		Outputs: blindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(mintRequestTooManyBlindMessages)
+
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Amounts in outputs are not the same"` {
+		t.Errorf("Expected Amounts in outputs are not the same, got %s", w.Body.String())
+	}
+
+	// MINT SUCCESSFULY
 	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(1000, referenceKeyset)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
