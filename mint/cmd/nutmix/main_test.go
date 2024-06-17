@@ -66,7 +66,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 1000,
+		Amount: 10000,
 		Unit:   cashu.Sat.String(),
 	}
 	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
@@ -123,7 +123,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
 
 	// ask for minting
-	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(1000, referenceKeyset)
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, referenceKeyset)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -149,6 +149,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
 
+	fmt.Printf("BODY %+v", w)
+
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
@@ -159,7 +161,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		totalAmountSigned += output.Amount
 	}
 
-	if totalAmountSigned != 1000 {
+	if totalAmountSigned != 10000 {
 		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
 	}
 
@@ -246,7 +248,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(1009, mint.ActiveKeysets[cashu.Sat.String()][1])
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -282,7 +284,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		totalAmountSigned += output.Amount
 	}
 
-	if totalAmountSigned != 1000 {
+	if totalAmountSigned != 1009 {
 		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
 	}
 
@@ -433,6 +435,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
+	fmt.Printf("BODY %+v", w)
 	if w.Code != 403 {
 		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
