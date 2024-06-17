@@ -66,13 +66,22 @@ func (l *LightingComms) CheckIfInvoicePayed(quote string) (*lnrpc.Invoice, error
 	return invoice, nil
 }
 
-func (l *LightingComms) PayInvoice(invoice string) (*lnrpc.SendResponse, error) {
+func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*lnrpc.SendResponse, error) {
 
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
 
 	client := lnrpc.NewLightningClient(l.RpcClient)
 
-	res, err := client.SendPaymentSync(ctx, &lnrpc.SendRequest{PaymentRequest: invoice})
+	fixedLimit := lnrpc.FeeLimit_Fixed{
+		Fixed: int64(feeReserve),
+	}
+
+	feeLimit := lnrpc.FeeLimit{
+		Limit: &fixedLimit,
+	}
+	sendRequest := lnrpc.SendRequest{PaymentRequest: invoice, AllowSelfPayment: true, FeeLimit: &feeLimit}
+
+	res, err := client.SendPaymentSync(ctx, &sendRequest)
 
 	if err != nil {
 		return nil, err

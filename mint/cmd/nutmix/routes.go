@@ -103,7 +103,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 		}
 
 		nuts := make(map[string]cashu.SwapMintInfo)
-		var activeNuts []string = []string{"1", "2", "3", "4", "5", "6"}
+		var activeNuts []string = []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"}
 
 		for _, nut := range activeNuts {
 			nuts[nut] = cashu.SwapMintInfo{
@@ -250,19 +250,44 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			return
 		}
 
-		blindedSignatures := []cashu.BlindSignature{}
+		amountBlindMessages := uint64(0)
 
+		for _, blindMessage := range mintRequest.Outputs {
+			amountBlindMessages += blindMessage.Amount
+		}
+		blindedSignatures := []cashu.BlindSignature{}
 		recoverySigsDb := []cashu.RecoverSigDB{}
 		lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
 
 		switch lightningBackendType {
 
 		case comms.FAKE_WALLET:
+			invoice, err := zpay32.Decode(quote.Request, &mint.Network)
+
+			if err != nil {
+				log.Println(fmt.Errorf("zpay32.Decode: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
+			amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
+
+			if err != nil {
+				log.Println(fmt.Errorf("UnmarshallAmt: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
+			// check the amount in outputs are the same as the quote
+			if int32(*invoice.MilliSat) != int32(amountMilsats) {
+				log.Println(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)))
+				c.JSON(403, "Amounts in outputs are not the same")
+				return
+			}
 			blindedSignatures, recoverySigsDb, err = mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
 
 			if err != nil {
 
-				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
 				if errors.Is(err, ErrInvalidBlindMessage) {
 					c.JSON(400, ErrInvalidBlindMessage.Error())
 					return
@@ -303,13 +328,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-			var amount uint64 = 0
-
-			for _, output := range mintRequest.Outputs {
-				amount += output.Amount
-			}
-
-			amountMilsats, err := lnrpc.UnmarshallAmt(int64(amount), 0)
+			amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
 
 			if err != nil {
 				log.Println(fmt.Errorf("UnmarshallAmt: %w", err))
@@ -320,7 +339,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			// check the amount in outputs are the same as the quote
 			if int32(*invoice.MilliSat) != int32(amountMilsats) {
 				log.Println(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)))
-				c.JSON(400, "Amounts in outputs are not the same")
+				c.JSON(403, "Amounts in outputs are not the same")
 				return
 			}
 
@@ -329,7 +348,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			if err != nil {
 				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
 				if errors.Is(err, ErrInvalidBlindMessage) {
-					c.JSON(400, ErrInvalidBlindMessage.Error())
+					c.JSON(403, ErrInvalidBlindMessage.Error())
 					return
 				}
 
@@ -545,20 +564,12 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			}
 
 			fee := lightning.GetAverageRouteFee(query.Routes) / 1000
-			// randUuid, err := uuid.NewRandom()
 			hexHash := hex.EncodeToString(invoice.PaymentHash[:])
-
-			if err != nil {
-				log.Println(fmt.Errorf("NewRamdom: %w", err))
-
-				c.JSON(500, "Opps!, something went wrong")
-				return
-			}
 
 			response = cashu.PostMeltQuoteBolt11Response{
 				Paid:       false,
 				Expiry:     cashu.ExpiryTime,
-				FeeReserve: fee,
+				FeeReserve: (fee + 1),
 				Amount:     uint64(*invoice.MilliSat) / 1000,
 				Quote:      hexHash,
 			}
@@ -665,7 +676,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 
 		}
 
-		if AmountProofs < quote.Amount {
+		if AmountProofs < quote.Amount+quote.FeeReserve {
 			log.Printf("Not enought proofs to expend. Needs: %v", quote.Amount)
 			c.JSON(403, "Not enought proofs to expend. Needs: %v")
 			return
@@ -727,7 +738,7 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 			}
 
 		case comms.LND_WALLET:
-			payment, err := mint.LightningComs.PayInvoice(quote.Request)
+			payment, err := mint.LightningComs.PayInvoice(quote.Request, quote.FeeReserve)
 
 			if err != nil {
 				log.Printf("mint.LightningComs.PayInvoice %+v", err)
@@ -735,7 +746,6 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 			}
 
-			// catch the comm
 			switch {
 			case payment.PaymentError == "invoice is already paid":
 				c.JSON(400, "invoice is already paid")
@@ -749,11 +759,51 @@ func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint Mint) {
 				return
 
 			}
-
 			quote.RequestPaid = true
 			response = cashu.PostMeltBolt11Response{
 				Paid:            true,
 				PaymentPreimage: string(payment.PaymentPreimage),
+			}
+
+			// if fees where lower than expected return sats to the user
+			feesInSat := uint64(payment.PaymentRoute.TotalFeesMsat / 1000)
+
+			if feesInSat < quote.FeeReserve && len(meltRequest.Outputs) > 0 {
+
+				overpaidFees := quote.FeeReserve - feesInSat
+				amounts := cashu.AmountSplit(overpaidFees)
+				change := meltRequest.Outputs
+				switch {
+				case len(amounts) > len(meltRequest.Outputs):
+					for i := range change {
+						change[i].Amount = amounts[i]
+					}
+
+				default:
+					change = change[:len(amounts)]
+
+					for i := range change {
+						change[i].Amount = amounts[i]
+					}
+
+				}
+				blindSignatures, recoverySigsDb, err := mint.SignBlindedMessages(change, quote.Unit)
+
+				if err != nil {
+					log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+					c.JSON(500, "Opps!, something went wrong")
+					return
+				}
+
+				err = SetRestoreSigs(pool, recoverySigsDb)
+
+				if err != nil {
+					log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
+					log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
+				}
+
+				response.Change = blindSignatures
+
 			}
 
 		default:
