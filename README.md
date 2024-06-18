@@ -10,8 +10,7 @@ _This project is in active development; it has not gone through optimization and
 
 Cashu protocol mint. Focused on Multiple denominations of ecash.
 
-
-you can test this mint on Mutinynet's signet at: mutinynet.nutmix.cash
+Please test in Mutinynet at: *https://mutinynet.nutmix.cash*
 
 ## Purpose of this project
 
@@ -54,7 +53,7 @@ At this moment NUTS are up to P2PK (NUT-11) are implemented and working. I plan 
     - Emmit blind signatures for certain users.
     - Activate Nostr only mode.
     - Change mint messages
-5. Add support for other lightning nodes. Ex: core-lighting, strike, greenlight.
+5. Add support for other lightning nodes. Ex: core-lighting, Strike, Greenlight.
 4. Add Monero Support this would probably include a way to exchange in between Bitcoin and Monero.
 5. Tor only mode
 6. Nostr only Mode.
