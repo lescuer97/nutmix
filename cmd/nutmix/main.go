@@ -22,6 +22,11 @@ func main() {
 			log.Fatal("ERROR: no .env file found and not running in docker")
 		}
 	}
+	mode := os.Getenv("MODE")
+
+    if mode == "prod" {
+        gin.SetMode(gin.ReleaseMode)
+    }
 
 	pool, err := DatabaseSetup("migrations")
 
