@@ -6,11 +6,11 @@ _This project is in active development; it has not gone through optimization and
 
 # Nutmix
 
-Cashu protocol mint. 
+Cashu protocol mint. Focused on Multiple denominations of ecash.
 
 ## Purpose of this project
 
-This is an attempt to learn Go and eCash. I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make a reference implementation of the mint in Go. 
+This is an attempt to learn Go and eCash. I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make an implementation of the mint in Go. 
 I am attempting to make all the NUTs available as well as some other ideas such as: Monero ECash token.
 
 The wallet is going to be made with SvelteKit (probably not the best option). I will implement the wallet with the possibility of multiple denominations of eCash (SATs, Monero, eUSD). I would also like to have some Nostr functionality.
@@ -27,9 +27,9 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [x] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
 - [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md)
 - [x] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md)
-- [ ] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
-- [ ] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md)
-- [ ] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
+- [x] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
+- [x] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md)
+- [x] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
 - [ ] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
 - [ ] [NUT-13](https://github.com/cashubtc/nuts/blob/main/13.md)
 - [ ] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
