@@ -40,6 +40,8 @@ func main() {
 		log.Fatalf("Could not GetAllSeeds: %v", err)
 	}
 
+	log.Println("Amount of seeds: ", len(seeds))
+
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
 		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
@@ -49,6 +51,12 @@ func main() {
 		}
 
 		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
+
+		if err != nil {
+			log.Fatalf("cashu.DeriveSeedsFromKey: %+v ", err)
+		}
+
+        log.Println("Generated new seeds")
 
 		err = SaveNewSeeds(pool, generatedSeeds)
 
