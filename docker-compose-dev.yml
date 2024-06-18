@@ -9,12 +9,17 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
 
   mint:
     env_file:
       - path: ".env"
         required: true
-    build: ./mint/
+    build: ./
     ports:
       - 8080:8080
     restart: on-failure:10

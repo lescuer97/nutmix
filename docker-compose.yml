@@ -3,6 +3,9 @@ services:
     image: "traefik:v3.0.0"
     container_name: "traefik"
     restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
