@@ -8,6 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes"
 )
 
 func main() {
@@ -24,17 +27,17 @@ func main() {
 	}
 	mode := os.Getenv("MODE")
 
-    if mode == "prod" {
-        gin.SetMode(gin.ReleaseMode)
-    }
+	if mode == "prod" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
-	pool, err := DatabaseSetup("migrations")
+	pool, err := database.DatabaseSetup("migrations")
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
 	}
 
-	seeds, err := GetAllSeeds(pool)
+	seeds, err := database.GetAllSeeds(pool)
 
 	if err != nil {
 		log.Fatalf("Could not GetAllSeeds: %v", err)
@@ -50,7 +53,7 @@ func main() {
 
 		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
 
-		err = SaveNewSeeds(pool, generatedSeeds)
+		err = database.SaveNewSeeds(pool, generatedSeeds)
 
 		seeds = append(seeds, generatedSeeds...)
 
@@ -60,7 +63,7 @@ func main() {
 
 	}
 
-	mint, err := SetUpMint(seeds)
+	mint, err := mint.SetUpMint(seeds)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -73,7 +76,7 @@ func main() {
 
 	r.Use(cors.Default())
 
-	V1Routes(r, pool, mint)
+	routes.V1Routes(r, pool, mint)
 
 	defer pool.Close()
 
