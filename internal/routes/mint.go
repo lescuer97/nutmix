@@ -120,7 +120,6 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 		c.JSON(200, response)
 	})
 
-
 	v1.POST("/swap", func(c *gin.Context) {
 		var swapRequest cashu.PostSwapRequest
 
@@ -242,7 +241,6 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 
 		c.JSON(200, response)
 	})
-
 
 	v1.POST("/checkstate", func(c *gin.Context) {
 		var checkStateRequest cashu.PostCheckStateRequest

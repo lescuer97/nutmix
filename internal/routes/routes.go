@@ -7,10 +7,7 @@ import (
 )
 
 func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
-    v1MintRoutes(r, pool, mint)
-    v1bolt11Routes(r, pool, mint)
+	v1MintRoutes(r, pool, mint)
+	v1bolt11Routes(r, pool, mint)
 
 }
-
-
-

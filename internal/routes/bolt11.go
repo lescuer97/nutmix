@@ -18,10 +18,10 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/mint"
+	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
-    m "github.com/lescuer97/nutmix/internal/mint"
 )
 
 func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {

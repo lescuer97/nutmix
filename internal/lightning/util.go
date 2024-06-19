@@ -1,4 +1,5 @@
 package lightning
+
 import (
 	"context"
 	"fmt"

@@ -27,9 +27,9 @@ func main() {
 	}
 	mode := os.Getenv("MODE")
 
-    if mode == "prod" {
-        gin.SetMode(gin.ReleaseMode)
-    }
+	if mode == "prod" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	pool, err := database.DatabaseSetup("migrations")
 
