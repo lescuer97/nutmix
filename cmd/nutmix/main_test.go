@@ -18,6 +18,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/comms"
+	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -557,16 +560,16 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 }
 
-func SetupRoutingForTesting() (*gin.Engine, Mint) {
+func SetupRoutingForTesting() (*gin.Engine, mint.Mint) {
 	os.Setenv("NETWORK", "regtest")
 
-	pool, err := DatabaseSetup("../../migrations/")
+	pool, err := database.DatabaseSetup("../../migrations/")
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
 	}
 
-	seeds, err := GetAllSeeds(pool)
+	seeds, err := database.GetAllSeeds(pool)
 
 	if err != nil {
 		log.Fatalf("Could not keysets: %v", err)
@@ -582,7 +585,7 @@ func SetupRoutingForTesting() (*gin.Engine, Mint) {
 
 		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
 
-		err = SaveNewSeeds(pool, generatedSeeds)
+		err = database.SaveNewSeeds(pool, generatedSeeds)
 
 		seeds = append(seeds, generatedSeeds...)
 
@@ -592,7 +595,7 @@ func SetupRoutingForTesting() (*gin.Engine, Mint) {
 
 	}
 
-	mint, err := SetUpMint(seeds)
+	mint, err := mint.SetUpMint(seeds)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -600,7 +603,7 @@ func SetupRoutingForTesting() (*gin.Engine, Mint) {
 
 	r := gin.Default()
 
-	V1Routes(r, pool, mint)
+    routes.V1Routes(r, pool, mint)
 
 	return r, mint
 }
@@ -1233,7 +1236,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 }
 
-func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 
 	// try to swap tokens
 	var proofs []cashu.Proof
