@@ -3,10 +3,10 @@ package cashu
 import (
 	"encoding/hex"
 	"fmt"
-	"testing"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/tyler-smith/go-bip32"
+	"testing"
 )
 
 func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {

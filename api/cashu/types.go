@@ -471,12 +471,13 @@ func (b *BlindSignature) GenerateDLEQ(B_ *secp256k1.PublicKey, a *secp256k1.Priv
 	R1 := r.PubKey()
 
 	// R2 = r * B_
-	var blindMessagePoint, R2Point secp256k1.JacobianPoint
+	var blindMessagePoint, R2 secp256k1.JacobianPoint
 	B_.AsJacobian(&blindMessagePoint)
 
-	btcec.ScalarMultNonConst(&r.Key, &blindMessagePoint, &R2Point)
-	R2Point.ToAffine()
+	btcec.ScalarMultNonConst(&r.Key, &blindMessagePoint, &R2)
+	R2.ToAffine()
 
+	// Convert C_ String to secp256k1.PublicKey
 	C_bytes, err := hex.DecodeString(b.C_)
 	if err != nil {
 		return fmt.Errorf("hex.DecodeString(b.C_): %w", err)
@@ -488,21 +489,22 @@ func (b *BlindSignature) GenerateDLEQ(B_ *secp256k1.PublicKey, a *secp256k1.Priv
 		return fmt.Errorf("secp256k1.ParsePubKey: %w", err)
 	}
 
-	// generate e
-	keys := []*secp256k1.PublicKey{R1, btcec.NewPublicKey(&R2Point.X, &R2Point.Y), a.PubKey(), C_}
+	// generate e = hash(R1,R2,A,C')
+	keys := []*secp256k1.PublicKey{R1, btcec.NewPublicKey(&R2.X, &R2.Y), a.PubKey(), C_}
 
 	ehash := crypto.Hash_e(keys)
 
 	e := secp256k1.PrivKeyFromBytes(ehash[:])
 
-	// generate s
-	// s = r + e*a
+	// generate s = r + e*a
+
 	// e*a
 	e.Key.Mul(&a.Key)
 
-	// r
+	// r * ea
 	s := secp256k1.NewPrivateKey(r.Key.Add(&e.Key))
 
+	// I don't use e here because the original variable got altered when multiplying for a.Key
 	b.Dleq = &BlindSignatureDLEQ{E: secp256k1.PrivKeyFromBytes(ehash[:]), S: s}
 
 	return nil
@@ -525,8 +527,9 @@ func (b *BlindSignature) VerifyDLEQ(
 
 	// negate the e key
 	e.Key.Negate()
-
 	A.AsJacobian(&a_point)
+
+	// (-e) * A
 	btcec.ScalarMultNonConst(&e.Key, &a_point, &eA)
 	eA.ToAffine()
 
@@ -536,15 +539,18 @@ func (b *BlindSignature) VerifyDLEQ(
 	sPubKey := s.PubKey()
 	sPubKey.AsJacobian(&sG)
 
+	// s*G + ((-e)*A)
 	btcec.AddNonConst(&sG, &eA, &R1)
 	R1.ToAffine()
 
 	var eC, c_point secp256k1.JacobianPoint
 
+	// Parse BlindSignature to Pubkey
 	C_bytes, err := hex.DecodeString(b.C_)
 	if err != nil {
 		return false, fmt.Errorf("hex.DecodeString(b.C_): %w", err)
 	}
+
 	C_, err := secp256k1.ParsePubKey(C_bytes)
 
 	if err != nil {
@@ -552,6 +558,8 @@ func (b *BlindSignature) VerifyDLEQ(
 	}
 
 	C_.AsJacobian(&c_point)
+
+	// e*C'
 	secp256k1.ScalarMultNonConst(&e.Key, &c_point, &eC)
 	eC.ToAffine()
 
@@ -562,6 +570,7 @@ func (b *BlindSignature) VerifyDLEQ(
 	btcec.ScalarMultNonConst(&s.Key, &point_b, &sB)
 	sB.ToAffine()
 
+	// R2 = s*B' + ((-e)*C')
 	btcec.AddNonConst(&sB, &eC, &R2)
 	R2.ToAffine()
 
@@ -571,6 +580,7 @@ func (b *BlindSignature) VerifyDLEQ(
 
 	hashed_keys_priv := secp256k1.PrivKeyFromBytes(hashed_keys[:])
 
+	// I negate the hashed_keys_priv because the original key got altered when multiplying for A
 	return hashed_keys_priv.Key.Negate().String() == e.Key.String(), nil
 
 }
