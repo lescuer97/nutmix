@@ -1,6 +1,7 @@
 package cashu
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -101,17 +102,27 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 
 	C_ := crypto.SignBlindedMessage(B_, k)
 
-	return BlindSignature{
+	blindSig := BlindSignature{
 		Amount: b.Amount,
 		Id:     b.Id,
 		C_:     hex.EncodeToString(C_.SerializeCompressed()),
-	}, nil
+	}
+
+	 err = blindSig.GenerateDLEQ(B_, k)
+
+	if err != nil {
+		return blindSig, fmt.Errorf("blindSig.GenerateDLEQ: %w", err)
+	}
+
+
+	return blindSig, nil
 }
 
 type BlindSignature struct {
-	Amount uint64 `json:"amount"`
-	Id     string `json:"id"`
-	C_     string `json:"C_"`
+	Amount uint64              `json:"amount"`
+	Id     string              `json:"id"`
+	C_     string              `json:"C_"`
+	Dleq   *BlindSignatureDLEQ `json:"dleq"`
 }
 
 type ProofState string
@@ -430,4 +441,72 @@ type PostRestoreRequest struct {
 type PostRestoreResponse struct {
 	Outputs    []BlindedMessage `json:"outputs"`
 	Signatures []BlindSignature `json:"signatures"`
+}
+
+type BlindSignatureDLEQ struct {
+	E *secp256k1.PrivateKey `json:"e"`
+	S *secp256k1.PrivateKey `json:"s"`
+}
+
+func (b *BlindSignatureDLEQ) MarshalJSON() ([]byte, error) {
+
+	return json.Marshal(&struct {
+		E string `json:"e"` // We want to encode the E as a string
+		S string `json:"s"` // We want to encode the S as a string
+	}{
+		E: b.E.Key.String(),
+		S: b.S.Key.String(),
+	})
+}
+
+func (b *BlindSignature) GenerateDLEQ(B_ *secp256k1.PublicKey, a *secp256k1.PrivateKey)  error {
+	// Generate nonce private key
+	nonce := make([]byte, 32)
+	_, err := rand.Read(nonce)
+	if err != nil {
+		return  fmt.Errorf("rand.Read: %w", err)
+	}
+	r := secp256k1.PrivKeyFromBytes(nonce)
+
+	// R1 = r*G
+	R1 := r.PubKey()
+
+	// R2 = r*B_
+	var blindMessagePoint, R2Point secp256k1.JacobianPoint
+	B_.AsJacobian(&blindMessagePoint)
+	blindMessagePoint.ToAffine()
+    
+
+	secp256k1.ScalarMultNonConst(&r.Key, &blindMessagePoint, &R2Point)
+	R2Point.ToAffine()
+
+    C_bytes, err := hex.DecodeString(b.C_)
+    if err != nil {
+        return  fmt.Errorf("hex.DecodeString(b.C_): %w", err)
+    }
+
+    C_, err := secp256k1.ParsePubKey(C_bytes)
+
+    if err != nil {
+        return  fmt.Errorf("secp256k1.ParsePubKey: %w", err)
+    }
+
+	// generate e
+	keys := []*secp256k1.PublicKey{R1, secp256k1.NewPublicKey(&R2Point.X, &R2Point.Y), a.PubKey(), C_}
+
+	ehash, err := crypto.Hash_e(keys)
+
+	if err != nil {
+		return  fmt.Errorf("crypto.Hash_e: %w", err)
+	}
+
+	e := secp256k1.PrivKeyFromBytes(ehash[:])
+
+	ea := e.Key.Mul(&a.Key)
+
+	s := secp256k1.NewPrivateKey(r.Key.Add(ea))
+
+    b.Dleq = &BlindSignatureDLEQ{E: e, S: s}
+
+	return nil
 }

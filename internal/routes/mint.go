@@ -98,7 +98,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 		}
 
 		nuts := make(map[string]cashu.SwapMintInfo)
-		var activeNuts []string = []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"}
+		var activeNuts []string = []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"}
 
 		for _, nut := range activeNuts {
 			nuts[nut] = cashu.SwapMintInfo{
