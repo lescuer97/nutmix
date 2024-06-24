@@ -209,14 +209,10 @@ func TestHashE(t *testing.T) {
 	}
 	keys := []*secp256k1.PublicKey{R1, R2, K, C_}
 
-	hash, err := Hash_e(keys)
-
-	if err != nil {
-		t.Errorf("error hashing: %v", err)
-	}
+	hash := Hash_e(keys)
 
 	if hex.EncodeToString(hash[:]) != "a4dc034b74338c28c6bc3ea49731f2a24440fc7c4affc08b31a93fc9fbe6401e" {
-        t.Errorf("hash is not correct. got: \n\n %v", hex.EncodeToString(hash[:]))
+		t.Errorf("hash is not correct. got: \n\n %v", hex.EncodeToString(hash[:]))
 	}
 
 }

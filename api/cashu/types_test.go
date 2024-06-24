@@ -2,6 +2,7 @@ package cashu
 
 import (
 	"encoding/hex"
+	"fmt"
 	"testing"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
@@ -97,37 +98,39 @@ func TestGenerateDLEQ(t *testing.T) {
 		t.Errorf("error decoding R1: %v", err)
 	}
 
-    a := secp256k1.PrivKeyFromBytes(a_bytes)
+	a := secp256k1.PrivKeyFromBytes(a_bytes)
 
-    b_bytes, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2")
-    if err != nil {
-        t.Errorf("error decoding b_: %v", err)
-    }
+	b_bytes, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2")
+	if err != nil {
+		t.Errorf("error decoding b_: %v", err)
+	}
 
-    B_, err := secp256k1.ParsePubKey(b_bytes)
+	B_, err := secp256k1.ParsePubKey(b_bytes)
 
-    if err != nil {
-        t.Errorf("secp256k1.ParsePubKey: %v", err)
-    }
+	if err != nil {
+		t.Errorf("secp256k1.ParsePubKey: %v", err)
+	}
 
-    C_ := "02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2"
+	C_ := "02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2"
 
-    blindSignature := BlindSignature{
-        C_: C_,
-    }
+	blindSignature := BlindSignature{
+		C_: C_,
+	}
 
-    err = blindSignature.GenerateDLEQ( B_, a)
+	err = blindSignature.GenerateDLEQ(B_, a)
+	if err != nil {
+		t.Errorf("could not GenerateDLEQ %+v", err)
+	}
 
-    if err != nil {
-        t.Errorf("could not GenerateDLEQ %+v", err)
-    }
+	verify, err := blindSignature.VerifyDLEQ(B_, blindSignature.Dleq.E, blindSignature.Dleq.S, a.PubKey())
+	if err != nil {
+		t.Errorf("could not VerifyDLEQ %+v", err)
+	}
 
-    if  blindSignature.Dleq.E.Key.String() != "9818e061ee51d5c8edc3342369a554998ff7b4381c8652d724cdf46429be73d9" {
-        t.Errorf("DLEQ.E is not correct %+v", blindSignature.Dleq.E.Key.String())
-    }
+	fmt.Println("verify: ", verify)
 
-    if blindSignature.Dleq.S.Key.String() != "9818e061ee51d5c8edc3342369a554998ff7b4381c8652d724cdf46429be73da" {
-        t.Errorf("DLEQ.S is not correct %+v", blindSignature.Dleq.S.Key.String())
-    }
+	if !verify {
+		t.Errorf("DLEQ is not correct")
+	}
 
 }

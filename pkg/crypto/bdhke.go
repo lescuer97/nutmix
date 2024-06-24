@@ -126,7 +126,7 @@ func verify(Y *secp256k1.PublicKey, k *secp256k1.PrivateKey, C *secp256k1.Public
 }
 
 // DLEQ HASH
-func Hash_e(pubkeys []*secp256k1.PublicKey) ([32]byte, error) {
+func Hash_e(pubkeys []*secp256k1.PublicKey) [32]byte {
 	e_ := ""
 	for _, pubkey := range pubkeys {
 		_p := pubkey.SerializeUncompressed()
@@ -138,5 +138,5 @@ func Hash_e(pubkeys []*secp256k1.PublicKey) ([32]byte, error) {
 
 	e := sha256.Sum256(e_bytes)
 
-	return e, nil
+	return e
 }
