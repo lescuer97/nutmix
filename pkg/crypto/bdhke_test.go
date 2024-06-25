@@ -173,7 +173,6 @@ func TestHashE(t *testing.T) {
 	if err != nil {
 		t.Errorf("error decoding R1: %v", err)
 	}
-	// fmt.Println(" len  ", len(R1Bytes))
 	R1, error := secp256k1.ParsePubKey(R1Bytes)
 	if error != nil {
 		t.Errorf("error parsing R1: %v", error)

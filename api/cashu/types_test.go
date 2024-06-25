@@ -127,8 +127,6 @@ func TestGenerateDLEQ(t *testing.T) {
 		t.Errorf("could not VerifyDLEQ %+v", err)
 	}
 
-	fmt.Println("verify: ", verify)
-
 	if !verify {
 		t.Errorf("DLEQ is not correct")
 	}

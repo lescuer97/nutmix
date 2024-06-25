@@ -495,7 +495,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	fmt.Printf("BODY %+v", w)
 	if w.Code != 403 {
 		t.Errorf("Expected status code 403, got %d", w.Code)
 	}

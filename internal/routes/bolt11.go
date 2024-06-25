@@ -48,7 +48,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 
 		switch lightningBackendType {
 		case comms.FAKE_WALLET:
-			payReq, err := lightning.CreateMockInvoice(mintRequest.Amount, "mock invoice", mint.Network)
+			payReq, err := lightning.CreateMockInvoice(mintRequest.Amount, "mock invoice", mint.Network, cashu.ExpiryTime)
 			if err != nil {
 				log.Println(err)
 				c.JSON(500, "Opps!, something went wrong")
