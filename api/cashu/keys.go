@@ -33,9 +33,9 @@ func GenerateKeysets(masterKey *bip32.Key, values []uint64, id string, unit Unit
 	// Format the time as a string
 	formattedTime := currentTime.Unix()
 
-	for _, value := range values {
+	for i, value := range values {
 		// uses the value it represents to derive the key
-		childKey, err := masterKey.NewChildKey(uint32(value))
+		childKey, err := masterKey.NewChildKey(uint32(i))
 		if err != nil {
 			return nil, err
 		}
