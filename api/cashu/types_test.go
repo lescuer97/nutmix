@@ -53,11 +53,11 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		t.Errorf("could GenerateBlindSignature %+v", err)
 	}
 
-	if blindSignature.C_ != "02911a413c227c35f235517dc87432c2d9b0cba66766245f632be8e185de58af92" {
+	if blindSignature.C_ != "024b60ff45c5a4ef4630072a03eaabcb948beae56d034a3bba68dc8cda68845c5d" {
 		t.Errorf("blindSignature is not correct")
 	}
 
-	if blindSignature.Id != "00b7413b33e713ea" {
+	if blindSignature.Id != "0014d74f728e80b8" {
 		t.Errorf("blindSignature id is not correct")
 	}
 

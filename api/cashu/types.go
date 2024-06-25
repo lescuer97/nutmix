@@ -447,6 +447,36 @@ type BlindSignatureDLEQ struct {
 	S *secp256k1.PrivateKey `json:"s"`
 }
 
+func (b *BlindSignatureDLEQ) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		E string `json:"e"`
+		S string `json:"s"`
+	}
+
+	err := json.Unmarshal(data, &aux)
+	if err != nil {
+		return fmt.Errorf("json.Unmarshal: %w", err)
+	}
+
+	e_bytes, err := hex.DecodeString(aux.E)
+	if err != nil {
+		return fmt.Errorf("hex.DecodeString(aux.E): %w", err)
+	}
+
+	s_bytes, err := hex.DecodeString(aux.S)
+	if err != nil {
+		return fmt.Errorf("hex.DecodeString(aux.S): %w", err)
+	}
+
+	e := secp256k1.PrivKeyFromBytes(e_bytes)
+	s := secp256k1.PrivKeyFromBytes(s_bytes)
+
+	b.E = e
+	b.S = s
+
+	return nil
+}
+
 func (b *BlindSignatureDLEQ) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(&struct {

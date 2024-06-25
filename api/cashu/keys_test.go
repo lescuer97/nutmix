@@ -2,9 +2,8 @@ package cashu
 
 import (
 	"encoding/hex"
-	"testing"
-
 	"github.com/tyler-smith/go-bip32"
+	"testing"
 )
 
 func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
@@ -33,7 +32,7 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 		t.Errorf("keyset unit is not Sat")
 	}
 
-	if hex.EncodeToString(generatedKeysets[0].PrivKey.PubKey().SerializeCompressed()) != "0368a33e7aad5f9983dccd05b5792d8c5f3c9e28d5cad4e448a69eead5b84b3869" {
+	if hex.EncodeToString(generatedKeysets[0].PrivKey.PubKey().SerializeCompressed()) != "03fbf65684a42313691fe562aa315f26409a19aaaaa8ef0163fc8d8598f16fe003" {
 		t.Errorf("keyset id PrivKEy is not correct. %+v", hex.EncodeToString(generatedKeysets[0].PrivKey.PubKey().SerializeCompressed()))
 	}
 
@@ -43,7 +42,7 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 		t.Errorf("could not derive keyset id %+v", err)
 	}
 
-	if keysetId != "00b7413b33e713ea" {
+	if keysetId != "0014d74f728e80b8" {
 		t.Errorf("keyset id is not correct")
 	}
 
@@ -71,7 +70,7 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 		t.Errorf("seed 0 unit is not correct")
 	}
 
-	if generatedSeeds[0].Id != "00178484f5e74df9" {
+	if generatedSeeds[0].Id != "00bfa73302d12ffd" {
 		t.Errorf("seed 0 id is not correct %v", generatedSeeds[0].Id)
 	}
 

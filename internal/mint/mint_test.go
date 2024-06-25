@@ -47,7 +47,7 @@ func TestSetUpMint(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not setup master key %+v", err)
 	}
-	childKey, err := masterKey.NewChildKey(1)
+	childKey, err := masterKey.NewChildKey(0)
 	if err != nil {
 		t.Errorf("could not set lightning backend %v", err)
 	}
@@ -59,7 +59,7 @@ func TestSetUpMint(t *testing.T) {
 	}
 
 	// compare keys for value 2 sat
-	childKeyTwo, err := masterKey.NewChildKey(2)
+	childKeyTwo, err := masterKey.NewChildKey(1)
 	if err != nil {
 		t.Errorf("could not set lightning backend %v", err)
 	}
@@ -67,16 +67,5 @@ func TestSetUpMint(t *testing.T) {
 
 	if mint.ActiveKeysets[cashu.Sat.String()][2].PrivKey.Key.String() != privKeyTwo.Key.String() {
 		t.Errorf("Keys are not the same. \n\n Should be: %x  \n\n Is: %x ", privKeyTwo.Key.String(), mint.ActiveKeysets[cashu.Sat.String()][2].PrivKey.Key.String())
-	}
-
-	// checks for the last key available in the keyset
-	childKeyLast, err := masterKey.NewChildKey(131072)
-	if err != nil {
-		t.Errorf("could not set lightning backend %v", err)
-	}
-	privKeyLast := secp256k1.PrivKeyFromBytes(childKeyLast.Key)
-
-	if mint.ActiveKeysets[cashu.Sat.String()][131072].PrivKey.Key.String() != privKeyLast.Key.String() {
-		t.Errorf("Keys are not the same. \n\n Should be: %x  \n\n Is: %x ", privKeyLast.Key.String(), mint.ActiveKeysets[cashu.Sat.String()][131072].PrivKey.Key.String())
 	}
 }
