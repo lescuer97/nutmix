@@ -56,7 +56,7 @@ func mppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Preimage
 	return paymentPreimage, paymentHash, nil
 }
 
-func CreateMockInvoice(amountSats int64, description string, network chaincfg.Params) (string, error) {
+func CreateMockInvoice(amountSats int64, description string, network chaincfg.Params, expiry int64) (string, error) {
 	milsats, err := lnrpc.UnmarshallAmt(amountSats, 0)
 	if err != nil {
 		return "", fmt.Errorf("UnmarshallAmt: %w", err)
@@ -66,7 +66,7 @@ func CreateMockInvoice(amountSats int64, description string, network chaincfg.Pa
 		Memo:     description,
 		Value:    milsats,
 		Preimage: nil,
-		Expiry:   3600,
+		Expiry:   expiry,
 		Private:  false,
 		Hash:     nil,
 	}

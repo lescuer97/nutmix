@@ -2,10 +2,9 @@ package crypto
 
 import (
 	"encoding/hex"
-	"testing"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"testing"
 )
 
 func TestHashToCurve(t *testing.T) {
@@ -167,4 +166,52 @@ func TestVerify(t *testing.T) {
 	if !Verify(secret, k, C) {
 		t.Error("failed verification")
 	}
+}
+
+func TestHashE(t *testing.T) {
+	R1Bytes, err := hex.DecodeString("020000000000000000000000000000000000000000000000000000000000000001")
+	if err != nil {
+		t.Errorf("error decoding R1: %v", err)
+	}
+	R1, error := secp256k1.ParsePubKey(R1Bytes)
+	if error != nil {
+		t.Errorf("error parsing R1: %v", error)
+	}
+
+	R2Bytes, err := hex.DecodeString("020000000000000000000000000000000000000000000000000000000000000001")
+	if error != nil {
+		t.Errorf("error parsing R1: %v", error)
+	}
+	R2, error := secp256k1.ParsePubKey(R2Bytes)
+	if error != nil {
+		t.Errorf("error parsing R2: %v", error)
+	}
+
+	KBytes, err := hex.DecodeString("020000000000000000000000000000000000000000000000000000000000000001")
+	if error != nil {
+		t.Errorf("error parsing K: %v", error)
+	}
+	K, error := secp256k1.ParsePubKey(KBytes)
+
+	if error != nil {
+		t.Errorf("error parsing R1: %v", error)
+	}
+
+	C_Bytes, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2")
+	if error != nil {
+		t.Errorf("error parsing C_: %v", error)
+	}
+
+	C_, error := secp256k1.ParsePubKey(C_Bytes)
+	if error != nil {
+		t.Errorf("error parsing C_: %v", error)
+	}
+	keys := []*secp256k1.PublicKey{R1, R2, K, C_}
+
+	hash := Hash_e(keys)
+
+	if hex.EncodeToString(hash[:]) != "a4dc034b74338c28c6bc3ea49731f2a24440fc7c4affc08b31a93fc9fbe6401e" {
+		t.Errorf("hash is not correct. got: \n\n %v", hex.EncodeToString(hash[:]))
+	}
+
 }
