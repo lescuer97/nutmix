@@ -41,7 +41,7 @@ func DatabaseSetup(migrationDir string) (*pgxpool.Pool, error) {
 func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 
-	rows, err := pool.Query(context.Background(), "SELECT * FROM seeds")
+	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id FROM seeds")
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -63,7 +63,7 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 }
 
 func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
-	rows, err := pool.Query(context.Background(), "SELECT * FROM seeds WHERE active")
+	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id FROM seeds WHERE active")
 	if err != nil {
 		return cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
@@ -172,7 +172,7 @@ func ModifyQuoteMeltMeltedStatus(pool *pgxpool.Pool, melted bool, quote string) 
 
 func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.PostMintQuoteBolt11Response, error) {
 
-	rows, err := pool.Query(context.Background(), "SELECT * FROM mint_request WHERE quote = $1", id)
+	rows, err := pool.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted FROM mint_request WHERE quote = $1", id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.PostMintQuoteBolt11Response{}, err
@@ -193,7 +193,7 @@ func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.PostMintQuoteBolt11R
 }
 func GetMeltQuoteById(pool *pgxpool.Pool, id string) (cashu.MeltRequestDB, error) {
 
-	rows, err := pool.Query(context.Background(), "SELECT * FROM melt_request WHERE quote = $1", id)
+	rows, err := pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve  FROM melt_request WHERE quote = $1", id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.MeltRequestDB{}, err
@@ -207,6 +207,7 @@ func GetMeltQuoteById(pool *pgxpool.Pool, id string) (cashu.MeltRequestDB, error
 		if err == pgx.ErrNoRows {
 			return cashu.MeltRequestDB{}, err
 		}
+
 		return quote, fmt.Errorf("CollectOneRow: %w", err)
 	}
 
@@ -217,7 +218,7 @@ func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) 
 
 	var proofList []cashu.Proof
 
-	rows, err := pool.Query(context.Background(), "SELECT * FROM proofs WHERE C = ANY($1) OR secret = ANY($2)", CList, SecretList)
+	rows, err := pool.Query(context.Background(), "SELECT amount, id, secret, c, y, witness  FROM proofs WHERE C = ANY($1) OR secret = ANY($2)", CList, SecretList)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -261,7 +262,7 @@ func CheckListOfProofsBySecretCurve(pool *pgxpool.Pool, Ys []string) ([]cashu.Pr
 
 	var proofList []cashu.Proof
 
-	rows, err := pool.Query(context.Background(), "SELECT * FROM proofs WHERE Y = ANY($1)", Ys)
+	rows, err := pool.Query(context.Background(), "SELECT amount, id, secret, c, y, witness FROM proofs WHERE Y = ANY($1)", Ys)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
