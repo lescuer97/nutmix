@@ -87,14 +87,26 @@ func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
 }
 
 func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
-	_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id, version) VALUES ($1, $2, $3, $4, $5, $6)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version)
 
-	if err != nil {
-		return databaseError(fmt.Errorf("Inserting to seeds: %w", err))
+	tries := 0
+
+	for {
+		tries += 1
+		_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id, version) VALUES ($1, $2, $3, $4, $5, $6)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version)
+
+		switch {
+		case err != nil && tries < 3:
+			continue
+		case err != nil && tries >= 3:
+			return databaseError(fmt.Errorf("Inserting to seeds: %w", err))
+		case err == nil:
+			return nil
+		}
+
 	}
-	return nil
 }
 func SaveNewSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
+	tries := 0
 
 	entries := [][]any{}
 	columns := []string{"seed", "active", "created_at", "unit", "id", "version"}
@@ -104,11 +116,21 @@ func SaveNewSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
 		entries = append(entries, []any{seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version})
 	}
 
-	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
+	for {
+		tries += 1
+		_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
-	if err != nil {
-		return databaseError(fmt.Errorf("inserting seeds: %w", err))
+		switch {
+		case err != nil && tries < 3:
+			continue
+		case err != nil && tries >= 3:
+			return databaseError(fmt.Errorf("inserting seeds: %w", err))
+		case err == nil:
+			return nil
+		}
+
 	}
+
 	return nil
 }
 
@@ -253,15 +275,27 @@ func SaveProofs(pool *pgxpool.Pool, proofs []cashu.Proof) error {
 	columns := []string{"c", "secret", "amount", "id", "y", "witness"}
 	tableName := "proofs"
 
+	tries := 0
+
 	for _, proof := range proofs {
 		entries = append(entries, []any{proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness})
 	}
 
-	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
+	for {
+		tries += 1
+		_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
-	if err != nil {
-		return databaseError(fmt.Errorf("inserting to DB: %w", err))
+		switch {
+		case err != nil && tries < 3:
+			continue
+		case err != nil && tries >= 3:
+			return databaseError(fmt.Errorf("inserting to DB: %w", err))
+		case err == nil:
+			return nil
+		}
+
 	}
+
 	return nil
 }
 
@@ -323,15 +357,24 @@ func SetRestoreSigs(pool *pgxpool.Pool, recover_sigs []cashu.RecoverSigDB) error
 	entries := [][]any{}
 	columns := []string{"id", "amount", "B_", "C_", "created_at", "witness"}
 	tableName := "recovery_signature"
+	tries := 0
 
 	for _, sig := range recover_sigs {
 		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, sig.Witness})
 	}
 
-	_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
+	for {
+		tries += 1
+		_, err := pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
-	if err != nil {
-		return databaseError(fmt.Errorf("inserting to DB: %w", err))
+		switch {
+		case err != nil && tries < 3:
+			continue
+		case err != nil && tries >= 3:
+			return databaseError(fmt.Errorf("inserting to DB: %w", err))
+		case err == nil:
+			return nil
+		}
+
 	}
-	return nil
 }
