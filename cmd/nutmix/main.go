@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -8,30 +9,42 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 )
 
+var (
+	DOCKER_ENV           = "DOCKER"
+	MODE_ENV             = "MODE"
+	MINT_PRIVATE_KEY_ENV = "MINT_PRIVATE_KEY"
+)
+
 func main() {
-	docker := os.Getenv("DOCKER")
-
-	switch {
-	case docker == "true":
-		log.Println("Running in docker")
-	default:
-		err := godotenv.Load(".env")
-		if err != nil {
-			log.Fatal("ERROR: no .env file found and not running in docker")
-		}
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("ERROR: no .env file found and not running in docker")
 	}
-	mode := os.Getenv("MODE")
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, DOCKER_ENV, os.Getenv(DOCKER_ENV))
+	ctx = context.WithValue(ctx, MODE_ENV, os.Getenv(MODE_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, comms.LND_HOST, os.Getenv(comms.LND_HOST))
+	ctx = context.WithValue(ctx, comms.LND_TLS_CERT, os.Getenv(comms.LND_TLS_CERT))
+	ctx = context.WithValue(ctx, comms.LND_MACAROON, os.Getenv(comms.LND_MACAROON))
 
-	if mode == "prod" {
+	if ctx.Value(DOCKER_ENV) == "prod" {
+		log.Println("Running in docker")
+	}
+
+	if ctx.Value(DOCKER_ENV) == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	pool, err := database.DatabaseSetup("migrations")
+	pool, err := database.DatabaseSetup(ctx, "migrations")
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
@@ -43,7 +56,7 @@ func main() {
 		log.Fatalf("Could not GetAllSeeds: %v", err)
 	}
 
-	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+	mint_privkey := os.Getenv(MINT_PRIVATE_KEY_ENV)
 	if mint_privkey == "" {
 		log.Fatalf("No mint private key found in env")
 	}
@@ -99,7 +112,10 @@ func main() {
 
 	}
 
-	mint, err := mint.SetUpMint(seeds)
+	// remove mint private key from variable
+	mint_privkey = ""
+
+	mint, err := mint.SetUpMint(ctx, seeds)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -112,7 +128,7 @@ func main() {
 
 	r.Use(cors.Default())
 
-	routes.V1Routes(r, pool, mint)
+	routes.V1Routes(ctx, r, pool, mint)
 
 	defer pool.Close()
 

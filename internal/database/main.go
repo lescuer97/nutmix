@@ -4,26 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"os"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/pressly/goose/v3"
+	"log"
 )
 
 var DBError = errors.New("ERROR DATABASE")
+
+var DATABASE_URL_ENV = "DATABASE_URL"
 
 func databaseError(err error) error {
 	return fmt.Errorf("%w  %w", DBError, err)
 }
 
-func DatabaseSetup(migrationDir string) (*pgxpool.Pool, error) {
-	databaseConUrl := os.Getenv("DATABASE_URL")
-
-	pool, err := pgxpool.New(context.Background(), databaseConUrl)
+func DatabaseSetup(ctx context.Context, migrationDir string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(context.Background(), ctx.Value(DATABASE_URL_ENV).(string))
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		log.Fatalf("Error setting dialect: %v", err)

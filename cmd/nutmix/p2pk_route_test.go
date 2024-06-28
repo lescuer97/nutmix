@@ -14,6 +14,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/testcontainers/testcontainers-go"
@@ -49,8 +50,14 @@ func TestRoutesSwapMelt(t *testing.T) {
 	os.Setenv("DATABASE_URL", connUri)
 	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	os.Setenv(mint.NETWORK_ENV, "regtest")
 
-	router, mint := SetupRoutingForTesting()
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+
+	router, mint := SetupRoutingForTesting(ctx)
 
 	lockingPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x04})
 
@@ -331,11 +338,17 @@ func TestMultisigSigning(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	os.Setenv(database.DATABASE_URL_ENV, connUri)
+	os.Setenv(MINT_PRIVATE_KEY_ENV, MintPrivateKey)
+	os.Setenv(mint.MINT_LIGHTNING_BACKEND_ENV, "FakeWallet")
+	os.Setenv(mint.NETWORK_ENV, "regtest")
 
-	router, mint := SetupRoutingForTesting()
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+
+	router, mint := SetupRoutingForTesting(ctx)
 
 	lockingPrivKeyOne := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x04})
 

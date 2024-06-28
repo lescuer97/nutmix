@@ -2,6 +2,7 @@ package comms
 
 import (
 	"context"
+	"os"
 	"testing"
 )
 
@@ -9,12 +10,15 @@ func TestSetupLightingComms(t *testing.T) {
 	// setup
 	ctx := context.Background()
 	_, _, _, err := SetUpLightingNetworkTestEnviroment(ctx, "lightingsetup-test")
+	ctx = context.WithValue(ctx, LND_HOST, os.Getenv(LND_HOST))
+	ctx = context.WithValue(ctx, LND_TLS_CERT, os.Getenv(LND_TLS_CERT))
+	ctx = context.WithValue(ctx, LND_MACAROON, os.Getenv(LND_MACAROON))
 
 	if err != nil {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
 	}
 
-	lightingComms, err := SetupLightingComms()
+	lightingComms, err := SetupLightingComms(ctx)
 
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)
