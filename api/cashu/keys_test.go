@@ -75,3 +75,27 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 	}
 
 }
+
+func TestDeriveIndividualSeedFromKey(t *testing.T) {
+
+	masterKey := "0000000000000000000000000000000000000000000000000000000000000001"
+
+	generatedSeeds, err := DeriveIndividualSeedFromKey(masterKey, 1, Sat)
+
+	if err != nil {
+		t.Errorf("could not derive seeds from key %+v", err)
+	}
+
+	if hex.EncodeToString(generatedSeeds.Seed) != "0f451868e048a61dcf274af7c3a463f48d32dbabb47bfd3f4da850f4d6525975" {
+		t.Errorf("seed 0 is not correct %v", hex.EncodeToString(generatedSeeds.Seed))
+	}
+
+	if generatedSeeds.Unit != Sat.String() {
+		t.Errorf("seed 0 unit is not correct")
+	}
+
+	if generatedSeeds.Id != "00bfa73302d12ffd" {
+		t.Errorf("seed 0 id is not correct %v", generatedSeeds.Id)
+	}
+
+}
