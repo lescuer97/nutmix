@@ -46,9 +46,11 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 
 		var response cashu.PostMintQuoteBolt11Response
 
+		expireTime := cashu.ExpiryTime()
+
 		switch lightningBackendType {
 		case comms.FAKE_WALLET:
-			payReq, err := lightning.CreateMockInvoice(mintRequest.Amount, "mock invoice", mint.Network, cashu.ExpiryTime)
+			payReq, err := lightning.CreateMockInvoice(mintRequest.Amount, "mock invoice", mint.Network, expireTime)
 			if err != nil {
 				log.Println(err)
 				c.JSON(500, "Opps!, something went wrong")
@@ -68,7 +70,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 				Quote:       randUuid.String(),
 				Request:     payReq,
 				RequestPaid: true,
-				Expiry:      cashu.ExpiryTime,
+				Expiry:      expireTime,
 				Unit:        mintRequest.Unit,
 			}
 
@@ -86,7 +88,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 				Quote:       hash,
 				Request:     resInvoice.GetPaymentRequest(),
 				RequestPaid: false,
-				Expiry:      cashu.ExpiryTime,
+				Expiry:      expireTime,
 				Unit:        mintRequest.Unit,
 			}
 
@@ -302,6 +304,8 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 		response := cashu.PostMeltQuoteBolt11Response{}
 		dbRequest := cashu.MeltRequestDB{}
 
+		expireTime := cashu.ExpiryTime()
+
 		lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
 		switch lightningBackendType {
 		case comms.FAKE_WALLET:
@@ -317,7 +321,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 
 			response = cashu.PostMeltQuoteBolt11Response{
 				Paid:       true,
-				Expiry:     cashu.ExpiryTime,
+				Expiry:     expireTime,
 				FeeReserve: 1,
 				Amount:     uint64(*invoice.MilliSat) / 1000,
 				Quote:      randUuid.String(),
@@ -347,7 +351,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 
 			response = cashu.PostMeltQuoteBolt11Response{
 				Paid:       false,
-				Expiry:     cashu.ExpiryTime,
+				Expiry:     expireTime,
 				FeeReserve: (fee + 1),
 				Amount:     uint64(*invoice.MilliSat) / 1000,
 				Quote:      hexHash,
