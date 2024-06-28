@@ -84,6 +84,15 @@ If you missed and important variable for the mint. The mint should panic and let
 
 ``` docker compose up -d ```
 
+#### How to rotate a keyset up
+
+key rotation schema:  /keydenomition/version/amount.
+
+In case that you want to rotate the keys from a given keyset, you should set the given seed to active=false in your
+Database. Then restart the mint. The mint will automatically catch not having any active seed for a given unit and will rotate the key. 
+
+if you have a key: /sat/1/1 and rotate up it will turn out /sat/2/1
+
 ### Development
 
 If you want to develop for the project I personally run a hybrid setup. I run the mint locally and the db on docker. 

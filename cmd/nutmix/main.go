@@ -47,6 +47,7 @@ func main() {
 	if mint_privkey == "" {
 		log.Fatalf("No mint private key found in env")
 	}
+
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
 
@@ -73,7 +74,7 @@ func main() {
 
 	log.Printf("INFO: Inactive units: %+v", inactiveUnits)
 
-    // if there are inactive seeds we derive new seeds from the mint private key and version up 
+	// if there are inactive seeds we derive new seeds from the mint private key and version up
 	if len(inactiveUnits) > 0 {
 		log.Printf("INFO: Deriving new seeds for activation: %+v", inactiveUnits)
 
