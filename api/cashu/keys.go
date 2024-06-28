@@ -61,7 +61,6 @@ func SetUpSeedAndKeyset(masterKey *bip32.Key, version int, unit Unit) (Seed, err
 	currentTime := time.Now().Unix()
 
 	// Derive key from version
-
 	versionKey, err := masterKey.NewChildKey(uint32(version))
 
 	if err != nil {
@@ -93,36 +92,48 @@ func SetUpSeedAndKeyset(masterKey *bip32.Key, version int, unit Unit) (Seed, err
 }
 
 func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) ([]Seed, error) {
-	key_bytes, err := hex.DecodeString(keyFromMint)
 
 	var seeds []Seed
 
-	if err != nil {
-		return nil, fmt.Errorf("Error decoding mint private key: %+v ", err)
-	}
-
-	masterKey, err := bip32.NewMasterKey(key_bytes)
-
-	if err != nil {
-		return nil, fmt.Errorf("Error creating master key: %w ", err)
-	}
-
 	for _, seedDerivationPath := range availableSeeds {
 
-		// Set the derivation for each type of ecash. Ex: sat, usd, eur
-		seedKey, err := masterKey.NewChildKey(uint32(seedDerivationPath))
+		seed, err := DeriveIndividualSeedFromKey(keyFromMint, version, seedDerivationPath)
 
 		if err != nil {
-			return nil, fmt.Errorf("could not generate derivation por seed: %w ", err)
+			return seeds, fmt.Errorf("DeriveIndividualSeedFromKey(keyFromMint, version, seedDerivationPath): %w ", err)
 		}
-
-		seed, err := SetUpSeedAndKeyset(seedKey, version, seedDerivationPath)
 
 		seeds = append(seeds, seed)
 
 	}
 
 	return seeds, nil
+}
+
+func DeriveIndividualSeedFromKey(keyFromMint string, version int, unit Unit) (Seed, error) {
+	var seed Seed
+	key_bytes, err := hex.DecodeString(keyFromMint)
+	if err != nil {
+		return seed, fmt.Errorf("Error decoding mint private key: %+v ", err)
+	}
+
+	masterKey, err := bip32.NewMasterKey(key_bytes)
+
+	if err != nil {
+		return seed, fmt.Errorf("Error creating master key: %w ", err)
+	}
+
+	// Set the derivation for each type of ecash. Ex: sat, usd, eur
+	seedKey, err := masterKey.NewChildKey(uint32(unit))
+
+	if err != nil {
+		return seed, fmt.Errorf("could not generate derivation por seed: %w ", err)
+	}
+
+	seed, err = SetUpSeedAndKeyset(seedKey, version, unit)
+
+	return seed, nil
+
 }
 
 const MaxKeysetAmount int = 64

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -14,6 +15,8 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 )
+
+var ErrCouldNotParseUnitString = errors.New("Could not parse unit string")
 
 const ExpiryMinutesDefault int64 = 15
 
@@ -43,7 +46,7 @@ func UnitFromString(s string) (Unit, error) {
 	case "msat":
 		return Msat, nil
 	default:
-		return 0, fmt.Errorf("Invalid unit: %s", s)
+		return 0, fmt.Errorf("%w: %s", ErrCouldNotParseUnitString, s)
 	}
 }
 

@@ -33,7 +33,7 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [x] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
 - [x] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md)
 - [x] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
-- [ ] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
+- [x] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
 - [ ] [NUT-13](https://github.com/cashubtc/nuts/blob/main/13.md)
 - [ ] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
 
@@ -83,6 +83,15 @@ If you have this correctly setup it should be as easy as running a simple docker
 If you missed and important variable for the mint. The mint should panic and let you know.
 
 ``` docker compose up -d ```
+
+#### How to rotate a keyset up
+
+key rotation schema:  /keydenomition/version/amount.
+
+In case that you want to rotate the keys from a given keyset, you should set the given seed to active=false in your
+Database. Then restart the mint. The mint will automatically catch not having any active seed for a given unit and will rotate the key. 
+
+if you have a key: /sat/1/1 and rotate up it will turn out /sat/2/1
 
 ### Development
 

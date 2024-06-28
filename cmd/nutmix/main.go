@@ -43,15 +43,19 @@ func main() {
 		log.Fatalf("Could not GetAllSeeds: %v", err)
 	}
 
+	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+	if mint_privkey == "" {
+		log.Fatalf("No mint private key found in env")
+	}
+
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
-		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
-
-		if mint_privkey == "" {
-			log.Fatalf("No mint private key found in env")
-		}
 
 		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
+
+		if err != nil {
+			log.Fatalf("ERROR: DeriveSeedsFromKey: %+v ", err)
+		}
 
 		err = database.SaveNewSeeds(pool, generatedSeeds)
 
@@ -60,6 +64,38 @@ func main() {
 		if err != nil {
 			log.Fatalf("SaveNewSeed: %+v ", err)
 		}
+	}
+
+	inactiveUnits, err := mint.CheckForInactiveSeeds(seeds)
+
+	if err != nil {
+		log.Fatalf("ERROR: CheckForActiveSeeds: %+v ", err)
+	}
+
+	log.Printf("INFO: Inactive units: %+v", inactiveUnits)
+
+	// if there are inactive seeds we derive new seeds from the mint private key and version up
+	if len(inactiveUnits) > 0 {
+		log.Printf("INFO: Deriving new seeds for activation: %+v", inactiveUnits)
+
+		var versionedUpSeeds []cashu.Seed
+		for _, seedType := range inactiveUnits {
+
+			generatedSeed, err := cashu.DeriveIndividualSeedFromKey(mint_privkey, seedType.Version+1, seedType.Unit)
+
+			if err != nil {
+				log.Fatalf("ERROR: cashu.DeriveIndividualSeedFromKey INCREASE Version: %+v ", err)
+			}
+
+			versionedUpSeeds = append(versionedUpSeeds, generatedSeed)
+		}
+
+		err = database.SaveNewSeeds(pool, versionedUpSeeds)
+		if err != nil {
+			log.Fatalf("SaveNewSeed: %+v ", err)
+		}
+
+		seeds = append(seeds, versionedUpSeeds...)
 
 	}
 
