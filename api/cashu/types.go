@@ -15,7 +15,11 @@ import (
 	"github.com/lescuer97/nutmix/pkg/crypto"
 )
 
-var ExpiryTime int64 = time.Now().Add(15 * time.Minute).Unix()
+const ExpiryMinutesDefault int64 = 15
+
+func ExpiryTime() int64 {
+	return time.Now().Add(15 * time.Minute).Unix()
+}
 
 type Unit int
 

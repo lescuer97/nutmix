@@ -34,7 +34,8 @@ func (l *LightingComms) RequestInvoice(amount int64) (*lnrpc.AddInvoiceResponse,
 
 	client := lnrpc.NewLightningClient(l.RpcClient)
 
-	res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: amount, Expiry: 3600})
+	// Expiry time is 15 minutes
+	res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: amount, Expiry: 900})
 
 	if err != nil {
 		return nil, err
