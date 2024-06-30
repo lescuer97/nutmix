@@ -60,8 +60,14 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	os.Setenv("DATABASE_URL", connUri)
 	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	os.Setenv(mint.NETWORK_ENV, "regtest")
 
-	router, mint := SetupRoutingForTesting()
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+
+	router, mint := SetupRoutingForTesting(ctx)
 
 	// MINTING TESTING STARTS
 
@@ -559,10 +565,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 }
 
-func SetupRoutingForTesting() (*gin.Engine, mint.Mint) {
-	os.Setenv("NETWORK", "regtest")
+func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, mint.Mint) {
 
-	pool, err := database.DatabaseSetup("../../migrations/")
+	pool, err := database.DatabaseSetup(ctx, "../../migrations/")
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
@@ -594,7 +599,7 @@ func SetupRoutingForTesting() (*gin.Engine, mint.Mint) {
 
 	}
 
-	mint, err := mint.SetUpMint(seeds)
+	mint, err := mint.SetUpMint(ctx, seeds)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -602,7 +607,7 @@ func SetupRoutingForTesting() (*gin.Engine, mint.Mint) {
 
 	r := gin.Default()
 
-	routes.V1Routes(r, pool, mint)
+	routes.V1Routes(ctx, r, pool, mint)
 
 	return r, mint
 }
@@ -682,14 +687,24 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	os.Setenv("DATABASE_URL", connUri)
 	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	os.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
+	os.Setenv(mint.NETWORK_ENV, "regtest")
+
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
 	_, bobLnd, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
+
+	ctx = context.WithValue(ctx, comms.LND_HOST, os.Getenv(comms.LND_HOST))
+	ctx = context.WithValue(ctx, comms.LND_TLS_CERT, os.Getenv(comms.LND_TLS_CERT))
+	ctx = context.WithValue(ctx, comms.LND_MACAROON, os.Getenv(comms.LND_MACAROON))
 
 	if err != nil {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
 	}
 
-	router, mint := SetupRoutingForTesting()
+	router, mint := SetupRoutingForTesting(ctx)
 
 	// MINTING TESTING STARTS
 

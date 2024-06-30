@@ -1,11 +1,13 @@
 package mint
 
 import (
+	"context"
+	"os"
+	"testing"
+
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/tyler-smith/go-bip32"
-	"os"
-	"testing"
 )
 
 func TestSetUpMint(t *testing.T) {
@@ -20,13 +22,13 @@ func TestSetUpMint(t *testing.T) {
 		Id:        "id",
 	}
 
-	err := os.Setenv("NETWORK", "regtest")
+	err := os.Setenv(NETWORK_ENV, "regtest")
 
 	if err != nil {
 		t.Errorf("could not set network %v", err)
 
 	}
-	err = os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	err = os.Setenv(MINT_LIGHTNING_BACKEND_ENV, "FakeWallet")
 	if err != nil {
 		t.Errorf("could not set lightning backend %v", err)
 
@@ -36,7 +38,11 @@ func TestSetUpMint(t *testing.T) {
 		seed,
 	}
 
-	mint, err := SetUpMint(seeds)
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, MINT_LIGHTNING_BACKEND_ENV, os.Getenv(MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, NETWORK_ENV, os.Getenv(NETWORK_ENV))
+
+	mint, err := SetUpMint(ctx, seeds)
 
 	if err != nil {
 		t.Errorf("could not setup mint: %+v", err)

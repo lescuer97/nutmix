@@ -1,13 +1,10 @@
 package mint
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
-	"os"
-	"time"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -17,6 +14,8 @@ import (
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/tyler-smith/go-bip32"
+	"log"
+	"time"
 )
 
 type KeysetMap map[uint64]cashu.Keyset
@@ -38,6 +37,11 @@ var (
 	ErrQuoteNotPaid           = errors.New("Quote not paid")
 	ErrMessageAmountToBig     = errors.New("Message amount is to big")
 	ErrInvalidBlindMessage    = errors.New("Invalid blind message")
+)
+
+var (
+	NETWORK_ENV                = "NETWORK"
+	MINT_LIGHTNING_BACKEND_ENV = "MINT_LIGHTNING_BACKEND"
 )
 
 func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof) (cashu.Unit, error) {
@@ -233,13 +237,13 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 	return orderedKeys
 }
 
-func SetUpMint(seeds []cashu.Seed) (Mint, error) {
+func SetUpMint(ctx context.Context, seeds []cashu.Seed) (Mint, error) {
 	mint := Mint{
 		ActiveKeysets: make(map[string]KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
 	}
 
-	network := os.Getenv("NETWORK")
+	network := ctx.Value(NETWORK_ENV)
 	switch network {
 	case "testnet":
 		mint.Network = chaincfg.TestNet3Params
@@ -253,13 +257,13 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 		return mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
-	lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
+	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
 	switch lightningBackendType {
 
 	case comms.FAKE_WALLET:
 
 	case comms.LND_WALLET:
-		lightningComs, err := comms.SetupLightingComms()
+		lightningComs, err := comms.SetupLightingComms(ctx)
 
 		if err != nil {
 			return mint, err
@@ -307,8 +311,8 @@ func SetUpMint(seeds []cashu.Seed) (Mint, error) {
 
 type AddToDBFunc func(*pgxpool.Pool, bool, string) error
 
-func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (bool, error) {
-	lightningBackendType := os.Getenv("MINT_LIGHTNING_BACKEND")
+func (m *Mint) VerifyLightingPaymentHappened(ctx context.Context, pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (bool, error) {
+	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
 	switch lightningBackendType {
 
 	case comms.FAKE_WALLET:

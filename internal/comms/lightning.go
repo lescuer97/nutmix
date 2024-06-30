@@ -5,15 +5,13 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
-	"log"
-	"os"
-
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
+	"log"
 )
 
 const (
@@ -155,12 +153,12 @@ func (l *LightingComms) QueryPayment(invoice *zpay32.Invoice) (*lnrpc.QueryRoute
 	return res, nil
 }
 
-func SetupLightingComms() (*LightingComms, error) {
-	host := os.Getenv(LND_HOST)
+func SetupLightingComms(ctx context.Context) (*LightingComms, error) {
+	host := ctx.Value(LND_HOST).(string)
 	if host == "" {
 		return nil, fmt.Errorf("LND_HOST not available")
 	}
-	pem_cert := os.Getenv(LND_TLS_CERT)
+	pem_cert := ctx.Value(LND_TLS_CERT).(string)
 
 	if pem_cert == "" {
 		return nil, fmt.Errorf("LND_CERT_PATH not available")
@@ -188,7 +186,7 @@ func SetupLightingComms() (*LightingComms, error) {
 		return nil, err
 	}
 
-	macaroon := os.Getenv(LND_MACAROON)
+	macaroon := ctx.Value(LND_MACAROON).(string)
 
 	if macaroon == "" {
 		return nil, fmt.Errorf("LND_MACAROON_PATH not available")

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -16,7 +17,7 @@ import (
 	"github.com/tyler-smith/go-bip32"
 )
 
-func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
+func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
