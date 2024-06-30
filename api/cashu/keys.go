@@ -86,6 +86,7 @@ func SetUpSeedAndKeyset(masterKey *bip32.Key, version int, unit Unit) (Seed, err
 		Unit:      unit.String(),
 		Id:        id,
 		Version:   version,
+		Encrypted: false,
 	}
 
 	return newSeed, nil
@@ -102,6 +103,8 @@ func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) 
 		if err != nil {
 			return seeds, fmt.Errorf("DeriveIndividualSeedFromKey(keyFromMint, version, seedDerivationPath): %w ", err)
 		}
+
+		// encrypt seeds before saving
 
 		seeds = append(seeds, seed)
 
@@ -131,6 +134,14 @@ func DeriveIndividualSeedFromKey(keyFromMint string, version int, unit Unit) (Se
 	}
 
 	seed, err = SetUpSeedAndKeyset(seedKey, version, unit)
+
+	// Encrypt seed and set encrypted to true
+	err = seed.EncryptSeed(keyFromMint)
+	if err != nil {
+		return seed, fmt.Errorf("Error encrypting seed: %w", err)
+	}
+
+	 seed.Encrypted = true
 
 	return seed, nil
 
