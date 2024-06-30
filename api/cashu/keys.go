@@ -141,7 +141,7 @@ func DeriveIndividualSeedFromKey(keyFromMint string, version int, unit Unit) (Se
 		return seed, fmt.Errorf("Error encrypting seed: %w", err)
 	}
 
-	 seed.Encrypted = true
+	seed.Encrypted = true
 
 	return seed, nil
 

@@ -115,7 +115,7 @@ func main() {
 	// check for seeds that are not encrypted and encrypt them
 	for i, seed := range seeds {
 		if !seed.Encrypted {
-		
+
 			err = seed.EncryptSeed(mint_privkey)
 
 			if err != nil {
@@ -124,14 +124,13 @@ func main() {
 
 			seed.Encrypted = true
 
-            err = database.UpdateSeed( pool, seed)
-            if err != nil {
-                log.Fatalf("ERROR: Could not update seeds %+v", err)
-            }
-           seeds[i] = seed
+			err = database.UpdateSeed(pool, seed)
+			if err != nil {
+				log.Fatalf("ERROR: Could not update seeds %+v", err)
+			}
+			seeds[i] = seed
 		}
 	}
-
 
 	// remove mint private key from variable
 

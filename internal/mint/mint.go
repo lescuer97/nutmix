@@ -278,14 +278,14 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mi
 	// uses seed to generate the keysets
 	for _, seed := range seeds {
 
-        // decrypt seed
+		// decrypt seed
 
 		// decrypt seed first
-        err := seed.DecryptSeed(mint_privkey)
+		err := seed.DecryptSeed(mint_privkey)
 
-        if err != nil {
-            log.Println(fmt.Errorf("seed.DecryptSeed: %w", err))
-        }
+		if err != nil {
+			log.Println(fmt.Errorf("seed.DecryptSeed: %w", err))
+		}
 		masterKey, err := bip32.NewMasterKey(seed.Seed)
 		if err != nil {
 			log.Println(fmt.Errorf("NewMasterKey: %w", err))

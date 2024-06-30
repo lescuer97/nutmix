@@ -131,7 +131,7 @@ func SaveNewSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
 	}
 
 }
-func UpdateSeed( pool *pgxpool.Pool, seed cashu.Seed) error {
+func UpdateSeed(pool *pgxpool.Pool, seed cashu.Seed) error {
 	// change the paid status of the quote
 	_, err := pool.Exec(context.Background(), "UPDATE seeds SET encrypted = $1, seed = $2  WHERE id = $3", seed.Encrypted, seed.Seed, seed.Id)
 	if err != nil {
