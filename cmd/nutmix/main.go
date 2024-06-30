@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"log"
 	"os"
 
@@ -109,13 +110,36 @@ func main() {
 		}
 
 		seeds = append(seeds, versionedUpSeeds...)
-
 	}
 
-	// remove mint private key from variable
-	mint_privkey = ""
+	// check for seeds that are not encrypted and encrypt them
+	for i, seed := range seeds {
+		if !seed.Encrypted {
+		
+			err = seed.EncryptSeed(mint_privkey)
 
-	mint, err := mint.SetUpMint(ctx, seeds)
+			if err != nil {
+				log.Fatalf("ERROR: Could not encrypt seed that was not encrypted %+v", err)
+			}
+
+			seed.Encrypted = true
+
+            err = database.UpdateSeed( pool, seed)
+            if err != nil {
+                log.Fatalf("ERROR: Could not update seeds %+v", err)
+            }
+           seeds[i] = seed
+		}
+	}
+
+
+	// remove mint private key from variable
+
+	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds)
+
+	// clear mint seeds and privatekey
+	seeds = []cashu.Seed{}
+	mint_privkey = ""
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
