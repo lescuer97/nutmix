@@ -1,6 +1,8 @@
 package mint
 
-import "github.com/lescuer97/nutmix/api/cashu"
+import (
+	"github.com/lescuer97/nutmix/api/cashu"
+)
 
 type SeedType struct {
 	Version int

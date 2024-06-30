@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/pressly/goose/v3"
-	"log"
 )
 
 var DBError = errors.New("ERROR DATABASE")
@@ -47,7 +48,7 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (*pgxpool.Pool, err
 func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 
-	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id FROM seeds")
+	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id, encrypted FROM seeds")
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -69,7 +70,7 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 }
 
 func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
-	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id FROM seeds WHERE active")
+	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id, encrypted FROM seeds WHERE active")
 	if err != nil {
 		return cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
@@ -90,7 +91,7 @@ func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
 
 	for {
 		tries += 1
-		_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id, version) VALUES ($1, $2, $3, $4, $5, $6)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version)
+		_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id, version, encrypted) VALUES ($1, $2, $3, $4, $5, $6)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.Encrypted)
 
 		switch {
 		case err != nil && tries < 3:
@@ -107,11 +108,11 @@ func SaveNewSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
 	tries := 0
 
 	entries := [][]any{}
-	columns := []string{"seed", "active", "created_at", "unit", "id", "version"}
+	columns := []string{"seed", "active", "created_at", "unit", "id", "version", "encrypted"}
 	tableName := "seeds"
 
 	for _, seed := range seeds {
-		entries = append(entries, []any{seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version})
+		entries = append(entries, []any{seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.Encrypted})
 	}
 
 	for {
@@ -129,6 +130,14 @@ func SaveNewSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
 
 	}
 
+}
+func UpdateSeed(pool *pgxpool.Pool, seed cashu.Seed) error {
+	// change the paid status of the quote
+	_, err := pool.Exec(context.Background(), "UPDATE seeds SET encrypted = $1, seed = $2  WHERE id = $3", seed.Encrypted, seed.Seed, seed.Id)
+	if err != nil {
+		return databaseError(fmt.Errorf("Update to seeds: %w", err))
+
+	}
 	return nil
 }
 

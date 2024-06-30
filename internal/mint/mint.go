@@ -237,7 +237,7 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 	return orderedKeys
 }
 
-func SetUpMint(ctx context.Context, seeds []cashu.Seed) (Mint, error) {
+func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mint, error) {
 	mint := Mint{
 		ActiveKeysets: make(map[string]KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
@@ -277,6 +277,15 @@ func SetUpMint(ctx context.Context, seeds []cashu.Seed) (Mint, error) {
 
 	// uses seed to generate the keysets
 	for _, seed := range seeds {
+
+		// decrypt seed
+
+		// decrypt seed first
+		err := seed.DecryptSeed(mint_privkey)
+
+		if err != nil {
+			log.Println(fmt.Errorf("seed.DecryptSeed: %w", err))
+		}
 		masterKey, err := bip32.NewMasterKey(seed.Seed)
 		if err != nil {
 			log.Println(fmt.Errorf("NewMasterKey: %w", err))
