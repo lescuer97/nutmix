@@ -1,12 +1,15 @@
 package cashu
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -16,7 +19,11 @@ import (
 	"github.com/lescuer97/nutmix/pkg/crypto"
 )
 
-var ErrCouldNotParseUnitString = errors.New("Could not parse unit string")
+var (
+	ErrCouldNotParseUnitString = errors.New("Could not parse unit string")
+	ErrCouldNotEncryptSeed     = errors.New("Could not encrypt seed")
+	ErrCouldNotDecryptSeed     = errors.New("Could not decrypt seed")
+)
 
 const ExpiryMinutesDefault int64 = 15
 
@@ -280,6 +287,67 @@ type Seed struct {
 	Version   int
 	Unit      string
 	Id        string
+	Encrypted bool
+}
+
+func (seed *Seed) EncryptSeed(mintPrivateKey string) error {
+	key_bytes, err := hex.DecodeString(mintPrivateKey)
+	if err != nil {
+		return fmt.Errorf("Error decoding mint private key: %+v ", err)
+	}
+
+	cipherBlock, err := aes.NewCipher(key_bytes)
+	if err != nil {
+		return fmt.Errorf("aes.NewCipher(key_bytes): %w %w", ErrCouldNotEncryptSeed, err)
+
+	}
+	aesGCM, err := cipher.NewGCM(cipherBlock)
+	if err != nil {
+		return fmt.Errorf("cipher.NewGCM(: %w %w", ErrCouldNotEncryptSeed, err)
+	}
+
+	//Create a nonce. Nonce should be from GCM
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		return fmt.Errorf("io.ReadFull(rand.Reader, nonce): %w %w", ErrCouldNotEncryptSeed, err)
+	}
+
+	ciphertext := aesGCM.Seal(nonce, nonce, seed.Seed, nil)
+
+	seed.Seed = ciphertext
+
+	return nil
+}
+func (seed *Seed) DecryptSeed(mintPrivateKey string) error {
+	key_bytes, err := hex.DecodeString(mintPrivateKey)
+	if err != nil {
+		return fmt.Errorf("Error decoding mint private key: %+v ", err)
+	}
+
+	cipherBlock, err := aes.NewCipher(key_bytes)
+	if err != nil {
+		return fmt.Errorf("aes.NewCipher(key_bytes): %w %w", ErrCouldNotDecryptSeed, err)
+
+	}
+	aesGCM, err := cipher.NewGCM(cipherBlock)
+	if err != nil {
+		return fmt.Errorf("cipher.NewGCM(: %w %w", ErrCouldNotDecryptSeed, err)
+	}
+
+	nonceSize := aesGCM.NonceSize()
+
+	//Extract the nonce from the encrypted data
+	nonce, ciphertext := seed.Seed[:nonceSize], seed.Seed[nonceSize:]
+
+	//Decrypt the data
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return fmt.Errorf("aesGCM.Open(: %w %w", ErrCouldNotDecryptSeed, err)
+	}
+
+	seed.Seed = plaintext
+
+	return nil
 }
 
 type SwapMintMethod struct {
