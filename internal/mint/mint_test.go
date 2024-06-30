@@ -38,11 +38,14 @@ func TestSetUpMint(t *testing.T) {
 		seed,
 	}
 
+
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, MINT_LIGHTNING_BACKEND_ENV, os.Getenv(MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, NETWORK_ENV, os.Getenv(NETWORK_ENV))
 
-	mint, err := SetUpMint(ctx, seeds)
+	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+
+	mint, err := SetUpMint(ctx, mint_privkey, seeds)
 
 	if err != nil {
 		t.Errorf("could not setup mint: %+v", err)

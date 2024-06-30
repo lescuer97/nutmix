@@ -579,9 +579,9 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, mint.Mint) {
 		log.Fatalf("Could not keysets: %v", err)
 	}
 
+	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
-		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 
 		if mint_privkey == "" {
 			log.Fatalf("No mint private key found in env")
@@ -599,7 +599,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, mint.Mint) {
 
 	}
 
-	mint, err := mint.SetUpMint(ctx, seeds)
+	mint, err := mint.SetUpMint(ctx,mint_privkey, seeds)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)

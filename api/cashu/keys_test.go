@@ -62,6 +62,12 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 		t.Errorf("seed length is not 2")
 	}
 
+     err = generatedSeeds[0].DecryptSeed(masterKey)
+
+    if err != nil {
+        t.Errorf("could not decrypt seed %+v", err)
+    }
+
 	if hex.EncodeToString(generatedSeeds[0].Seed) != "0f451868e048a61dcf274af7c3a463f48d32dbabb47bfd3f4da850f4d6525975" {
 		t.Errorf("seed 0 is not correct %v", hex.EncodeToString(generatedSeeds[0].Seed))
 	}
@@ -85,6 +91,11 @@ func TestDeriveIndividualSeedFromKey(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not derive seeds from key %+v", err)
 	}
+     err = generatedSeeds.DecryptSeed(masterKey)
+
+    if err != nil {
+        t.Errorf("could not decrypt seed %+v", err)
+    }
 
 	if hex.EncodeToString(generatedSeeds.Seed) != "0f451868e048a61dcf274af7c3a463f48d32dbabb47bfd3f4da850f4d6525975" {
 		t.Errorf("seed 0 is not correct %v", hex.EncodeToString(generatedSeeds.Seed))
