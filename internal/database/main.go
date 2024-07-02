@@ -143,16 +143,16 @@ func UpdateSeed(pool *pgxpool.Pool, seed cashu.Seed) error {
 
 func SaveQuoteMintRequest(pool *pgxpool.Pool, request cashu.PostMintQuoteBolt11Response) error {
 
-	_, err := pool.Exec(context.Background(), "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted) VALUES ($1, $2, $3, $4, $5, $6)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted)
+	_, err := pool.Exec(context.Background(), "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state) VALUES ($1, $2, $3, $4, $5, $6, $7)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 
 	}
 	return nil
 }
-func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, requestPaid bool, quote string) error {
+func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, requestPaid bool, state cashu.ACTION_STATE, quote string) error {
 	// change the paid status of the quote
-	_, err := pool.Exec(context.Background(), "UPDATE mint_request SET request_paid = $1 WHERE quote = $2", requestPaid, quote)
+	_, err := pool.Exec(context.Background(), "UPDATE mint_request SET request_paid = $1, state = $3 WHERE quote = $2", requestPaid, quote, state)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 
@@ -160,35 +160,64 @@ func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, requestPaid bool, quote string
 	return nil
 }
 
-func ModifyQuoteMintMintedStatus(pool *pgxpool.Pool, minted bool, quote string) error {
+func ModifyQuoteMintMintedStatus(ctx context.Context, pool *pgxpool.Pool, minted bool, state cashu.ACTION_STATE, quote string) error {
+	args := pgx.NamedArgs{
+		"state":  state,
+		"minted": minted,
+		"quote":  quote,
+	}
+
+	query := `UPDATE mint_request SET minted = @minted, state = @state WHERE quote = @quote`
+
+	conn, err := pool.Acquire(ctx)
+
+	if err != nil {
+		return databaseError(fmt.Errorf("pool.Acquire(ctx): %w", err))
+	}
+
 	// change the paid status of the quote
-	_, err := pool.Exec(context.Background(), "UPDATE mint_request SET minted = $1 WHERE quote = $2", minted, quote)
+	_, err = conn.Exec(context.Background(), query, args)
+
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
+
+	}
+	if err != conn.Conn().Close(ctx) {
+		return databaseError(fmt.Errorf("conn.Conn().Close(): %w", err))
 
 	}
 	return nil
 }
 func SaveQuoteMeltRequest(pool *pgxpool.Pool, request cashu.MeltRequestDB) error {
 
-	_, err := pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted)
+	_, err := pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 	}
 	return nil
 }
-func ModifyQuoteMeltPayStatus(pool *pgxpool.Pool, paid bool, request string) error {
+
+func AddPaymentPreimageToMeltRequest(pool *pgxpool.Pool, preimage string, quote string) error {
 	// change the paid status of the quote
-	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1 WHERE quote = $2", paid, request)
+	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET payment_preimage = $1 WHERE quote = $2", preimage, quote)
+	if err != nil {
+		return databaseError(fmt.Errorf("updating melt_request with preimage: %w", err))
+
+	}
+	return nil
+}
+func ModifyQuoteMeltPayStatus(pool *pgxpool.Pool, paid bool, state cashu.ACTION_STATE, request string) error {
+	// change the paid status of the quote
+	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, state = $3 WHERE quote = $2", paid, request, state)
 	if err != nil {
 		return databaseError(fmt.Errorf("updating mint_request: %w", err))
 
 	}
 	return nil
 }
-func ModifyQuoteMeltPayStatusAndMelted(pool *pgxpool.Pool, paid bool, melted bool, request string) error {
+func ModifyQuoteMeltPayStatusAndMelted(pool *pgxpool.Pool, paid bool, melted bool, state cashu.ACTION_STATE, request string) error {
 	// change the paid status of the quote
-	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, melted = $3 WHERE quote = $2", paid, request, melted)
+	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, melted = $3, state = $4 WHERE quote = $2", paid, request, melted, state)
 	if err != nil {
 		return databaseError(fmt.Errorf("updating mint_request: %w", err))
 
@@ -208,7 +237,7 @@ func ModifyQuoteMeltMeltedStatus(pool *pgxpool.Pool, melted bool, quote string) 
 
 func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.PostMintQuoteBolt11Response, error) {
 
-	rows, err := pool.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted FROM mint_request WHERE quote = $1", id)
+	rows, err := pool.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state FROM mint_request WHERE quote = $1", id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.PostMintQuoteBolt11Response{}, err
@@ -229,7 +258,7 @@ func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.PostMintQuoteBolt11R
 }
 func GetMeltQuoteById(pool *pgxpool.Pool, id string) (cashu.MeltRequestDB, error) {
 
-	rows, err := pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve  FROM melt_request WHERE quote = $1", id)
+	rows, err := pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage  FROM melt_request WHERE quote = $1", id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.MeltRequestDB{}, err

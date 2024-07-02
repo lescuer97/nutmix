@@ -38,7 +38,6 @@ func TestSetUpMint(t *testing.T) {
 		seed,
 	}
 
-
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, MINT_LIGHTNING_BACKEND_ENV, os.Getenv(MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, NETWORK_ENV, os.Getenv(NETWORK_ENV))

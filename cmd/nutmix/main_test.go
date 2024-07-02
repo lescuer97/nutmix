@@ -98,6 +98,10 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if !postMintQuoteResponse.RequestPaid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponse.RequestPaid)
 	}
+	if postMintQuoteResponse.State != cashu.PAID {
+		t.Errorf("Expected state to be PAID, got %v", postMintQuoteResponse.State)
+
+	}
 
 	if postMintQuoteResponse.Unit != "sat" {
 		t.Errorf("Expected unit to be sat, got %v", postMintQuoteResponse.Unit)
@@ -121,6 +125,11 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if !postMintQuoteResponseTwo.RequestPaid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponseTwo.RequestPaid)
+	}
+
+	if postMintQuoteResponse.State != cashu.PAID {
+		t.Errorf("Expected state to be PAID, got %v", postMintQuoteResponse.State)
+
 	}
 
 	if postMintQuoteResponseTwo.Unit != "sat" {
@@ -201,6 +210,24 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if postMintResponse.Signatures[0].Id != referenceKeyset.Id {
 		t.Errorf("Expected id to be %s, got %s", referenceKeyset.Id, postMintResponse.Signatures[0].Id)
+	}
+
+	// lookup in the db if quote shows as issued
+	req = httptest.NewRequest("GET", "/v1/mint/quote/bolt11"+"/"+postMintQuoteResponse.Quote, strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+	postMintQuoteResponseTwo = cashu.PostMintQuoteBolt11Response{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
+
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+	if postMintQuoteResponseTwo.State != cashu.ISSUED {
+		t.Errorf("Expected state to be MINTED, got %v", postMintQuoteResponseTwo.State)
 	}
 
 	// try to remint tokens with other blinded signatures
@@ -455,6 +482,10 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
 	}
 
+	if postMeltQuoteResponse.State != cashu.PAID {
+		t.Errorf("Expected state to be PAID, got %v", postMeltQuoteResponse.State)
+	}
+
 	if postMeltQuoteResponse.Amount != 1000 {
 		t.Errorf("Expected amount to be 1000, got %d", postMeltQuoteResponse.Amount)
 	}
@@ -475,6 +506,14 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if !postMeltQuoteResponse.Paid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
+	}
+
+	if postMeltQuoteResponse.State != cashu.PAID {
+		t.Errorf("Expected state to be PAID, got %v", postMeltQuoteResponse.State)
+	}
+
+	if postMeltQuoteResponse.State != cashu.PAID {
+		t.Errorf("Expected state to be PAID, got %v", postMeltQuoteResponse.State)
 	}
 
 	if postMeltQuoteResponse.Amount != 1000 {
@@ -525,7 +564,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	var postMeltResponse cashu.PostMeltBolt11Response
+	var postMeltResponse cashu.PostMeltQuoteBolt11Response
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 
@@ -535,6 +574,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if !postMeltResponse.Paid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
+	}
+	if postMeltResponse.State != cashu.PAID {
+		t.Errorf("Expected state to be MINTED, got %v", postMintQuoteResponseTwo.State)
 	}
 	if postMeltResponse.PaymentPreimage != "MockPaymentPreimage" {
 		t.Errorf("Expected payment preimage to be empty, got %s", postMeltResponse.PaymentPreimage)
@@ -599,7 +641,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, mint.Mint) {
 
 	}
 
-	mint, err := mint.SetUpMint(ctx,mint_privkey, seeds)
+	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -735,6 +777,9 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	if postMintQuoteResponse.RequestPaid {
 		t.Errorf("Expected paid to be false because it's a lnd node, got %v", postMintQuoteResponse.RequestPaid)
 	}
+	if postMintQuoteResponse.State != cashu.UNPAID {
+		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponse.State)
+	}
 
 	if postMintQuoteResponse.Unit != "sat" {
 		t.Errorf("Expected unit to be sat, got %v", postMintQuoteResponse.Unit)
@@ -758,6 +803,10 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	if postMintQuoteResponseTwo.RequestPaid {
 		t.Errorf("Expected paid to be false because it's a Lnd wallet and I have not paid the invoice yet, got %v", postMintQuoteResponseTwo.RequestPaid)
+	}
+
+	if postMintQuoteResponseTwo.State != cashu.UNPAID {
+		t.Errorf("Expected to not be unpaid have: %s ", postMintQuoteResponseTwo.State)
 	}
 
 	if postMintQuoteResponseTwo.Unit != "sat" {
@@ -905,6 +954,24 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	if postMintResponse.Signatures[0].Id != referenceKeyset.Id {
 		t.Errorf("Expected id to be %s, got %s", referenceKeyset.Id, postMintResponse.Signatures[0].Id)
+	}
+
+	// lookup in the db if quote shows as issued
+	req = httptest.NewRequest("GET", "/v1/mint/quote/bolt11"+"/"+postMintQuoteResponse.Quote, strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+	postMintQuoteResponseTwo = cashu.PostMintQuoteBolt11Response{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
+
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+	if postMintQuoteResponseTwo.State != cashu.ISSUED {
+		t.Errorf("Expected state to be MINTED, got %v", postMintQuoteResponseTwo.State)
 	}
 
 	// try to remint tokens with other blinded signatures
@@ -1142,6 +1209,10 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	if postMeltQuoteResponse.Paid {
 		t.Errorf("Expected paid to be false because it's a LND Node, got %v", postMeltQuoteResponse.Paid)
 	}
+	if postMeltQuoteResponse.State != cashu.UNPAID {
+
+		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponseTwo.State)
+	}
 
 	if postMeltQuoteResponse.Amount != 900 {
 		t.Errorf("Expected amount to be 900, got %d", postMeltQuoteResponse.Amount)
@@ -1163,6 +1234,10 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	if postMeltQuoteResponse.Paid {
 		t.Errorf("Expected paid to be false because it's a Lnd Node, got %v", postMeltQuoteResponse.Paid)
+	}
+	if postMeltQuoteResponse.State != cashu.UNPAID {
+
+		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponseTwo.State)
 	}
 
 	if postMeltQuoteResponse.Amount != 900 {
@@ -1213,12 +1288,16 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	var postMeltResponse cashu.PostMeltBolt11Response
+	var postMeltResponse cashu.PostMeltQuoteBolt11Response
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+	if postMeltResponse.State != cashu.PAID {
+		t.Errorf("Expected state to be PAID, got %v", postMintQuoteResponseTwo.State)
 	}
 
 	if !postMeltResponse.Paid {
