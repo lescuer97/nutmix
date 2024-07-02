@@ -124,7 +124,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		state, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
+		state, _, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
 
 		if err != nil {
 			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
@@ -214,7 +214,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		case comms.LND_WALLET:
 
-			state, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
+			state, _, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
 			if err != nil {
 				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 					c.JSON(200, quote)
@@ -276,7 +276,6 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		quote.Minted = true
 		quote.State = cashu.ISSUED
 
-
 		err = database.ModifyQuoteMintMintedStatus(ctx, pool, quote.Minted, quote.State, quote.Quote)
 
 		if err != nil {
@@ -332,23 +331,25 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			}
 
 			response = cashu.PostMeltQuoteBolt11Response{
-				Paid:       true,
-				Expiry:     expireTime,
-				FeeReserve: 1,
-				Amount:     uint64(*invoice.MilliSat) / 1000,
-				Quote:      randUuid.String(),
-				State:      cashu.PAID,
+				Paid:            true,
+				Expiry:          expireTime,
+				FeeReserve:      1,
+				Amount:          uint64(*invoice.MilliSat) / 1000,
+				Quote:           randUuid.String(),
+				State:           cashu.PAID,
+				PaymentPreimage: "",
 			}
 
 			dbRequest = cashu.MeltRequestDB{
-				Quote:       response.Quote,
-				Request:     meltRequest.Request,
-				Unit:        cashu.Sat.String(),
-				Expiry:      response.Expiry,
-				Amount:      response.Amount,
-				FeeReserve:  response.FeeReserve,
-				RequestPaid: response.Paid,
-				State:       response.State,
+				Quote:           response.Quote,
+				Request:         meltRequest.Request,
+				Unit:            cashu.Sat.String(),
+				Expiry:          response.Expiry,
+				Amount:          response.Amount,
+				FeeReserve:      response.FeeReserve,
+				RequestPaid:     response.Paid,
+				State:           response.State,
+				PaymentPreimage: response.PaymentPreimage,
 			}
 
 		case comms.LND_WALLET:
@@ -364,23 +365,25 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			hexHash := hex.EncodeToString(invoice.PaymentHash[:])
 
 			response = cashu.PostMeltQuoteBolt11Response{
-				Paid:       false,
-				Expiry:     expireTime,
-				FeeReserve: (fee + 1),
-				Amount:     uint64(*invoice.MilliSat) / 1000,
-				Quote:      hexHash,
-				State:      cashu.UNPAID,
+				Paid:            false,
+				Expiry:          expireTime,
+				FeeReserve:      (fee + 1),
+				Amount:          uint64(*invoice.MilliSat) / 1000,
+				Quote:           hexHash,
+				State:           cashu.UNPAID,
+				PaymentPreimage: "",
 			}
 
 			dbRequest = cashu.MeltRequestDB{
-				Quote:       response.Quote,
-				Request:     meltRequest.Request,
-				Unit:        cashu.Sat.String(),
-				Expiry:      response.Expiry,
-				Amount:      response.Amount,
-				FeeReserve:  response.FeeReserve,
-				RequestPaid: response.Paid,
-				State:       response.State,
+				Quote:           response.Quote,
+				Request:         meltRequest.Request,
+				Unit:            cashu.Sat.String(),
+				Expiry:          response.Expiry,
+				Amount:          response.Amount,
+				FeeReserve:      response.FeeReserve,
+				RequestPaid:     response.Paid,
+				State:           response.State,
+				PaymentPreimage: response.PaymentPreimage,
 			}
 
 		default:
@@ -403,20 +406,18 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		quoteId := c.Param("quote")
 
 		quote, err := database.GetMeltQuoteById(pool, quoteId)
+		if err != nil {
+			log.Println(fmt.Errorf("database.GetMeltQuoteById: %w", err))
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
 
 		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
 			c.JSON(200, quote.GetPostMeltQuoteResponse())
 			return
 		}
 
-		if err != nil {
-			log.Println(fmt.Errorf("GetQuoteById: %w", err))
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-
-		state, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMeltPayStatus)
-
+		state, preimage, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMeltPayStatus)
 		if err != nil {
 			if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 				c.JSON(200, quote.GetPostMeltQuoteResponse())
@@ -426,10 +427,17 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
-
+		quote.PaymentPreimage = preimage
 		quote.State = state
 		if state == cashu.PAID {
 			quote.RequestPaid = true
+		}
+
+		err = database.AddPaymentPreimageToMeltRequest(pool, preimage, quote.Quote)
+		if err != nil {
+			log.Println(fmt.Errorf("database.GetMeltQuoteById: %w", err))
+			c.JSON(200, quote.GetPostMeltQuoteResponse())
+			return
 		}
 
 		c.JSON(200, quote.GetPostMeltQuoteResponse())
@@ -572,7 +580,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			quote.State = cashu.PAID
 			response = cashu.PostMeltBolt11Response{
 				Paid:            true,
-				PaymentPreimage: string(payment.PaymentPreimage),
+				PaymentPreimage: hex.EncodeToString(payment.PaymentPreimage),
 				State:           quote.State,
 			}
 

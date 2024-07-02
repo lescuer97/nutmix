@@ -190,9 +190,19 @@ func ModifyQuoteMintMintedStatus(ctx context.Context, pool *pgxpool.Pool, minted
 }
 func SaveQuoteMeltRequest(pool *pgxpool.Pool, request cashu.MeltRequestDB) error {
 
-	_, err := pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State)
+	_, err := pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
+	}
+	return nil
+}
+
+func AddPaymentPreimageToMeltRequest(pool *pgxpool.Pool, preimage string, quote string) error {
+	// change the paid status of the quote
+	_, err := pool.Exec(context.Background(), "UPDATE melt_request SET payment_preimage = $1 WHERE quote = $2", preimage, quote)
+	if err != nil {
+		return databaseError(fmt.Errorf("updating melt_request with preimage: %w", err))
+
 	}
 	return nil
 }
@@ -248,7 +258,7 @@ func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.PostMintQuoteBolt11R
 }
 func GetMeltQuoteById(pool *pgxpool.Pool, id string) (cashu.MeltRequestDB, error) {
 
-	rows, err := pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state  FROM melt_request WHERE quote = $1", id)
+	rows, err := pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage  FROM melt_request WHERE quote = $1", id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.MeltRequestDB{}, err

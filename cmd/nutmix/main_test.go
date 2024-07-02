@@ -777,9 +777,9 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	if postMintQuoteResponse.RequestPaid {
 		t.Errorf("Expected paid to be false because it's a lnd node, got %v", postMintQuoteResponse.RequestPaid)
 	}
-    if postMintQuoteResponse.State != cashu.UNPAID {
-        t.Errorf("Expected to not be paid have: %s " ,postMintQuoteResponse.State)
-        }
+	if postMintQuoteResponse.State != cashu.UNPAID {
+		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponse.State)
+	}
 
 	if postMintQuoteResponse.Unit != "sat" {
 		t.Errorf("Expected unit to be sat, got %v", postMintQuoteResponse.Unit)
@@ -805,9 +805,9 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 		t.Errorf("Expected paid to be false because it's a Lnd wallet and I have not paid the invoice yet, got %v", postMintQuoteResponseTwo.RequestPaid)
 	}
 
-    if postMintQuoteResponseTwo.State != cashu.UNPAID {
-        t.Errorf("Expected to not be unpaid have: %s " ,postMintQuoteResponseTwo.State)
-        }
+	if postMintQuoteResponseTwo.State != cashu.UNPAID {
+		t.Errorf("Expected to not be unpaid have: %s ", postMintQuoteResponseTwo.State)
+	}
 
 	if postMintQuoteResponseTwo.Unit != "sat" {
 		t.Errorf("Expected unit to be sat, got %v", postMintQuoteResponseTwo.Unit)
@@ -1209,10 +1209,10 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	if postMeltQuoteResponse.Paid {
 		t.Errorf("Expected paid to be false because it's a LND Node, got %v", postMeltQuoteResponse.Paid)
 	}
-    if postMeltQuoteResponse.State != cashu.UNPAID {
+	if postMeltQuoteResponse.State != cashu.UNPAID {
 
-        t.Errorf("Expected to not be paid have: %s " ,postMintQuoteResponseTwo.State)
-    }
+		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponseTwo.State)
+	}
 
 	if postMeltQuoteResponse.Amount != 900 {
 		t.Errorf("Expected amount to be 900, got %d", postMeltQuoteResponse.Amount)
@@ -1235,10 +1235,10 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	if postMeltQuoteResponse.Paid {
 		t.Errorf("Expected paid to be false because it's a Lnd Node, got %v", postMeltQuoteResponse.Paid)
 	}
-    if postMeltQuoteResponse.State != cashu.UNPAID {
+	if postMeltQuoteResponse.State != cashu.UNPAID {
 
-        t.Errorf("Expected to not be paid have: %s " ,postMintQuoteResponseTwo.State)
-    }
+		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponseTwo.State)
+	}
 
 	if postMeltQuoteResponse.Amount != 900 {
 		t.Errorf("Expected amount to be 900, got %d", postMeltQuoteResponse.Amount)
