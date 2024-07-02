@@ -541,18 +541,14 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		response := cashu.PostMeltBolt11Response{}
-
 		lightningBackendType := ctx.Value("MINT_LIGHTNING_BACKEND").(string)
+
+		var changeResponse []cashu.BlindSignature
 		switch lightningBackendType {
 		case comms.FAKE_WALLET:
 			quote.RequestPaid = true
 			quote.State = cashu.PAID
-			response = cashu.PostMeltBolt11Response{
-				Paid:            true,
-				PaymentPreimage: "MockPaymentPreimage",
-				State:           quote.State,
-			}
+			quote.PaymentPreimage = "MockPaymentPreimage"
 
 		case comms.LND_WALLET:
 			payment, err := mint.LightningComs.PayInvoice(quote.Request, quote.FeeReserve)
@@ -578,11 +574,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			}
 			quote.RequestPaid = true
 			quote.State = cashu.PAID
-			response = cashu.PostMeltBolt11Response{
-				Paid:            true,
-				PaymentPreimage: hex.EncodeToString(payment.PaymentPreimage),
-				State:           quote.State,
-			}
+			quote.PaymentPreimage = hex.EncodeToString(payment.PaymentPreimage)
 
 			// if fees where lower than expected return sats to the user
 			feesInSat := uint64(payment.PaymentRoute.TotalFeesMsat / 1000)
@@ -621,7 +613,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 					log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
 				}
 
-				response.Change = blindSignatures
+				changeResponse = blindSignatures
 
 			}
 
@@ -631,7 +623,10 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		quote.Melted = true
 
-		err = database.ModifyQuoteMeltPayStatusAndMelted(pool, quote.RequestPaid, quote.Melted, quote.State, meltRequest.Quote)
+		response := quote.GetPostMeltQuoteResponse()
+		response.Change = changeResponse
+
+		err = database.ModifyQuoteMeltPayStatusAndMelted(pool, quote.RequestPaid, quote.Melted, quote.State, quote.Quote)
 		if err != nil {
 			log.Println(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err))
 			c.JSON(200, response)

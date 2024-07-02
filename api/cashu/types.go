@@ -480,14 +480,6 @@ type PostMeltBolt11Request struct {
 	Outputs []BlindedMessage `json:"outputs"`
 }
 
-type PostMeltBolt11Response struct {
-	// Deprecated: Should be removed after all main wallets change to the new State format
-	Paid            bool             `json:"paid"`
-	PaymentPreimage string           `json:"payment_preimage"`
-	Change          []BlindSignature `json:"change"`
-	State           ACTION_STATE     `json:"state"`
-}
-
 type PostCheckStateRequest struct {
 	Ys []string `json:"Ys"`
 }

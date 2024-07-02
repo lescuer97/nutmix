@@ -564,7 +564,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	var postMeltResponse cashu.PostMeltBolt11Response
+	var postMeltResponse cashu.PostMeltQuoteBolt11Response
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 
@@ -1288,7 +1288,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	var postMeltResponse cashu.PostMeltBolt11Response
+	var postMeltResponse cashu.PostMeltQuoteBolt11Response
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 
@@ -1299,6 +1299,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	if postMeltResponse.State != cashu.PAID {
 		t.Errorf("Expected state to be PAID, got %v", postMintQuoteResponseTwo.State)
 	}
+
 	if !postMeltResponse.Paid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
