@@ -267,7 +267,7 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint m
 
 			checkState := cashu.CheckState{
 				Y:       state,
-				State:   cashu.UNSPENT,
+				State:   cashu.PROOF_UNSPENT,
 				Witness: nil,
 			}
 
@@ -278,7 +278,7 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint m
 				return p.Y == state
 			}):
 				pendingAndSpent = true
-				checkState.State = cashu.PENDING
+				checkState.State = cashu.PROOF_PENDING
 			// Check if is in list of spents and if its also pending add it for removal of pending list
 			case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
 				compare := p.Y == state
@@ -289,7 +289,7 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint m
 				}
 				return compare
 			}):
-				checkState.State = cashu.SPENT
+				checkState.State = cashu.PROOF_SPENT
 			}
 
 			checkStateResponse.States = append(checkStateResponse.States, checkState)

@@ -140,9 +140,9 @@ type BlindSignature struct {
 
 type ProofState string
 
-const UNSPENT ProofState = "UNSPENT"
-const SPENT ProofState = "SPENT"
-const PENDING ProofState = "PENDING"
+const PROOF_UNSPENT ProofState = "UNSPENT"
+const PROOF_SPENT ProofState = "SPENT"
+const PROOF_PENDING ProofState = "PENDING"
 
 type Proof struct {
 	Amount  uint64 `json:"amount"`
@@ -387,12 +387,14 @@ type PostMintQuoteBolt11Request struct {
 }
 
 type PostMintQuoteBolt11Response struct {
-	Quote       string `json:"quote"`
-	Request     string `json:"request"`
-	RequestPaid bool   `json:"paid" db:"request_paid"`
-	Expiry      int64  `json:"expiry"`
-	Unit        string `json:"unit"`
-	Minted      bool   `json:"minted"`
+	Quote       string       `json:"quote"`
+	Request     string       `json:"request"`
+    // Deprecated: Should be removed after all main wallets change to the new State format
+	RequestPaid bool         `json:"paid" db:"request_paid"`
+	Expiry      int64        `json:"expiry"`
+	Unit        string       `json:"unit"`
+	Minted      bool         `json:"minted"`
+	State       ACTION_STATE `json:"state"`
 }
 
 type PostMintBolt11Request struct {
@@ -410,15 +412,26 @@ type BasicKeysetResponse struct {
 	Active bool   `json:"active"`
 }
 
+type ACTION_STATE string
+
+const (
+	UNPAID  ACTION_STATE = "UNPAID"
+	PAID    ACTION_STATE = "PAID"
+	PENDING ACTION_STATE = "PENDING"
+	ISSUED  ACTION_STATE = "ISSUED"
+)
+
 type MeltRequestDB struct {
-	Quote       string `json:"quote"`
-	Unit        string `json:"unit"`
-	Expiry      int64  `json:"expiry"`
-	Amount      uint64 `json:"amount"`
-	FeeReserve  uint64 `json:"fee_reserve" db:"fee_reserve"`
-	RequestPaid bool   `json:"paid" db:"request_paid"`
-	Request     string `json:"request"`
-	Melted      bool   `json:"melted"`
+	Quote       string       `json:"quote"`
+	Unit        string       `json:"unit"`
+	Expiry      int64        `json:"expiry"`
+	Amount      uint64       `json:"amount"`
+	FeeReserve  uint64       `json:"fee_reserve" db:"fee_reserve"`
+    // Deprecated: Should be removed after all main wallets change to the new State format
+	RequestPaid bool         `json:"paid" db:"request_paid"`
+	Request     string       `json:"request"`
+	Melted      bool         `json:"melted"`
+	State       ACTION_STATE `json:"state"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
@@ -428,6 +441,7 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		FeeReserve: meltRequest.FeeReserve,
 		Paid:       meltRequest.RequestPaid,
 		Expiry:     meltRequest.Expiry,
+		State:      meltRequest.State,
 	}
 
 }
@@ -438,11 +452,14 @@ type PostMeltQuoteBolt11Request struct {
 }
 
 type PostMeltQuoteBolt11Response struct {
-	Quote      string `json:"quote"`
-	Amount     uint64 `json:"amount"`
-	FeeReserve uint64 `json:"fee_reserve"`
-	Paid       bool   `json:"paid"`
-	Expiry     int64  `json:"expiry"`
+	Quote      string           `json:"quote"`
+	Amount     uint64           `json:"amount"`
+	FeeReserve uint64           `json:"fee_reserve"`
+    // Deprecated: Should be removed after all main wallets change to the new State format
+	Paid       bool             `json:"paid"`
+	Expiry     int64            `json:"expiry"`
+	State      ACTION_STATE     `json:"state"`
+	Change     []BlindSignature `json:"change"`
 }
 
 type PostSwapRequest struct {
@@ -461,9 +478,11 @@ type PostMeltBolt11Request struct {
 }
 
 type PostMeltBolt11Response struct {
+    // Deprecated: Should be removed after all main wallets change to the new State format
 	Paid            bool             `json:"paid"`
 	PaymentPreimage string           `json:"payment_preimage"`
 	Change          []BlindSignature `json:"change"`
+	State           ACTION_STATE     `json:"state"`
 }
 
 type PostCheckStateRequest struct {

@@ -318,39 +318,42 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mi
 	return mint, nil
 }
 
-type AddToDBFunc func(*pgxpool.Pool, bool, string) error
+type AddToDBFunc func(*pgxpool.Pool, bool, cashu.ACTION_STATE, string) error
 
-func (m *Mint) VerifyLightingPaymentHappened(ctx context.Context, pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (bool, error) {
+func (m *Mint) VerifyLightingPaymentHappened(ctx context.Context, pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, error) {
 	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
 	switch lightningBackendType {
 
 	case comms.FAKE_WALLET:
-		err := dbCall(pool, true, quote)
+		err := dbCall(pool, true, cashu.PAID, quote)
 		if err != nil {
-			return false, fmt.Errorf("dbCall: %w", err)
+			return cashu.UNPAID, fmt.Errorf("dbCall: %w", err)
 		}
 
-		return true, nil
+		return cashu.PAID, nil
 
 	case comms.LND_WALLET:
 		invoiceDB, err := m.LightningComs.CheckIfInvoicePayed(quote)
 		if err != nil {
-
-			return false, fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
+			return cashu.UNPAID, fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
 		}
-		// if invoiceDB.
-		if invoiceDB.State == lnrpc.Invoice_SETTLED {
-			err := dbCall(pool, true, quote)
+		switch {
+		case invoiceDB.State == lnrpc.Invoice_SETTLED:
+			err := dbCall(pool, true, cashu.PAID, quote)
 			if err != nil {
-				return false, fmt.Errorf("dbCall: %w", err)
+				return cashu.PAID, fmt.Errorf("dbCall: %w", err)
 			}
-			return true, nil
+			return cashu.PAID, nil
 
-		} else {
+		case invoiceDB.State == lnrpc.Invoice_OPEN:
+			err := dbCall(pool, true, cashu.UNPAID, quote)
+			if err != nil {
+				return cashu.UNPAID, fmt.Errorf("dbCall: %w", err)
+			}
+			return cashu.UNPAID, nil
 
-			return false, nil
 		}
 
 	}
-	return false, nil
+	return cashu.UNPAID, nil
 }
