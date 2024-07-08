@@ -75,19 +75,18 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				State:       cashu.PAID,
 			}
 
-		case comms.LND_WALLET:
+		case comms.LND_WALLET, comms.LNBITS_WALLET:
 			resInvoice, err := mint.LightningComs.RequestInvoice(mintRequest.Amount)
 
 			if err != nil {
 				log.Println(err)
 				c.JSON(500, "Opps!, something went wrong")
 				return
-
 			}
-			hash := hex.EncodeToString(resInvoice.GetRHash())
+
 			response = cashu.PostMintQuoteBolt11Response{
-				Quote:       hash,
-				Request:     resInvoice.GetPaymentRequest(),
+				Quote:       resInvoice.Rhash,
+				Request:     resInvoice.PaymentRequest,
 				RequestPaid: false,
 				Expiry:      expireTime,
 				Unit:        mintRequest.Unit,
@@ -212,7 +211,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				return
 			}
 
-		case comms.LND_WALLET:
+		case comms.LND_WALLET, comms.LNBITS_WALLET:
 
 			state, _, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
 			if err != nil {
@@ -304,7 +303,6 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		}
 
 		invoice, err := zpay32.Decode(meltRequest.Request, &mint.Network)
-		// hash := hex.EncodeToString(*invoice.PaymentHash[:])
 		if err != nil {
 			log.Println(fmt.Errorf("zpay32.Decode: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
@@ -352,8 +350,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				PaymentPreimage: response.PaymentPreimage,
 			}
 
-		case comms.LND_WALLET:
-			query, err := mint.LightningComs.QueryPayment(invoice)
+		case comms.LND_WALLET, comms.LNBITS_WALLET:
+			queryFee, err := mint.LightningComs.QueryPayment(invoice, meltRequest.Request)
 
 			if err != nil {
 				log.Println(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err))
@@ -361,13 +359,12 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				return
 			}
 
-			fee := lightning.GetAverageRouteFee(query.Routes) / 1000
 			hexHash := hex.EncodeToString(invoice.PaymentHash[:])
 
 			response = cashu.PostMeltQuoteBolt11Response{
 				Paid:            false,
 				Expiry:          expireTime,
-				FeeReserve:      (fee + 1),
+				FeeReserve:      (queryFee.FeeReserve + 1),
 				Amount:          uint64(*invoice.MilliSat) / 1000,
 				Quote:           hexHash,
 				State:           cashu.UNPAID,
@@ -550,7 +547,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			quote.State = cashu.PAID
 			quote.PaymentPreimage = "MockPaymentPreimage"
 
-		case comms.LND_WALLET:
+		case comms.LND_WALLET, comms.LNBITS_WALLET:
 			payment, err := mint.LightningComs.PayInvoice(quote.Request, quote.FeeReserve)
 
 			if err != nil {
@@ -560,13 +557,13 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			}
 
 			switch {
-			case payment.PaymentError == "invoice is already paid":
+			case payment.PaymentError.Error() == "invoice is already paid":
 				c.JSON(400, "invoice is already paid")
 				return
-			case payment.PaymentError == "unable to find a path to destination":
+			case payment.PaymentError.Error() == "unable to find a path to destination":
 				c.JSON(400, "unable to find a path to destination")
 				return
-			case payment.PaymentError != "":
+			case payment.PaymentError.Error() != "":
 				log.Printf("unknown lighting error: %+v", payment.PaymentError)
 				c.JSON(500, "Unknown error happend while paying")
 				return
@@ -574,10 +571,10 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			}
 			quote.RequestPaid = true
 			quote.State = cashu.PAID
-			quote.PaymentPreimage = hex.EncodeToString(payment.PaymentPreimage)
+			quote.PaymentPreimage = payment.PaymentRequest
 
 			// if fees where lower than expected return sats to the user
-			feesInSat := uint64(payment.PaymentRoute.TotalFeesMsat / 1000)
+			feesInSat := uint64(1000 / 1000)
 
 			if feesInSat < quote.FeeReserve && len(meltRequest.Outputs) > 0 {
 
