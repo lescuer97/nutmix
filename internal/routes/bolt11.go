@@ -556,6 +556,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				return
 			}
 
+            fmt.Printf("PaymentError: %+v ", payment)
+
 			switch {
 			case payment.PaymentError.Error() == "invoice is already paid":
 				c.JSON(400, "invoice is already paid")

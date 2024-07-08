@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -248,6 +249,7 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 
 		invoiceRes.PaymentRequest = lnbitsInvoice.PaymentRequest
 		invoiceRes.Rhash = lnbitsInvoice.PaymentHash
+        invoiceRes.PaymentError = errors.New("")
 
 		return &invoiceRes, nil
 	}
