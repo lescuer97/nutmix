@@ -649,7 +649,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, mint.Mint) {
 
 	r := gin.Default()
 
-	routes.V1Routes(ctx, r, pool, mint)
+	routes.V1Routes(ctx, r, pool, &mint)
 
 	return r, mint
 }
