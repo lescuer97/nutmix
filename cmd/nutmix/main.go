@@ -35,6 +35,8 @@ func main() {
 	ctx = context.WithValue(ctx, comms.LND_HOST, os.Getenv(comms.LND_HOST))
 	ctx = context.WithValue(ctx, comms.LND_TLS_CERT, os.Getenv(comms.LND_TLS_CERT))
 	ctx = context.WithValue(ctx, comms.LND_MACAROON, os.Getenv(comms.LND_MACAROON))
+	ctx = context.WithValue(ctx, comms.MINT_LNBITS_KEY, os.Getenv(comms.MINT_LNBITS_KEY))
+	ctx = context.WithValue(ctx, comms.MINT_LNBITS_ENDPOINT, os.Getenv(comms.MINT_LNBITS_ENDPOINT))
 
 	if ctx.Value(DOCKER_ENV) == "prod" {
 		log.Println("Running in docker")

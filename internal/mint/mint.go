@@ -12,7 +12,6 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/pkg/crypto"
-	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/tyler-smith/go-bip32"
 	"log"
 	"slices"
@@ -387,7 +386,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mi
 
 	case comms.FAKE_WALLET:
 
-	case comms.LND_WALLET:
+	case comms.LND_WALLET, comms.LNBITS_WALLET:
 		lightningComs, err := comms.SetupLightingComms(ctx)
 
 		if err != nil {
@@ -457,25 +456,26 @@ func (m *Mint) VerifyLightingPaymentHappened(ctx context.Context, pool *pgxpool.
 
 		return cashu.PAID, "", nil
 
-	case comms.LND_WALLET:
-		invoiceDB, err := m.LightningComs.CheckIfInvoicePayed(quote)
+	case comms.LND_WALLET, comms.LNBITS_WALLET:
+		state, preimage, err := m.LightningComs.CheckIfInvoicePayed(quote)
 		if err != nil {
 			return cashu.UNPAID, "", fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
 		}
+
 		switch {
-		case invoiceDB.State == lnrpc.Invoice_SETTLED:
+		case state == cashu.PAID:
 			err := dbCall(pool, true, cashu.PAID, quote)
 			if err != nil {
-				return cashu.PAID, hex.EncodeToString(invoiceDB.RPreimage), fmt.Errorf("dbCall: %w", err)
+				return cashu.PAID, preimage, fmt.Errorf("dbCall: %w", err)
 			}
-			return cashu.PAID, hex.EncodeToString(invoiceDB.RPreimage), nil
+			return cashu.PAID, preimage, nil
 
-		case invoiceDB.State == lnrpc.Invoice_OPEN:
+		case state == cashu.UNPAID:
 			err := dbCall(pool, true, cashu.UNPAID, quote)
 			if err != nil {
-				return cashu.UNPAID, hex.EncodeToString(invoiceDB.RPreimage), fmt.Errorf("dbCall: %w", err)
+				return cashu.UNPAID, preimage, fmt.Errorf("dbCall: %w", err)
 			}
-			return cashu.UNPAID, hex.EncodeToString(invoiceDB.RPreimage), nil
+			return cashu.UNPAID, preimage, nil
 
 		}
 

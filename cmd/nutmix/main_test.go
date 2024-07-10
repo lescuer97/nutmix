@@ -736,7 +736,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	_, bobLnd, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
+	_, bobLnd, _, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
 
 	ctx = context.WithValue(ctx, comms.LND_HOST, os.Getenv(comms.LND_HOST))
 	ctx = context.WithValue(ctx, comms.LND_TLS_CERT, os.Getenv(comms.LND_TLS_CERT))
@@ -746,6 +746,106 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
 	}
 
+    LightningBolt11Test(t, ctx, bobLnd)
+
+	// Clean up the container
+	defer func() {
+		if err := postgresContainer.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container: %s", err)
+		}
+
+	}()
+
+}
+func TestMintBolt11LNBITSLigthning(t *testing.T) {
+
+	const posgrespassword = "password"
+	const postgresuser = "user"
+	ctx := context.Background()
+
+	postgresContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:16.2"),
+		postgres.WithDatabase("postgres"),
+		postgres.WithUsername(postgresuser),
+		postgres.WithPassword(posgrespassword),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	connUri, err := postgresContainer.ConnectionString(ctx)
+
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
+	}
+
+	os.Setenv("DATABASE_URL", connUri)
+	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	os.Setenv("MINT_LIGHTNING_BACKEND", "LNbitsWallet")
+	os.Setenv(mint.NETWORK_ENV, "regtest")
+
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+
+	_, bobLnd, _, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-bolt11-tests")
+
+	ctx = context.WithValue(ctx, comms.MINT_LNBITS_ENDPOINT, os.Getenv(comms.MINT_LNBITS_ENDPOINT))
+	ctx = context.WithValue(ctx, comms.MINT_LNBITS_KEY, os.Getenv(comms.MINT_LNBITS_KEY))
+
+	if err != nil {
+		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
+	}
+
+    LightningBolt11Test(t, ctx, bobLnd)
+
+	// Clean up the container
+	defer func() {
+		if err := postgresContainer.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container: %s", err)
+		}
+
+	}()
+
+}
+
+func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+
+	// try to swap tokens
+	var proofs []cashu.Proof
+	// unblid the signatures and make proofs
+	for i, output := range signatures {
+
+		parsedBlindFactor, err := hex.DecodeString(output.C_)
+		if err != nil {
+			return nil, fmt.Errorf("Error decoding hex: %w", err)
+		}
+		blindedFactor, err := secp256k1.ParsePubKey(parsedBlindFactor)
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
+		}
+
+		mintPublicKey, err := secp256k1.ParsePubKey(keysets[cashu.Sat.String()][output.Amount].PrivKey.PubKey().SerializeCompressed())
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
+		}
+
+		C := crypto.UnblindSignature(blindedFactor, secretsKey[i], mintPublicKey)
+
+		hexC := hex.EncodeToString(C.SerializeCompressed())
+
+		proofs = append(proofs, cashu.Proof{Id: output.Id, Amount: output.Amount, C: hexC, Secret: secrets[i]})
+	}
+
+	return proofs, nil
+}
+
+func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainers.Container) {
 	router, mint := SetupRoutingForTesting(ctx)
 
 	// MINTING TESTING STARTS
@@ -768,7 +868,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	}
 
 	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
-	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
+    err := json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
 		t.Errorf("Error unmarshalling response: %v", err)
@@ -1319,43 +1419,4 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	// MELTING TESTING ENDS
 
-	// Clean up the container
-	defer func() {
-		if err := postgresContainer.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container: %s", err)
-		}
-
-	}()
-
-}
-
-func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
-
-	// try to swap tokens
-	var proofs []cashu.Proof
-	// unblid the signatures and make proofs
-	for i, output := range signatures {
-
-		parsedBlindFactor, err := hex.DecodeString(output.C_)
-		if err != nil {
-			return nil, fmt.Errorf("Error decoding hex: %w", err)
-		}
-		blindedFactor, err := secp256k1.ParsePubKey(parsedBlindFactor)
-		if err != nil {
-			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
-		}
-
-		mintPublicKey, err := secp256k1.ParsePubKey(keysets[cashu.Sat.String()][output.Amount].PrivKey.PubKey().SerializeCompressed())
-		if err != nil {
-			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
-		}
-
-		C := crypto.UnblindSignature(blindedFactor, secretsKey[i], mintPublicKey)
-
-		hexC := hex.EncodeToString(C.SerializeCompressed())
-
-		proofs = append(proofs, cashu.Proof{Id: output.Id, Amount: output.Amount, C: hexC, Secret: secrets[i]})
-	}
-
-	return proofs, nil
 }
