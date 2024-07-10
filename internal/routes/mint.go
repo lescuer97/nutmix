@@ -17,7 +17,7 @@ import (
 	"github.com/tyler-smith/go-bip32"
 )
 
-func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint mint.Mint) {
+func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
@@ -65,6 +65,9 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint m
 
 	v1.GET("/info", func(c *gin.Context) {
 
+		fmt.Printf("Active Swaps: %v\n", len(mint.ActiveProofs.Proofs))
+		fmt.Printf("Active Mint: %v\n", len(mint.ActiveQuotes.Quote))
+
 		seed, err := database.GetActiveSeed(pool)
 
 		var pubkey string = ""
@@ -99,11 +102,21 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint m
 		}
 
 		nuts := make(map[string]cashu.SwapMintInfo)
-		var activeNuts []string = []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"}
+		var baseNuts []string = []string{"1", "2", "3", "4", "5", "6"}
 
-		for _, nut := range activeNuts {
+		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12"}
+
+		for _, nut := range baseNuts {
+			b := false
 			nuts[nut] = cashu.SwapMintInfo{
-				Disabled: false,
+				Disabled: &b,
+			}
+		}
+
+		for _, nut := range optionalNuts {
+			b := true
+			nuts[nut] = cashu.SwapMintInfo{
+				Supported: &b,
 			}
 		}
 
@@ -175,21 +188,31 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint m
 		}
 
 		if len(knownProofs) != 0 {
-			log.Printf("Proofs already used: %+v", knownProofs)
 			c.JSON(400, "Proofs already used")
+			return
+		}
+
+		err = mint.AddProofs(swapRequest.Inputs)
+
+		if err != nil {
+			log.Printf("mint.AddProof: %+v", err)
+			c.JSON(400, "Proofs are already in use")
 			return
 		}
 
 		unit, err := mint.CheckProofsAreSameUnit(swapRequest.Inputs)
 
 		if err != nil {
+			mint.RemoveProofs(swapRequest.Inputs)
 			log.Printf("CheckProofsAreSameUnit: %+v", err)
 			c.JSON(400, "Proofs are not the same unit")
 			return
 		}
+
 		err = mint.VerifyListOfProofs(swapRequest.Inputs, swapRequest.Outputs, unit)
 
 		if err != nil {
+			mint.RemoveProofs(swapRequest.Inputs)
 			log.Println(fmt.Errorf("mint.VerifyListOfProofs: %w", err))
 
 			switch {
@@ -213,6 +236,7 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint m
 		blindedSignatures, recoverySigsDb, err := mint.SignBlindedMessages(swapRequest.Outputs, cashu.Sat.String())
 
 		if err != nil {
+			mint.RemoveProofs(swapRequest.Inputs)
 			log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
@@ -226,11 +250,14 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint m
 		err = database.SaveProofs(pool, swapRequest.Inputs)
 
 		if err != nil {
+			mint.RemoveProofs(swapRequest.Inputs)
 			log.Println(fmt.Errorf("SaveProofs: %w", err))
 			log.Println(fmt.Errorf("Proofs: %+v", swapRequest.Inputs))
 			c.JSON(200, response)
 			return
 		}
+
+		mint.RemoveProofs(swapRequest.Inputs)
 
 		err = database.SetRestoreSigs(pool, recoverySigsDb)
 		if err != nil {
