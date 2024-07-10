@@ -358,19 +358,20 @@ type SwapMintMethod struct {
 }
 
 type SwapMintInfo struct {
-	Methods  *[]SwapMintMethod `json:"methods,omitempty"`
-	Disabled bool              `json:"disabled"`
+	Methods   *[]SwapMintMethod `json:"methods,omitempty"`
+	Disabled  *bool             `json:"disabled,omitempty"`
+	Supported *bool             `json:"supported,omitempty"`
 }
 
 type GetInfoResponse struct {
-	Name            string     `json:"name"`
-	Version         string     `json:"version"`
-	Pubkey          string     `json:"pubkey"`
-	Description     string     `json:"description"`
-	DescriptionLong string     `json:"description_long"`
-	Contact         [][]string `json:"contact"`
-	Motd            string     `json:"motd"`
-	Nuts            map[string]SwapMintInfo
+	Name            string                  `json:"name"`
+	Version         string                  `json:"version"`
+	Pubkey          string                  `json:"pubkey"`
+	Description     string                  `json:"description"`
+	DescriptionLong string                  `json:"description_long"`
+	Contact         [][]string              `json:"contact"`
+	Motd            string                  `json:"motd"`
+	Nuts            map[string]SwapMintInfo `json:"nuts"`
 }
 
 type KeysResponse map[string][]KeysetResponse
