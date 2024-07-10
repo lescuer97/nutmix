@@ -15,6 +15,8 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/tyler-smith/go-bip32"
 	"log"
+	"slices"
+	"sync"
 	"time"
 )
 
@@ -26,6 +28,129 @@ type Mint struct {
 	LightningComs comms.LightingComms
 	Network       chaincfg.Params
 	PendingProofs []cashu.Proof
+	ActiveProofs  ActiveProofs
+	ActiveQuotes  ActiveQuote
+	// ActiveMeltQuote ActiveMeltQuote
+}
+
+var (
+	AlreadyActiveProof = errors.New("Proof already being spent")
+	AlreadyActiveQuote = errors.New("Quote already being spent")
+)
+
+type ActiveProofs struct {
+	Proofs []cashu.Proof
+	sync.Mutex
+}
+
+func (a *Mint) AddProofs(proofs []cashu.Proof) error {
+	a.ActiveProofs.Lock()
+	// check if proof already exists
+	for _, activeProof := range a.ActiveProofs.Proofs {
+		alreadyActiveProof := slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
+			if p == activeProof {
+				return true
+			}
+			return false
+
+		})
+		if alreadyActiveProof {
+			a.ActiveProofs.Unlock()
+			return AlreadyActiveProof
+		}
+	}
+
+	a.ActiveProofs.Proofs = append(a.ActiveProofs.Proofs, proofs...)
+	a.ActiveProofs.Unlock()
+	return nil
+}
+
+func (a *Mint) RemoveProofs(proofs []cashu.Proof) {
+	a.ActiveProofs.Lock()
+	for _, proofToDelete := range proofs {
+		activeProofs := slices.DeleteFunc(a.ActiveProofs.Proofs, func(p cashu.Proof) bool {
+			if p == proofToDelete {
+				return true
+			}
+			return false
+
+		})
+		a.ActiveProofs.Proofs = activeProofs
+	}
+
+	a.ActiveProofs.Unlock()
+}
+
+type ActiveQuote struct {
+	Quote []string
+	sync.Mutex
+}
+
+func (a *Mint) AddActiveMintQuote(quote string) error {
+	a.ActiveQuotes.Lock()
+	// check if proof already exists
+	for _, activeQuote := range a.ActiveQuotes.Quote {
+
+		if activeQuote == quote {
+			a.ActiveQuotes.Unlock()
+			return AlreadyActiveProof
+		}
+	}
+
+	a.ActiveQuotes.Quote = append(a.ActiveQuotes.Quote, quote)
+	a.ActiveQuotes.Unlock()
+	return nil
+}
+
+func (a *Mint) RemoveActiveMintQuote(quote string) error {
+	a.ActiveQuotes.Lock()
+	activeQuote := slices.DeleteFunc(a.ActiveQuotes.Quote, func(p string) bool {
+		if p == quote {
+			return true
+		}
+		return false
+
+	})
+	a.ActiveQuotes.Quote = activeQuote
+
+	a.ActiveQuotes.Unlock()
+	return nil
+
+}
+
+type ActiveMeltQuote struct {
+	Quote []string
+	sync.Mutex
+}
+
+func (m *Mint) AddQuotesAndProofs(quote string, proofs []cashu.Proof) error {
+
+	if quote != "" {
+		err := m.AddActiveMintQuote(quote)
+		if err != nil {
+			return fmt.Errorf("m.AddActiveMintQuote(quote): %w", err)
+		}
+	}
+
+	if len(proofs) == 0 {
+		err := m.AddProofs(proofs)
+		if err != nil {
+			return fmt.Errorf("AddProofs: %w", err)
+		}
+
+	}
+	return nil
+}
+
+func (m *Mint) RemoveQuotesAndProofs(quote string, proofs []cashu.Proof) {
+	if quote != "" {
+		m.RemoveActiveMintQuote(quote)
+	}
+
+	if len(proofs) == 0 {
+		m.RemoveProofs(proofs)
+
+	}
 }
 
 // errors types for validation
