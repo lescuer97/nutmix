@@ -102,11 +102,21 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *
 		}
 
 		nuts := make(map[string]cashu.SwapMintInfo)
-		var activeNuts []string = []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"}
+		var baseNuts []string = []string{"1", "2", "3", "4", "5", "6"}
 
-		for _, nut := range activeNuts {
+		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12"}
+
+		for _, nut := range baseNuts {
+			b := false
 			nuts[nut] = cashu.SwapMintInfo{
-				Disabled: false,
+				Disabled: &b,
+			}
+		}
+
+		for _, nut := range optionalNuts {
+			b := true
+			nuts[nut] = cashu.SwapMintInfo{
+				Supported: &b,
 			}
 		}
 
