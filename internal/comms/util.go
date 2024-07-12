@@ -261,7 +261,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	alicePort := "10009"
 
-    tlsCertPath := "/.lnd/tls.cert"
+	tlsCertPath := "/.lnd/tls.cert"
 
 	err = os.Setenv(LND_HOST, lndAliceIp+":"+alicePort)
 	err = os.Setenv(LND_TLS_CERT, tlsCert)
@@ -280,21 +280,18 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	aliceLnbitsEnvVariables["LND_GRPC_MACAROON"] = macaroonHex
 	aliceLnbitsEnvVariables["LNBITS_ADMIN_UI"] = "true"
 
-
-    tlscertReader := strings.NewReader(tlsCert)
-
+	tlscertReader := strings.NewReader(tlsCert)
 
 	aliceLnbitsContainerReq := testcontainers.ContainerRequest{
-		Image:        "lnbits/lnbits",
-		WaitingFor:   wait.ForLog("Application startup complete"),
-        Files: []testcontainers.ContainerFile{
-            {
-                Reader: tlscertReader,
-                ContainerFilePath: tlsCertPath,
-                FileMode: 0o700,
-
-            },
-        },
+		Image:      "lnbits/lnbits",
+		WaitingFor: wait.ForLog("Application startup complete"),
+		Files: []testcontainers.ContainerFile{
+			{
+				Reader:            tlscertReader,
+				ContainerFilePath: tlsCertPath,
+				FileMode:          0o700,
+			},
+		},
 		ExposedPorts: []string{"5000/tcp"},
 		Name:         "aliceLNBITS" + names,
 		Env:          aliceLnbitsEnvVariables,
@@ -306,34 +303,32 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Started:          true,
 	})
 
-    aliceLnbitsC.CopyToContainer(ctx, []byte(tlsCert),tlsCertPath, 0o700)
+	aliceLnbitsC.CopyToContainer(ctx, []byte(tlsCert), tlsCertPath, 0o700)
 
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get aliceLnbitsC %w", err)
 	}
-    
 
-    aliceLnbitsIp, err := aliceLnbitsC.ContainerIP(ctx)
+	aliceLnbitsIp, err := aliceLnbitsC.ContainerIP(ctx)
 
-    if err != nil {
-        return nil, nil, nil, nil, fmt.Errorf("could not get aliceLnbitsC.ContainerIP %w", err)
-    }
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not get aliceLnbitsC.ContainerIP %w", err)
+	}
 
-    // Get API key for aliceLnbits
+	// Get API key for aliceLnbits
 
-    // make request for first install
+	// make request for first install
 	client := &http.Client{}
 
-
-    firstInstallBody := struct {
-        Username string `json:"username"`
-        Password string `json:"password"`
-        PasswordRepeat string `json:"password_repeat"`
-    }{
-        Username: "admin",
-        Password: "password",
-        PasswordRepeat: "password",
-    }
+	firstInstallBody := struct {
+		Username       string `json:"username"`
+		Password       string `json:"password"`
+		PasswordRepeat string `json:"password_repeat"`
+	}{
+		Username:       "admin",
+		Password:       "password",
+		PasswordRepeat: "password",
+	}
 	jsonBytes, err := json.Marshal(firstInstallBody)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("json.Marshal: %w", err)
@@ -341,41 +336,40 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	b := bytes.NewBuffer(jsonBytes)
 
-    req, err := http.NewRequest("PUT", "http://"+aliceLnbitsIp+":5000/api/v1/auth/first_install", b)
-    if err != nil {
-        return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
-    }
+	req, err := http.NewRequest("PUT", "http://"+aliceLnbitsIp+":5000/api/v1/auth/first_install", b)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
+	}
 
-    resp, err := client.Do(req)
-    if err != nil {
-        return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
-    }
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
+	}
 
 	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
-		return nil, nil, nil, nil,fmt.Errorf("ioutil.ReadAll: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("ioutil.ReadAll: %w", err)
 	}
-    var response struct {
-        AccessToken string `json:"access_token"`
-    }
+	var response struct {
+		AccessToken string `json:"access_token"`
+	}
 
-    err = json.Unmarshal(body, &response)
+	err = json.Unmarshal(body, &response)
 
-    if err != nil {
-        return nil, nil, nil, nil, fmt.Errorf("json.Unmarshal: %w", err)
-    }
-    fmt.Printf("Body: %+v ", response)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("json.Unmarshal: %w", err)
+	}
+	fmt.Printf("Body: %+v ", response)
 
-
-    // get auth settings
-    authBody := struct {
-        Username string `json:"username"`
-        Password string `json:"password"`
-    }{
-        Username: "admin",
-        Password: "password",
-    }
+	// get auth settings
+	authBody := struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{
+		Username: "admin",
+		Password: "password",
+	}
 
 	jsonBytes, err = json.Marshal(authBody)
 	if err != nil {
@@ -384,50 +378,46 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	b = bytes.NewBuffer(jsonBytes)
 
-    
-    walletsRequest, err := http.NewRequest("GET", "http://"+aliceLnbitsIp+":5000/api/v1/wallets", nil)
-    if err != nil {
-        return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
-    }
+	walletsRequest, err := http.NewRequest("GET", "http://"+aliceLnbitsIp+":5000/api/v1/wallets", nil)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
+	}
 
-    walletsRequest.Header.Add("Authorization", "Bearer "+response.AccessToken)
-    walletsRequest.Header.Add("cookie_access_token", response.AccessToken)
+	walletsRequest.Header.Add("Authorization", "Bearer "+response.AccessToken)
+	walletsRequest.Header.Add("cookie_access_token", response.AccessToken)
 
-    respWallet ,err  :=client.Do(walletsRequest)
-    if err != nil {
-        return nil, nil, nil, nil, fmt.Errorf("could not make response %w", err)
-    }
-
+	respWallet, err := client.Do(walletsRequest)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not make response %w", err)
+	}
 
 	body, err = io.ReadAll(respWallet.Body)
 
 	if err != nil {
-		return nil, nil, nil, nil,fmt.Errorf("ioutil.ReadAll: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("ioutil.ReadAll: %w", err)
 	}
-    var responseWallet []struct {
-        AdminKey string `json:"adminkey"`
-    }
+	var responseWallet []struct {
+		AdminKey string `json:"adminkey"`
+	}
 
-    err = json.Unmarshal(body, &responseWallet)
+	err = json.Unmarshal(body, &responseWallet)
 
-    if err != nil {
-        return nil, nil, nil, nil, fmt.Errorf("json.Unmarshal: %w", err)
-    }
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("json.Unmarshal: %w", err)
+	}
 
-    if len(responseWallet) == 0 {
-        return nil, nil, nil, nil, fmt.Errorf("no wallet found")
-    }
+	if len(responseWallet) == 0 {
+		return nil, nil, nil, nil, fmt.Errorf("no wallet found")
+	}
 
-    fmt.Printf("AdminKey: %+v ", responseWallet[0].AdminKey)
+	fmt.Printf("AdminKey: %+v ", responseWallet[0].AdminKey)
 	err = os.Setenv(MINT_LNBITS_KEY, responseWallet[0].AdminKey)
-    err = os.Setenv(MINT_LNBITS_ENDPOINT,"http://" + aliceLnbitsIp+":5000")
-    if err != nil {
-        return nil, nil, nil, nil, fmt.Errorf("could not set env %w", err)
-    }
+	err = os.Setenv(MINT_LNBITS_ENDPOINT, "http://"+aliceLnbitsIp+":5000")
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not set env %w", err)
+	}
 
-    fmt.Println("Response: ", string(body))
-
-
+	fmt.Println("Response: ", string(body))
 
 	// generate wallet
 

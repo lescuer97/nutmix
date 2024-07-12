@@ -55,7 +55,7 @@ func TestParseProofWithP2PK(t *testing.T) {
 		t.Errorf("Error in spend condition refund %+v", hex.EncodeToString(spendCondition.Data.Tags.Refund[0].SerializeUncompressed()))
 	}
 
-	var p2pkWitness P2PKWitness
+	var p2pkWitness Witness
 	// parse witness
 	err = json.Unmarshal([]byte(proof.Witness), &p2pkWitness)
 
@@ -69,3 +69,9 @@ func TestParseProofWithP2PK(t *testing.T) {
 
 	}
 }
+
+// func TestParseProofWithHTLC(t *testing.T) {
+//
+//     parse :=
+//
+// }

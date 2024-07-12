@@ -65,8 +65,8 @@ type LightningInvoiceResponse struct {
 }
 
 type LightningPaymentResponse struct {
-	Preimage     string
-	PaymentError error
+	Preimage       string
+	PaymentError   error
 	PaymentRequest string
 	Rhash          string
 }
@@ -249,7 +249,7 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 
 		invoiceRes.PaymentRequest = lnbitsInvoice.PaymentRequest
 		invoiceRes.Rhash = lnbitsInvoice.PaymentHash
-        invoiceRes.PaymentError = errors.New("")
+		invoiceRes.PaymentError = errors.New("")
 
 		return &invoiceRes, nil
 	}
@@ -293,7 +293,7 @@ func getFeatureBits(features *lnwire.FeatureVector) []lnrpc.FeatureBit {
 }
 
 type QueryRoutesResponse struct {
-    FeeReserve uint64 `json:"fee_reserve"`
+	FeeReserve uint64 `json:"fee_reserve"`
 }
 
 func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string) (*QueryRoutesResponse, error) {
@@ -328,8 +328,7 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 			return nil, err
 		}
 		fee := lightning.GetAverageRouteFee(res.Routes) / 1000
-        queryResponse.FeeReserve = fee
-
+		queryResponse.FeeReserve = fee
 
 		return &queryResponse, nil
 
@@ -337,16 +336,16 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 		invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
 		err := l.LnbitsInvoiceRequest("GET", invoiceString, nil, &queryResponse)
-        queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
+		queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
 
 		if err != nil {
 			return nil, fmt.Errorf("json.Marshal: %w", err)
 		}
 
-        return &queryResponse, nil
+		return &queryResponse, nil
 
 	}
-    return nil, fmt.Errorf("Something happened")
+	return nil, fmt.Errorf("Something happened")
 
 }
 

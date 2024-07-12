@@ -464,8 +464,8 @@ func TestMultisigSigning(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	// // TRY SWAPING with WRONG SIGNATURES
-	swapProofsWrongSigs, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
+	// // TRY SWAPING with Timelock passed
+	swapProofsTimelockNotExpiredWrongSig, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
@@ -478,7 +478,78 @@ func TestMultisigSigning(t *testing.T) {
 	}
 
 	swapRequestTwo := cashu.PostSwapRequest{
-		Inputs:  swapProofsWrongSigs,
+		Inputs:  swapProofsTimelockNotExpiredWrongSig,
+		Outputs: swapBlindedMessagesP2PKWrongSigs,
+	}
+
+	jsonRequestBody, _ = json.Marshal(swapRequestTwo)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("Expected status code 403, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Locktime has passed and no refund key was found"` {
+		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	}
+
+	// TRY SWAPPING with refund key
+	swapProofsRefund, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, refundPrivKey})
+
+	currentPlus15 := time.Now().Add(15 * time.Minute).Unix()
+
+	// generate new blind signatures with timelock over 15 minutes of current time
+	swapBlindedMessagesP2PKWrongSigsOverlock, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, int(currentPlus15), cashu.SigInputs)
+
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+	swapRequestRefund := cashu.PostSwapRequest{
+		Inputs:  swapProofsRefund,
+		Outputs: swapBlindedMessagesP2PKWrongSigsOverlock,
+	}
+
+	jsonRequestBody, _ = json.Marshal(swapRequestRefund)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	// var postSwapResponse cashu.PostSwapResponse
+
+	if w.Code != 200 {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
+	}
+
+	err = json.Unmarshal(w.Body.Bytes(), &postSwapResponse)
+
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+	// try swapping with wrong refund key and timelock not yet expired
+
+	swapProofsTimelockNotExpiredWrongSig, err = GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
+
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+
+	swapBlindedMessagesP2PKWrongSigs, _, _, err = CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	swapRequestTwo = cashu.PostSwapRequest{
+		Inputs:  swapProofsTimelockNotExpiredWrongSig,
 		Outputs: swapBlindedMessagesP2PKWrongSigs,
 	}
 
@@ -496,29 +567,6 @@ func TestMultisigSigning(t *testing.T) {
 
 	if w.Body.String() != `"Not enough signatures"` {
 		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
-	}
-
-	// TRY SWAPPING with refund key
-	swapProofsRefund, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, refundPrivKey})
-
-	if err != nil {
-		t.Fatalf("Error generating proofs: %v", err)
-	}
-	swapRequestRefund := cashu.PostSwapRequest{
-		Inputs:  swapProofsRefund,
-		Outputs: swapBlindedMessagesP2PKWrongSigs,
-	}
-
-	jsonRequestBody, _ = json.Marshal(swapRequestRefund)
-
-	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
-
-	w = httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
 
 }

@@ -746,7 +746,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
 	}
 
-    LightningBolt11Test(t, ctx, bobLnd)
+	LightningBolt11Test(t, ctx, bobLnd)
 
 	// Clean up the container
 	defer func() {
@@ -802,7 +802,7 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
 	}
 
-    LightningBolt11Test(t, ctx, bobLnd)
+	LightningBolt11Test(t, ctx, bobLnd)
 
 	// Clean up the container
 	defer func() {
@@ -868,7 +868,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
-    err := json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
+	err := json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
 		t.Errorf("Error unmarshalling response: %v", err)

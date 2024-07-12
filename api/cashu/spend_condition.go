@@ -27,6 +27,7 @@ var (
 	ErrEmptyWitness                  = errors.New("Witness is empty")
 	ErrNoValidSignatures             = errors.New("No valid signatures found")
 	ErrNotEnoughSignatures           = errors.New("Not enough signatures")
+	ErrLocktimePassed                = errors.New("Locktime has passed and no refund key was found")
 )
 
 type SpendCondition struct {
@@ -276,7 +277,7 @@ func (scd *SpendConditionData) UnmarshalJSON(b []byte) error {
 
 }
 
-func (sc *SpendCondition) VerifySignatures(witness *P2PKWitness, message string) (bool, []*btcec.PublicKey, error) {
+func (sc *SpendCondition) VerifySignatures(witness *Witness, message string) (bool, []*btcec.PublicKey, error) {
 
 	currentTime := time.Now().Unix()
 
@@ -292,6 +293,7 @@ func (sc *SpendCondition) VerifySignatures(witness *P2PKWitness, message string)
 				}
 			}
 		}
+		return false, signaturesToTry, ErrLocktimePassed
 	}
 
 	// append all posibles keys for signing
@@ -397,29 +399,32 @@ func SigFlagFromString(s string) (SigFlag, error) {
 	}
 }
 
-type P2PKWitness struct {
+type Witness struct {
+	Preimage   string `json:"preimage,omitempty"`
 	Signatures []*schnorr.Signature
 }
 
-func (wit *P2PKWitness) String() (string, error) {
-	var singatures = struct {
+func (wit *Witness) String() (string, error) {
+	var witness = struct {
+		Preimage   string
 		Signatures []string
 	}{}
 
 	for _, sig := range wit.Signatures {
-		singatures.Signatures = append(singatures.Signatures, hex.EncodeToString(sig.Serialize()))
+		witness.Signatures = append(witness.Signatures, hex.EncodeToString(sig.Serialize()))
 	}
 
-	b, err := json.Marshal(singatures)
+	b, err := json.Marshal(witness)
 	if err != nil {
 		return "", fmt.Errorf("json.Marshal(singatures): %w", err)
 	}
 	return string(b), nil
 }
 
-func (wit *P2PKWitness) UnmarshalJSON(b []byte) error {
+func (wit *Witness) UnmarshalJSON(b []byte) error {
 
 	var sigs = struct {
+		Witness    string
 		Signatures []string
 	}{}
 
@@ -429,7 +434,8 @@ func (wit *P2PKWitness) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("json.Unmarshal(b, &info): %w", err)
 	}
 
-	witness := P2PKWitness{
+	witness := Witness{
+		Preimage:   sigs.Witness,
 		Signatures: make([]*schnorr.Signature, 0),
 	}
 
