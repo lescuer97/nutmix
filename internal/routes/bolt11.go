@@ -567,6 +567,9 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			case errors.Is(err, cashu.ErrLocktimePassed):
 				c.JSON(403, cashu.ErrLocktimePassed.Error())
 				return
+			case errors.Is(err, cashu.ErrInvalidPreimage):
+				c.JSON(403, cashu.ErrInvalidPreimage.Error())
+				return
 
 			}
 

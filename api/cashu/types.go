@@ -156,10 +156,10 @@ type Proof struct {
 func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
 
 	if spendCondition.Type == HTLC {
-       err :=  spendCondition.VerifyPreimage(witness)
-       if err != nil {
-           return false, fmt.Errorf("spendCondition.VerifyPreimage  %w ", err)
-       }
+		err := spendCondition.VerifyPreimage(witness)
+		if err != nil {
+			return false, fmt.Errorf("spendCondition.VerifyPreimage  %w ", err)
+		}
 	}
 
 	ok, pubkeys, err := spendCondition.VerifySignatures(witness, p.Secret)
@@ -267,19 +267,19 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 	p.Witness = witnessStr
 	return nil
 }
-func (p *Proof) AddPreimage(preimage string ) error {
+func (p *Proof) AddPreimage(preimage string) error {
 
 	var witness Witness
 	if p.Witness == "" {
 		witness = Witness{}
 	} else {
-        err := json.Unmarshal([]byte(p.Witness), &witness)
+		err := json.Unmarshal([]byte(p.Witness), &witness)
 		if err != nil {
 			return fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w, %w", ErrCouldNotParseWitness, err)
 		}
 	}
 
-    witness.Preimage = preimage
+	witness.Preimage = preimage
 
 	witnessStr, err := witness.String()
 
