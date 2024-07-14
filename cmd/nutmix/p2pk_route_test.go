@@ -22,7 +22,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func TestRoutesSwapMelt(t *testing.T) {
+func TestRoutesP2PKSwapMelt(t *testing.T) {
 	const posgrespassword = "password"
 	const postgresuser = "user"
 	ctx := context.Background()
@@ -252,7 +252,7 @@ func CreateP2PKBlindedMessages(amount uint64, keyset cashu.Keyset, pubkey *secp2
 func makeP2PKSpendCondition(pubkey *secp256k1.PublicKey, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) (cashu.SpendCondition, error) {
 	var spendCondition cashu.SpendCondition
 	spendCondition.Type = cashu.P2PK
-	spendCondition.Data.Data = pubkey
+	spendCondition.Data.Data = hex.EncodeToString(pubkey.SerializeCompressed())
 	spendCondition.Data.Tags.Pubkeys = pubkeys
 	spendCondition.Data.Tags.NSigs = nSigs
 	spendCondition.Data.Tags.Locktime = locktime
@@ -313,7 +313,7 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]mi
 	return proofs, nil
 }
 
-func TestMultisigSigning(t *testing.T) {
+func TestP2PKMultisigSigning(t *testing.T) {
 	const posgrespassword = "password"
 	const postgresuser = "user"
 	ctx := context.Background()

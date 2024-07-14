@@ -28,6 +28,8 @@ var (
 	ErrNoValidSignatures             = errors.New("No valid signatures found")
 	ErrNotEnoughSignatures           = errors.New("Not enough signatures")
 	ErrLocktimePassed                = errors.New("Locktime has passed and no refund key was found")
+	ErrInvalidHexPreimage            = errors.New("Preimage is not a valid hex string")
+	ErrInvalidPreimage               = errors.New("Invalid preimage")
 )
 
 type SpendCondition struct {
@@ -69,7 +71,7 @@ func (sc *SpendCondition) String() (string, error) {
 
 	str += fmt.Sprintf("\"%s\",", typestr)
 	str += fmt.Sprintf(`{"nonce":"%s",`, sc.Data.Nonce)
-	str += fmt.Sprintf(`"data":"%s",`, hex.EncodeToString(sc.Data.Data.SerializeCompressed()))
+	str += fmt.Sprintf(`"data":"%s",`, sc.Data.Data)
 	str += fmt.Sprintf(`"tags":[`)
 	str += fmt.Sprintf(`["sigflag","%s"],`, sc.Data.Tags.Sigflag.String())
 	str += fmt.Sprintf(`["n_sigs","%s"],`, strconv.Itoa(sc.Data.Tags.NSigs))
@@ -241,37 +243,22 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 
 type SpendConditionData struct {
 	Nonce string
-	Data  *btcec.PublicKey
+	Data  string
 	Tags  TagsInfo
 }
 
-func (scd *SpendConditionData) UnmarshalJSON(b []byte) error {
-
-	var info = struct {
-		Nonce string
-		Data  string
-		Tags  TagsInfo
-	}{}
-
-	err := json.Unmarshal(b, &info)
+func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
+	preImageBytes, err := hex.DecodeString(witness.Preimage)
 
 	if err != nil {
-		return fmt.Errorf("json.Unmarshal(b, &info): %w", err)
+		return fmt.Errorf("hex.DecodeString: %w, %w", ErrInvalidHexPreimage, err)
 	}
 
-	pubkey, err := hex.DecodeString(info.Data)
-	if err != nil {
-		return fmt.Errorf("hex.DecodeString: %s %w", info.Data, err)
-	}
+	parsedPreimage := sha256.Sum256(preImageBytes)
 
-	parsedPubkey, err := btcec.ParsePubKey(pubkey)
-	if err != nil {
-		return fmt.Errorf("secp256k1.ParsePubKey: %w", err)
+	if hex.EncodeToString(parsedPreimage[:]) != sc.Data.Data {
+		return ErrInvalidPreimage
 	}
-
-	scd.Data = parsedPubkey
-	scd.Tags = info.Tags
-	scd.Nonce = info.Nonce
 
 	return nil
 
@@ -282,7 +269,24 @@ func (sc *SpendCondition) VerifySignatures(witness *Witness, message string) (bo
 	currentTime := time.Now().Unix()
 
 	hashMessage := sha256.Sum256([]byte(message))
-	signaturesToTry := append(sc.Data.Tags.Pubkeys, sc.Data.Data)
+
+	signaturesToTry := sc.Data.Tags.Pubkeys
+
+	if sc.Type == P2PK {
+
+		pubkey, err := hex.DecodeString(sc.Data.Data)
+
+		if err != nil {
+			return false, sc.Data.Tags.Pubkeys, ErrNoValidSignatures
+		}
+		//
+		parsedPubkey, err := btcec.ParsePubKey(pubkey)
+		if err != nil {
+			return false, sc.Data.Tags.Pubkeys, ErrNoValidSignatures
+		}
+
+		signaturesToTry = append(signaturesToTry, parsedPubkey)
+	}
 
 	// check if locktime has passed and if there are refund keys
 	if sc.Data.Tags.Locktime != 0 && currentTime > int64(sc.Data.Tags.Locktime) && len(sc.Data.Tags.Refund) > 0 {

@@ -155,6 +155,13 @@ type Proof struct {
 
 func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
 
+	if spendCondition.Type == HTLC {
+       err :=  spendCondition.VerifyPreimage(witness)
+       if err != nil {
+           return false, fmt.Errorf("spendCondition.VerifyPreimage  %w ", err)
+       }
+	}
+
 	ok, pubkeys, err := spendCondition.VerifySignatures(witness, p.Secret)
 
 	if err != nil {

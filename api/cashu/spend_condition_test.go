@@ -43,8 +43,8 @@ func TestParseProofWithP2PK(t *testing.T) {
 		t.Errorf("Error in spend condition type %+v", spendCondition.Type)
 	}
 
-	if hex.EncodeToString(spendCondition.Data.Data.SerializeCompressed()) != "0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae" {
-		t.Errorf("Error in spend condition data %+v", hex.EncodeToString(spendCondition.Data.Data.SerializeUncompressed()))
+	if spendCondition.Data.Data != "0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae" {
+		t.Errorf("Error in spend condition data %+v", spendCondition.Data.Data)
 	}
 
 	if hex.EncodeToString(spendCondition.Data.Tags.Pubkeys[0].SerializeCompressed()) != "02698c4e2b5f9534cd0687d87513c759790cf829aa5739184a3e3735471fbda904" {
