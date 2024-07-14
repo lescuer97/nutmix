@@ -267,6 +267,29 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 	p.Witness = witnessStr
 	return nil
 }
+func (p *Proof) AddPreimage(preimage string ) error {
+
+	var witness Witness
+	if p.Witness == "" {
+		witness = Witness{}
+	} else {
+        err := json.Unmarshal([]byte(p.Witness), &witness)
+		if err != nil {
+			return fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w, %w", ErrCouldNotParseWitness, err)
+		}
+	}
+
+    witness.Preimage = preimage
+
+	witnessStr, err := witness.String()
+
+	if err != nil {
+		return fmt.Errorf("witness.String: %w", err)
+	}
+
+	p.Witness = witnessStr
+	return nil
+}
 
 type MintError struct {
 	Detail string `json:"detail"`

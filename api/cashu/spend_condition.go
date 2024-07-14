@@ -418,6 +418,11 @@ func (wit *Witness) String() (string, error) {
 		witness.Signatures = append(witness.Signatures, hex.EncodeToString(sig.Serialize()))
 	}
 
+    if wit.Preimage != "" {
+        witness.Preimage = wit.Preimage
+    }
+
+
 	b, err := json.Marshal(witness)
 	if err != nil {
 		return "", fmt.Errorf("json.Marshal(singatures): %w", err)
@@ -426,22 +431,24 @@ func (wit *Witness) String() (string, error) {
 }
 
 func (wit *Witness) UnmarshalJSON(b []byte) error {
-
 	var sigs = struct {
-		Witness    string
+		Preimage    string
 		Signatures []string
 	}{}
 
-	err := json.Unmarshal(b, &sigs)
+    err := json.Unmarshal(b, &sigs)
 
 	if err != nil {
 		return fmt.Errorf("json.Unmarshal(b, &info): %w", err)
 	}
 
+
 	witness := Witness{
-		Preimage:   sigs.Witness,
 		Signatures: make([]*schnorr.Signature, 0),
 	}
+    if sigs.Preimage != "" {
+        witness.Preimage = sigs.Preimage
+    }
 
 	for _, sig := range sigs.Signatures {
 		sigBytes, err := hex.DecodeString(sig)
