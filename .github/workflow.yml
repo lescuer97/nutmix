@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          go get .
+          go get ./...
 
       - name: Build
         run: |
