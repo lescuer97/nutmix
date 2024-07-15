@@ -65,9 +65,6 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *
 
 	v1.GET("/info", func(c *gin.Context) {
 
-		fmt.Printf("Active Swaps: %v\n", len(mint.ActiveProofs.Proofs))
-		fmt.Printf("Active Mint: %v\n", len(mint.ActiveQuotes.Quote))
-
 		seed, err := database.GetActiveSeed(pool)
 
 		var pubkey string = ""
