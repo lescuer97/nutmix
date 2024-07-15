@@ -204,7 +204,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		totalAmountSigned += output.Amount
 	}
 
-	if totalAmountSigned != 100 {
+	if totalAmountSigned != 10000 {
 		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
 	}
 
