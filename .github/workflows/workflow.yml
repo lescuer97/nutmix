@@ -18,6 +18,7 @@ jobs:
         with:
           go-version: '1.22.1'
           cache-dependency-path: subdir/go.sum
+      - uses: docker/setup-buildx-action@v3
       - name: Go Toolchain info
         run: |
           go version
