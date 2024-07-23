@@ -1,0 +1,10 @@
+{{ template "base" }}
+
+<div class="form">
+    <form id="login-form">
+        Please make sure that you have a NIP-07 Browser add on.
+        <input name="passwordNonce"  hidden value="{{.Nonce}}" />
+        <button type="submit" >Login with Browser Add-On</button>
+    </form>
+</div>
+

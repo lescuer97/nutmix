@@ -1,0 +1,14 @@
+body {
+    display: flex;
+    flex-direction: column;
+
+}
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+#login-form {
+    max-width: 480px;
+
+}

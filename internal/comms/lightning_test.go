@@ -52,7 +52,7 @@ func TestSetupLightingCommsLnBits(t *testing.T) {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
 	}
 
-    lightingComms, err := SetupLightingComms(ctx)
+	lightingComms, err := SetupLightingComms(ctx)
 
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)
