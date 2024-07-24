@@ -70,7 +70,7 @@ func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey
 	if b.Witness == "" {
 		return ErrEmptyWitness
 	}
-	var p2pkWitness P2PKWitness
+	var p2pkWitness Witness
 
 	err := json.Unmarshal([]byte(b.Witness), &p2pkWitness)
 
@@ -153,7 +153,14 @@ type Proof struct {
 	Witness string `json:"witness" db:"witness"`
 }
 
-func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWitness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
+func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
+
+	if spendCondition.Type == HTLC {
+		err := spendCondition.VerifyPreimage(witness)
+		if err != nil {
+			return false, fmt.Errorf("spendCondition.VerifyPreimage  %w ", err)
+		}
+	}
 
 	ok, pubkeys, err := spendCondition.VerifySignatures(witness, p.Secret)
 
@@ -169,10 +176,10 @@ func (p Proof) VerifyWitnessSig(spendCondition *SpendCondition, witness *P2PKWit
 
 }
 
-func (p Proof) parseWitnessAndSecret() (*SpendCondition, *P2PKWitness, error) {
+func (p Proof) parseWitnessAndSecret() (*SpendCondition, *Witness, error) {
 
 	var spendCondition SpendCondition
-	var witness P2PKWitness
+	var witness Witness
 
 	err := json.Unmarshal([]byte(p.Secret), &spendCondition)
 
@@ -191,8 +198,8 @@ func (p Proof) parseWitnessAndSecret() (*SpendCondition, *P2PKWitness, error) {
 	return &spendCondition, &witness, nil
 }
 
-func (p Proof) IsProofSpendConditioned(checkOutputs *bool) (bool, *SpendCondition, *P2PKWitness, error) {
-	var witness P2PKWitness
+func (p Proof) IsProofSpendConditioned(checkOutputs *bool) (bool, *SpendCondition, *Witness, error) {
+	var witness Witness
 	witnessErr := json.Unmarshal([]byte(p.Witness), &witness)
 
 	var spendCondition SpendCondition
@@ -239,9 +246,9 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 		return fmt.Errorf("schnorr.Sign: %w", err)
 	}
 
-	var witness P2PKWitness
+	var witness Witness
 	if p.Witness == "" {
-		witness = P2PKWitness{}
+		witness = Witness{}
 	} else {
 		err = json.Unmarshal([]byte(p.Witness), &witness)
 		if err != nil {
@@ -250,6 +257,29 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 	}
 
 	witness.Signatures = append(witness.Signatures, sig)
+
+	witnessStr, err := witness.String()
+
+	if err != nil {
+		return fmt.Errorf("witness.String: %w", err)
+	}
+
+	p.Witness = witnessStr
+	return nil
+}
+func (p *Proof) AddPreimage(preimage string) error {
+
+	var witness Witness
+	if p.Witness == "" {
+		witness = Witness{}
+	} else {
+		err := json.Unmarshal([]byte(p.Witness), &witness)
+		if err != nil {
+			return fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w, %w", ErrCouldNotParseWitness, err)
+		}
+	}
+
+	witness.Preimage = preimage
 
 	witnessStr, err := witness.String()
 

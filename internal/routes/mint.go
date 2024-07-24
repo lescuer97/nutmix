@@ -65,9 +65,6 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *
 
 	v1.GET("/info", func(c *gin.Context) {
 
-		fmt.Printf("Active Swaps: %v\n", len(mint.ActiveProofs.Proofs))
-		fmt.Printf("Active Mint: %v\n", len(mint.ActiveQuotes.Quote))
-
 		seed, err := database.GetActiveSeed(pool)
 
 		var pubkey string = ""
@@ -225,7 +222,12 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *
 			case errors.Is(err, cashu.ErrNotEnoughSignatures):
 				c.JSON(403, cashu.ErrNotEnoughSignatures.Error())
 				return
-
+			case errors.Is(err, cashu.ErrLocktimePassed):
+				c.JSON(403, cashu.ErrLocktimePassed.Error())
+				return
+			case errors.Is(err, cashu.ErrInvalidPreimage):
+				c.JSON(403, cashu.ErrInvalidPreimage.Error())
+				return
 			}
 
 			c.JSON(403, "Invalid Proof")
