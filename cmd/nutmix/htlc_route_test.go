@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -21,7 +23,10 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func TestRoutesP2PKSwapMelt(t *testing.T) {
+var correctPreimage = hex.EncodeToString([]byte("12345"))
+var incorrectPreimage = hex.EncodeToString([]byte("54321"))
+
+func TestRoutesHTLCSwapMelt(t *testing.T) {
 	const posgrespassword = "password"
 	const postgresuser = "user"
 	ctx := context.Background()
@@ -93,7 +98,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
 
 	// ask for minting
-	p2pkBlindedMessages, p2pkMintingSecrets, P2PKMintingSecretKeys, err := CreateP2PKBlindedMessages(1000, referenceKeyset, lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	htlcBlindedMessages, htlcMintingSecrets, HTLCMintingSecretKeys, err := CreateHTLCBlindedMessages(1000, referenceKeyset, correctPreimage, 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -101,7 +106,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 	mintRequest := cashu.PostMintBolt11Request{
 		Quote:   postMintQuoteResponse.Quote,
-		Outputs: p2pkBlindedMessages,
+		Outputs: htlcBlindedMessages,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
@@ -128,14 +133,14 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 	aliceBlindSigs = append(aliceBlindSigs, postMintResponse.Signatures...)
 
-	// SWAP P2PK TOKEN with other P2PK TOKENS
-	swapProofs, err := GenerateProofsP2PK(postMintResponse.Signatures, mint.ActiveKeysets, p2pkMintingSecrets, P2PKMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKey})
+	// SWAP HTLC TOKEN with other HTLC TOKENS
+	swapProofs, err := GenerateProofsHTLC(postMintResponse.Signatures, correctPreimage, mint.ActiveKeysets, htlcMintingSecrets, HTLCMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PK, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	swapBlindedMessagesHTLC, swapSecretsHTLC, swapSecretKeyHTLC, err := CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -143,7 +148,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 	swapRequest := cashu.PostSwapRequest{
 		Inputs:  swapProofs,
-		Outputs: swapBlindedMessagesP2PK,
+		Outputs: swapBlindedMessagesHTLC,
 	}
 
 	jsonRequestBody, _ = json.Marshal(swapRequest)
@@ -167,13 +172,13 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	}
 
 	// TRY SWAPING with WRONG SIGNATURES
-	swapProofsWrongSigs, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{wrongPrivKey})
+	swapProofsWrongSigs, err := GenerateProofsHTLC(postSwapResponse.Signatures, correctPreimage, mint.ActiveKeysets, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{wrongPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PKWrongSigs, _, _, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	swapBlindedMessagesHTLCWrongSigs, _, _, err := CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -181,7 +186,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 	swapRequestTwo := cashu.PostSwapRequest{
 		Inputs:  swapProofsWrongSigs,
-		Outputs: swapBlindedMessagesP2PKWrongSigs,
+		Outputs: swapBlindedMessagesHTLCWrongSigs,
 	}
 
 	jsonRequestBody, _ = json.Marshal(swapRequestTwo)
@@ -200,9 +205,43 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
 	}
 
+	// TRY SWAPING with WRONG Preimage
+	swapProofsWrongSigs, err = GenerateProofsHTLC(postSwapResponse.Signatures, incorrectPreimage, mint.ActiveKeysets, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{wrongPrivKey})
+
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+
+	swapBlindedMessagesHTLCWrongSigs, _, _, err = CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	swapRequestTwo = cashu.PostSwapRequest{
+		Inputs:  swapProofsWrongSigs,
+		Outputs: swapBlindedMessagesHTLCWrongSigs,
+	}
+
+	jsonRequestBody, _ = json.Marshal(swapRequestTwo)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("Expected status code 403, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Invalid preimage"` {
+		t.Fatalf("Expected response Invalid preimage, got %s", w.Body.String())
+	}
+
 }
 
-func CreateP2PKBlindedMessages(amount uint64, keyset cashu.Keyset, pubkey *secp256k1.PublicKey, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
+func CreateHTLCBlindedMessages(amount uint64, keyset cashu.Keyset, preimage string, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
 	splitAmounts := cashu.AmountSplit(amount)
 	splitLen := len(splitAmounts)
 
@@ -211,10 +250,10 @@ func CreateP2PKBlindedMessages(amount uint64, keyset cashu.Keyset, pubkey *secp2
 	rs := make([]*secp256k1.PrivateKey, splitLen)
 
 	for i, amt := range splitAmounts {
-		spendCond, err := makeP2PKSpendCondition(pubkey, nSigs, pubkeys, refundPubkey, locktime, sigflag)
+		spendCond, err := makeHTLCSpendCondition(preimage, nSigs, pubkeys, refundPubkey, locktime, sigflag)
 
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("MakeP2PKSpendCondition: %w", err)
+			return nil, nil, nil, fmt.Errorf("MakeHTLCSpendCondition: %w", err)
 		}
 
 		jsonSpend, err := spendCond.String()
@@ -248,27 +287,36 @@ func CreateP2PKBlindedMessages(amount uint64, keyset cashu.Keyset, pubkey *secp2
 	return blindedMessages, secrets, rs, nil
 }
 
-func makeP2PKSpendCondition(pubkey *secp256k1.PublicKey, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) (cashu.SpendCondition, error) {
+func makeHTLCSpendCondition(preimage string, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) (cashu.SpendCondition, error) {
+
+	bytesPreimage, err := hex.DecodeString(preimage)
+	if err != nil {
+		return cashu.SpendCondition{}, err
+	}
+
+	parsedPreimage := sha256.Sum256(bytesPreimage)
+
 	var spendCondition cashu.SpendCondition
-	spendCondition.Type = cashu.P2PK
-	spendCondition.Data.Data = hex.EncodeToString(pubkey.SerializeCompressed())
+	spendCondition.Type = cashu.HTLC
+	spendCondition.Data.Data = hex.EncodeToString(parsedPreimage[:])
 	spendCondition.Data.Tags.Pubkeys = pubkeys
 	spendCondition.Data.Tags.NSigs = nSigs
 	spendCondition.Data.Tags.Locktime = locktime
 	spendCondition.Data.Tags.Sigflag = sigflag
 	spendCondition.Data.Tags.Refund = refundPubkey
 
-	nonce, err := cashu.GenerateNonceHex()
 	// generate random Nonce
+	nonce := make([]byte, 32) // create a slice with length 16 for the nonce
+	_, err = rand.Read(nonce) // read random bytes into the nonce slice
 	if err != nil {
 		return spendCondition, err
 	}
-	spendCondition.Data.Nonce = nonce
+	spendCondition.Data.Nonce = hex.EncodeToString(nonce)
 
 	return spendCondition, nil
 }
 
-func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofsHTLC(signatures []cashu.BlindSignature, preimage string, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 	// try to swap tokens
 	var proofs []cashu.Proof
 	// unblid the signatures and make proofs
@@ -299,6 +347,10 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]mi
 			if err != nil {
 				return nil, fmt.Errorf("Error signing proof: %w", err)
 			}
+			err = proof.AddPreimage(preimage)
+			if err != nil {
+				return nil, fmt.Errorf("Error signing proof: %w", err)
+			}
 		}
 
 		if err != nil {
@@ -311,7 +363,7 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]mi
 	return proofs, nil
 }
 
-func TestP2PKMultisigSigning(t *testing.T) {
+func TestHTLCMultisigSigning(t *testing.T) {
 	const posgrespassword = "password"
 	const postgresuser = "user"
 	ctx := context.Background()
@@ -386,7 +438,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	// ask for minting
 	// Create multisig token for 2 pubkeys
-	p2pkBlindedMessages, p2pkMintingSecrets, P2PKMintingSecretKeys, err := CreateP2PKBlindedMessages(1000, referenceKeyset, lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, nil, 0, cashu.SigInputs)
+	htlcBlindedMessages, htlcMintingSecrets, HTLCMintingSecretKeys, err := CreateHTLCBlindedMessages(1000, referenceKeyset, correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyOne.PubKey(), lockingPrivKeyTwo.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -394,7 +446,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	mintRequest := cashu.PostMintBolt11Request{
 		Quote:   postMintQuoteResponse.Quote,
-		Outputs: p2pkBlindedMessages,
+		Outputs: htlcBlindedMessages,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
@@ -421,9 +473,9 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	aliceBlindSigs = append(aliceBlindSigs, postMintResponse.Signatures...)
 
-	// SWAP P2PK TOKEN with other P2PK TOKENS
+	// SWAP HTLC TOKEN with other HTLC TOKENS
 	// sign multisig with correct privkeys
-	swapProofs, err := GenerateProofsP2PK(postMintResponse.Signatures, mint.ActiveKeysets, p2pkMintingSecrets, P2PKMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKeyOne, lockingPrivKeyTwo})
+	swapProofs, err := GenerateProofsHTLC(postMintResponse.Signatures, correctPreimage, mint.ActiveKeysets, htlcMintingSecrets, HTLCMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKeyOne, lockingPrivKeyTwo})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
@@ -431,7 +483,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	refundPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x06})
 
-	swapBlindedMessagesP2PK, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+	swapBlindedMessagesHTLC, swapSecretsHTLC, swapSecretKeyHTLC, err := CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey(), lockingPrivKeyOne.PubKey(), lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -439,7 +491,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	swapRequest := cashu.PostSwapRequest{
 		Inputs:  swapProofs,
-		Outputs: swapBlindedMessagesP2PK,
+		Outputs: swapBlindedMessagesHTLC,
 	}
 
 	jsonRequestBody, _ = json.Marshal(swapRequest)
@@ -463,13 +515,13 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	}
 
 	// // TRY SWAPING with Timelock passed
-	swapProofsTimelockNotExpiredWrongSig, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
+	swapProofsTimelockNotExpiredWrongSig, err := GenerateProofsHTLC(postSwapResponse.Signatures, correctPreimage, mint.ActiveKeysets, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PKWrongSigs, _, _, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+	swapBlindedMessagesHTLCWrongPreimage, _, _, err := CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -477,7 +529,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	swapRequestTwo := cashu.PostSwapRequest{
 		Inputs:  swapProofsTimelockNotExpiredWrongSig,
-		Outputs: swapBlindedMessagesP2PKWrongSigs,
+		Outputs: swapBlindedMessagesHTLCWrongPreimage,
 	}
 
 	jsonRequestBody, _ = json.Marshal(swapRequestTwo)
@@ -497,19 +549,19 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	}
 
 	// TRY SWAPPING with refund key
-	swapProofsRefund, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, refundPrivKey})
+	swapProofsRefund, err := GenerateProofsHTLC(postSwapResponse.Signatures, correctPreimage, mint.ActiveKeysets, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{lockingPrivKeyTwo, refundPrivKey})
 
 	currentPlus15 := time.Now().Add(15 * time.Minute).Unix()
 
 	// generate new blind signatures with timelock over 15 minutes of current time
-	swapBlindedMessagesP2PKWrongSigsOverlock, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, int(currentPlus15), cashu.SigInputs)
+	swapBlindedMessagesHTLCWrongSigsOverlock, swapSecretsHTLC, swapSecretKeyHTLC, err := CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyOne.PubKey(), lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, int(currentPlus15), cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 	swapRequestRefund := cashu.PostSwapRequest{
 		Inputs:  swapProofsRefund,
-		Outputs: swapBlindedMessagesP2PKWrongSigsOverlock,
+		Outputs: swapBlindedMessagesHTLCWrongSigsOverlock,
 	}
 
 	jsonRequestBody, _ = json.Marshal(swapRequestRefund)
@@ -519,8 +571,6 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-
-	// var postSwapResponse cashu.PostSwapResponse
 
 	if w.Code != 200 {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
@@ -534,13 +584,13 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	// try swapping with wrong refund key and timelock not yet expired
 
-	swapProofsTimelockNotExpiredWrongSig, err = GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
+	swapProofsTimelockNotExpiredWrongSig, err = GenerateProofsHTLC(postSwapResponse.Signatures, correctPreimage, mint.ActiveKeysets, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PKWrongSigs, _, _, err = CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+	swapBlindedMessagesHTLCWrongPreimage, _, _, err = CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -548,7 +598,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	swapRequestTwo = cashu.PostSwapRequest{
 		Inputs:  swapProofsTimelockNotExpiredWrongSig,
-		Outputs: swapBlindedMessagesP2PKWrongSigs,
+		Outputs: swapBlindedMessagesHTLCWrongPreimage,
 	}
 
 	jsonRequestBody, _ = json.Marshal(swapRequestTwo)
@@ -565,6 +615,104 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	if w.Body.String() != `"Not enough signatures"` {
 		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	}
+
+	// Try swapping with not enough signatures
+	swapProofsTimelockNotExpiredWrongSig, err = GenerateProofsHTLC(postSwapResponse.Signatures, correctPreimage, mint.ActiveKeysets, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{lockingPrivKeyTwo})
+
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+
+	swapBlindedMessagesHTLCWrongPreimage, _, _, err = CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	swapRequestTwo = cashu.PostSwapRequest{
+		Inputs:  swapProofsTimelockNotExpiredWrongSig,
+		Outputs: swapBlindedMessagesHTLCWrongPreimage,
+	}
+
+	jsonRequestBody, _ = json.Marshal(swapRequestTwo)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("Expected status code 403, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Not enough signatures"` {
+		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	}
+
+	// Try swapping with correct signatures but wrong preimage
+	swapProofsTimelockNotExpiredWrongSig, err = GenerateProofsHTLC(postSwapResponse.Signatures, incorrectPreimage, mint.ActiveKeysets, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{lockingPrivKeyOne, lockingPrivKeyTwo})
+
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+
+	swapBlindedMessagesHTLCWrongPreimage, _, _, err = CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyOne.PubKey(), lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	swapRequestTwo = cashu.PostSwapRequest{
+		Inputs:  swapProofsTimelockNotExpiredWrongSig,
+		Outputs: swapBlindedMessagesHTLCWrongPreimage,
+	}
+
+	jsonRequestBody, _ = json.Marshal(swapRequestTwo)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 403 {
+		t.Fatalf("Expected status code 403, got %d", w.Code)
+	}
+
+	if w.Body.String() != `"Invalid preimage"` {
+		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	}
+
+	// Try swapping with correct signatures and correct preimage
+	swapProofsTimelockNotExpiredWrongSig, err = GenerateProofsHTLC(postSwapResponse.Signatures, correctPreimage, mint.ActiveKeysets, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{lockingPrivKeyOne, lockingPrivKeyTwo})
+
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+
+	swapBlindedMessagesHTLCWrongPreimage, _, _, err = CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	swapRequestTwo = cashu.PostSwapRequest{
+		Inputs:  swapProofsTimelockNotExpiredWrongSig,
+		Outputs: swapBlindedMessagesHTLCWrongPreimage,
+	}
+
+	jsonRequestBody, _ = json.Marshal(swapRequestTwo)
+
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
 
 }

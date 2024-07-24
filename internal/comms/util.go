@@ -360,7 +360,6 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("json.Unmarshal: %w", err)
 	}
-	fmt.Printf("Body: %+v ", response)
 
 	// get auth settings
 	authBody := struct {
@@ -410,14 +409,11 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		return nil, nil, nil, nil, fmt.Errorf("no wallet found")
 	}
 
-	fmt.Printf("AdminKey: %+v ", responseWallet[0].AdminKey)
 	err = os.Setenv(MINT_LNBITS_KEY, responseWallet[0].AdminKey)
 	err = os.Setenv(MINT_LNBITS_ENDPOINT, "http://"+aliceLnbitsIp+":5000")
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not set env %w", err)
 	}
-
-	fmt.Println("Response: ", string(body))
 
 	// generate wallet
 

@@ -564,6 +564,12 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			case errors.Is(err, cashu.ErrNotEnoughSignatures):
 				c.JSON(403, cashu.ErrNotEnoughSignatures.Error())
 				return
+			case errors.Is(err, cashu.ErrLocktimePassed):
+				c.JSON(403, cashu.ErrLocktimePassed.Error())
+				return
+			case errors.Is(err, cashu.ErrInvalidPreimage):
+				c.JSON(403, cashu.ErrInvalidPreimage.Error())
+				return
 
 			}
 
@@ -589,8 +595,6 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				c.JSON(400, "could not make payment")
 				return
 			}
-
-			fmt.Printf("PaymentError: %+v ", payment)
 
 			switch {
 			case payment.PaymentError.Error() == "invoice is already paid":

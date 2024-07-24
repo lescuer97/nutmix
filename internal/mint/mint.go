@@ -255,7 +255,7 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	}
 
 	if isProofLocked {
-		ok, err := proof.VerifyWitnessSig(spendCondition, witness, pubkeysFromProofs)
+		ok, err := proof.VerifyWitness(spendCondition, witness, pubkeysFromProofs)
 
 		if err != nil {
 			return fmt.Errorf("proof.VerifyWitnessSig(): %w", err)
