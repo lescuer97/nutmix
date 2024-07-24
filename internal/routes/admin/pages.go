@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -11,8 +10,8 @@ import (
 )
 
 func LoginPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
-
 	return func(c *gin.Context) {
+
 		// generate nonce for login nostr
 		nonce, err := cashu.GenerateNonceHex()
 		if err != nil {
@@ -27,10 +26,14 @@ func LoginPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Han
 
 		database.SaveNostrLoginAuth(pool, nostrLogin)
 
+		adminNPUB := ctx.Value("ADMIN_NOSTR_NPUB").(string)
+
 		loginValues := struct {
-			Nonce string
+			Nonce     string
+			ADMINNPUB string
 		}{
-			Nonce: nostrLogin.Nonce,
+			Nonce:     nostrLogin.Nonce,
+			ADMINNPUB: adminNPUB,
 		}
 
 		c.HTML(200, "login.html", loginValues)

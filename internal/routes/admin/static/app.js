@@ -20,15 +20,12 @@
 */
 
 
-
-let loginForm = document.getElementById("login-form")
-loginForm?.addEventListener("submit", (e) => {
+let nip07form = document.getElementById("nip07-form")
+// sig nonce sent by the server, in case of success navigate. if an error occurs show an error
+nip07form?.addEventListener("submit", (e) => {
     e.preventDefault();
 
     let formValues = Object.values(e.target).reduce((obj,field) => { obj[field.name] = field.value; return obj }, {})
-
-    console.log({formValues})
-
 
     /** @type {UnsignedNostrEvent}*/
     const eventToSign = {
@@ -38,27 +35,41 @@ loginForm?.addEventListener("submit", (e) => {
         content: formValues.passwordNonce
     }
 
-    console.log({target: e.target})
     window.nostr.signEvent(eventToSign).then((/** 
         @type {SignedNostrEvent}
         */signedEvent) => {
-        console.log({signedEvent})
 
         const loginRequest = new Request("/admin/login", {method: "POST", body: JSON.stringify(signedEvent)})
 
-            fetch(loginRequest).then((_) => {
-                window.location.href="/admin"
+            fetch(loginRequest).then((res) => {
+
+                if (res.ok) {
+                    window.location.href="/admin"
+                } else {
+
+                    const targetHeader = res.headers.get("HX-RETARGET");
+
+                    if (window.htmx && targetHeader) {
+
+                        res.text().then(text => {
+
+                            window.htmx.swap(`#${targetHeader}`, text, {swapStyle: "innerHTML"})
+                        }).catch(err => {
+                            console.log({errText: err})
+
+                        })
+
+                    }
+
+                }
+
             }).catch(err => {
+                console.log("Error message")
                 console.log({err})
             })
-        // request mint login
 
-        fetch()
     }).catch((err) => {
         console.log({err})
     })
-
-    // console.log({nostr: window.nostr.get-nostr-key})
-
-
 })
+

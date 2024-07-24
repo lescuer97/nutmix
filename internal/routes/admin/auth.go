@@ -21,7 +21,6 @@ import (
 const AdminAuthKey = "admin-cookie"
 
 func AuthMiddleware(ctx context.Context) gin.HandlerFunc {
-
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
 			key := ctx.Value(JWTSECRET).([]byte)
@@ -104,7 +103,7 @@ func Login(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Handler
 
 		if !validSig {
 			log.Printf("Invalid Signature: %+v", err)
-			c.JSON(400, "Invalid signature")
+			c.JSON(403, "Invalid signature")
 			return
 		}
 
@@ -159,8 +158,9 @@ func Login(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Handler
 		verified := sig.Verify(eventHash[:], pubkey)
 
 		if !verified {
-			log.Printf("Incorrect signature %+v", err)
-			c.JSON(400, "Incorrect signature")
+			log.Printf("Private key used is not correct")
+			c.Header("HX-RETARGET", "error-message")
+			c.HTML(400, "incorrect-key-error", nil)
 			return
 		}
 
