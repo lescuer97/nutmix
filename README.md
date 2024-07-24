@@ -14,8 +14,9 @@ Please test in Mutinynet at: *https://mutinynet.nutmix.cash*
 
 ## Purpose of this project
 
-I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make an implementation of the mint in Go. I am attempting to make all the
-NUTs available as well as some other ideas such as: Monero and FIAT ecash.
+I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make an implementation of the mint in Go. 
+
+I'm also attempting to make all NUTs available as well as some other ideas such as: Monero and FIAT ecash.
 
 ## Supported NUTs
 
