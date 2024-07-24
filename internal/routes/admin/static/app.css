@@ -1,0 +1,72 @@
+:root {
+/** CSS DARK THEME PRIMARY COLORS */
+--color-primary-100: #2196f3;
+--color-primary-200: #50a1f5;
+--color-primary-300: #6eacf6;
+--color-primary-400: #87b8f8;
+--color-primary-500: #9dc3f9;
+--color-primary-600: #b2cffb;
+/** CSS DARK THEME SURFACE COLORS */
+--color-surface-100: #000000;
+--color-surface-200: #1e1e1e;
+--color-surface-300: #353535;
+--color-surface-400: #4e4e4e;
+--color-surface-500: #696969;
+--color-surface-600: #858585;
+/** CSS DARK THEME MIXED SURFACE COLORS */
+--color-surface-mixed-100: #0f141b;
+--color-surface-mixed-200: #252930;
+--color-surface-mixed-300: #3c4046;
+--color-surface-mixed-400: #55585e;
+--color-surface-mixed-500: #6f7277;
+--color-surface-mixed-600: #8a8c90;
+
+--white: #FFFFFF;
+}
+
+html, body {
+    min-height: 100%;
+    height: 100%;
+    background-color: var(--color-surface-100);
+    color: var(--white);
+}
+
+
+body {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    width: 100vw;
+    margin: 0px;
+
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--color-surface-200);
+    gap: 15px;
+    padding: 15px;
+    border-radius: 15px;
+    border: 2px solid #020000;
+}
+
+button {
+    background-color: var(--color-primary-500);
+    padding: 15px;
+    border-radius: 50px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+#login-form {
+    max-width: 480px;
+}
+
+#nip07-form {
+    display: flex;
+    flex-direction: column;
+}

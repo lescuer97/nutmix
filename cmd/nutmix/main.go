@@ -13,6 +13,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
+	"github.com/lescuer97/nutmix/internal/routes/admin"
 )
 
 var (
@@ -37,6 +38,7 @@ func main() {
 	ctx = context.WithValue(ctx, comms.LND_MACAROON, os.Getenv(comms.LND_MACAROON))
 	ctx = context.WithValue(ctx, comms.MINT_LNBITS_KEY, os.Getenv(comms.MINT_LNBITS_KEY))
 	ctx = context.WithValue(ctx, comms.MINT_LNBITS_ENDPOINT, os.Getenv(comms.MINT_LNBITS_ENDPOINT))
+	ctx = context.WithValue(ctx, "ADMIN_NOSTR_NPUB", os.Getenv("ADMIN_NOSTR_NPUB"))
 
 	if ctx.Value(DOCKER_ENV) == "prod" {
 		log.Println("Running in docker")
@@ -134,7 +136,6 @@ func main() {
 	}
 
 	// remove mint private key from variable
-
 	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds)
 
 	// clear mint seeds and privatekey
@@ -152,7 +153,9 @@ func main() {
 
 	r.Use(cors.Default())
 
-	routes.V1Routes(ctx, r, pool, &mint)
+	routes.V1Routes(ctx, r, pool, mint)
+
+	admin.AdminRoutes(ctx, r, pool, mint)
 
 	defer pool.Close()
 

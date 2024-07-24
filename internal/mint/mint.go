@@ -29,7 +29,6 @@ type Mint struct {
 	PendingProofs []cashu.Proof
 	ActiveProofs  ActiveProofs
 	ActiveQuotes  ActiveQuote
-	// ActiveMeltQuote ActiveMeltQuote
 }
 
 var (
@@ -361,7 +360,7 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 	return orderedKeys
 }
 
-func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mint, error) {
+func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*Mint, error) {
 	mint := Mint{
 		ActiveKeysets: make(map[string]KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
@@ -378,7 +377,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mi
 	case "signet":
 		mint.Network = chaincfg.SigNetParams
 	default:
-		return mint, fmt.Errorf("Invalid network: %s", network)
+		return &mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
 	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
@@ -390,7 +389,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mi
 		lightningComs, err := comms.SetupLightingComms(ctx)
 
 		if err != nil {
-			return mint, err
+			return &mint, err
 		}
 		mint.LightningComs = *lightningComs
 	default:
@@ -413,19 +412,19 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mi
 		masterKey, err := bip32.NewMasterKey(seed.Seed)
 		if err != nil {
 			log.Println(fmt.Errorf("NewMasterKey: %w", err))
-			return mint, err
+			return &mint, err
 		}
 
 		unit, err := cashu.UnitFromString(seed.Unit)
 		if err != nil {
 			log.Println(fmt.Errorf("cashu.UnitFromString: %w", err))
-			return mint, err
+			return &mint, err
 		}
 
 		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit)
 
 		if err != nil {
-			return mint, fmt.Errorf("GenerateKeysets: %w", err)
+			return &mint, fmt.Errorf("GenerateKeysets: %w", err)
 		}
 
 		if seed.Active {
@@ -439,7 +438,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mi
 		mint.Keysets[seed.Unit] = append(mint.Keysets[seed.Unit], keysets...)
 	}
 
-	return mint, nil
+	return &mint, nil
 }
 
 type AddToDBFunc func(*pgxpool.Pool, bool, cashu.ACTION_STATE, string) error

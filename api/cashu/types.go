@@ -27,8 +27,9 @@ var (
 
 const ExpiryMinutesDefault int64 = 15
 
-func ExpiryTime() int64 {
-	return time.Now().Add(15 * time.Minute).Unix()
+func ExpiryTimeMinUnit(minutes int64) int64 {
+	duration := time.Duration(minutes) * time.Minute
+	return time.Now().Add(duration).Unix()
 }
 
 type Unit int
@@ -733,4 +734,10 @@ func (b *BlindSignature) VerifyDLEQ(
 	// I negate the hashed_keys_priv because the original key got altered when multiplying for A
 	return hashed_keys_priv.Key.Negate().String() == e.Key.String(), nil
 
+}
+
+type NostrLoginAuth struct {
+	Nonce     string
+	Activated bool
+	Expiry    int
 }
