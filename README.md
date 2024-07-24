@@ -8,15 +8,14 @@ _This project is in active development; it has not gone through optimization and
 
 # Nutmix
 
-Cashu protocol mint. Focused on Multiple denominations of ecash.
+Cashu protocol mint focused on ease of use and feature completeness.
 
 Please test in Mutinynet at: *https://mutinynet.nutmix.cash*
 
 ## Purpose of this project
 
-This is an attempt to learn Go and eCash. I saw the work made by calle on the Cashu protocol and was fascinated by the
-awesomeness of the project. So I decided to make an implementation of the mint in Go. I am attempting to make all the
-NUTs available as well as some other ideas such as: Monero and USD ecash.
+I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make an implementation of the mint in Go. I am attempting to make all the
+NUTs available as well as some other ideas such as: Monero and FIAT ecash.
 
 ## Supported NUTs
 
@@ -44,7 +43,7 @@ able to monitor and control de behaviour of the mint.
 ## Roadmap
 At this moment NUTS are up to P2PK (NUT-11) are implemented and working. I plan to keep going until all NUTS are done.
 
-1. Finish Milestones for [V1](https://github.com/lescuer97/nutmix/milestone/1). 
+1. ~~Finish Milestones for [V1](https://github.com/lescuer97/nutmix/milestone/1).~~
 2. Finish NUTS until NUT-15. 
 3. Add dashboard for controlling aspects of the mint.
     - Nostr Login
