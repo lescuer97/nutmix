@@ -46,7 +46,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		var response cashu.PostMintQuoteBolt11Response
 
-		expireTime := cashu.ExpiryTime()
+		expireTime := cashu.ExpiryTimeMinUnit(15)
 
 		switch lightningBackendType {
 		case comms.FAKE_WALLET:
@@ -332,7 +332,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		response := cashu.PostMeltQuoteBolt11Response{}
 		dbRequest := cashu.MeltRequestDB{}
 
-		expireTime := cashu.ExpiryTime()
+		expireTime := cashu.ExpiryTimeMinUnit(15)
 
 		lightningBackendType := ctx.Value("MINT_LIGHTNING_BACKEND").(string)
 

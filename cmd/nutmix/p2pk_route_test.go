@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -259,13 +258,12 @@ func makeP2PKSpendCondition(pubkey *secp256k1.PublicKey, nSigs int, pubkeys []*s
 	spendCondition.Data.Tags.Sigflag = sigflag
 	spendCondition.Data.Tags.Refund = refundPubkey
 
+	nonce, err := cashu.GenerateNonceHex()
 	// generate random Nonce
-	nonce := make([]byte, 32)  // create a slice with length 16 for the nonce
-	_, err := rand.Read(nonce) // read random bytes into the nonce slice
 	if err != nil {
 		return spendCondition, err
 	}
-	spendCondition.Data.Nonce = hex.EncodeToString(nonce)
+	spendCondition.Data.Nonce = nonce
 
 	return spendCondition, nil
 }
