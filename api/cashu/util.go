@@ -37,3 +37,34 @@ func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
 	return res
 
 }
+
+func Fees(proofs []Proof, keysets []Keyset) (int, error) {
+	totalFees := 0
+
+	var keysetToUse Keyset
+	for _, proof := range proofs {
+		// find keyset to compare to fees if keyset id is not found throw error
+		// only check for new keyset if proofs id is different
+		if keysetToUse.Id != proof.Id {
+			for _, keyset := range keysets {
+				if keyset.Id == proof.Id {
+
+					keysetToUse = keyset
+				}
+			}
+			if keysetToUse.Id != proof.Id {
+				return 0, ErrKeysetForProofNotFound
+
+			}
+
+		}
+
+		totalFees += keysetToUse.InputFeePpk
+
+	}
+
+	totalFees = (totalFees + 999) / 1000
+
+	return totalFees, nil
+
+}

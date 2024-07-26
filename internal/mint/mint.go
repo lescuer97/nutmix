@@ -155,12 +155,10 @@ func (m *Mint) RemoveQuotesAndProofs(quote string, proofs []cashu.Proof) {
 // errors types for validation
 
 var (
-	ErrKeysetNotFound         = errors.New("Keyset not found")
-	ErrKeysetForProofNotFound = errors.New("Keyset for proof not found")
-	ErrInvalidProof           = errors.New("Invalid proof")
-	ErrQuoteNotPaid           = errors.New("Quote not paid")
-	ErrMessageAmountToBig     = errors.New("Message amount is to big")
-	ErrInvalidBlindMessage    = errors.New("Invalid blind message")
+	ErrInvalidProof        = errors.New("Invalid proof")
+	ErrQuoteNotPaid        = errors.New("Quote not paid")
+	ErrMessageAmountToBig  = errors.New("Message amount is to big")
+	ErrInvalidBlindMessage = errors.New("Invalid blind message")
 )
 
 var (
@@ -180,7 +178,7 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof) (cashu.Unit, error) 
 		}
 
 		if len(keyset) == 0 {
-			return cashu.Sat, ErrKeysetForProofNotFound
+			return cashu.Sat, cashu.ErrKeysetForProofNotFound
 		}
 
 		units[keyset[0].Unit] = true
@@ -244,7 +242,7 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 
 	// check if keysetToUse is not assigned
 	if keysetToUse.Id == "" {
-		return ErrKeysetForProofNotFound
+		return cashu.ErrKeysetForProofNotFound
 	}
 
 	// check if a proof is locked to a spend condition and verifies it
@@ -422,7 +420,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (Mi
 			return mint, err
 		}
 
-		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit)
+		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk)
 
 		if err != nil {
 			return mint, fmt.Errorf("GenerateKeysets: %w", err)
