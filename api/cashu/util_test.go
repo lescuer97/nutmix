@@ -12,7 +12,7 @@ func TestOrderKeysetByUnit(t *testing.T) {
 		t.Errorf("could not setup master key %+v", err)
 	}
 
-	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat)
+	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat, 0)
 
 	if err != nil {
 		t.Errorf("could not generate keyset %+v", err)
@@ -25,6 +25,56 @@ func TestOrderKeysetByUnit(t *testing.T) {
 
 	if firstOrdKey.Keys["1"] != "03fbf65684a42313691fe562aa315f26409a19aaaaa8ef0163fc8d8598f16fe003" {
 		t.Errorf("keyset is not correct")
+	}
+
+}
+
+func TestAmountOfFeeProofs(t *testing.T) {
+
+	var proofs []Proof
+	var keysets []Keyset
+	id := "keysetID"
+	inputFee := 100
+
+	for i := 0; i < 9; i++ {
+		// add 9 proofs
+		proof := Proof{
+			Id: id,
+		}
+
+		keyset := Keyset{
+			Id:          id,
+			InputFeePpk: inputFee,
+		}
+
+		proofs = append(proofs, proof)
+		keysets = append(keysets, keyset)
+	}
+
+	fee, _ := Fees(proofs, keysets)
+
+	if fee != 1 {
+		t.Errorf("fee calculation is incorrect: %v. Should be 1", fee)
+	}
+
+	for i := 0; i < 3; i++ {
+		// add 9 proofs
+		proof := Proof{
+			Id: id,
+		}
+
+		keyset := Keyset{
+			Id:          id,
+			InputFeePpk: inputFee,
+		}
+
+		proofs = append(proofs, proof)
+		keysets = append(keysets, keyset)
+	}
+	fee, _ = Fees(proofs, keysets)
+
+	if fee != 2 {
+		t.Errorf("fee calculation is incorrect: %v. Should be 2", fee)
 	}
 
 }
