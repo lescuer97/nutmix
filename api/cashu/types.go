@@ -23,6 +23,8 @@ var (
 	ErrCouldNotParseUnitString = errors.New("Could not parse unit string")
 	ErrCouldNotEncryptSeed     = errors.New("Could not encrypt seed")
 	ErrCouldNotDecryptSeed     = errors.New("Could not decrypt seed")
+	ErrKeysetNotFound          = errors.New("Keyset not found")
+	ErrKeysetForProofNotFound  = errors.New("Keyset for proof not found")
 )
 
 const ExpiryMinutesDefault int64 = 15
@@ -297,12 +299,13 @@ type MintError struct {
 }
 
 type Keyset struct {
-	Id        string                `json:"id"`
-	Active    bool                  `json:"active" db:"active"`
-	Unit      string                `json:"unit"`
-	Amount    uint64                `json:"amount"`
-	PrivKey   *secp256k1.PrivateKey `json:"priv_key"`
-	CreatedAt int64                 `json:"created_at"`
+	Id          string                `json:"id"`
+	Active      bool                  `json:"active" db:"active"`
+	Unit        string                `json:"unit"`
+	Amount      uint64                `json:"amount"`
+	PrivKey     *secp256k1.PrivateKey `json:"priv_key"`
+	CreatedAt   int64                 `json:"created_at"`
+	InputFeePpk int                   `json:"input_fee_ppk"`
 }
 
 func (keyset *Keyset) GetPubKey() *secp256k1.PublicKey {
@@ -311,13 +314,14 @@ func (keyset *Keyset) GetPubKey() *secp256k1.PublicKey {
 }
 
 type Seed struct {
-	Seed      []byte
-	Active    bool
-	CreatedAt int64
-	Version   int
-	Unit      string
-	Id        string
-	Encrypted bool
+	Seed        []byte
+	Active      bool
+	CreatedAt   int64
+	Version     int
+	Unit        string
+	Id          string
+	Encrypted   bool
+	InputFeePpk int `json:"input_fee_ppk" db:"input_fee_ppk"`
 }
 
 func (seed *Seed) EncryptSeed(mintPrivateKey string) error {
@@ -407,9 +411,10 @@ type GetInfoResponse struct {
 type KeysResponse map[string][]KeysetResponse
 
 type KeysetResponse struct {
-	Id   string            `json:"id"`
-	Unit string            `json:"unit"`
-	Keys map[string]string `json:"keys"`
+	Id          string            `json:"id"`
+	Unit        string            `json:"unit"`
+	Keys        map[string]string `json:"keys"`
+	InputFeePpk int               `json:"input_fee_ppk"`
 }
 
 type PostMintQuoteBolt11Request struct {
@@ -438,9 +443,10 @@ type PostMintBolt11Response struct {
 }
 
 type BasicKeysetResponse struct {
-	Id     string `json:"id"`
-	Unit   string `json:"unit"`
-	Active bool   `json:"active"`
+	Id          string `json:"id"`
+	Unit        string `json:"unit"`
+	Active      bool   `json:"active"`
+	InputFeePpk int    `json:"input_fee_ppk"`
 }
 
 type ACTION_STATE string
