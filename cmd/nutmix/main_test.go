@@ -641,7 +641,11 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	}
 
-	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds)
+	config, err := mint.SetUpConfigFile()
+	if err != nil {
+		log.Fatalf("could not setup config file: %+v ", err)
+	}
+	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds, config)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)

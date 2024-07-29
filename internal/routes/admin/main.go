@@ -31,6 +31,9 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.GET("/login", LoginPage(ctx, pool, mint))
 	adminRoute.POST("/login", Login(ctx, pool, mint))
 
+	// partial template routes
+	adminRoute.GET("/settings", SettingsTab(ctx, pool, mint))
+
 }
 
 func generateHMACSecret() ([]byte, error) {

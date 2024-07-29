@@ -44,7 +44,12 @@ func TestSetUpMint(t *testing.T) {
 
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 
-	mint, err := SetUpMint(ctx, mint_privkey, seeds)
+	config, err := SetUpConfigFile()
+	if err != nil {
+		t.Errorf("could not setup config file: %+v", err)
+	}
+
+	mint, err := SetUpMint(ctx, mint_privkey, seeds, config)
 
 	if err != nil {
 		t.Errorf("could not setup mint: %+v", err)

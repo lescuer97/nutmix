@@ -17,6 +17,11 @@ var DBError = errors.New("ERROR DATABASE")
 
 var DATABASE_URL_ENV = "DATABASE_URL"
 
+const (
+	DOCKERDATABASE = "DOCKERDATABASE"
+	CUSTOMDATABASE = "CUSTOMDATABASE"
+)
+
 func databaseError(err error) error {
 	return fmt.Errorf("%w  %w", DBError, err)
 }

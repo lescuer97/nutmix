@@ -358,13 +358,13 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 	return orderedKeys
 }
 
-func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*Mint, error) {
+func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, config Config) (*Mint, error) {
 	mint := Mint{
 		ActiveKeysets: make(map[string]KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
 	}
 
-	network := ctx.Value(NETWORK_ENV)
+	network := config.NETWORK
 	switch network {
 	case "testnet":
 		mint.Network = chaincfg.TestNet3Params
@@ -378,8 +378,8 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*M
 		return &mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
-	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
-	switch lightningBackendType {
+	// lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
+	switch config.MINT_LIGHTNING_BACKEND {
 
 	case comms.FAKE_WALLET:
 
@@ -391,7 +391,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*M
 		}
 		mint.LightningComs = *lightningComs
 	default:
-		log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
+		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)
 	}
 
 	mint.PendingProofs = make([]cashu.Proof, 0)
