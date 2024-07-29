@@ -1,7 +1,7 @@
 {{ template "base" }}
 
-<div>
-    hello from index
+<div class="content">
+    <div id="tabs" hx-get="/admin/settings" hx-trigger="load delay:100ms" hx-target="#tabs" hx-swap="innerHTML"></div>
 </div>
 
 

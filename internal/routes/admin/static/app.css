@@ -62,6 +62,21 @@ button {
     cursor: pointer;
 }
 
+button.selected {
+    background-color: var(--color-primary-200);
+
+    cursor: default;
+}
+
+.content {
+    padding: 120px 120px;
+}
+
+.tab-content {
+    margin-top: 36px;
+
+}
+
 #login-form {
     max-width: 480px;
 }
