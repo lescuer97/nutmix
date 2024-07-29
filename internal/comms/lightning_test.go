@@ -21,7 +21,18 @@ func TestSetupLightingCommsLND(t *testing.T) {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
 	}
 
-	lightingComms, err := SetupLightingComms(ctx)
+	// config, err := mint.SetUpConfigFile()
+	config := LightingCommsData{
+		MINT_LIGHTNING_BACKEND: os.Getenv("MINT_LIGHTNING_BACKEND"),
+		LND_TLS_CERT:           os.Getenv(LND_TLS_CERT),
+		LND_MACAROON:           os.Getenv(LND_MACAROON),
+		LND_GRPC_HOST:          os.Getenv(LND_HOST),
+	}
+	// if err != nil {
+	// 	log.Fatalf("could not setup config file: %+v ", err)
+	// }
+
+	lightingComms, err := SetupLightingComms(ctx, config)
 
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)
@@ -51,8 +62,13 @@ func TestSetupLightingCommsLnBits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
 	}
+	config := LightingCommsData{
+		MINT_LIGHTNING_BACKEND: os.Getenv("MINT_LIGHTNING_BACKEND"),
+		MINT_LNBITS_ENDPOINT:   os.Getenv(MINT_LNBITS_ENDPOINT),
+		MINT_LNBITS_KEY:        os.Getenv(MINT_LNBITS_KEY),
+	}
 
-	lightingComms, err := SetupLightingComms(ctx)
+	lightingComms, err := SetupLightingComms(ctx, config)
 
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)

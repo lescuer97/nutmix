@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/pelletier/go-toml/v2"
@@ -26,6 +27,7 @@ type Config struct {
 	MINT_LIGHTNING_BACKEND string
 	LND_GRPC_HOST          string
 	LND_TLS_CERT           string
+	LND_MACAROON           string
 
 	MINT_LNBITS_ENDPOINT string
 	MINT_LNBITS_KEY      string
@@ -52,6 +54,7 @@ func (c *Config) Default() {
 
 	c.LND_GRPC_HOST = ""
 	c.LND_TLS_CERT = ""
+	c.LND_MACAROON = ""
 
 	c.MINT_LNBITS_ENDPOINT = ""
 	c.MINT_LNBITS_KEY = ""
@@ -76,6 +79,7 @@ func (c *Config) UseEnviromentVars() {
 
 	c.LND_GRPC_HOST = os.Getenv("LND_GRPC_HOST")
 	c.LND_TLS_CERT = os.Getenv("LND_TLS_CERT")
+	c.LND_MACAROON = os.Getenv("LND_MACAROON")
 
 	c.MINT_LNBITS_ENDPOINT = os.Getenv("MINT_LNBITS_ENDPOINT")
 	c.MINT_LNBITS_KEY = os.Getenv("MINT_LNBITS_KEY")
@@ -86,6 +90,20 @@ func (c *Config) UseEnviromentVars() {
 	c.POSTGRES_PASSWORD = os.Getenv("POSTGRES_PASSWORD")
 
 	c.ADMIN_NOSTR_NPUB = os.Getenv("ADMIN_NOSTR_NPUB")
+}
+
+func (c *Config) ToLightningCommsData() comms.LightingCommsData {
+
+	return comms.LightingCommsData{
+		MINT_LIGHTNING_BACKEND: c.MINT_LIGHTNING_BACKEND,
+		LND_GRPC_HOST:          c.LND_GRPC_HOST,
+		LND_TLS_CERT:           c.LND_TLS_CERT,
+		LND_MACAROON:           c.LND_MACAROON,
+
+		MINT_LNBITS_KEY:      c.MINT_LNBITS_KEY,
+		MINT_LNBITS_ENDPOINT: c.MINT_LNBITS_ENDPOINT,
+	}
+
 }
 
 func SetUpConfigFile() (Config, error) {

@@ -71,6 +71,16 @@ type LightningPaymentResponse struct {
 	Rhash          string
 }
 
+type LightingCommsData struct {
+	MINT_LIGHTNING_BACKEND string
+	LND_GRPC_HOST          string
+	LND_TLS_CERT           string
+	LND_MACAROON           string
+
+	MINT_LNBITS_ENDPOINT string
+	MINT_LNBITS_KEY      string
+}
+
 func (l *LightingComms) LnbitsInvoiceRequest(method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{}
 	jsonBytes, err := json.Marshal(reqBody)
@@ -349,13 +359,13 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 
 }
 
-func SetupLightingComms(ctx context.Context) (*LightingComms, error) {
-	usedLightningBackend := ctx.Value("MINT_LIGHTNING_BACKEND")
+func SetupLightingComms(ctx context.Context, config LightingCommsData) (*LightingComms, error) {
+	usedLightningBackend := config.MINT_LIGHTNING_BACKEND
 
 	var lightningComs LightingComms
 	switch usedLightningBackend {
 	case LND_WALLET:
-		err := setupLndRpcComms(ctx, &lightningComs)
+		err := setupLndRpcComms(&lightningComs, config)
 		lightningComs.LightningBackend = LNDGRPC
 
 		if err != nil {
@@ -364,12 +374,12 @@ func SetupLightingComms(ctx context.Context) (*LightingComms, error) {
 
 	case LNBITS_WALLET:
 
-		mint_key := ctx.Value(MINT_LNBITS_KEY).(string)
+		mint_key := config.MINT_LNBITS_KEY
 
 		if mint_key == "" {
 			return nil, fmt.Errorf("MINT_LNBITS_KEY not available")
 		}
-		mint_endpoint := ctx.Value(MINT_LNBITS_ENDPOINT).(string)
+		mint_endpoint := config.MINT_LNBITS_ENDPOINT
 		if mint_endpoint == "" {
 			return nil, fmt.Errorf("MINT_LNBITS_ENDPOINT not available")
 		}
@@ -386,12 +396,12 @@ func SetupLightingComms(ctx context.Context) (*LightingComms, error) {
 
 }
 
-func setupLndRpcComms(ctx context.Context, lightningComs *LightingComms) error {
-	host := ctx.Value(LND_HOST).(string)
+func setupLndRpcComms(lightningComs *LightingComms, config LightingCommsData) error {
+	host := config.LND_GRPC_HOST
 	if host == "" {
 		return fmt.Errorf("LND_HOST not available")
 	}
-	pem_cert := ctx.Value(LND_TLS_CERT).(string)
+	pem_cert := config.LND_TLS_CERT
 
 	if pem_cert == "" {
 		return fmt.Errorf("LND_CERT_PATH not available")
@@ -419,7 +429,7 @@ func setupLndRpcComms(ctx context.Context, lightningComs *LightingComms) error {
 		return err
 	}
 
-	macaroon := ctx.Value(LND_MACAROON).(string)
+	macaroon := config.LND_MACAROON
 
 	if macaroon == "" {
 		return fmt.Errorf("LND_MACAROON_PATH not available")

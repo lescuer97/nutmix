@@ -29,6 +29,7 @@ type Mint struct {
 	PendingProofs []cashu.Proof
 	ActiveProofs  ActiveProofs
 	ActiveQuotes  ActiveQuote
+	Config        Config
 }
 
 var (
@@ -362,6 +363,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 	mint := Mint{
 		ActiveKeysets: make(map[string]KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
+		Config:        config,
 	}
 
 	network := config.NETWORK
@@ -384,7 +386,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 	case comms.FAKE_WALLET:
 
 	case comms.LND_WALLET, comms.LNBITS_WALLET:
-		lightningComs, err := comms.SetupLightingComms(ctx)
+		lightningComs, err := comms.SetupLightingComms(ctx, config.ToLightningCommsData())
 
 		if err != nil {
 			return &mint, err
