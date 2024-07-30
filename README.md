@@ -132,4 +132,10 @@ sp1qq0fju879lh2rgvwjjd7e78pg4gnr7a8aumth8qlezdgjs2rwzk7ssq5jm7v27cuuk5dyjfurdy8t
 bc1qp7lswgftpgrkt00vszrm63dmkq3nuxjv60czk6
 ```
 
+*Donate with Monero*
+
+```
+84yCRZY6BXebs8xWE6Yzj6S6cE17uLhkTSynneVPmejjWAcgBtnV7UEUiZqJNLE4pXaPmXNkJuhcAYbpu49zAdVsEZqqxac
+```
+
 
