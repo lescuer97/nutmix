@@ -12,6 +12,10 @@ import (
 
 const JWTSECRET = "JWTSECRET"
 
+type ErrorNotif struct {
+	Error string
+}
+
 func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 	r.Static("static", "internal/routes/admin/static")
 	r.LoadHTMLGlob("internal/routes/admin/templates/**")
@@ -32,7 +36,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.POST("/login", Login(ctx, pool, mint))
 
 	// partial template routes
-	adminRoute.GET("/settings", SettingsTab(ctx, pool, mint))
+	adminRoute.GET("/mintinfo", MintInfoTab(ctx, pool, mint))
+	adminRoute.POST("/mintinfo", MintInfoPost(ctx, pool, mint))
 
 }
 

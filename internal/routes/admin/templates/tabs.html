@@ -1,17 +1,68 @@
-{{ define "settings" }}
-<div class="tab-list" role="tablist">
-	<button hx-get="/tab2" role="tab" aria-selected="false" aria-controls="tab-content">Tab 2</button>
-	<button hx-get="/tab3" role="tab" aria-selected="false" aria-controls="tab-content">Tab 3</button>
-	<button hx-get="/settings" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Settings</button>
-</div>
+{{ define "mintinfo" }}
+<nav class="tab-list" role="tablist">
+	<button hx-get="/admin/mintinfo" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
+	<button hx-get="/admin/bol11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/database" role="tab" aria-selected="false" aria-controls="tab-content">Database</button>
+</nav>
 
-<div id="tab-content" role="tabpanel" class="tab-content">
-	Commodo normcore truffaut VHS duis gluten-free keffiyeh iPhone taxidermy godard ramps anim pour-over.
-	Pitchfork vegan mollit umami quinoa aute aliquip kinfolk eiusmod live-edge cardigan ipsum locavore.
-	Polaroid duis occaecat narwhal small batch food truck.
-	PBR&B venmo shaman small batch you probably haven't heard of them hot chicken readymade.
-	Enim tousled cliche woke, typewriter single-origin coffee hella culpa.
-	Art party readymade 90's, asymmetrical hell of fingerstache ipsum.
-</div>
+<article id="tab-content" role="tabpanel" class="tab-content">
+
+
+    <form hx-post="/admin/mintinfo" hx-target="#notifications" hx-swap="innerHTML">
+    <div hx-ext="remove-me" id="notifications">
+    </div>
+        <h3>Mint Settings</h3>
+        <!-- <div class="form-section"> -->
+            <label for="MOTD" class="settings-input"> 
+                Mint Notifications (MOTD):
+                <input name="MOTD" value="{{.MOTD}}" type="text"  />
+            </label>
+        <!-- </div> -->
+            <label for="NAME" class="settings-input"> 
+                Name:
+                <input name="NAME"value="{{.NAME}}" type="text"  />
+            </label>
+
+            <label for="DESCRIPTION" class="settings-input"> 
+                Description:
+                <input name="DESCRIPTION"value="{{.DESCRIPTION}}" type="text"  />
+            </label>
+            <label for="DESCRIPTION_LONG" class="settings-input"> 
+                Long Description:
+                <textarea name="DESCRIPTION_LONG"  type="text">{{.DESCRIPTION_LONG}}</textarea>
+            </label>
+
+        <div class="form-section">
+            <label for="EMAIL" class="settings-input"> 
+                Contact email:
+                <input name="EMAIL" value="{{.EMAIL}}" type="email"  />
+            </label>
+            <label for="NOSTR" class="settings-input"> 
+                Nostr contact info:
+                <input name="NOSTR" value="{{.NOSTR}}" type="text"  />
+            </label>
+            
+        </div>
+
+    <button type="submit">Save Settings</button>
+    </form>
+
+
+</article>
 
 {{ end }}
+
+{{ define "settings-error" }}
+    
+<div remove-me="3s" class="error">
+    <span>{{.Error}}</span>
+</div>
+
+{{end}}
+{{ define "settings-success" }}
+    
+<div remove-me="3s" class="success">
+    <span>{{.Success}}</span>
+</div>
+
+{{end}}

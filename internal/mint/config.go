@@ -105,6 +105,29 @@ func (c *Config) ToLightningCommsData() comms.LightingCommsData {
 	}
 
 }
+func (c *Config) SetTOMLFile() error {
+	dir, err := os.UserHomeDir()
+
+	if err != nil {
+		return fmt.Errorf("os.UserHomeDir(), %w", err)
+	}
+
+	var pathToProjectDir string = dir + "/" + ConfigDirName
+	var pathToProjectConfigFile string = pathToProjectDir + "/" + ConfigFileName
+
+	bytes, err := toml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("toml.Marshal(c), %w", err)
+	}
+
+	err = os.WriteFile(pathToProjectConfigFile, bytes, 0764)
+
+	if err != nil {
+		return fmt.Errorf("os.WriteFile(pathToProjectConfigFile, bytes,0764), %w", err)
+	}
+
+	return nil
+}
 
 func SetUpConfigFile() (Config, error) {
 	dir, err := os.UserHomeDir()

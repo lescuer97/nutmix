@@ -48,7 +48,7 @@ form {
     flex-direction: column;
     background-color: var(--color-surface-200);
     gap: 15px;
-    padding: 15px;
+    padding: 0px 30px 30px 30px;
     border-radius: 15px;
     border: 2px solid #020000;
 }
@@ -68,6 +68,12 @@ button.selected {
     cursor: default;
 }
 
+input {
+    padding: 10px;
+    letter-spacing: 1px;
+
+}
+
 .content {
     padding: 120px 120px;
 }
@@ -75,6 +81,42 @@ button.selected {
 .tab-content {
     margin-top: 36px;
 
+}
+
+.settings-input {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    background-color: var(--color-surface-300);
+    border-radius: 25px;
+    gap: 10px;
+}
+
+.form-section {
+    display: flex;
+    flex-direction: row;
+    gap: 15px;
+
+}
+
+#notifications {
+    display: flex;
+    justify-content: center;
+    color: black;
+}
+#notifications > .success {
+    background-color: #90ef6e;
+    margin-top: 15px;
+    margin-bottom: -15px;
+    padding: 10px 25px;
+    border-radius: 25px;
+}
+#notifications > .error {
+    background-color: #ff6666;
+    margin-top: 15px;
+    margin-bottom: -15px;
+    padding: 10px 25px;
+    border-radius: 25px;
 }
 
 #login-form {
