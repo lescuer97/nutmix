@@ -104,6 +104,7 @@ input {
     justify-content: center;
     color: black;
 }
+
 #notifications > .success {
     background-color: #90ef6e;
     margin-top: 15px;
@@ -126,4 +127,10 @@ input {
 #nip07-form {
     display: flex;
     flex-direction: column;
+}
+
+#lightning-data {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }

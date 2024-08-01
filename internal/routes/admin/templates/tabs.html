@@ -1,7 +1,7 @@
 {{ define "mintinfo" }}
 <nav class="tab-list" role="tablist">
 	<button hx-get="/admin/mintinfo" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/bol11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 	<button hx-get="/admin/database" role="tab" aria-selected="false" aria-controls="tab-content">Database</button>
 </nav>
 
@@ -46,11 +46,83 @@
 
     <button type="submit">Save Settings</button>
     </form>
-
-
 </article>
 
 {{ end }}
+
+
+{{ define "bolt11-info" }}
+<nav class="tab-list" role="tablist">
+	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
+	<button hx-get="/admin/bolt11" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/database" role="tab" aria-selected="false" aria-controls="tab-content">Database</button>
+</nav>
+
+<article id="tab-content" role="tabpanel" class="tab-content">
+    <form hx-post="/admin/mintinfo" hx-target="#notifications" hx-swap="innerHTML">
+    <div hx-ext="remove-me" id="notifications">
+
+    </div>
+        <h3>Lightning Node info</h3>
+
+        <select hx-trigger="change, load" hx-get="/admin/lightningdata" hx-target="#lightning-data" name="MINT_LIGHTNING_BACKEND"> 
+            <option value="FakeWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" {{ if eq .MINT_LIGHTNING_BACKEND "FakeWallet"}} selected {{ end }}>Fake Wallet</option>
+            <option value="LndGrpcWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" {{ if eq .MINT_LIGHTNING_BACKEND "LndGrpcWallet"}} selected {{ end }}>LND Grpc wallet</option>
+            <option value="LNbitsWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" {{ if eq .MINT_LIGHTNING_BACKEND "LNbitsWallet"}} selected {{ end }}>LNBITS wallet</option>
+        </select>
+
+
+        <div id="lightning-data" />
+
+    <button type="submit">Save Settings</button>
+    </form>
+</article>
+{{ end }}
+
+
+{{ define "lnd-grpc-form" }}
+
+            <label for="LND_GRPC_HOST" class="settings-input"> 
+                LND GRPC Host:
+                <input type="text" name="LND_GRPC_HOST" value="{{.LND_GRPC_HOST}}"/>
+            </label>
+            <label for="LND_GRPC_HOST" class="settings-input"> 
+                LND TLS Certificate:
+                <input type="text" name="LND_TLS_CERT" value="{{.LND_TLS_CERT}}"/>
+            </label>
+            <label for="LND_MACAROON" class="settings-input"> 
+                LND Macaroon:
+                <input type="text" name="LND_MACAROON" value="{{.LND_MACAROON}}"/>
+            </label>
+
+{{ end }}
+
+{{ define "fake-wallet-form" }}
+
+    It's a fake lightning wallet so you don't have to set anything up
+
+{{ end }}
+
+{{ define "lnbits-wallet-form" }}
+
+            <label for="MINT_LNBITS_ENDPOINT" class="settings-input"> 
+                LNBITS endpoint:
+                <input type="text" name="MINT_LNBITS_ENDPOINT" value="{{.MINT_LNBITS_ENDPOINT}}"/>
+            </label>
+            <label for="MINT_LNBITS_KEY" class="settings-input"> 
+                LNBITS Key:
+                <input type="text" name="MINT_LNBITS_KEY" value="{{.MINT_LNBITS_KEY}}"/>
+            </label>
+
+{{ end }}
+
+{{ define "problem-form" }}
+
+"something is wrong you sent the wrong lightning backend"
+
+{{ end }}
+
+
 
 {{ define "settings-error" }}
     

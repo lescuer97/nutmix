@@ -47,3 +47,42 @@ func MintInfoPost(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.
 		c.HTML(200, "settings-success", successMessage)
 	}
 }
+func Bolt11Tab(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+		c.HTML(200, "bolt11-info", mint.Config)
+	}
+}
+func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+		// c.Request.Form
+		// check the different variables that could change
+		// mint.Config.NAME = c.Request.PostFormValue("NAME")
+		// mint.Config.DESCRIPTION = c.Request.PostFormValue("DESCRIPTION")
+		// mint.Config.DESCRIPTION_LONG = c.Request.PostFormValue("DESCRIPTION_LONG")
+		// mint.Config.EMAIL = c.Request.PostFormValue("EMAIL")
+		// mint.Config.NOSTR = c.Request.PostFormValue("NOSTR")
+		// mint.Config.MOTD = c.Request.PostFormValue("MOTD")
+
+		err := mint.Config.SetTOMLFile()
+		if err != nil {
+			log.Println("mint.Config.SetTOMLFile() %w", err)
+			errorMessage := ErrorNotif{
+				Error: "there was a problem in the server",
+			}
+
+			c.HTML(200, "settings-error", errorMessage)
+			return
+
+		}
+
+		successMessage := struct {
+			Success string
+		}{
+			Success: "Lighning node settings changed successfully set",
+		}
+
+		c.HTML(200, "settings-success", successMessage)
+	}
+}
