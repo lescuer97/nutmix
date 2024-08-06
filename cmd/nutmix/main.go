@@ -42,7 +42,7 @@ func main() {
 		log.Println("Running in docker")
 	}
 
-	if ctx.Value(DOCKER_ENV) == "prod" {
+	if ctx.Value(MODE_ENV) == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
