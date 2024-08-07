@@ -397,13 +397,18 @@ type SwapMintInfo struct {
 	Supported *bool             `json:"supported,omitempty"`
 }
 
+type ContactInfo struct {
+	Method string
+	Info   string
+}
+
 type GetInfoResponse struct {
 	Name            string                  `json:"name"`
 	Version         string                  `json:"version"`
 	Pubkey          string                  `json:"pubkey"`
 	Description     string                  `json:"description"`
 	DescriptionLong string                  `json:"description_long"`
-	Contact         [][]string              `json:"contact"`
+	Contact         []ContactInfo           `json:"contact"`
 	Motd            string                  `json:"motd"`
 	Nuts            map[string]SwapMintInfo `json:"nuts"`
 }

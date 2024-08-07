@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
-	"os"
-
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -13,6 +10,8 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
+	"log"
+	"os"
 )
 
 var (
@@ -152,7 +151,7 @@ func main() {
 
 	r.Use(cors.Default())
 
-	routes.V1Routes(ctx, r, pool, &mint)
+	routes.V1Routes(ctx, r, pool, mint)
 
 	defer pool.Close()
 
