@@ -2,13 +2,11 @@ package mint
 
 import (
 	"fmt"
-	"io"
 	"os"
-
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
-	"github.com/pelletier/go-toml/v2"
+    "github.com/BurntSushi/toml"
 )
 
 const ConfigFileName string = "config.toml"
@@ -115,7 +113,7 @@ func (c *Config) SetTOMLFile() error {
 	var pathToProjectDir string = dir + "/" + ConfigDirName
 	var pathToProjectConfigFile string = pathToProjectDir + "/" + ConfigFileName
 
-	bytes, err := toml.Marshal(c)
+    bytes, err := toml.Marshal(c)
 	if err != nil {
 		return fmt.Errorf("toml.Marshal(c), %w", err)
 	}
@@ -158,23 +156,7 @@ func SetUpConfigFile() (Config, error) {
 	}
 
 	// Manipulate Config file
-	f, err := os.OpenFile(pathToProjectConfigFile, os.O_RDWR, 0764)
-	if err != nil {
-		return config, fmt.Errorf("os.OpenFile(pathToProjectConfigFile, os.O_RDWR, 0764), %w", err)
-	}
-
-	var buf []byte
-	for {
-		// read a chunk
-		n, err := f.Read(buf)
-		if err != nil && err != io.EOF {
-			panic(err)
-		}
-		if n == 0 {
-			break
-		}
-
-	}
+	buf, err := os.ReadFile(pathToProjectConfigFile)
 
 	err = toml.Unmarshal(buf, &config)
 	if err != nil {
@@ -185,15 +167,16 @@ func SetUpConfigFile() (Config, error) {
 	mint_lightning_backendEnv := os.Getenv(MINT_LIGHTNING_BACKEND_ENV)
 
 	writeToFile := false
+
 	switch {
 	// if env values are set and no config exists on toml file use those.
 	// if MINT_LIGHTNING_BACKEND and NETWORK are empty we can assume the file is empty
-	case len(networkEnv) > 0 && len(mint_lightning_backendEnv) > 0 && len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0:
+	case (len(networkEnv) > 0 && len(mint_lightning_backendEnv) > 0 && len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0):
 		config.UseEnviromentVars()
 		writeToFile = true
 
 	// if no config and no env set default to toml
-	case len(networkEnv) == 0 && len(mint_lightning_backendEnv) == 0 && len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0:
+	case (len(networkEnv) == 0 && len(mint_lightning_backendEnv) == 0 && len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0):
 		config.Default()
 		writeToFile = true
 
@@ -206,7 +189,7 @@ func SetUpConfigFile() (Config, error) {
 			return config, fmt.Errorf("toml.Marshal(config), %w", err)
 		}
 
-		_, err = f.Write(bytesForFile)
+        err = os.WriteFile(pathToProjectConfigFile, bytesForFile,0764)
 		if err != nil {
 			return config, fmt.Errorf("f.Write(bytesForFile) %w", err)
 		}

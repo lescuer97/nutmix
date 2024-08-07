@@ -32,7 +32,7 @@ func TestSetupLightingCommsLND(t *testing.T) {
 	// 	log.Fatalf("could not setup config file: %+v ", err)
 	// }
 
-	lightingComms, err := SetupLightingComms(ctx, config)
+	lightingComms, err := SetupLightingComms(config)
 
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)
@@ -68,7 +68,7 @@ func TestSetupLightingCommsLnBits(t *testing.T) {
 		MINT_LNBITS_KEY:        os.Getenv(MINT_LNBITS_KEY),
 	}
 
-	lightingComms, err := SetupLightingComms(ctx, config)
+	lightingComms, err := SetupLightingComms(config)
 
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)

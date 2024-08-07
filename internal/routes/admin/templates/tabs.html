@@ -59,7 +59,7 @@
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">
-    <form hx-post="/admin/mintinfo" hx-target="#notifications" hx-swap="innerHTML">
+    <form hx-post="/admin/bolt11" hx-target="#notifications" hx-swap="innerHTML">
     <div hx-ext="remove-me" id="notifications">
 
     </div>
@@ -72,9 +72,9 @@
         </select>
 
 
-        <div id="lightning-data" />
+        <div id="lightning-data" > </div>
 
-    <button type="submit">Save Settings</button>
+        <button type="submit">Save Settings</button>
     </form>
 </article>
 {{ end }}
@@ -88,7 +88,8 @@
             </label>
             <label for="LND_GRPC_HOST" class="settings-input"> 
                 LND TLS Certificate:
-                <input type="text" name="LND_TLS_CERT" value="{{.LND_TLS_CERT}}"/>
+                <textarea name="LND_TLS_CERT"  type="text">{{.LND_TLS_CERT}}</textarea>
+                <!-- <input type="text" name="LND_TLS_CERT" value="{{.LND_TLS_CERT}}"/> -->
             </label>
             <label for="LND_MACAROON" class="settings-input"> 
                 LND Macaroon:

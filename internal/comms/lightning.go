@@ -81,7 +81,7 @@ type LightingCommsData struct {
 	MINT_LNBITS_KEY      string
 }
 
-func (l *LightingComms) LnbitsInvoiceRequest(method string, endpoint string, reqBody any, responseType any) error {
+func (l *LightingComms) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{}
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
@@ -106,6 +106,8 @@ func (l *LightingComms) LnbitsInvoiceRequest(method string, endpoint string, req
 	if err != nil {
 		return fmt.Errorf("ioutil.ReadAll: %w", err)
 	}
+
+	fmt.Printf("body: %+v", string(body))
 
 	err = json.Unmarshal(body, &responseType)
 	if err != nil {
@@ -146,7 +148,7 @@ func (l *LightingComms) RequestInvoice(amount int64) (LightningInvoiceResponse, 
 			PaymentHash    string `json:"payment_hash"`
 			PaymentRequest string `json:"payment_request"`
 		}
-		err := l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
+		err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 		if err != nil {
 			return invoiceRes, fmt.Errorf("json.Marshal: %w", err)
 		}
@@ -196,7 +198,7 @@ func (l *LightingComms) CheckIfInvoicePayed(quote string) (cashu.ACTION_STATE, s
 			Pending  bool   `json:"pending"`
 			Preimage string `json:"preimage"`
 		}
-		err := l.LnbitsInvoiceRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
+		err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
 		if err != nil {
 			return cashu.UNPAID, "", fmt.Errorf("json.Marshal: %w", err)
 		}
@@ -208,6 +210,41 @@ func (l *LightingComms) CheckIfInvoicePayed(quote string) (cashu.ACTION_STATE, s
 
 	}
 	return cashu.UNPAID, "", nil
+
+}
+
+func (l *LightingComms) ConnectionCheck() (bool, error) {
+	switch l.LightningBackend {
+	case LNDGRPC:
+
+		ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
+
+		client := lnrpc.NewLightningClient(l.LndRpcClient)
+
+		walletRequest := lnrpc.WalletBalanceRequest{}
+
+		_, err := client.WalletBalance(ctx, &walletRequest)
+
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+
+	case LNBITS:
+		var paymentStatus struct {
+			Paid     bool   `json:"paid"`
+			Pending  bool   `json:"pending"`
+			Preimage string `json:"preimage"`
+		}
+		err := l.LnbitsRequest("GET", "/api/v1/wallet", nil, &paymentStatus)
+		if err != nil {
+			return false, fmt.Errorf("l.LnbitsInvoiceRequest: %w", err)
+		}
+
+		return true, nil
+
+	}
+	return false, nil
 
 }
 
@@ -252,7 +289,7 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 			PaymentHash    string `json:"payment_hash"`
 			PaymentRequest string `json:"payment_request"`
 		}
-		err := l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
+		err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 		if err != nil {
 			return &invoiceRes, fmt.Errorf("json.Marshal: %w", err)
 		}
@@ -345,7 +382,7 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 	case LNBITS:
 		invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
-		err := l.LnbitsInvoiceRequest("GET", invoiceString, nil, &queryResponse)
+		err := l.LnbitsRequest("GET", invoiceString, nil, &queryResponse)
 		queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
 
 		if err != nil {
@@ -359,13 +396,13 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 
 }
 
-func SetupLightingComms(ctx context.Context, config LightingCommsData) (*LightingComms, error) {
+func SetupLightingComms(config LightingCommsData) (*LightingComms, error) {
 	usedLightningBackend := config.MINT_LIGHTNING_BACKEND
 
 	var lightningComs LightingComms
 	switch usedLightningBackend {
 	case LND_WALLET:
-		err := setupLndRpcComms(&lightningComs, config)
+		err := SetupLndRpcComms(&lightningComs, config)
 		lightningComs.LightningBackend = LNDGRPC
 
 		if err != nil {
@@ -396,7 +433,7 @@ func SetupLightingComms(ctx context.Context, config LightingCommsData) (*Lightin
 
 }
 
-func setupLndRpcComms(lightningComs *LightingComms, config LightingCommsData) error {
+func SetupLndRpcComms(lightningComs *LightingComms, config LightingCommsData) error {
 	host := config.LND_GRPC_HOST
 	if host == "" {
 		return fmt.Errorf("LND_HOST not available")
