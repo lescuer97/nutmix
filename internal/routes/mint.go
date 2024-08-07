@@ -79,7 +79,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 
 		nostr := os.Getenv("NOSTR")
 
-		if len(email) > 0 {
+		if len(nostr) > 0 {
 			contacts = append(contacts, cashu.ContactInfo{
 				Method: "nostr",
 				Info:   nostr,
