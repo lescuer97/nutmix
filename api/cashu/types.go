@@ -398,8 +398,8 @@ type SwapMintInfo struct {
 }
 
 type ContactInfo struct {
-	Method string
-	Info   string
+	Method string `json:"method"`
+	Info   string `json:"info"`
 }
 
 type GetInfoResponse struct {
