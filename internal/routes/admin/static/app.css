@@ -37,7 +37,6 @@ body {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
-    align-content: center;
     width: 100vw;
     margin: 0px;
 
@@ -64,7 +63,6 @@ button {
 
 button.selected {
     background-color: var(--color-primary-200);
-
     cursor: default;
 }
 
@@ -75,11 +73,14 @@ input {
 }
 
 .content {
-    padding: 120px 120px;
+    width: 90%;
 }
 
 .tab-content {
     margin-top: 36px;
+}
+.tab-list {
+    margin-top: 25px;
 
 }
 
@@ -90,6 +91,13 @@ input {
     background-color: var(--color-surface-300);
     border-radius: 25px;
     gap: 10px;
+}
+
+select {
+    padding: 20px;
+    border-radius: 25px;
+    gap: 10px;
+
 }
 
 .form-section {
@@ -120,8 +128,9 @@ input {
     border-radius: 25px;
 }
 
-#login-form {
-    max-width: 480px;
+.login-form {
+    align-content: center;
+    justify-content: center;
 }
 
 #nip07-form {

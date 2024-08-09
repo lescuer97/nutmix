@@ -2,11 +2,11 @@ package mint
 
 import (
 	"fmt"
-	"os"
+	"github.com/BurntSushi/toml"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
-    "github.com/BurntSushi/toml"
+	"os"
 )
 
 const ConfigFileName string = "config.toml"
@@ -113,7 +113,7 @@ func (c *Config) SetTOMLFile() error {
 	var pathToProjectDir string = dir + "/" + ConfigDirName
 	var pathToProjectConfigFile string = pathToProjectDir + "/" + ConfigFileName
 
-    bytes, err := toml.Marshal(c)
+	bytes, err := toml.Marshal(c)
 	if err != nil {
 		return fmt.Errorf("toml.Marshal(c), %w", err)
 	}
@@ -189,7 +189,7 @@ func SetUpConfigFile() (Config, error) {
 			return config, fmt.Errorf("toml.Marshal(config), %w", err)
 		}
 
-        err = os.WriteFile(pathToProjectConfigFile, bytesForFile,0764)
+		err = os.WriteFile(pathToProjectConfigFile, bytesForFile, 0764)
 		if err != nil {
 			return config, fmt.Errorf("f.Write(bytesForFile) %w", err)
 		}

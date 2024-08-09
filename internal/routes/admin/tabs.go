@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
 func MintInfoTab(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
@@ -25,8 +27,46 @@ func MintInfoPost(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.
 		mint.Config.DESCRIPTION = c.Request.PostFormValue("DESCRIPTION")
 		mint.Config.DESCRIPTION_LONG = c.Request.PostFormValue("DESCRIPTION_LONG")
 		mint.Config.EMAIL = c.Request.PostFormValue("EMAIL")
-		mint.Config.NOSTR = c.Request.PostFormValue("NOSTR")
 		mint.Config.MOTD = c.Request.PostFormValue("MOTD")
+
+		nostrKey := c.Request.PostFormValue("NOSTR")
+
+		if len(nostrKey) > 0 {
+
+			fmt.Println("nostrKey:", nostrKey)
+			fmt.Println("nostr.IsValidPublicKey:", nostr.IsValidPublicKey(nostrKey))
+
+			_, key, err := nip19.Decode(nostrKey)
+
+			if err != nil {
+				errorMessage := ErrorNotif{
+					Error: "Nostr npub is not valid",
+				}
+
+				c.HTML(200, "settings-error", errorMessage)
+
+				return
+
+			}
+
+			switch nostr.IsValid32ByteHex(key.(string)) {
+			case true:
+				mint.Config.NOSTR = nostrKey
+			case false:
+				errorMessage := ErrorNotif{
+					Error: "Nostr npub is not valid",
+				}
+
+				c.HTML(200, "settings-error", errorMessage)
+
+				return
+
+			}
+
+		} else {
+			mint.Config.NOSTR = ""
+
+		}
 
 		err := mint.Config.SetTOMLFile()
 		if err != nil {
@@ -36,6 +76,7 @@ func MintInfoPost(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.
 			}
 
 			c.HTML(200, "settings-error", errorMessage)
+
 			return
 
 		}
@@ -70,8 +111,11 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
 
 		case comms.FAKE_WALLET:
-                successMessage.Success = "Nothing to change"
-		        c.HTML(200, "settings-success", successMessage)
+
+			mint.Config.MINT_LIGHTNING_BACKEND = comms.FAKE_WALLET
+
+			successMessage.Success = "Nothing to change"
+			c.HTML(200, "settings-success", successMessage)
 		case comms.LND_WALLET:
 
 			lndHost := c.Request.PostFormValue("LND_GRPC_HOST")
@@ -110,18 +154,17 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 					return
 
 				}
-                mint.Config.MINT_LIGHTNING_BACKEND =  newCommsData.MINT_LIGHTNING_BACKEND
-                mint.Config.LND_GRPC_HOST =  newCommsData.LND_GRPC_HOST
-                mint.Config.LND_MACAROON =  newCommsData.LND_MACAROON
-                mint.Config.LND_TLS_CERT =  newCommsData.LND_TLS_CERT
-		        c.HTML(200, "settings-success", successMessage)
+				mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
+				mint.Config.LND_GRPC_HOST = newCommsData.LND_GRPC_HOST
+				mint.Config.LND_MACAROON = newCommsData.LND_MACAROON
+				mint.Config.LND_TLS_CERT = newCommsData.LND_TLS_CERT
+				c.HTML(200, "settings-success", successMessage)
 
 			} else {
-                successMessage.Success = "Nothing to change"
-		        c.HTML(200, "settings-success", successMessage)
+				successMessage.Success = "Nothing to change"
+				c.HTML(200, "settings-success", successMessage)
 
-            }
-
+			}
 
 		case comms.LNBITS_WALLET:
 			lnbitsKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
@@ -159,10 +202,10 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 
 				}
 
-                mint.Config.MINT_LIGHTNING_BACKEND =  newCommsData.MINT_LIGHTNING_BACKEND
-                mint.Config.MINT_LNBITS_KEY =  newCommsData.MINT_LNBITS_KEY
-                mint.Config.MINT_LNBITS_ENDPOINT =  newCommsData.MINT_LNBITS_ENDPOINT
-		        c.HTML(200, "settings-success", successMessage)
+				mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
+				mint.Config.MINT_LNBITS_KEY = newCommsData.MINT_LNBITS_KEY
+				mint.Config.MINT_LNBITS_ENDPOINT = newCommsData.MINT_LNBITS_ENDPOINT
+				c.HTML(200, "settings-success", successMessage)
 
 			}
 
