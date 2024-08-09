@@ -37,7 +37,6 @@ body {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
-    width: 100vw;
     margin: 0px;
 
 }
@@ -73,7 +72,7 @@ input {
 }
 
 .content {
-    width: 90%;
+    min-width: 90%;
 }
 
 .tab-content {
@@ -91,6 +90,10 @@ input {
     background-color: var(--color-surface-300);
     border-radius: 25px;
     gap: 10px;
+}
+
+.settings-input textarea {
+    min-height: 120px;
 }
 
 select {
@@ -143,3 +146,43 @@ select {
     flex-direction: column;
     gap: 15px;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
