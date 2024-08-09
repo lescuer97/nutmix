@@ -36,6 +36,12 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			c.JSON(400, "Malformed body request")
 			return
 		}
+		// TODO - REMOVE this when doing multi denomination tokens with Milisats
+		if mintRequest.Unit != cashu.Sat.String() {
+			log.Printf("Incorrect Unit for minting: %+v", mintRequest.Unit)
+			c.JSON(400, "Incorrect Unit for minting")
+			return
+		}
 
 		if mintRequest.Amount == 0 {
 			c.JSON(400, "amount missing")
@@ -175,6 +181,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		for _, blindMessage := range mintRequest.Outputs {
 			amountBlindMessages += blindMessage.Amount
+			// check all blind messages have the same unit
 		}
 		blindedSignatures := []cashu.BlindSignature{}
 		recoverySigsDb := []cashu.RecoverSigDB{}
@@ -319,6 +326,13 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		if err != nil {
 			log.Printf("Incorrect body: %+v", err)
 			c.JSON(400, "Malformed body request")
+			return
+		}
+
+		// TODO - REMOVE this when doing multi denomination tokens with Milisats
+		if meltRequest.Unit != cashu.Sat.String() {
+			log.Printf("Incorrect Unit for minting: %+v", meltRequest.Unit)
+			c.JSON(400, "Incorrect Unit for melting")
 			return
 		}
 
@@ -481,6 +495,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+
 		if quote.Melted {
 			c.JSON(400, "Quote already melted")
 			return
@@ -501,6 +516,13 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 			log.Printf("CheckProofsAreSameUnit: %+v", err)
 			c.JSON(400, "Proofs are not the same unit")
+			return
+		}
+		// TODO - REMOVE this when doing multi denomination tokens with Milisats
+		if unit != cashu.Sat {
+			log.Printf("Incorrect Unit for minting: %+v", unit)
+			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+			c.JSON(400, "Incorrect Unit for minting")
 			return
 		}
 
