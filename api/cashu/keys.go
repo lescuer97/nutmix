@@ -24,7 +24,7 @@ func DeriveKeysetId(keysets []Keyset) (string, error) {
 	return "00" + hex[:14], nil
 }
 
-func GenerateKeysets(masterKey *bip32.Key, values []uint64, id string, unit Unit) ([]Keyset, error) {
+func GenerateKeysets(masterKey *bip32.Key, values []uint64, id string, unit Unit, inputFee int) ([]Keyset, error) {
 	var keysets []Keyset
 
 	// Get the current time
@@ -42,12 +42,13 @@ func GenerateKeysets(masterKey *bip32.Key, values []uint64, id string, unit Unit
 		privKey := secp256k1.PrivKeyFromBytes(childKey.Key)
 
 		keyset := Keyset{
-			Id:        id,
-			Active:    true,
-			Unit:      unit.String(),
-			Amount:    value,
-			PrivKey:   privKey,
-			CreatedAt: formattedTime,
+			Id:          id,
+			Active:      true,
+			Unit:        unit.String(),
+			Amount:      value,
+			PrivKey:     privKey,
+			CreatedAt:   formattedTime,
+			InputFeePpk: inputFee,
 		}
 
 		keysets = append(keysets, keyset)
@@ -67,7 +68,7 @@ func SetUpSeedAndKeyset(masterKey *bip32.Key, version int, unit Unit) (Seed, err
 		return Seed{}, fmt.Errorf("Error deriving key from version: %w", err)
 	}
 
-	list_of_keys, err := GenerateKeysets(versionKey, GetAmountsForKeysets(), "", unit)
+	list_of_keys, err := GenerateKeysets(versionKey, GetAmountsForKeysets(), "", unit, 0)
 
 	if err != nil {
 		return Seed{}, err

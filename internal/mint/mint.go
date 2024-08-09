@@ -29,6 +29,7 @@ type Mint struct {
 	PendingProofs []cashu.Proof
 	ActiveProofs  ActiveProofs
 	ActiveQuotes  ActiveQuote
+	Config        Config
 }
 
 var (
@@ -154,12 +155,10 @@ func (m *Mint) RemoveQuotesAndProofs(quote string, proofs []cashu.Proof) {
 // errors types for validation
 
 var (
-	ErrKeysetNotFound         = errors.New("Keyset not found")
-	ErrKeysetForProofNotFound = errors.New("Keyset for proof not found")
-	ErrInvalidProof           = errors.New("Invalid proof")
-	ErrQuoteNotPaid           = errors.New("Quote not paid")
-	ErrMessageAmountToBig     = errors.New("Message amount is to big")
-	ErrInvalidBlindMessage    = errors.New("Invalid blind message")
+	ErrInvalidProof        = errors.New("Invalid proof")
+	ErrQuoteNotPaid        = errors.New("Quote not paid")
+	ErrMessageAmountToBig  = errors.New("Message amount is to big")
+	ErrInvalidBlindMessage = errors.New("Invalid blind message")
 )
 
 var (
@@ -179,7 +178,7 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof) (cashu.Unit, error) 
 		}
 
 		if len(keyset) == 0 {
-			return cashu.Sat, ErrKeysetForProofNotFound
+			return cashu.Sat, cashu.ErrKeysetForProofNotFound
 		}
 
 		units[keyset[0].Unit] = true
@@ -243,7 +242,7 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 
 	// check if keysetToUse is not assigned
 	if keysetToUse.Id == "" {
-		return ErrKeysetForProofNotFound
+		return cashu.ErrKeysetForProofNotFound
 	}
 
 	// check if a proof is locked to a spend condition and verifies it
@@ -360,13 +359,14 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 	return orderedKeys
 }
 
-func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*Mint, error) {
+func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, config Config) (*Mint, error) {
 	mint := Mint{
 		ActiveKeysets: make(map[string]KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
+		Config:        config,
 	}
 
-	network := ctx.Value(NETWORK_ENV)
+	network := config.NETWORK
 	switch network {
 	case "testnet":
 		mint.Network = chaincfg.TestNet3Params
@@ -380,20 +380,20 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*M
 		return &mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
-	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
-	switch lightningBackendType {
+	// lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
+	switch config.MINT_LIGHTNING_BACKEND {
 
 	case comms.FAKE_WALLET:
 
 	case comms.LND_WALLET, comms.LNBITS_WALLET:
-		lightningComs, err := comms.SetupLightingComms(ctx)
+		lightningComs, err := comms.SetupLightingComms(config.ToLightningCommsData())
 
 		if err != nil {
 			return &mint, err
 		}
 		mint.LightningComs = *lightningComs
 	default:
-		log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
+		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)
 	}
 
 	mint.PendingProofs = make([]cashu.Proof, 0)
@@ -421,7 +421,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*M
 			return &mint, err
 		}
 
-		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit)
+		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk)
 
 		if err != nil {
 			return &mint, fmt.Errorf("GenerateKeysets: %w", err)

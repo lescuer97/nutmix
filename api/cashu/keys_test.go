@@ -14,7 +14,7 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 		t.Errorf("could not setup master key %+v", err)
 	}
 
-	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat)
+	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat, 0)
 
 	if err != nil {
 		t.Errorf("could not generate keyset %+v", err)

@@ -495,6 +495,24 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
+		unit, err := mint.CheckProofsAreSameUnit(meltRequest.Inputs)
+
+		if err != nil {
+			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+			log.Printf("CheckProofsAreSameUnit: %+v", err)
+			c.JSON(400, "Proofs are not the same unit")
+			return
+		}
+
+		// check for needed amount of fees
+		fee, err := cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()])
+		if err != nil {
+			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+			log.Printf("cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()]): %+v", err)
+			c.JSON(400, "Could not find keyset for proof id")
+			return
+		}
+
 		var CList, SecretList []string
 		var AmountProofs uint64
 
@@ -518,7 +536,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		}
 
-		if AmountProofs < quote.Amount+quote.FeeReserve {
+		if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 			log.Printf("Not enought proofs to expend. Needs: %v", quote.Amount)
 			c.JSON(403, "Not enought proofs to expend. Needs: %v")
@@ -538,15 +556,6 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		if len(knownProofs) != 0 {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 			c.JSON(400, "Proofs already used")
-			return
-		}
-
-		unit, err := mint.CheckProofsAreSameUnit(meltRequest.Inputs)
-
-		if err != nil {
-			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Printf("CheckProofsAreSameUnit: %+v", err)
-			c.JSON(400, "Proofs are not the same unit")
 			return
 		}
 
