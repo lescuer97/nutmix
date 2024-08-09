@@ -33,9 +33,6 @@ func MintInfoPost(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.
 
 		if len(nostrKey) > 0 {
 
-			fmt.Println("nostrKey:", nostrKey)
-			fmt.Println("nostr.IsValidPublicKey:", nostr.IsValidPublicKey(nostrKey))
-
 			_, key, err := nip19.Decode(nostrKey)
 
 			if err != nil {
