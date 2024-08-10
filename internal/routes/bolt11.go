@@ -165,6 +165,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 		if quote.Minted {
+			log.Printf("Quote already minted")
 			c.JSON(400, "Quote already minted")
 			return
 		}
@@ -221,6 +222,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 				mint.RemoveActiveMintQuote(quote.Quote)
 				if errors.Is(err, m.ErrInvalidBlindMessage) {
+			        log.Printf("Invalid Blind Message %+v", m.ErrInvalidBlindMessage.Error())
 					c.JSON(400, m.ErrInvalidBlindMessage.Error())
 					return
 				}
@@ -248,6 +250,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				quote.RequestPaid = true
 			} else {
 				mint.RemoveActiveMintQuote(quote.Quote)
+			    log.Printf("Quote not paid")
 				c.JSON(400, "Quote not paid")
 				return
 			}
@@ -484,6 +487,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		}
 
 		if len(meltRequest.Inputs) == 0 {
+			log.Printf("Outputs are empty")
 			c.JSON(400, "Outputs are empty")
 			return
 		}
@@ -497,6 +501,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		}
 
 		if quote.Melted {
+			log.Printf("Quote already melted")
 			c.JSON(400, "Quote already melted")
 			return
 		}
@@ -577,6 +582,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if len(knownProofs) != 0 {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+			log.Printf("Proofs already used %+v \n", knownProofs)
 			c.JSON(400, "Proofs already used")
 			return
 		}
@@ -585,6 +591,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+			log.Printf("Could not verify Proofs %+v", err.Error())
+
 			switch {
 			case errors.Is(err, cashu.ErrEmptyWitness):
 				c.JSON(403, "Empty Witness")
