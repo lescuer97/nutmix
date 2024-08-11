@@ -2,7 +2,6 @@ package cashu
 
 import (
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/tyler-smith/go-bip32"
