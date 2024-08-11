@@ -48,7 +48,7 @@ func (c *Config) Default() {
 
 	c.NETWORK = lightning.MAINNET
 
-	c.MINT_LIGHTNING_BACKEND = ""
+	c.MINT_LIGHTNING_BACKEND = comms.FAKE_WALLET
 
 	c.LND_GRPC_HOST = ""
 	c.LND_TLS_CERT = ""
@@ -179,6 +179,9 @@ func SetUpConfigFile() (Config, error) {
 	case (len(networkEnv) == 0 && len(mint_lightning_backendEnv) == 0 && len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0):
 		config.Default()
 		writeToFile = true
+
+    default:
+        fmt.Println("running default")
 
 		// if valid config value exists use those
 	}

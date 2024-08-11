@@ -363,6 +363,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 		Config:        config,
 	}
 
+    fmt.Printf("CONFIG %+v", config)
 	network := config.NETWORK
 	switch network {
 	case "testnet":
