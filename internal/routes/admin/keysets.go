@@ -74,8 +74,6 @@ func RotateSatsSeed(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gi
 
 		newSeedFee, err := strconv.Atoi(feeString)
 
-		fmt.Println("New seed fee", newSeedFee)
-
 		if err != nil {
 			log.Printf("Err: There was a problem rotating the key")
 			errorMessage := ErrorNotif{

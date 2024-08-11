@@ -9,6 +9,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/tyler-smith/go-bip32"
 )
+
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
 
 func TestSetUpMint(t *testing.T) {
@@ -24,7 +25,7 @@ func TestSetUpMint(t *testing.T) {
 	}
 	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 
-    seed.EncryptSeed(MintPrivateKey)
+	seed.EncryptSeed(MintPrivateKey)
 
 	err := os.Setenv(NETWORK_ENV, "regtest")
 

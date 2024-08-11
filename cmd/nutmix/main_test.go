@@ -109,7 +109,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	w.Flush()
 
-
 	// check quote request
 	req = httptest.NewRequest("GET", "/v1/mint/quote/bolt11"+"/"+postMintQuoteResponse.Quote, strings.NewReader(string(jsonRequestBody)))
 
@@ -644,14 +643,14 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	config, err := mint.SetUpConfigFile()
 
-    config.MINT_LIGHTNING_BACKEND = ctx.Value(mint.MINT_LIGHTNING_BACKEND_ENV).(string)
-    config.DATABASE_URL = ctx.Value(database.DATABASE_URL_ENV).(string)
-    config.NETWORK = ctx.Value(mint.NETWORK_ENV).(string)
-    config.LND_GRPC_HOST = os.Getenv(comms.LND_HOST)
-    config.LND_TLS_CERT = os.Getenv(comms.LND_TLS_CERT)
-    config.LND_MACAROON = os.Getenv(comms.LND_MACAROON) 
-    config.MINT_LNBITS_KEY = os.Getenv(comms.MINT_LNBITS_KEY) 
-    config.MINT_LNBITS_ENDPOINT =os.Getenv(comms.MINT_LNBITS_ENDPOINT) 
+	config.MINT_LIGHTNING_BACKEND = ctx.Value(mint.MINT_LIGHTNING_BACKEND_ENV).(string)
+	config.DATABASE_URL = ctx.Value(database.DATABASE_URL_ENV).(string)
+	config.NETWORK = ctx.Value(mint.NETWORK_ENV).(string)
+	config.LND_GRPC_HOST = os.Getenv(comms.LND_HOST)
+	config.LND_TLS_CERT = os.Getenv(comms.LND_TLS_CERT)
+	config.LND_MACAROON = os.Getenv(comms.LND_MACAROON)
+	config.MINT_LNBITS_KEY = os.Getenv(comms.MINT_LNBITS_KEY)
+	config.MINT_LNBITS_ENDPOINT = os.Getenv(comms.MINT_LNBITS_ENDPOINT)
 
 	if err != nil {
 		log.Fatalf("could not setup config file: %+v ", err)
@@ -902,7 +901,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	w.Flush()
 
-    fmt.Printf("Post mint request: %+v \n\n", postMintQuoteResponse)
 	// check quote request
 	req = httptest.NewRequest("GET", "/v1/mint/quote/bolt11"+"/"+postMintQuoteResponse.Quote, strings.NewReader(string(jsonRequestBody)))
 
@@ -911,7 +909,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	router.ServeHTTP(w, req)
 	var postMintQuoteResponseTwo cashu.PostMintQuoteBolt11Response
 
-    fmt.Println("BODY: ", w.Body.String())
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
 	if err != nil {
@@ -967,9 +964,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	// Lnd BOB pays the invoice
 	_, _, err = bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "payinvoice", postMintQuoteResponse.Request, "--force"})
 
-	 if err != nil {
-	 	fmt.Errorf("Error paying invoice %+v", err)
-	 }
+	if err != nil {
+		fmt.Errorf("Error paying invoice %+v", err)
+	}
 
 	// Minting with invalid signatures
 	w = httptest.NewRecorder()

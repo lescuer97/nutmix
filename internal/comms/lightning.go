@@ -125,9 +125,6 @@ func (l *LightingComms) RequestInvoice(amount int64) (LightningInvoiceResponse, 
 		Out:    false,
 		Expiry: 900,
 	}
-    fmt.Println("lightningBackend", l.LightningBackend)
-    fmt.Println("LNDGRPC", LNDGRPC)
-    fmt.Println("LNBITS", LNBITS)
 	switch l.LightningBackend {
 	case LNDGRPC:
 		ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
@@ -137,12 +134,9 @@ func (l *LightingComms) RequestInvoice(amount int64) (LightningInvoiceResponse, 
 		// Expiry time is 15 minutes
 		res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: reqInvoice.Amount, Expiry: reqInvoice.Expiry})
 
-        fmt.Printf("Res %+v", res)
-
 		if err != nil {
 			return invoiceRes, err
 		}
-
 
 		invoiceRes.Rhash = hex.EncodeToString(res.RHash)
 		invoiceRes.PaymentRequest = res.PaymentRequest
@@ -402,8 +396,6 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 
 func SetupLightingComms(config LightingCommsData) (*LightingComms, error) {
 	usedLightningBackend := config.MINT_LIGHTNING_BACKEND
-
-    fmt.Println("usedLightningBackend:  ", usedLightningBackend)
 
 	var lightningComs LightingComms
 	switch usedLightningBackend {
