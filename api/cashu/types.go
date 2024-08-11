@@ -17,6 +17,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
+	"github.com/tyler-smith/go-bip32"
 )
 
 var (
@@ -299,6 +300,7 @@ type MintError struct {
 	Code   int8   `json:"code"`
 }
 
+type KeysetMap map[uint64]Keyset
 type Keyset struct {
 	Id          string                `json:"id"`
 	Active      bool                  `json:"active" db:"active"`
@@ -353,6 +355,34 @@ func (seed *Seed) EncryptSeed(mintPrivateKey string) error {
 
 	return nil
 }
+
+func (seed *Seed) DeriveKeyset(mint_privkey string) ([]Keyset, error) {
+	var keysets []Keyset
+	err := seed.DecryptSeed(mint_privkey)
+
+	if err != nil {
+		return keysets, fmt.Errorf("seed.DecryptSeed: %w", err)
+	}
+	masterKey, err := bip32.NewMasterKey(seed.Seed)
+	if err != nil {
+		return keysets, fmt.Errorf("NewMasterKey: %w", err)
+	}
+
+	unit, err := UnitFromString(seed.Unit)
+	if err != nil {
+		return keysets, fmt.Errorf("cashu.UnitFromString: %w", err)
+	}
+
+	keysets, err = GenerateKeysets(masterKey, GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk)
+
+	if err != nil {
+		return keysets, fmt.Errorf("GenerateKeysets(masterKey, GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk): %w", err)
+	}
+
+	return keysets, nil
+
+}
+
 func (seed *Seed) DecryptSeed(mintPrivateKey string) error {
 	key_bytes, err := hex.DecodeString(mintPrivateKey)
 	if err != nil {

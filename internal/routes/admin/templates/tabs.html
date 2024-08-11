@@ -2,7 +2,7 @@
 <nav class="tab-list" role="tablist">
 	<button hx-get="/admin/mintinfo" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
 	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
-	<button hx-get="/admin/database" role="tab" aria-selected="false" aria-controls="tab-content">Database</button>
+	<button hx-get="/admin/keysets" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">
@@ -53,21 +53,34 @@
 <nav class="tab-list" role="tablist">
 	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
 	<button hx-get="/admin/bolt11" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
-	<button hx-get="/admin/database" role="tab" aria-selected="false" aria-controls="tab-content">Database</button>
+	<button hx-get="/admin/keysets" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">
     <form hx-post="/admin/bolt11" hx-target="#notifications" hx-swap="innerHTML">
-    <div hx-ext="remove-me" id="notifications">
+    <div hx-ext="remove-me" id="notifications"/>
 
     </div>
         <h3>Lightning Node info</h3>
 
+            <label for="NETWORK" class="settings-input"> 
+                Network Type
+                <select  name="NETWORK"> 
+                    <option value="mainnet"  {{ if eq .NETWORK "mainnet"}} selected {{ end }}>Mainnet</option>
+                    <option value="testnet"  {{ if eq .NETWORK "testnet"}} selected {{ end }}>Testnet</option>
+                    <option value="signet"  {{ if eq .NETWORK "signet"}} selected {{ end }}>Signet</option>
+                    <option value="regtest"  {{ if eq .NETWORK "regtest"}} selected {{ end }}>Regtest</option>
+                </select>
+            </label>
+        <label for="MINT_LIGHTNING_BACKEND" class="settings-input"> 
+            Lightning Node Backend
         <select hx-trigger="change, load" hx-get="/admin/lightningdata" hx-target="#lightning-data" name="MINT_LIGHTNING_BACKEND"> 
             <option value="FakeWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" {{ if eq .MINT_LIGHTNING_BACKEND "FakeWallet"}} selected {{ end }}>Fake Wallet</option>
             <option value="LndGrpcWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" {{ if eq .MINT_LIGHTNING_BACKEND "LndGrpcWallet"}} selected {{ end }}>LND Grpc wallet</option>
             <option value="LNbitsWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" {{ if eq .MINT_LIGHTNING_BACKEND "LNbitsWallet"}} selected {{ end }}>LNBITS wallet</option>
         </select>
+            </label>
+
 
 
         <div id="lightning-data" > </div>
@@ -115,10 +128,99 @@
 
 {{ end }}
 
+
+{{ define "keysets-page" }}
+<nav class="tab-list" role="tablist">
+	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
+	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/keysets" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+</nav>
+
+<article id="tab-content" role="tabpanel" class="tab-content">
+   
+
+    <div hx-ext="remove-me" id="notifications">
+    </div>
+
+    <form 
+        hx-indicator="#loader" 
+        hx-target="#notifications" 
+        hx-swap="innerHTML" 
+        hx-post="/admin/rotate/sats"
+        class="fees-form"
+
+        >
+            <label for="FEE" class=""> 
+
+                    Fees (PPK).
+                    
+                    Ex: 100 PPK = 1 sat / 10 Inputs
+                
+                    <input type="number" name="FEE" value="0"/>
+            </label>
+
+
+        <button hx-disabled-elt="this" 
+            class="square" 
+            type="submit">
+            Rotate Sats keys up
+
+
+        </button>
+        
+        <div id="loader" class="htmx-indicator lds-dual-ring" ></div>
+    </form>
+        
+
+
+
+    <div hx-get="/admin/keysets-layout" hx-trigger="load, recharge-keyset from:body" hx-swap="innerHTML" hx-target="this" class="keysets">
+        
+    </div>
+
+
+
+
+</article>
+{{ end }}
+
+
+{{ define "keysets" }}
+    {{range .Keysets}}
+
+        {{template "keyset-card"  .}}
+
+
+    {{end}}
+
+{{ end }}
+
+{{ define "keyset-card" }}
+
+<div class="keyset_card">
+    <span>Id: {{.Id}}</span>
+    <span>Active: {{.Active}}</span>
+    <span>Unit: {{.Unit}}</span>
+    <span>Fees (PPK): {{.Fees}}</span>
+    <span>Version: {{.Version}}</span>
+
+</div>
+
+{{end}}
+
+
+
+
+
+
+
+
+
+
+
+
 {{ define "problem-form" }}
-
-"something is wrong you sent the wrong lightning backend"
-
+    "something is wrong you sent the wrong lightning backend"
 {{ end }}
 
 
@@ -130,6 +232,7 @@
 </div>
 
 {{end}}
+
 {{ define "settings-success" }}
     
 <div remove-me="3s" class="success">

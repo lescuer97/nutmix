@@ -43,7 +43,9 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.POST("/bolt11", Bolt11Post(ctx, pool, mint))
 
 	adminRoute.GET("/keysets", KeysetsPage(ctx, pool, mint))
-	// adminRoute.POST("/keysets", Bolt11Post(ctx, pool, mint))
+
+	adminRoute.POST("/rotate/sats", RotateSatsSeed(ctx, pool, mint))
+	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(ctx, pool, mint))
 
 	adminRoute.GET("/lightningdata", LightningDataFormFields(ctx, pool, mint))
 

@@ -12,17 +12,14 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/pkg/crypto"
-	"github.com/tyler-smith/go-bip32"
 	"log"
 	"slices"
 	"sync"
 	"time"
 )
 
-type KeysetMap map[uint64]cashu.Keyset
-
 type Mint struct {
-	ActiveKeysets map[string]KeysetMap
+	ActiveKeysets map[string]cashu.KeysetMap
 	Keysets       map[string][]cashu.Keyset
 	LightningComs comms.LightingComms
 	Network       chaincfg.Params
@@ -361,7 +358,7 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 
 func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, config Config) (*Mint, error) {
 	mint := Mint{
-		ActiveKeysets: make(map[string]KeysetMap),
+		ActiveKeysets: make(map[string]cashu.KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
 		Config:        config,
 	}
@@ -380,6 +377,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 		return &mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
+    fmt.Printf(" config %+v", config)
 	// lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
 	switch config.MINT_LIGHTNING_BACKEND {
 
@@ -403,32 +401,13 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 
 		// decrypt seed
 
-		// decrypt seed first
-		err := seed.DecryptSeed(mint_privkey)
-
+		keysets, err := seed.DeriveKeyset(mint_privkey)
 		if err != nil {
-			log.Println(fmt.Errorf("seed.DecryptSeed: %w", err))
-		}
-		masterKey, err := bip32.NewMasterKey(seed.Seed)
-		if err != nil {
-			log.Println(fmt.Errorf("NewMasterKey: %w", err))
-			return &mint, err
-		}
-
-		unit, err := cashu.UnitFromString(seed.Unit)
-		if err != nil {
-			log.Println(fmt.Errorf("cashu.UnitFromString: %w", err))
-			return &mint, err
-		}
-
-		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk)
-
-		if err != nil {
-			return &mint, fmt.Errorf("GenerateKeysets: %w", err)
+			return &mint, fmt.Errorf("seed.DeriveKeyset(mint_privkey): %w", err)
 		}
 
 		if seed.Active {
-			mint.ActiveKeysets[seed.Unit] = make(KeysetMap)
+			mint.ActiveKeysets[seed.Unit] = make(cashu.KeysetMap)
 			for _, keyset := range keysets {
 				mint.ActiveKeysets[seed.Unit][keyset.Amount] = keyset
 			}

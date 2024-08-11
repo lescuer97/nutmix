@@ -84,6 +84,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				return
 			}
 
+            fmt.Printf("ResInvoice %+v", resInvoice )
+
 			response = cashu.PostMintQuoteBolt11Response{
 				Quote:       resInvoice.Rhash,
 				Request:     resInvoice.PaymentRequest,

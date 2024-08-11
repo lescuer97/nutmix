@@ -2,16 +2,13 @@ package admin
 
 import (
 	"context"
-	"fmt"
-	"log"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
+	"log"
 )
 
 func MintInfoTab(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
@@ -105,7 +102,7 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 		}
 
 		// check if the the lightning values have change if yes try to setup a new connection client for mint
-          mint.Config.NAME = c.Request.PostFormValue("NETWORK")
+		mint.Config.NAME = c.Request.PostFormValue("NETWORK")
 
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
 
@@ -225,28 +222,3 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 		return
 	}
 }
-
-func KeysetsPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
-
-	return func(c *gin.Context) {
-        type KeysetData struct {
-            Id string
-            Active bool
-            Unit string
-            Fees int
-            CreatedAt int64
-        }
-
-
-        
-        fmt.Printf("Keyset %+v", mint.Keysets)
-        keysetArr := struct {
-            Keysets []cashu.Keyset
-        }{}
-        
-		c.HTML(200, "keysets-page", keysetArr)
-	}
-}
-// func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
-
-

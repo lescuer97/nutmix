@@ -2,8 +2,10 @@ package cashu
 
 import (
 	"encoding/hex"
-	"github.com/tyler-smith/go-bip32"
+	"fmt"
 	"testing"
+
+	"github.com/tyler-smith/go-bip32"
 )
 
 func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
@@ -68,6 +70,7 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 		t.Errorf("could not decrypt seed %+v", err)
 	}
 
+    fmt.Println("generatedSeeds[0].Seed:", hex.EncodeToString(generatedSeeds[0].Seed))
 	if hex.EncodeToString(generatedSeeds[0].Seed) != "0f451868e048a61dcf274af7c3a463f48d32dbabb47bfd3f4da850f4d6525975" {
 		t.Errorf("seed 0 is not correct %v", hex.EncodeToString(generatedSeeds[0].Seed))
 	}

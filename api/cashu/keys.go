@@ -105,6 +105,7 @@ func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) 
 			return seeds, fmt.Errorf("DeriveIndividualSeedFromKey(keyFromMint, version, seedDerivationPath): %w ", err)
 		}
 
+
 		// encrypt seeds before saving
 
 		seeds = append(seeds, seed)

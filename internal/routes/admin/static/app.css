@@ -59,6 +59,9 @@ button {
     letter-spacing: 1px;
     cursor: pointer;
 }
+button.square {
+    border-radius: 0px;
+}
 
 button.selected {
     background-color: var(--color-primary-200);
@@ -147,6 +150,33 @@ select {
     gap: 15px;
 }
 
+.fees-form {
+    flex-direction: row;
+    padding: 15px;
+    margin: 0px;
+    align-items: center;
+    /* margin: 15px; */
+
+}
+
+.keysets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.keyset_card {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    border: 1px solid var(--color-primary-500);
+    width: fit-content;
+
+    padding: 10px 5px;
+
+}
 
 
 
@@ -164,6 +194,42 @@ select {
 
 
 
+
+
+/* lds loading ring */
+.lds-dual-ring {
+  /* change color here */
+  color: #1c4c5b;
+  margin-bottom:15px;
+}
+.lds-dual-ring,
+.lds-dual-ring:after {
+  box-sizing: border-box;
+}
+.lds-dual-ring {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+}
+.lds-dual-ring:after {
+  content: " ";
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin: 8px;
+  border-radius: 50%;
+  border: 6.4px solid currentColor;
+  border-color: currentColor transparent currentColor transparent;
+  animation: lds-dual-ring 1.2s linear infinite;
+}
+@keyframes lds-dual-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
 
 
 
