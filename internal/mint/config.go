@@ -103,6 +103,7 @@ func (c *Config) ToLightningCommsData() comms.LightingCommsData {
 	}
 
 }
+
 func (c *Config) SetTOMLFile() error {
 	dir, err := os.UserHomeDir()
 
@@ -180,8 +181,8 @@ func SetUpConfigFile() (Config, error) {
 		config.Default()
 		writeToFile = true
 
-    default:
-        fmt.Println("running default")
+	default:
+		fmt.Println("running default")
 
 		// if valid config value exists use those
 	}

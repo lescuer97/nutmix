@@ -2,14 +2,14 @@ package admin
 
 import (
 	"context"
-	"log"
-	"os"
-	"strconv"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"log"
+	"os"
+	"strconv"
 )
 
 func KeysetsPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
