@@ -2,8 +2,9 @@ package cashu
 
 import (
 	"encoding/hex"
-	"github.com/tyler-smith/go-bip32"
 	"testing"
+
+	"github.com/tyler-smith/go-bip32"
 )
 
 func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
@@ -14,7 +15,7 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 		t.Errorf("could not setup master key %+v", err)
 	}
 
-	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat)
+	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat, 0)
 
 	if err != nil {
 		t.Errorf("could not generate keyset %+v", err)

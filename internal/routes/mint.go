@@ -57,7 +57,7 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *
 		keys["keysets"] = []cashu.BasicKeysetResponse{}
 
 		for _, seed := range seeds {
-			keys["keysets"] = append(keys["keysets"], cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active})
+			keys["keysets"] = append(keys["keysets"], cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
 		}
 
 		c.JSON(200, keys)
@@ -169,8 +169,26 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *
 		for _, output := range swapRequest.Outputs {
 			AmountSignature += output.Amount
 		}
+		unit, err := mint.CheckProofsAreSameUnit(swapRequest.Inputs)
 
-		if AmountProofs < AmountSignature {
+		if err != nil {
+			mint.RemoveProofs(swapRequest.Inputs)
+			log.Printf("CheckProofsAreSameUnit: %+v", err)
+			c.JSON(400, "Proofs are not the same unit")
+			return
+		}
+
+		// check for needed amount of fees
+		fee, err := cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])
+		if err != nil {
+			mint.RemoveProofs(swapRequest.Inputs)
+			log.Printf("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()]): %+v", err)
+			c.JSON(400, "Could not find keyset for proof id")
+			return
+		}
+
+		if AmountProofs < (uint64(fee) + AmountSignature) {
+			log.Printf("didn't provide enough fees. ProofAmount: %v, needed Proofs: %v", AmountProofs, (uint64(fee) + AmountSignature))
 			c.JSON(400, "Not enough proofs for signatures")
 			return
 		}
@@ -194,15 +212,6 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *
 		if err != nil {
 			log.Printf("mint.AddProof: %+v", err)
 			c.JSON(400, "Proofs are already in use")
-			return
-		}
-
-		unit, err := mint.CheckProofsAreSameUnit(swapRequest.Inputs)
-
-		if err != nil {
-			mint.RemoveProofs(swapRequest.Inputs)
-			log.Printf("CheckProofsAreSameUnit: %+v", err)
-			c.JSON(400, "Proofs are not the same unit")
 			return
 		}
 

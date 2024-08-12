@@ -17,6 +17,11 @@ var DBError = errors.New("ERROR DATABASE")
 
 var DATABASE_URL_ENV = "DATABASE_URL"
 
+const (
+	DOCKERDATABASE = "DOCKERDATABASE"
+	CUSTOMDATABASE = "CUSTOMDATABASE"
+)
+
 func databaseError(err error) error {
 	return fmt.Errorf("%w  %w", DBError, err)
 }
@@ -48,7 +53,7 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (*pgxpool.Pool, err
 func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 
-	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id, encrypted FROM seeds")
+	rows, err := pool.Query(context.Background(), `SELECT seed, created_at, active, version, unit, id, encrypted, "input_fee_ppk" FROM seeds ORDER BY version DESC`)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -70,7 +75,7 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 }
 
 func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
-	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id, encrypted FROM seeds WHERE active")
+	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id, encrypted, input_fee_ppk FROM seeds WHERE active")
 	if err != nil {
 		return cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
@@ -79,10 +84,25 @@ func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
 	seed, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.Seed])
 
 	if err != nil {
-		return seed, fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.Seed]): %w", err)
+		return seed, databaseError(fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.Seed]): %w", err))
 	}
 
 	return seed, nil
+}
+func GetSeedsByUnit(pool *pgxpool.Pool, unit cashu.Unit) ([]cashu.Seed, error) {
+	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id, encrypted, input_fee_ppk FROM seeds WHERE unit = $1", unit.String())
+	if err != nil {
+		return []cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
+	}
+	defer rows.Close()
+
+	seeds, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
+
+	if err != nil {
+		return seeds, databaseError(fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed]): %w", err))
+	}
+
+	return seeds, nil
 }
 
 func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
@@ -91,7 +111,7 @@ func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
 
 	for {
 		tries += 1
-		_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id, version, encrypted) VALUES ($1, $2, $3, $4, $5, $6)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.Encrypted)
+		_, err := pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id, version, encrypted, input_fee_ppk) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.Encrypted, seed.InputFeePpk)
 
 		switch {
 		case err != nil && tries < 3:
@@ -104,15 +124,16 @@ func SaveNewSeed(pool *pgxpool.Pool, seed *cashu.Seed) error {
 
 	}
 }
+
 func SaveNewSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
 	tries := 0
 
 	entries := [][]any{}
-	columns := []string{"seed", "active", "created_at", "unit", "id", "version", "encrypted"}
+	columns := []string{"seed", "active", "created_at", "unit", "id", "version", "encrypted", "input_fee_ppk"}
 	tableName := "seeds"
 
 	for _, seed := range seeds {
-		entries = append(entries, []any{seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.Encrypted})
+		entries = append(entries, []any{seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.Encrypted, seed.InputFeePpk})
 	}
 
 	for {
@@ -131,6 +152,31 @@ func SaveNewSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
 	}
 
 }
+
+func UpdateActiveStatusSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
+	// change the paid status of the quote
+	batch := pgx.Batch{}
+	for _, seed := range seeds {
+
+		batch.Queue("UPDATE seeds SET active = $1 WHERE id = $2", seed.Active, seed.Id)
+
+	}
+	results := pool.SendBatch(context.Background(), &batch)
+
+	rows, err := results.Query()
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return err
+		}
+		return databaseError(fmt.Errorf(" results.Query(): %w", err))
+	}
+
+	defer rows.Close()
+
+	return nil
+
+}
+
 func UpdateSeed(pool *pgxpool.Pool, seed cashu.Seed) error {
 	// change the paid status of the quote
 	_, err := pool.Exec(context.Background(), "UPDATE seeds SET encrypted = $1, seed = $2  WHERE id = $3", seed.Encrypted, seed.Seed, seed.Id)
@@ -332,7 +378,6 @@ func SaveProofs(pool *pgxpool.Pool, proofs []cashu.Proof) error {
 
 	}
 
-	return nil
 }
 
 func CheckListOfProofsBySecretCurve(pool *pgxpool.Pool, Ys []string) ([]cashu.Proof, error) {

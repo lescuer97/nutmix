@@ -12,6 +12,10 @@ import (
 
 const JWTSECRET = "JWTSECRET"
 
+type ErrorNotif struct {
+	Error string
+}
+
 func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 	r.Static("static", "internal/routes/admin/static")
 	r.LoadHTMLGlob("internal/routes/admin/templates/**")
@@ -30,6 +34,20 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.GET("", InitPage(ctx, pool, mint))
 	adminRoute.GET("/login", LoginPage(ctx, pool, mint))
 	adminRoute.POST("/login", Login(ctx, pool, mint))
+
+	// partial template routes
+	adminRoute.GET("/mintinfo", MintInfoTab(ctx, pool, mint))
+	adminRoute.POST("/mintinfo", MintInfoPost(ctx, pool, mint))
+
+	adminRoute.GET("/bolt11", Bolt11Tab(ctx, pool, mint))
+	adminRoute.POST("/bolt11", Bolt11Post(ctx, pool, mint))
+
+	adminRoute.GET("/keysets", KeysetsPage(ctx, pool, mint))
+
+	adminRoute.POST("/rotate/sats", RotateSatsSeed(ctx, pool, mint))
+	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(ctx, pool, mint))
+
+	adminRoute.GET("/lightningdata", LightningDataFormFields(ctx, pool, mint))
 
 }
 

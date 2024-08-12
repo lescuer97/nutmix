@@ -641,7 +641,21 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	}
 
-	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds)
+	config, err := mint.SetUpConfigFile()
+
+	config.MINT_LIGHTNING_BACKEND = ctx.Value(mint.MINT_LIGHTNING_BACKEND_ENV).(string)
+	config.DATABASE_URL = ctx.Value(database.DATABASE_URL_ENV).(string)
+	config.NETWORK = ctx.Value(mint.NETWORK_ENV).(string)
+	config.LND_GRPC_HOST = os.Getenv(comms.LND_HOST)
+	config.LND_TLS_CERT = os.Getenv(comms.LND_TLS_CERT)
+	config.LND_MACAROON = os.Getenv(comms.LND_MACAROON)
+	config.MINT_LNBITS_KEY = os.Getenv(comms.MINT_LNBITS_KEY)
+	config.MINT_LNBITS_ENDPOINT = os.Getenv(comms.MINT_LNBITS_ENDPOINT)
+
+	if err != nil {
+		log.Fatalf("could not setup config file: %+v ", err)
+	}
+	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds, config)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -814,7 +828,7 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 
 }
 
-func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]cashu.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 
 	// try to swap tokens
 	var proofs []cashu.Proof

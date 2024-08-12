@@ -37,8 +37,6 @@ body {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
-    align-content: center;
-    width: 100vw;
     margin: 0px;
 
 }
@@ -48,7 +46,7 @@ form {
     flex-direction: column;
     background-color: var(--color-surface-200);
     gap: 15px;
-    padding: 15px;
+    padding: 0px 30px 30px 30px;
     border-radius: 15px;
     border: 2px solid #020000;
 }
@@ -61,12 +59,196 @@ button {
     letter-spacing: 1px;
     cursor: pointer;
 }
+button.square {
+    border-radius: 0px;
+}
 
-#login-form {
-    max-width: 480px;
+button.selected {
+    background-color: var(--color-primary-200);
+    cursor: default;
+}
+
+input {
+    padding: 10px;
+    letter-spacing: 1px;
+
+}
+
+.content {
+    min-width: 90%;
+}
+
+.tab-content {
+    margin-top: 36px;
+}
+.tab-list {
+    margin-top: 25px;
+
+}
+
+.settings-input {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    background-color: var(--color-surface-300);
+    border-radius: 25px;
+    gap: 10px;
+}
+
+.settings-input textarea {
+    min-height: 120px;
+}
+
+select {
+    padding: 20px;
+    border-radius: 25px;
+    gap: 10px;
+
+}
+
+.form-section {
+    display: flex;
+    flex-direction: row;
+    gap: 15px;
+
+}
+
+#notifications {
+    display: flex;
+    justify-content: center;
+    color: black;
+}
+
+#notifications > .success {
+    background-color: #90ef6e;
+    margin-top: 15px;
+    margin-bottom: -15px;
+    padding: 10px 25px;
+    border-radius: 25px;
+}
+#notifications > .error {
+    background-color: #ff6666;
+    margin-top: 15px;
+    margin-bottom: -15px;
+    padding: 10px 25px;
+    border-radius: 25px;
+}
+
+.login-form {
+    align-content: center;
+    justify-content: center;
 }
 
 #nip07-form {
     display: flex;
     flex-direction: column;
 }
+
+#lightning-data {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.fees-form {
+    flex-direction: row;
+    padding: 15px;
+    margin: 0px;
+    align-items: center;
+    /* margin: 15px; */
+
+}
+
+.keysets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.keyset_card {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    border: 1px solid var(--color-primary-500);
+    width: fit-content;
+
+    padding: 10px 5px;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* lds loading ring */
+.lds-dual-ring {
+  /* change color here */
+  color: #1c4c5b;
+  margin-bottom:15px;
+}
+.lds-dual-ring,
+.lds-dual-ring:after {
+  box-sizing: border-box;
+}
+.lds-dual-ring {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+}
+.lds-dual-ring:after {
+  content: " ";
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin: 8px;
+  border-radius: 50%;
+  border: 6.4px solid currentColor;
+  border-color: currentColor transparent currentColor transparent;
+  animation: lds-dual-ring 1.2s linear infinite;
+}
+@keyframes lds-dual-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

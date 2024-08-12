@@ -316,7 +316,7 @@ func makeHTLCSpendCondition(preimage string, nSigs int, pubkeys []*secp256k1.Pub
 	return spendCondition, nil
 }
 
-func GenerateProofsHTLC(signatures []cashu.BlindSignature, preimage string, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofsHTLC(signatures []cashu.BlindSignature, preimage string, keysets map[string]cashu.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 	// try to swap tokens
 	var proofs []cashu.Proof
 	// unblid the signatures and make proofs

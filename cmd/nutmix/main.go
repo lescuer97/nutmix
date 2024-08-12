@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
-	"os"
-
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -14,6 +11,8 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
+	"log"
+	"os"
 )
 
 var (
@@ -135,8 +134,13 @@ func main() {
 		}
 	}
 
+	config, err := mint.SetUpConfigFile()
+	if err != nil {
+		log.Fatalf("mint.SetUpConfigFile(): %+v ", err)
+	}
+
 	// remove mint private key from variable
-	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds)
+	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds, config)
 
 	// clear mint seeds and privatekey
 	seeds = []cashu.Seed{}
@@ -148,8 +152,8 @@ func main() {
 
 	r := gin.Default()
 
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
 
 	r.Use(cors.Default())
 
