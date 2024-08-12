@@ -2,6 +2,7 @@ package mint
 
 import (
 	"context"
+	// "fmt"
 	"os"
 	"testing"
 
@@ -42,6 +43,7 @@ func TestSetUpMint(t *testing.T) {
 	seeds := []cashu.Seed{
 		seed,
 	}
+	// t.T
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, MINT_LIGHTNING_BACKEND_ENV, os.Getenv(MINT_LIGHTNING_BACKEND_ENV))
@@ -50,6 +52,7 @@ func TestSetUpMint(t *testing.T) {
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 
 	config, err := SetUpConfigFile()
+
 	if err != nil {
 		t.Errorf("could not setup config file: %+v", err)
 	}

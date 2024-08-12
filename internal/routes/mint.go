@@ -1,23 +1,19 @@
 package routes
 
 import (
-	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
-	"os"
-	"slices"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
-	"github.com/tyler-smith/go-bip32"
+	"log"
+	"os"
+	"slices"
 )
 
-func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
+func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
@@ -65,37 +61,29 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *
 
 	v1.GET("/info", func(c *gin.Context) {
 
-		seed, err := database.GetActiveSeed(pool)
-
-		var pubkey string = ""
-
-		if err != nil {
-			c.JSON(500, "Server side error")
-			return
-		}
-
-		masterKey, err := bip32.NewMasterKey(seed.Seed)
-
-		if err != nil {
-			log.Printf("Error creating master key: %v ", err)
-			c.JSON(500, "Server side error")
-			return
-		}
-		pubkey = hex.EncodeToString(masterKey.PublicKey().Key)
 		name := os.Getenv("NAME")
 		description := os.Getenv("DESCRIPTION")
 		description_long := os.Getenv("DESCRIPTION_LONG")
 		motd := os.Getenv("MOTD")
 
-		email := []string{"email", os.Getenv("EMAIL")}
-		nostr := []string{"nostr", os.Getenv("NOSTR")}
+		contacts := []cashu.ContactInfo{}
 
-		contacts := [][]string{email, nostr}
+		email := os.Getenv("EMAIL")
 
-		for i, contact := range contacts {
-			if contact[1] == "" {
-				contacts = append(contacts[:i], contacts[i+1:]...)
-			}
+		if len(email) > 0 {
+			contacts = append(contacts, cashu.ContactInfo{
+				Method: "email",
+				Info:   email,
+			})
+		}
+
+		nostr := os.Getenv("NOSTR")
+
+		if len(nostr) > 0 {
+			contacts = append(contacts, cashu.ContactInfo{
+				Method: "nostr",
+				Info:   nostr,
+			})
 		}
 
 		nuts := make(map[string]cashu.SwapMintInfo)
@@ -119,8 +107,8 @@ func v1MintRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *
 
 		response := cashu.GetInfoResponse{
 			Name:            name,
-			Version:         "NutMix/0.1",
-			Pubkey:          pubkey,
+			Version:         "NutMix/0.1.1",
+			Pubkey:          mint.MintPubkey,
 			Description:     description,
 			DescriptionLong: description_long,
 			Motd:            motd,

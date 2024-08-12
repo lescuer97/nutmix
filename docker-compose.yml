@@ -19,6 +19,9 @@ services:
     volumes:
       - "./letsencrypt:/letsencrypt"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    depends_on:
+      - db
+      - mint
   db:
     image: postgres:16.2
     restart: always
@@ -62,6 +65,8 @@ services:
       - "traefik.http.services.mint.loadbalancer.server.port=8080"
       - "traefik.http.middlewares.mint.headers.customRequestHeaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.mint-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.mint-ratelimit1.ratelimit.average=30"
+      - "traefik.http.middlewares.mint-ratelimit2.ratelimit.burst=60"
       - "traefik.http.routers.mint-http.entrypoints=web"
       - "traefik.http.routers.mint-http.rule=Host(`${MINT_HOSTNAME}`)"
       - "traefik.http.routers.mint-http.middlewares=mint-https@docker"

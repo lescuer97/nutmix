@@ -27,6 +27,8 @@ type Mint struct {
 	ActiveProofs  ActiveProofs
 	ActiveQuotes  ActiveQuote
 	Config        Config
+	MintPubkey    string
+	// ActiveMeltQuote ActiveMeltQuote
 }
 
 var (
@@ -363,7 +365,6 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 		Config:        config,
 	}
 
-	fmt.Printf("CONFIG %+v", config)
 	network := config.NETWORK
 	switch network {
 	case "testnet":
@@ -416,6 +417,18 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 
 		mint.Keysets[seed.Unit] = append(mint.Keysets[seed.Unit], keysets...)
 	}
+
+	// parse mint private key and get hex value pubkey
+
+	parsedBytes, err := hex.DecodeString(mint_privkey)
+
+	if err != nil {
+		return &mint, fmt.Errorf("Could not setup mints pubkey %w", err)
+	}
+
+	pubkeyhex := hex.EncodeToString(secp256k1.PrivKeyFromBytes(parsedBytes).PubKey().SerializeCompressed())
+
+	mint.MintPubkey = pubkeyhex
 
 	return &mint, nil
 }

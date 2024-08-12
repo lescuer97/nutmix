@@ -1,7 +1,6 @@
 package configTest
 
 import (
-	"fmt"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"testing"
 )
@@ -77,7 +76,6 @@ func TestSetupConfigWithoutEnvVars(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not setup Config File")
 	}
-	fmt.Printf("config %+v", config)
 
 	if config.NETWORK != "mainnet" {
 		t.Errorf("Network is not default")
