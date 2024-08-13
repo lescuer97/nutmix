@@ -1492,7 +1492,6 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
-	fmt.Println("body:  ", w.Body.String())
 
 	if w.Body.String() != `"Incorrect Unit for melting"` {
 		t.Errorf("Expected `Incorrect Unit for melting`, got %s", w.Body.String())

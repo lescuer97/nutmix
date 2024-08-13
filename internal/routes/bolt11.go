@@ -506,7 +506,6 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		fmt.Printf("Quote %+v", quote)
 		err = mint.AddQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 
 		if err != nil {

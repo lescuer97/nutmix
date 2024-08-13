@@ -82,7 +82,6 @@ func (q *ActiveQuote) AddQuote(quote string) error {
 		return AlreadyActiveQuote
 	}
 
-	fmt.Println("quote", quote)
 	q.Quote[quote] = true
 
 	q.Unlock()
