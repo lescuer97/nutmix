@@ -206,7 +206,9 @@ func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, requestPaid bool, state cashu.
 	return nil
 }
 
-func ModifyQuoteMintMintedStatus(ctx context.Context, pool *pgxpool.Pool, minted bool, state cashu.ACTION_STATE, quote string) error {
+func ModifyQuoteMintMintedStatus(pool *pgxpool.Pool, minted bool, state cashu.ACTION_STATE, quote string) error {
+	ctx := context.Background()
+
 	args := pgx.NamedArgs{
 		"state":  state,
 		"minted": minted,

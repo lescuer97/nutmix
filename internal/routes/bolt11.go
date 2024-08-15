@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -24,7 +23,7 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
+func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 	v1 := r.Group("/v1")
 
 	v1.POST("/mint/quote/bolt11", func(c *gin.Context) {
@@ -48,13 +47,11 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		lightningBackendType := ctx.Value("MINT_LIGHTNING_BACKEND").(string)
-
 		var response cashu.PostMintQuoteBolt11Response
 
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 
-		switch lightningBackendType {
+		switch mint.Config.MINT_LIGHTNING_BACKEND {
 		case comms.FAKE_WALLET:
 			payReq, err := lightning.CreateMockInvoice(mintRequest.Amount, "mock invoice", mint.Network, expireTime)
 			if err != nil {
@@ -100,7 +97,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			}
 
 		default:
-			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
+			log.Fatalf("Unknown lightning backend: %s", mint.Config.MINT_LIGHTNING_BACKEND)
 		}
 
 		err = database.SaveQuoteMintRequest(pool, response)
@@ -129,7 +126,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		state, _, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
+		state, _, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
 
 		if err != nil {
 			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
@@ -186,9 +183,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		}
 		blindedSignatures := []cashu.BlindSignature{}
 		recoverySigsDb := []cashu.RecoverSigDB{}
-		lightningBackendType := ctx.Value("MINT_LIGHTNING_BACKEND").(string)
 
-		switch lightningBackendType {
+		switch mint.Config.MINT_LIGHTNING_BACKEND {
 
 		case comms.FAKE_WALLET:
 			invoice, err := zpay32.Decode(quote.Request, &mint.Network)
@@ -233,7 +229,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:
 
-			state, _, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
+			state, _, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
 			if err != nil {
 				mint.RemoveActiveMintQuote(quote.Quote)
 				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
@@ -296,13 +292,13 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			}
 
 		default:
-			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
+			log.Fatalf("Unknown lightning backend: %s", mint.Config.MINT_LIGHTNING_BACKEND)
 		}
 
 		quote.Minted = true
 		quote.State = cashu.ISSUED
 
-		err = database.ModifyQuoteMintMintedStatus(ctx, pool, quote.Minted, quote.State, quote.Quote)
+		err = database.ModifyQuoteMintMintedStatus(pool, quote.Minted, quote.State, quote.Quote)
 
 		if err != nil {
 			log.Println(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err))
@@ -351,9 +347,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 
-		lightningBackendType := ctx.Value("MINT_LIGHTNING_BACKEND").(string)
-
-		switch lightningBackendType {
+		switch mint.Config.MINT_LIGHTNING_BACKEND {
 		case comms.FAKE_WALLET:
 
 			randUuid, err := uuid.NewRandom()
@@ -421,7 +415,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			}
 
 		default:
-			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
+			log.Fatalf("Unknown lightning backend: %s", mint.Config.MINT_LIGHTNING_BACKEND)
 		}
 
 		err = database.SaveQuoteMeltRequest(pool, dbRequest)
@@ -451,7 +445,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		state, preimage, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMeltPayStatus)
+		state, preimage, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMeltPayStatus)
 		if err != nil {
 			if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 				c.JSON(200, quote.GetPostMeltQuoteResponse())
@@ -616,10 +610,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		lightningBackendType := ctx.Value("MINT_LIGHTNING_BACKEND").(string)
-
 		var changeResponse []cashu.BlindSignature
-		switch lightningBackendType {
+		switch mint.Config.MINT_LIGHTNING_BACKEND {
 		case comms.FAKE_WALLET:
 			quote.RequestPaid = true
 			quote.State = cashu.PAID
@@ -696,7 +688,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			}
 
 		default:
-			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
+			log.Fatalf("Unknown lightning backend: %s", mint.Config.MINT_LIGHTNING_BACKEND)
 		}
 
 		quote.Melted = true

@@ -157,7 +157,7 @@ func main() {
 
 	r.Use(cors.Default())
 
-	routes.V1Routes(ctx, r, pool, mint)
+	routes.V1Routes(r, pool, mint)
 
 	admin.AdminRoutes(ctx, r, pool, mint)
 
