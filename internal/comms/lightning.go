@@ -211,7 +211,8 @@ func (l *LightingComms) CheckIfInvoicePayed(quote string) (cashu.ACTION_STATE, s
 
 }
 
-func (l *LightingComms) ConnectionCheck() (bool, error) {
+// return in milisat
+func (l *LightingComms) WalletBalance() (uint64, error) {
 	switch l.LightningBackend {
 	case LNDGRPC:
 
@@ -219,30 +220,30 @@ func (l *LightingComms) ConnectionCheck() (bool, error) {
 
 		client := lnrpc.NewLightningClient(l.LndRpcClient)
 
-		walletRequest := lnrpc.WalletBalanceRequest{}
+		channelRequest := lnrpc.ChannelBalanceRequest{}
 
-		_, err := client.WalletBalance(ctx, &walletRequest)
+		balance, err := client.ChannelBalance(ctx, &channelRequest)
 
 		if err != nil {
-			return false, err
+			return balance.LocalBalance.GetMsat(), err
 		}
-		return true, nil
+		return balance.LocalBalance.GetMsat(), nil
 
 	case LNBITS:
-		var paymentStatus struct {
-			Paid     bool   `json:"paid"`
-			Pending  bool   `json:"pending"`
-			Preimage string `json:"preimage"`
+		var channelBalance struct {
+			Id      string `json:"id"`
+			Name    string `json:"name"`
+			Balance int    `json:"balance"`
 		}
-		err := l.LnbitsRequest("GET", "/api/v1/wallet", nil, &paymentStatus)
+		err := l.LnbitsRequest("GET", "/api/v1/wallet", nil, &channelBalance)
 		if err != nil {
-			return false, fmt.Errorf("l.LnbitsInvoiceRequest: %w", err)
+			return 0, fmt.Errorf("l.LnbitsInvoiceRequest: %w", err)
 		}
 
-		return true, nil
+		return uint64(channelBalance.Balance), nil
 
 	}
-	return false, nil
+	return 0, fmt.Errorf("Incorrent lightning backend")
 
 }
 

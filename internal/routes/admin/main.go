@@ -49,6 +49,9 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 
 	adminRoute.GET("/lightningdata", LightningDataFormFields(ctx, pool, mint))
 
+	adminRoute.GET("/mintactivity", MintActivityTab(ctx, pool, mint))
+	adminRoute.GET("/mint-balance", MintBalance(ctx, pool, mint))
+
 }
 
 func generateHMACSecret() ([]byte, error) {

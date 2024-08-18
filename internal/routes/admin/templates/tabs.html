@@ -1,5 +1,6 @@
 {{ define "mintinfo" }}
 <nav class="tab-list" role="tablist">
+	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
 	<button hx-get="/admin/mintinfo" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
 	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 	<button hx-get="/admin/keysets" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
@@ -51,6 +52,7 @@
 
 {{ define "bolt11-info" }}
 <nav class="tab-list" role="tablist">
+	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
 	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
 	<button hx-get="/admin/bolt11" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 	<button hx-get="/admin/keysets" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
@@ -131,6 +133,7 @@
 
 {{ define "keysets-page" }}
 <nav class="tab-list" role="tablist">
+	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
 	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
 	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 	<button hx-get="/admin/keysets" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
@@ -184,6 +187,28 @@
 </article>
 {{ end }}
 
+{{ define "mint-activity" }}
+<nav class="tab-list" role="tablist">
+	<button hx-get="/admin/mintactivity" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
+	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
+	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/keysets"  role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+</nav>
+
+<article id="tab-content" role="tabpanel" class="tab-content">
+   
+
+    <div hx-ext="remove-me" id="notifications">
+    </div>
+
+    <div hx-get="/admin/mint-balance" hx-trigger="load" hx-target="this" hx-swap="innerHTML" class="">
+        
+    </div>
+
+
+</article>
+{{ end }}
+
 
 {{ define "keysets" }}
     {{range .Keysets}}
@@ -207,17 +232,6 @@
 </div>
 
 {{end}}
-
-
-
-
-
-
-
-
-
-
-
 
 {{ define "problem-form" }}
     "something is wrong you sent the wrong lightning backend"

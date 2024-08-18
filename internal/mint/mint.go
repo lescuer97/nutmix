@@ -28,7 +28,6 @@ type Mint struct {
 	ActiveQuotes  ActiveQuote
 	Config        Config
 	MintPubkey    string
-	// ActiveMeltQuote ActiveMeltQuote
 }
 
 var (
