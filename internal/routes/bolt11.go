@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"time"
 
 	"strings"
 
@@ -47,9 +48,10 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 			return
 		}
 
-		var response cashu.PostMintQuoteBolt11Response
+		var mintRequestDB cashu.MintRequestDB
 
 		expireTime := cashu.ExpiryTimeMinUnit(15)
+         now := time.Now().Unix()
 
 		switch mint.Config.MINT_LIGHTNING_BACKEND {
 		case comms.FAKE_WALLET:
@@ -69,13 +71,16 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 				return
 			}
 
-			response = cashu.PostMintQuoteBolt11Response{
+        
+
+			mintRequestDB = cashu.MintRequestDB{
 				Quote:       randUuid.String(),
 				Request:     payReq,
 				RequestPaid: true,
 				Expiry:      expireTime,
 				Unit:        mintRequest.Unit,
 				State:       cashu.PAID,
+                SeenAt: now,
 			}
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:
@@ -87,20 +92,21 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 				return
 			}
 
-			response = cashu.PostMintQuoteBolt11Response{
+			mintRequestDB = cashu.MintRequestDB{
 				Quote:       resInvoice.Rhash,
 				Request:     resInvoice.PaymentRequest,
 				RequestPaid: false,
 				Expiry:      expireTime,
 				Unit:        mintRequest.Unit,
 				State:       cashu.UNPAID,
+                SeenAt: now,
 			}
 
 		default:
 			log.Fatalf("Unknown lightning backend: %s", mint.Config.MINT_LIGHTNING_BACKEND)
 		}
 
-		err = database.SaveQuoteMintRequest(pool, response)
+		err = database.SaveMintRequestDB(pool, mintRequestDB)
 
 		if err != nil {
 			log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
@@ -108,7 +114,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 			return
 		}
 
-		c.JSON(200, response)
+		c.JSON(200, mintRequestDB.PostMintQuoteBolt11Response())
 	})
 
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
@@ -369,6 +375,8 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 				PaymentPreimage: "",
 			}
 
+            now := time.Now().Unix()
+
 			dbRequest = cashu.MeltRequestDB{
 				Quote:           response.Quote,
 				Request:         meltRequest.Request,
@@ -379,6 +387,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 				RequestPaid:     response.Paid,
 				State:           response.State,
 				PaymentPreimage: response.PaymentPreimage,
+                SeenAt: now,
 			}
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:

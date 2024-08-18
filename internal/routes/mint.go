@@ -3,13 +3,15 @@ package routes
 import (
 	"errors"
 	"fmt"
+	"log"
+	"slices"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
-	"log"
-	"slices"
 )
 
 func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
@@ -132,6 +134,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 			return
 		}
 
+        now := time.Now().Unix()
 		// check proof have the same amount as blindedSignatures
 		for i, proof := range swapRequest.Inputs {
 			AmountProofs += proof.Amount
@@ -146,6 +149,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 				return
 			}
 			swapRequest.Inputs[i] = p
+			swapRequest.Inputs[i].SeenAt = now
 		}
 
 		for _, output := range swapRequest.Outputs {

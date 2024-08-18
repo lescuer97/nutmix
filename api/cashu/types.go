@@ -155,6 +155,7 @@ type Proof struct {
 	C       string `json:"C" db:"c"`
 	Y       string `json:"Y" db:"Y"`
 	Witness string `json:"witness" db:"witness"`
+    SeenAt int64  `json:"seen_at"`
 }
 
 func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
@@ -468,6 +469,31 @@ type PostMintQuoteBolt11Response struct {
 	Minted      bool         `json:"minted"`
 	State       ACTION_STATE `json:"state"`
 }
+type MintRequestDB struct {
+	Quote   string `json:"quote"`
+	Request string `json:"request"`
+	// Deprecated: Should be removed after all main wallets change to the new State format
+	RequestPaid bool         `json:"paid" db:"request_paid"`
+	Expiry      int64        `json:"expiry"`
+	Unit        string       `json:"unit"`
+	Minted      bool         `json:"minted"`
+	State       ACTION_STATE `json:"state"`
+    SeenAt int64  `json:"seen_at"`
+}
+
+
+func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
+    res := PostMintQuoteBolt11Response{
+        Quote : m.Quote,
+        Request: m.Request,
+        RequestPaid: m.RequestPaid,
+        Expiry: m.Expiry,
+        Unit: m.Unit,
+        Minted: m.Minted,
+        State: m.State,
+    }
+    return res
+}
 
 type PostMintBolt11Request struct {
 	Quote   string           `json:"quote"`
@@ -506,6 +532,7 @@ type MeltRequestDB struct {
 	Melted          bool         `json:"melted"`
 	State           ACTION_STATE `json:"state"`
 	PaymentPreimage string       `json:"payment_preimage"`
+    SeenAt int64  `json:"seen_at"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
