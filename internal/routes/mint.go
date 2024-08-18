@@ -134,7 +134,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 			return
 		}
 
-        now := time.Now().Unix()
+		now := time.Now().Unix()
 		// check proof have the same amount as blindedSignatures
 		for i, proof := range swapRequest.Inputs {
 			AmountProofs += proof.Amount

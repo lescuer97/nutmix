@@ -51,6 +51,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 
 	adminRoute.GET("/mintactivity", MintActivityTab(ctx, pool, mint))
 	adminRoute.GET("/mint-balance", MintBalance(ctx, pool, mint))
+	adminRoute.GET("/mint-melt", MintMeltActivity(ctx, pool, mint))
 
 }
 

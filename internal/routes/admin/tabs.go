@@ -221,4 +221,3 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 		return
 	}
 }
-

@@ -155,7 +155,7 @@ type Proof struct {
 	C       string `json:"C" db:"c"`
 	Y       string `json:"Y" db:"Y"`
 	Witness string `json:"witness" db:"witness"`
-    SeenAt int64  `json:"seen_at"`
+	SeenAt  int64  `json:"seen_at"`
 }
 
 func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
@@ -478,21 +478,20 @@ type MintRequestDB struct {
 	Unit        string       `json:"unit"`
 	Minted      bool         `json:"minted"`
 	State       ACTION_STATE `json:"state"`
-    SeenAt int64  `json:"seen_at"`
+	SeenAt      int64        `json:"seen_at"`
 }
 
-
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
-    res := PostMintQuoteBolt11Response{
-        Quote : m.Quote,
-        Request: m.Request,
-        RequestPaid: m.RequestPaid,
-        Expiry: m.Expiry,
-        Unit: m.Unit,
-        Minted: m.Minted,
-        State: m.State,
-    }
-    return res
+	res := PostMintQuoteBolt11Response{
+		Quote:       m.Quote,
+		Request:     m.Request,
+		RequestPaid: m.RequestPaid,
+		Expiry:      m.Expiry,
+		Unit:        m.Unit,
+		Minted:      m.Minted,
+		State:       m.State,
+	}
+	return res
 }
 
 type PostMintBolt11Request struct {
@@ -532,7 +531,7 @@ type MeltRequestDB struct {
 	Melted          bool         `json:"melted"`
 	State           ACTION_STATE `json:"state"`
 	PaymentPreimage string       `json:"payment_preimage"`
-    SeenAt int64  `json:"seen_at"`
+	SeenAt          int64        `json:"seen_at"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {

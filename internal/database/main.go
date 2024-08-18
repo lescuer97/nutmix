@@ -238,7 +238,7 @@ func ModifyQuoteMintMintedStatus(pool *pgxpool.Pool, minted bool, state cashu.AC
 }
 func SaveQuoteMeltRequest(pool *pgxpool.Pool, request cashu.MeltRequestDB) error {
 
-	_, err := pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage)
+	_, err := pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 	}

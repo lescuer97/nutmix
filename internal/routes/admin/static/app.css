@@ -166,16 +166,18 @@ select {
     margin-top: 30px;
 }
 
-.keyset_card {
+.balance {
+    display: flex;
+    gap: 35px;
+}
+
+.card {
     display: flex;
     flex-direction: column;
     gap: 5px;
-
     border: 1px solid var(--color-primary-500);
     width: fit-content;
-
-    padding: 10px 5px;
-
+    padding: 10px 15px;
 }
 
 
