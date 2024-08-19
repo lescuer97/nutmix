@@ -3,17 +3,19 @@ package routes
 import (
 	"errors"
 	"fmt"
+	"log"
+	"log/slog"
+	"os"
+	"slices"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
-	"log"
-	"os"
-	"slices"
 )
 
-func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
+func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
@@ -31,7 +33,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 		keysets, err := mint.GetKeysetById(id)
 
 		if err != nil {
-			log.Printf("GetKeysetById: %+v ", err)
+			logger.Error(fmt.Sprintf("GetKeysetById: %+v ", err))
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -45,6 +47,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 
 		seeds, err := database.GetAllSeeds(pool)
 		if err != nil {
+			logger.Error(fmt.Errorf("could not get keysets, database.GetAllSeeds(pool) %w", err).Error())
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -69,6 +72,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 		contacts := []cashu.ContactInfo{}
 
 		email := os.Getenv("EMAIL")
+		log.Printf("Getting info")
 
 		if len(email) > 0 {
 			contacts = append(contacts, cashu.ContactInfo{

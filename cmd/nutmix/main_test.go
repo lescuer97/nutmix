@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -649,7 +650,9 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	r := gin.Default()
 
-	routes.V1Routes(ctx, r, pool, mint)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	routes.V1Routes(ctx, r, pool, mint, logger)
 
 	return r, mint
 }

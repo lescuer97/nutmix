@@ -2,6 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"log"
+	"log/slog"
+	"log/syslog"
+	"os"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -10,8 +17,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
-	"log"
-	"os"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 var (
@@ -20,10 +26,51 @@ var (
 	MINT_PRIVATE_KEY_ENV = "MINT_PRIVATE_KEY"
 )
 
+const ConfigFileName string = "config.toml"
+const ConfigDirName string = ".nutmix"
+const logFileName string = "nutmix.log"
+
 func main() {
-	err := godotenv.Load(".env")
+
+	sysLogger, err := syslog.New(syslog.LOG_WARNING|syslog.LOG_DAEMON, "nutmix")
 	if err != nil {
-		log.Fatal("ERROR: no .env file found and not running in docker")
+		log.Fatalf("Could not setup syslog %+v", err)
+	}
+
+	defer sysLogger.Close()
+
+	dir, err := os.UserHomeDir()
+
+	if err != nil {
+		log.Panicln("Could not get Home directory")
+	}
+	var pathToProjectDir string = dir + "/" + ConfigDirName
+	err = utils.CreateDirectoryAndPath(pathToProjectDir, logFileName)
+
+	if err != nil {
+		log.Panicf("utils.CreateDirectoryAndPath(pathToProjectDir, logFileName ) %+v", err)
+	}
+
+	pathToConfigFile := pathToProjectDir + "/" + ConfigDirName
+
+	// Manipulate Config file
+	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0764)
+	if err != nil {
+		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
+	}
+
+	w := io.MultiWriter(os.Stdout, sysLogger, logFile)
+
+	opts := &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}
+
+	logger := slog.New(slog.NewJSONHandler(w, opts))
+
+	err = godotenv.Load(".env")
+
+	if err != nil {
+		sysLogger.Alert("ERROR: no .env file found and not running in docker")
 	}
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, DOCKER_ENV, os.Getenv(DOCKER_ENV))
@@ -38,28 +85,31 @@ func main() {
 	ctx = context.WithValue(ctx, comms.MINT_LNBITS_ENDPOINT, os.Getenv(comms.MINT_LNBITS_ENDPOINT))
 
 	if ctx.Value(DOCKER_ENV) == "prod" {
-		log.Println("Running in docker")
+		logger.Info("Running in docker")
 	}
 
 	if ctx.Value(MODE_ENV) == "prod" {
 		gin.SetMode(gin.ReleaseMode)
+		logger.Info("Running in Release mode")
 	}
 
 	pool, err := database.DatabaseSetup(ctx, "migrations")
 
 	if err != nil {
-		log.Fatal("Error conecting to db", err)
+		logger.Error(fmt.Sprintf("Error conecting to db %+v", err))
+		log.Panic()
 	}
 
 	seeds, err := database.GetAllSeeds(pool)
 
 	if err != nil {
-		log.Fatalf("Could not GetAllSeeds: %v", err)
+		logger.Error(fmt.Sprintf("Could not GetAllSeeds: %v", err))
+		log.Panic()
 	}
 
 	mint_privkey := os.Getenv(MINT_PRIVATE_KEY_ENV)
 	if mint_privkey == "" {
-		log.Fatalf("No mint private key found in env")
+		sysLogger.Alert("No mint private key found in env")
 	}
 
 	// incase there are no seeds in the db we create a new one
@@ -68,7 +118,7 @@ func main() {
 		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
 
 		if err != nil {
-			log.Fatalf("ERROR: DeriveSeedsFromKey: %+v ", err)
+			sysLogger.Alert(fmt.Sprintf("ERROR: DeriveSeedsFromKey: %+v ", err))
 		}
 
 		err = database.SaveNewSeeds(pool, generatedSeeds)
@@ -76,21 +126,19 @@ func main() {
 		seeds = append(seeds, generatedSeeds...)
 
 		if err != nil {
-			log.Fatalf("SaveNewSeed: %+v ", err)
+			sysLogger.Alert(fmt.Sprintf("SaveNewSeed: %+v ", err))
 		}
 	}
 
 	inactiveUnits, err := mint.CheckForInactiveSeeds(seeds)
 
 	if err != nil {
-		log.Fatalf("ERROR: CheckForActiveSeeds: %+v ", err)
+		sysLogger.Alert(fmt.Sprintf("ERROR: CheckForActiveSeeds: %+v ", err))
 	}
-
-	log.Printf("INFO: Inactive units: %+v", inactiveUnits)
 
 	// if there are inactive seeds we derive new seeds from the mint private key and version up
 	if len(inactiveUnits) > 0 {
-		log.Printf("INFO: Deriving new seeds for activation: %+v", inactiveUnits)
+		sysLogger.Info(fmt.Sprintf("Deriving new seeds for activation: %+v", inactiveUnits))
 
 		var versionedUpSeeds []cashu.Seed
 		for _, seedType := range inactiveUnits {
@@ -98,7 +146,7 @@ func main() {
 			generatedSeed, err := cashu.DeriveIndividualSeedFromKey(mint_privkey, seedType.Version+1, seedType.Unit)
 
 			if err != nil {
-				log.Fatalf("ERROR: cashu.DeriveIndividualSeedFromKey INCREASE Version: %+v ", err)
+				sysLogger.Alert(fmt.Sprintf(" cashu.DeriveIndividualSeedFromKey INCREASE Version: %+v ", err))
 			}
 
 			versionedUpSeeds = append(versionedUpSeeds, generatedSeed)
@@ -106,7 +154,7 @@ func main() {
 
 		err = database.SaveNewSeeds(pool, versionedUpSeeds)
 		if err != nil {
-			log.Fatalf("SaveNewSeed: %+v ", err)
+			sysLogger.Alert(fmt.Sprintf("SaveNewSeed: %+v ", err))
 		}
 
 		seeds = append(seeds, versionedUpSeeds...)
@@ -119,14 +167,14 @@ func main() {
 			err = seed.EncryptSeed(mint_privkey)
 
 			if err != nil {
-				log.Fatalf("ERROR: Could not encrypt seed that was not encrypted %+v", err)
+				sysLogger.Err(fmt.Sprintf("Could not encrypt seed that was not encrypted %+v", err))
 			}
 
 			seed.Encrypted = true
 
 			err = database.UpdateSeed(pool, seed)
 			if err != nil {
-				log.Fatalf("ERROR: Could not update seeds %+v", err)
+				sysLogger.Alert(fmt.Sprintf("Could not update seeds %+v", err))
 			}
 			seeds[i] = seed
 		}
@@ -141,19 +189,23 @@ func main() {
 	mint_privkey = ""
 
 	if err != nil {
-		log.Fatalf("SetUpMint: %+v ", err)
+		logger.Warn(fmt.Sprintf("SetUpMint: %+v ", err))
+		return
 	}
 
 	r := gin.Default()
 
+	r.Use(gin.LoggerWithWriter(w))
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
 
 	r.Use(cors.Default())
 
-	routes.V1Routes(ctx, r, pool, mint)
+	routes.V1Routes(ctx, r, pool, mint, logger)
 
 	defer pool.Close()
+
+	logger.Info("Nutmix started in port 8080")
 
 	r.Run(":8080")
 }

@@ -5,11 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
-	"slices"
-
-	"strings"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,9 +17,13 @@ import (
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
+	"log"
+	"log/slog"
+	"slices"
+	"strings"
 )
 
-func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
+func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
 
 	v1.POST("/mint/quote/bolt11", func(c *gin.Context) {
@@ -32,7 +31,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		err := c.BindJSON(&mintRequest)
 
 		if err != nil {
-			log.Printf("Incorrect body: %+v", err)
+			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -52,7 +51,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		case comms.FAKE_WALLET:
 			payReq, err := lightning.CreateMockInvoice(mintRequest.Amount, "mock invoice", mint.Network, expireTime)
 			if err != nil {
-				log.Println(err)
+				logger.Info(err.Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -60,7 +59,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			randUuid, err := uuid.NewRandom()
 
 			if err != nil {
-				log.Println(fmt.Errorf("NewRamdom: %w", err))
+				logger.Info(fmt.Errorf("NewRamdom: %w", err).Error())
 
 				c.JSON(500, "Opps!, something went wrong")
 				return
@@ -79,7 +78,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			resInvoice, err := mint.LightningComs.RequestInvoice(mintRequest.Amount)
 
 			if err != nil {
-				log.Println(err)
+				logger.Info(err.Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -100,7 +99,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		err = database.SaveQuoteMintRequest(pool, response)
 
 		if err != nil {
-			log.Println(fmt.Errorf("SaveQuoteRequest: %w", err))
+			logger.Error(fmt.Errorf("SaveQuoteRequest: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -118,7 +117,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 		if err != nil {
-			log.Println(fmt.Errorf("GetMintQuoteById: %w", err))
+			logger.Error(fmt.Errorf("GetMintQuoteById: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -126,7 +125,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		state, _, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
 
 		if err != nil {
-			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
+			logger.Warn(fmt.Errorf("VerifyLightingPaymentHappened: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -146,7 +145,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		err := c.BindJSON(&mintRequest)
 
 		if err != nil {
-			log.Printf("Incorrect body: %+v", err)
+			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -154,7 +153,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		quote, err := database.GetMintQuoteById(pool, mintRequest.Quote)
 
 		if err != nil {
-			log.Printf("Incorrect body: %+v", err)
+			logger.Warn(fmt.Errorf("Incorrect body: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -166,7 +165,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		err = mint.AddActiveMintQuote(quote.Quote)
 
 		if err != nil {
-			log.Println(fmt.Errorf("AddActiveMintQuote: %w", err))
+			logger.Warn(fmt.Errorf("AddActiveMintQuote: %w", err).Error())
 			c.JSON(400, "Proof already being minted")
 			return
 		}
@@ -187,7 +186,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			if err != nil {
 				mint.RemoveActiveMintQuote(quote.Quote)
-				log.Println(fmt.Errorf("zpay32.Decode: %w", err))
+				logger.Error(fmt.Errorf("zpay32.Decode: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -196,7 +195,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			if err != nil {
 				mint.RemoveActiveMintQuote(quote.Quote)
-				log.Println(fmt.Errorf("UnmarshallAmt: %w", err))
+				logger.Warn(fmt.Errorf("UnmarshallAmt: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -204,7 +203,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			// check the amount in outputs are the same as the quote
 			if int32(*invoice.MilliSat) != int32(amountMilsats) {
 				mint.RemoveActiveMintQuote(quote.Quote)
-				log.Println(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)))
+				logger.Warn(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)).Error())
 				c.JSON(403, "Amounts in outputs are not the same")
 				return
 			}
@@ -231,7 +230,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 					c.JSON(200, quote)
 					return
 				}
-				log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
+				logger.Warn(fmt.Errorf("VerifyLightingPaymentHappened: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -249,7 +248,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			if err != nil {
 				mint.RemoveActiveMintQuote(quote.Quote)
-				log.Println(fmt.Errorf("zpay32.Decode: %w", err))
+				logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -258,7 +257,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			if err != nil {
 				mint.RemoveActiveMintQuote(quote.Quote)
-				log.Println(fmt.Errorf("UnmarshallAmt: %w", err))
+				logger.Info(fmt.Errorf("UnmarshallAmt: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -266,7 +265,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			// check the amount in outputs are the same as the quote
 			if int32(*invoice.MilliSat) != int32(amountMilsats) {
 				mint.RemoveActiveMintQuote(quote.Quote)
-				log.Println(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)))
+				logger.Info(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)).Error())
 				c.JSON(403, "Amounts in outputs are not the same")
 				return
 			}
@@ -275,7 +274,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			if err != nil {
 				mint.RemoveActiveMintQuote(quote.Quote)
-				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+				logger.Error(fmt.Errorf("mint.SignBlindedMessages: %w", err).Error())
 				if errors.Is(err, m.ErrInvalidBlindMessage) {
 					c.JSON(403, m.ErrInvalidBlindMessage.Error())
 					return
@@ -295,14 +294,14 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		err = database.ModifyQuoteMintMintedStatus(ctx, pool, quote.Minted, quote.State, quote.Quote)
 
 		if err != nil {
-			log.Println(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err))
+			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
 			mint.RemoveActiveMintQuote(quote.Quote)
 		}
 		err = database.SetRestoreSigs(pool, recoverySigsDb)
 		if err != nil {
 			mint.RemoveActiveMintQuote(quote.Quote)
-			log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
-			log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
+			logger.Error(fmt.Errorf("SetRecoverySigs: %w", err).Error())
+			logger.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
 			return
 		}
 		mint.RemoveActiveMintQuote(quote.Quote)
@@ -317,14 +316,14 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		err := c.BindJSON(&meltRequest)
 
 		if err != nil {
-			log.Printf("Incorrect body: %+v", err)
+			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
 
 		invoice, err := zpay32.Decode(meltRequest.Request, &mint.Network)
 		if err != nil {
-			log.Println(fmt.Errorf("zpay32.Decode: %w", err))
+			logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -342,7 +341,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			randUuid, err := uuid.NewRandom()
 
 			if err != nil {
-				log.Println(fmt.Errorf("NewRamdom: %w", err))
+				logger.Info(fmt.Errorf("NewRamdom: %w", err).Error())
 
 				c.JSON(500, "Opps!, something went wrong")
 				return
@@ -374,7 +373,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			queryFee, err := mint.LightningComs.QueryPayment(invoice, meltRequest.Request)
 
 			if err != nil {
-				log.Println(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err))
+				logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -410,8 +409,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		err = database.SaveQuoteMeltRequest(pool, dbRequest)
 
 		if err != nil {
-			log.Println(fmt.Errorf("SaveQuoteMeltRequest: %w", err))
-			log.Println(fmt.Errorf("dbRequest: %+v", dbRequest))
+			logger.Warn(fmt.Errorf("SaveQuoteMeltRequest: %w", err).Error())
+			logger.Warn(fmt.Errorf("dbRequest: %+v", dbRequest).Error())
 			c.JSON(200, response)
 			return
 		}
@@ -424,7 +423,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		quote, err := database.GetMeltQuoteById(pool, quoteId)
 		if err != nil {
-			log.Println(fmt.Errorf("database.GetMeltQuoteById: %w", err))
+			logger.Warn(fmt.Errorf("database.GetMeltQuoteById: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -440,7 +439,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				c.JSON(200, quote.GetPostMeltQuoteResponse())
 				return
 			}
-			log.Println(fmt.Errorf("VerifyLightingPaymentHappened: %w", err))
+			logger.Warn(fmt.Errorf("VerifyLightingPaymentHappened: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -452,7 +451,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		err = database.AddPaymentPreimageToMeltRequest(pool, preimage, quote.Quote)
 		if err != nil {
-			log.Println(fmt.Errorf("database.GetMeltQuoteById: %w", err))
+			logger.Error(fmt.Errorf("database.GetMeltQuoteById: %w", err).Error())
 			c.JSON(200, quote.GetPostMeltQuoteResponse())
 			return
 		}
@@ -464,7 +463,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
 		if err != nil {
-			log.Printf("Incorrect body: %+v", err)
+			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -477,7 +476,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		quote, err := database.GetMeltQuoteById(pool, meltRequest.Quote)
 
 		if err != nil {
-			log.Println(fmt.Errorf("GetMeltQuoteById: %w", err))
+			logger.Info(fmt.Errorf("GetMeltQuoteById: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -490,7 +489,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Println(fmt.Errorf("mint.AddQuotesAndProofs(quote.Quote, meltRequest.Inputs): %w", err))
+			logger.Warn(fmt.Errorf("mint.AddQuotesAndProofs(quote.Quote, meltRequest.Inputs): %w", err).Error())
 			c.JSON(400, "Quote already being melted")
 			return
 		}
@@ -499,7 +498,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Printf("CheckProofsAreSameUnit: %+v", err)
+			logger.Info(fmt.Sprintf("CheckProofsAreSameUnit: %+v", err))
 			c.JSON(400, "Proofs are not the same unit")
 			return
 		}
@@ -508,7 +507,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		fee, err := cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()])
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Printf("cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()]): %+v", err)
+			logger.Info(fmt.Sprintf("cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()]): %+v", err))
 			c.JSON(400, "Could not find keyset for proof id")
 			return
 		}
@@ -526,7 +525,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			if err != nil {
 				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-				log.Printf("proof.HashSecretToCurve(): %+v", err)
+				logger.Info(fmt.Sprintf("proof.HashSecretToCurve(): %+v", err))
 				c.JSON(400, "Problem processing proofs")
 				return
 			}
@@ -538,7 +537,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Printf("Not enought proofs to expend. Needs: %v", quote.Amount)
+			logger.Info(fmt.Sprintf("Not enought proofs to expend. Needs: %v", quote.Amount))
 			c.JSON(403, "Not enought proofs to expend. Needs: %v")
 			return
 		}
@@ -548,7 +547,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Printf("CheckListOfProofs: %+v", err)
+			logger.Warn(fmt.Sprintf("CheckListOfProofs: %+v", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -600,7 +599,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			if err != nil {
 				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-				log.Printf("mint.LightningComs.PayInvoice %+v", err)
+				logger.Info(fmt.Sprintf("mint.LightningComs.PayInvoice %+v", err))
 				c.JSON(400, "could not make payment")
 				return
 			}
@@ -613,7 +612,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				c.JSON(400, "unable to find a path to destination")
 				return
 			case payment.PaymentError.Error() != "":
-				log.Printf("unknown lighting error: %+v", payment.PaymentError)
+				logger.Info(fmt.Sprintf("unknown lighting error: %+v", payment.PaymentError))
 				c.JSON(500, "Unknown error happend while paying")
 				return
 
@@ -648,7 +647,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 				if err != nil {
 					mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-					log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+					logger.Warn(fmt.Errorf("mint.SignBlindedMessages: %w", err).Error())
 					c.JSON(500, "Opps!, something went wrong")
 					return
 				}
@@ -657,8 +656,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 				if err != nil {
 					mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-					log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
-					log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
+					logger.Error(fmt.Errorf("SetRecoverySigs: %w", err).Error())
+					logger.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
 				}
 
 				changeResponse = blindSignatures
@@ -677,7 +676,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		err = database.ModifyQuoteMeltPayStatusAndMelted(pool, quote.RequestPaid, quote.Melted, quote.State, quote.Quote)
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Println(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err))
+			logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
 			c.JSON(200, response)
 			return
 		}
@@ -686,8 +685,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Println(fmt.Errorf("SaveProofs: %w", err))
-			log.Println(fmt.Errorf("Proofs: %+v", meltRequest.Inputs))
+			logger.Error(fmt.Errorf("SaveProofs: %w", err).Error())
+			logger.Error(fmt.Errorf("Proofs: %+v", meltRequest.Inputs).Error())
 			c.JSON(200, response)
 			return
 		}
