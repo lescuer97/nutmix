@@ -164,7 +164,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		unit, err := mint.CheckProofsAreSameUnit(swapRequest.Inputs)
 
 		if err != nil {
-			mint.RemoveProofs(swapRequest.Inputs)
+			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			log.Printf("CheckProofsAreSameUnit: %+v", err)
 			c.JSON(400, "Proofs are not the same unit")
 			return
@@ -173,7 +173,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		// check for needed amount of fees
 		fee, err := cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])
 		if err != nil {
-			mint.RemoveProofs(swapRequest.Inputs)
+			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			log.Printf("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()]): %+v", err)
 			c.JSON(400, "Could not find keyset for proof id")
 			return
@@ -199,7 +199,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 			return
 		}
 
-		err = mint.AddProofs(swapRequest.Inputs)
+		err = mint.ActiveProofs.AddProofs(swapRequest.Inputs)
 
 		if err != nil {
 			log.Printf("mint.AddProof: %+v", err)
@@ -210,7 +210,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		err = mint.VerifyListOfProofs(swapRequest.Inputs, swapRequest.Outputs, unit)
 
 		if err != nil {
-			mint.RemoveProofs(swapRequest.Inputs)
+			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			log.Println(fmt.Errorf("mint.VerifyListOfProofs: %w", err))
 
 			switch {
@@ -239,7 +239,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		blindedSignatures, recoverySigsDb, err := mint.SignBlindedMessages(swapRequest.Outputs, cashu.Sat.String())
 
 		if err != nil {
-			mint.RemoveProofs(swapRequest.Inputs)
+			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
@@ -253,14 +253,14 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		err = database.SaveProofs(pool, swapRequest.Inputs)
 
 		if err != nil {
-			mint.RemoveProofs(swapRequest.Inputs)
+			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			log.Println(fmt.Errorf("SaveProofs: %w", err))
 			log.Println(fmt.Errorf("Proofs: %+v", swapRequest.Inputs))
 			c.JSON(200, response)
 			return
 		}
 
-		mint.RemoveProofs(swapRequest.Inputs)
+		mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 
 		err = database.SetRestoreSigs(pool, recoverySigsDb)
 		if err != nil {

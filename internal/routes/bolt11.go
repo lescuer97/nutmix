@@ -35,6 +35,12 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			c.JSON(400, "Malformed body request")
 			return
 		}
+		// TODO - REMOVE this when doing multi denomination tokens with Milisats
+		if mintRequest.Unit != cashu.Sat.String() {
+			log.Printf("Incorrect Unit for minting: %+v", mintRequest.Unit)
+			c.JSON(400, "Incorrect Unit for minting")
+			return
+		}
 
 		if mintRequest.Amount == 0 {
 			c.JSON(400, "amount missing")
@@ -158,11 +164,12 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 		if quote.Minted {
+			log.Printf("Quote already minted")
 			c.JSON(400, "Quote already minted")
 			return
 		}
 
-		err = mint.AddActiveMintQuote(quote.Quote)
+		err = mint.ActiveQuotes.AddQuote(quote.Quote)
 
 		if err != nil {
 			logger.Warn(fmt.Errorf("AddActiveMintQuote: %w", err).Error())
@@ -174,6 +181,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		for _, blindMessage := range mintRequest.Outputs {
 			amountBlindMessages += blindMessage.Amount
+			// check all blind messages have the same unit
 		}
 		blindedSignatures := []cashu.BlindSignature{}
 		recoverySigsDb := []cashu.RecoverSigDB{}
@@ -211,8 +219,9 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			if err != nil {
 
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				if errors.Is(err, m.ErrInvalidBlindMessage) {
+					log.Printf("Invalid Blind Message %+v", m.ErrInvalidBlindMessage.Error())
 					c.JSON(400, m.ErrInvalidBlindMessage.Error())
 					return
 				}
@@ -225,7 +234,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			state, _, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
 			if err != nil {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 					c.JSON(200, quote)
 					return
@@ -239,7 +248,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			if quote.State == cashu.PAID {
 				quote.RequestPaid = true
 			} else {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
+				log.Printf("Quote not paid")
 				c.JSON(400, "Quote not paid")
 				return
 			}
@@ -304,7 +314,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			logger.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
 			return
 		}
-		mint.RemoveActiveMintQuote(quote.Quote)
+		mint.ActiveQuotes.RemoveQuote(quote.Quote)
 
 		// Store BlidedSignature
 		c.JSON(200, cashu.PostMintBolt11Response{
@@ -318,6 +328,13 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		if err != nil {
 			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
 			c.JSON(400, "Malformed body request")
+			return
+		}
+
+		// TODO - REMOVE this when doing multi denomination tokens with Milisats
+		if meltRequest.Unit != cashu.Sat.String() {
+			log.Printf("Incorrect Unit for minting: %+v", meltRequest.Unit)
+			c.JSON(400, "Incorrect Unit for melting")
 			return
 		}
 
@@ -469,6 +486,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		}
 
 		if len(meltRequest.Inputs) == 0 {
+			log.Printf("Outputs are empty")
 			c.JSON(400, "Outputs are empty")
 			return
 		}
@@ -480,7 +498,9 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+
 		if quote.Melted {
+			log.Printf("Quote already melted")
 			c.JSON(400, "Quote already melted")
 			return
 		}
@@ -500,6 +520,13 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 			logger.Info(fmt.Sprintf("CheckProofsAreSameUnit: %+v", err))
 			c.JSON(400, "Proofs are not the same unit")
+			return
+		}
+		// TODO - REMOVE this when doing multi denomination tokens with Milisats
+		if unit != cashu.Sat {
+			log.Printf("Incorrect Unit for minting: %+v", unit)
+			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+			c.JSON(400, "Incorrect Unit for minting")
 			return
 		}
 
@@ -554,6 +581,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if len(knownProofs) != 0 {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+			log.Printf("Proofs already used %+v \n", knownProofs)
 			c.JSON(400, "Proofs already used")
 			return
 		}
@@ -562,6 +590,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+			log.Printf("Could not verify Proofs %+v", err.Error())
+
 			switch {
 			case errors.Is(err, cashu.ErrEmptyWitness):
 				c.JSON(403, "Empty Witness")
