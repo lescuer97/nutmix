@@ -13,7 +13,6 @@ import (
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"log"
-	"slices"
 	"sync"
 	"time"
 )
@@ -24,11 +23,10 @@ type Mint struct {
 	LightningComs comms.LightingComms
 	Network       chaincfg.Params
 	PendingProofs []cashu.Proof
-	ActiveProofs  ActiveProofs
-	ActiveQuotes  ActiveQuote
+	ActiveProofs  *ActiveProofs
+	ActiveQuotes  *ActiveQuote
 	Config        Config
 	MintPubkey    string
-	// ActiveMeltQuote ActiveMeltQuote
 }
 
 var (
@@ -37,101 +35,75 @@ var (
 )
 
 type ActiveProofs struct {
-	Proofs []cashu.Proof
+	Proofs map[cashu.Proof]bool
 	sync.Mutex
 }
 
-func (a *Mint) AddProofs(proofs []cashu.Proof) error {
-	a.ActiveProofs.Lock()
+func (a *ActiveProofs) AddProofs(proofs []cashu.Proof) error {
+	a.Lock()
 	// check if proof already exists
-	for _, activeProof := range a.ActiveProofs.Proofs {
-		alreadyActiveProof := slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
-			if p == activeProof {
-				return true
-			}
-			return false
+	for _, p := range proofs {
 
-		})
-		if alreadyActiveProof {
-			a.ActiveProofs.Unlock()
+		if a.Proofs[p] {
+			a.Unlock()
 			return AlreadyActiveProof
 		}
-	}
 
-	a.ActiveProofs.Proofs = append(a.ActiveProofs.Proofs, proofs...)
-	a.ActiveProofs.Unlock()
+		a.Proofs[p] = true
+	}
+	a.Unlock()
 	return nil
 }
 
-func (a *Mint) RemoveProofs(proofs []cashu.Proof) {
-	a.ActiveProofs.Lock()
-	for _, proofToDelete := range proofs {
-		activeProofs := slices.DeleteFunc(a.ActiveProofs.Proofs, func(p cashu.Proof) bool {
-			if p == proofToDelete {
-				return true
-			}
-			return false
+func (a *ActiveProofs) RemoveProofs(proofs []cashu.Proof) error {
+	a.Lock()
+	// check if proof already exists
+	for _, p := range proofs {
 
-		})
-		a.ActiveProofs.Proofs = activeProofs
+		delete(a.Proofs, p)
+
 	}
-
-	a.ActiveProofs.Unlock()
+	a.Unlock()
+	return nil
 }
 
 type ActiveQuote struct {
-	Quote []string
+	Quote map[string]bool
 	sync.Mutex
 }
 
-func (a *Mint) AddActiveMintQuote(quote string) error {
-	a.ActiveQuotes.Lock()
-	// check if proof already exists
-	for _, activeQuote := range a.ActiveQuotes.Quote {
+func (q *ActiveQuote) AddQuote(quote string) error {
+	q.Lock()
 
-		if activeQuote == quote {
-			a.ActiveQuotes.Unlock()
-			return AlreadyActiveProof
-		}
+	if q.Quote[quote] {
+		q.Unlock()
+		return AlreadyActiveQuote
 	}
 
-	a.ActiveQuotes.Quote = append(a.ActiveQuotes.Quote, quote)
-	a.ActiveQuotes.Unlock()
+	q.Quote[quote] = true
+
+	q.Unlock()
 	return nil
 }
+func (q *ActiveQuote) RemoveQuote(quote string) error {
+	q.Lock()
 
-func (a *Mint) RemoveActiveMintQuote(quote string) error {
-	a.ActiveQuotes.Lock()
-	activeQuote := slices.DeleteFunc(a.ActiveQuotes.Quote, func(p string) bool {
-		if p == quote {
-			return true
-		}
-		return false
+	delete(q.Quote, quote)
 
-	})
-	a.ActiveQuotes.Quote = activeQuote
-
-	a.ActiveQuotes.Unlock()
+	q.Unlock()
 	return nil
-
 }
-
-type ActiveMeltQuote struct {
-	Quote []string
-	sync.Mutex
-}
-
 func (m *Mint) AddQuotesAndProofs(quote string, proofs []cashu.Proof) error {
 
 	if quote != "" {
-		err := m.AddActiveMintQuote(quote)
+		err := m.ActiveQuotes.AddQuote(quote)
 		if err != nil {
 			return fmt.Errorf("m.AddActiveMintQuote(quote): %w", err)
 		}
 	}
 
 	if len(proofs) == 0 {
-		err := m.AddProofs(proofs)
+		err := m.ActiveProofs.AddProofs(proofs)
 		if err != nil {
 			return fmt.Errorf("AddProofs: %w", err)
 		}
@@ -142,17 +114,16 @@ func (m *Mint) AddQuotesAndProofs(quote string, proofs []cashu.Proof) error {
 
 func (m *Mint) RemoveQuotesAndProofs(quote string, proofs []cashu.Proof) {
 	if quote != "" {
-		m.RemoveActiveMintQuote(quote)
+		m.ActiveQuotes.RemoveQuote(quote)
 	}
 
 	if len(proofs) == 0 {
-		m.RemoveProofs(proofs)
+		m.ActiveProofs.RemoveProofs(proofs)
 
 	}
 }
 
 // errors types for validation
-
 var (
 	ErrInvalidProof        = errors.New("Invalid proof")
 	ErrQuoteNotPaid        = errors.New("Quote not paid")
@@ -359,10 +330,18 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 }
 
 func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, config Config) (*Mint, error) {
+	activeProofs := ActiveProofs{
+		Proofs: make(map[cashu.Proof]bool),
+	}
+	activeQuotes := ActiveQuote{
+		Quote: make(map[string]bool),
+	}
 	mint := Mint{
 		ActiveKeysets: make(map[string]cashu.KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
 		Config:        config,
+		ActiveProofs:  &activeProofs,
+		ActiveQuotes:  &activeQuotes,
 	}
 
 	network := config.NETWORK
