@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"log/slog"
-	"log/syslog"
 	"os"
 
 	"github.com/gin-contrib/cors"
@@ -32,26 +31,24 @@ const logFileName string = "nutmix.log"
 
 func main() {
 
-	sysLogger, err := syslog.New(syslog.LOG_WARNING|syslog.LOG_DAEMON, "nutmix")
-	if err != nil {
-		log.Fatalf("Could not setup syslog %+v", err)
-	}
-
-	defer sysLogger.Close()
-
 	dir, err := os.UserHomeDir()
 
 	if err != nil {
 		log.Panicln("Could not get Home directory")
 	}
 	var pathToProjectDir string = dir + "/" + ConfigDirName
+
+	if os.Getenv(DOCKER_ENV) == "true" {
+		pathToProjectDir = "/var/log/nutmix"
+	}
+
 	err = utils.CreateDirectoryAndPath(pathToProjectDir, logFileName)
 
 	if err != nil {
 		log.Panicf("utils.CreateDirectoryAndPath(pathToProjectDir, logFileName ) %+v", err)
 	}
 
-	pathToConfigFile := pathToProjectDir + "/" + ConfigDirName
+	pathToConfigFile := pathToProjectDir + "/" + logFileName
 
 	// Manipulate Config file
 	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0764)
@@ -59,7 +56,7 @@ func main() {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
 
-	w := io.MultiWriter(os.Stdout, sysLogger, logFile)
+	w := io.MultiWriter(os.Stdout, logFile)
 
 	opts := &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -70,8 +67,10 @@ func main() {
 	err = godotenv.Load(".env")
 
 	if err != nil {
-		sysLogger.Alert("ERROR: no .env file found and not running in docker")
+		logger.Error("ERROR: no .env file found and not running in docker")
+		log.Panic()
 	}
+
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, DOCKER_ENV, os.Getenv(DOCKER_ENV))
 	ctx = context.WithValue(ctx, MODE_ENV, os.Getenv(MODE_ENV))
@@ -84,7 +83,7 @@ func main() {
 	ctx = context.WithValue(ctx, comms.MINT_LNBITS_KEY, os.Getenv(comms.MINT_LNBITS_KEY))
 	ctx = context.WithValue(ctx, comms.MINT_LNBITS_ENDPOINT, os.Getenv(comms.MINT_LNBITS_ENDPOINT))
 
-	if ctx.Value(DOCKER_ENV) == "prod" {
+	if ctx.Value(DOCKER_ENV) == "true" {
 		logger.Info("Running in docker")
 	}
 
@@ -109,7 +108,8 @@ func main() {
 
 	mint_privkey := os.Getenv(MINT_PRIVATE_KEY_ENV)
 	if mint_privkey == "" {
-		sysLogger.Alert("No mint private key found in env")
+		logger.Error("No mint private key found in env")
+		log.Panic()
 	}
 
 	// incase there are no seeds in the db we create a new one
@@ -118,7 +118,8 @@ func main() {
 		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
 
 		if err != nil {
-			sysLogger.Alert(fmt.Sprintf("ERROR: DeriveSeedsFromKey: %+v ", err))
+			logger.Error(fmt.Sprintf("ERROR: DeriveSeedsFromKey: %+v ", err))
+			log.Panic()
 		}
 
 		err = database.SaveNewSeeds(pool, generatedSeeds)
@@ -126,19 +127,21 @@ func main() {
 		seeds = append(seeds, generatedSeeds...)
 
 		if err != nil {
-			sysLogger.Alert(fmt.Sprintf("SaveNewSeed: %+v ", err))
+			logger.Error(fmt.Sprintf("SaveNewSeed: %+v ", err))
+			log.Panic()
 		}
 	}
 
 	inactiveUnits, err := mint.CheckForInactiveSeeds(seeds)
 
 	if err != nil {
-		sysLogger.Alert(fmt.Sprintf("ERROR: CheckForActiveSeeds: %+v ", err))
+		logger.Error(fmt.Sprintf("ERROR: CheckForActiveSeeds: %+v ", err))
+		log.Panic()
 	}
 
 	// if there are inactive seeds we derive new seeds from the mint private key and version up
 	if len(inactiveUnits) > 0 {
-		sysLogger.Info(fmt.Sprintf("Deriving new seeds for activation: %+v", inactiveUnits))
+		logger.Info(fmt.Sprintf("Deriving new seeds for activation: %+v", inactiveUnits))
 
 		var versionedUpSeeds []cashu.Seed
 		for _, seedType := range inactiveUnits {
@@ -146,7 +149,8 @@ func main() {
 			generatedSeed, err := cashu.DeriveIndividualSeedFromKey(mint_privkey, seedType.Version+1, seedType.Unit)
 
 			if err != nil {
-				sysLogger.Alert(fmt.Sprintf(" cashu.DeriveIndividualSeedFromKey INCREASE Version: %+v ", err))
+				logger.Warn(fmt.Sprintf(" cashu.DeriveIndividualSeedFromKey INCREASE Version: %+v ", err))
+				log.Panic()
 			}
 
 			versionedUpSeeds = append(versionedUpSeeds, generatedSeed)
@@ -154,7 +158,8 @@ func main() {
 
 		err = database.SaveNewSeeds(pool, versionedUpSeeds)
 		if err != nil {
-			sysLogger.Alert(fmt.Sprintf("SaveNewSeed: %+v ", err))
+			logger.Warn(fmt.Sprintf("SaveNewSeed: %+v ", err))
+			log.Panic()
 		}
 
 		seeds = append(seeds, versionedUpSeeds...)
@@ -167,14 +172,16 @@ func main() {
 			err = seed.EncryptSeed(mint_privkey)
 
 			if err != nil {
-				sysLogger.Err(fmt.Sprintf("Could not encrypt seed that was not encrypted %+v", err))
+				logger.Error(fmt.Sprintf("Could not encrypt seed that was not encrypted %+v", err))
+				log.Panic()
 			}
 
 			seed.Encrypted = true
 
 			err = database.UpdateSeed(pool, seed)
 			if err != nil {
-				sysLogger.Alert(fmt.Sprintf("Could not update seeds %+v", err))
+				logger.Error(fmt.Sprintf("Could not update seeds %+v", err))
+				log.Panic()
 			}
 			seeds[i] = seed
 		}
