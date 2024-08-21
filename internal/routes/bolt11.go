@@ -193,7 +193,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			invoice, err := zpay32.Decode(quote.Request, &mint.Network)
 
 			if err != nil {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				logger.Error(fmt.Errorf("zpay32.Decode: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
@@ -202,7 +202,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
 
 			if err != nil {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				logger.Warn(fmt.Errorf("UnmarshallAmt: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
@@ -210,7 +210,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			// check the amount in outputs are the same as the quote
 			if int32(*invoice.MilliSat) != int32(amountMilsats) {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				logger.Warn(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)).Error())
 				c.JSON(403, "Amounts in outputs are not the same")
 				return
@@ -257,7 +257,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			invoice, err := zpay32.Decode(quote.Request, &mint.Network)
 
 			if err != nil {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
@@ -266,7 +266,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
 
 			if err != nil {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				logger.Info(fmt.Errorf("UnmarshallAmt: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
@@ -274,7 +274,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			// check the amount in outputs are the same as the quote
 			if int32(*invoice.MilliSat) != int32(amountMilsats) {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				logger.Info(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)).Error())
 				c.JSON(403, "Amounts in outputs are not the same")
 				return
@@ -283,7 +283,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			blindedSignatures, recoverySigsDb, err = mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
 
 			if err != nil {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				logger.Error(fmt.Errorf("mint.SignBlindedMessages: %w", err).Error())
 				if errors.Is(err, m.ErrInvalidBlindMessage) {
 					c.JSON(403, m.ErrInvalidBlindMessage.Error())
@@ -305,11 +305,11 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if err != nil {
 			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
-			mint.RemoveActiveMintQuote(quote.Quote)
+			mint.ActiveQuotes.RemoveQuote(quote.Quote)
 		}
 		err = database.SetRestoreSigs(pool, recoverySigsDb)
 		if err != nil {
-			mint.RemoveActiveMintQuote(quote.Quote)
+			mint.ActiveQuotes.RemoveQuote(quote.Quote)
 			logger.Error(fmt.Errorf("SetRecoverySigs: %w", err).Error())
 			logger.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
 			return
