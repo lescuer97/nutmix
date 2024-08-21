@@ -1,7 +1,5 @@
 name: Nutmix
 on:
-  push:
-    branches: [master, signet]
   pull_request:
     branches: [master, signet]
 
