@@ -19,12 +19,16 @@ services:
     env_file:
       - path: ".env"
         required: true
+    environment:
+      DOCKER: "true"
     build: ./
     ports:
       - 8080:8080
     restart: on-failure:10
     depends_on:
       - db
+    volumes:
+      - /var/log/nutmix:/var/log/nutmix
 volumes:
   db:
     driver: local
