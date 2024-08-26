@@ -1506,7 +1506,7 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 401 {
+	if w.Code != 400 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
 
