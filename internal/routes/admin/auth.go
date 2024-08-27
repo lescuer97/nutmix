@@ -24,7 +24,7 @@ const AdminAuthKey = "admin-cookie"
 func AuthMiddleware(ctx context.Context) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
-			key := []byte(os.Getenv(JWTSECRET))
+			key := []byte(os.Getenv(JWT_SECRET))
 
 			token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
 
@@ -181,7 +181,7 @@ func Login(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Handler
 			return
 		}
 
-		jwtsecret := []byte(os.Getenv(JWTSECRET))
+		jwtsecret := []byte(os.Getenv(JWT_SECRET))
 
 		token, err := makeJWTToken(jwtsecret)
 

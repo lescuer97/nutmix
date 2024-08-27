@@ -75,6 +75,11 @@ func main() {
 		logger.Error("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")
 		log.Panicln("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")
 	}
+	// check in JWT_SECRET is not empty
+	if os.Getenv(admin.JWT_SECRET) == "" {
+		logger.Error("Please setup the JWT_SECRET so you can setup your mint")
+		log.Panicln("Please setup the JWT_SECRET so you can setup your mint")
+	}
 
 	ctx := context.Background()
 
