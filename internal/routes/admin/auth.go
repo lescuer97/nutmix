@@ -24,8 +24,14 @@ const AdminAuthKey = "admin-cookie"
 func AuthMiddleware(ctx context.Context) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
-			key := os.Getenv(JWTSECRET)
+			key := []byte(os.Getenv(JWTSECRET))
+
 			token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
+
+				// Don't forget to validate the alg is what you expect:
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				}
 				return key, nil
 			})
 

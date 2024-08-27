@@ -358,7 +358,6 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 		return &mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
-	// lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
 	switch config.MINT_LIGHTNING_BACKEND {
 
 	case comms.FAKE_WALLET:
