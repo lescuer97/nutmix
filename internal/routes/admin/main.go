@@ -10,7 +10,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 )
 
-const JWTSECRET = "JWTSECRET"
+const JWT_SECRET = "JWT_SECRET"
 
 type ErrorNotif struct {
 	Error string
@@ -27,7 +27,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 		log.Panic("ERROR: could not create HMAC secret")
 	}
 
-	ctx = context.WithValue(ctx, JWTSECRET, hmacSecret)
+	ctx = context.WithValue(ctx, JWT_SECRET, hmacSecret)
 
 	adminRoute.Use(AuthMiddleware(ctx))
 

@@ -86,9 +86,6 @@ func TestSetupConfigWithoutEnvVars(t *testing.T) {
 	if config.MINT_LIGHTNING_BACKEND != "FakeWallet" {
 		t.Errorf("Mint lightning backend is not default")
 	}
-	if config.POSTGRES_USER != "admin" {
-		t.Errorf("postgres user is not default")
-	}
 
 	err = WriteConfigFile(originalCopyFile.TomlFile)
 

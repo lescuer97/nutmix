@@ -30,12 +30,8 @@ type Config struct {
 	MINT_LNBITS_ENDPOINT string
 	MINT_LNBITS_KEY      string
 
-	DATABASE_TYPE     string
-	DATABASE_URL      string
-	POSTGRES_USER     string
-	POSTGRES_PASSWORD string
-
-	ADMIN_NOSTR_NPUB string
+	DATABASE_TYPE string
+	DATABASE_URL  string
 }
 
 func (c *Config) Default() {
@@ -58,10 +54,7 @@ func (c *Config) Default() {
 	c.MINT_LNBITS_KEY = ""
 
 	c.DATABASE_TYPE = database.DOCKERDATABASE
-	c.POSTGRES_USER = "admin"
-	c.POSTGRES_PASSWORD = ""
 
-	c.ADMIN_NOSTR_NPUB = ""
 }
 func (c *Config) UseEnviromentVars() {
 	c.NAME = os.Getenv("NAME")
@@ -84,10 +77,7 @@ func (c *Config) UseEnviromentVars() {
 
 	c.DATABASE_TYPE = database.CUSTOMDATABASE
 	c.DATABASE_URL = os.Getenv("DATABASE_URL")
-	c.POSTGRES_USER = os.Getenv("POSTGRES_USER")
-	c.POSTGRES_PASSWORD = os.Getenv("POSTGRES_PASSWORD")
 
-	c.ADMIN_NOSTR_NPUB = os.Getenv("ADMIN_NOSTR_NPUB")
 }
 
 func (c *Config) ToLightningCommsData() comms.LightingCommsData {

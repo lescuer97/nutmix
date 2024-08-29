@@ -358,7 +358,6 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 		return &mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
-	// lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
 	switch config.MINT_LIGHTNING_BACKEND {
 
 	case comms.FAKE_WALLET:
@@ -415,8 +414,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 type AddToDBFunc func(*pgxpool.Pool, bool, cashu.ACTION_STATE, string) error
 
 func (m *Mint) VerifyLightingPaymentHappened(ctx context.Context, pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
-	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
-	switch lightningBackendType {
+	switch m.Config.MINT_LIGHTNING_BACKEND {
 
 	case comms.FAKE_WALLET:
 		err := dbCall(pool, true, cashu.PAID, quote)
