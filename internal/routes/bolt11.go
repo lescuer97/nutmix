@@ -47,6 +47,20 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
+		if mint.Config.PEG_OUT_ONLY {
+			c.JSON(400, "Peg out only enabled")
+			return
+		}
+
+		if mint.Config.PEG_IN_LIMIT_SATS != nil {
+			if mintRequest.Amount > int64(*mint.Config.PEG_IN_LIMIT_SATS) {
+
+				c.JSON(400, "Mint amount over the limit")
+				return
+			}
+
+		}
+
 		var response cashu.PostMintQuoteBolt11Response
 
 		expireTime := cashu.ExpiryTimeMinUnit(15)
@@ -340,6 +354,14 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
+		}
+
+		if mint.Config.PEG_OUT_LIMIT_SATS != nil {
+			if int64(*invoice.MilliSat) > (int64(*mint.Config.PEG_OUT_LIMIT_SATS) * 1000) {
+				c.JSON(400, "Melt amount over the limit")
+				return
+			}
+
 		}
 
 		response := cashu.PostMeltQuoteBolt11Response{}
