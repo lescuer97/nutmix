@@ -41,6 +41,21 @@
             </label>
             
         </div>
+        <div class="form-section">
+            <label for="PEG_OUT_ONLY" class="settings-input"> 
+                Only PEG OUT SATS :
+                <input name="PEG_OUT_ONLY"  type="checkbox" {{ if .PEG_OUT_ONLY }} checked {{ end }}  />
+            </label>
+            <label for="PEG_IN_LIMIT_SATS" class="settings-input"> 
+                PEG IN LIMIT (SATS)
+                <input name="PEG_IN_LIMIT_SATS" value="{{.PEG_IN_LIMIT_SATS}}" type="number"  step="1" />
+            </label>
+            <label for="PEG_OUT_LIMIT_SATS" class="settings-input"> 
+                PEG OUT LIMIT (SATS)
+                <input name="PEG_OUT_LIMIT_SATS" value="{{.PEG_OUT_LIMIT_SATS}}" type="number" step="1"  />
+            </label>
+            <!--  -->
+        </div>
 
     <button type="submit">Save Settings</button>
     </form>

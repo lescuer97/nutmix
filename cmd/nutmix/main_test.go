@@ -1513,5 +1513,84 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 	if w.Body.String() != `"Incorrect Unit for melting"` {
 		t.Errorf("Expected `Incorrect Unit for melting`, got %s", w.Body.String())
 	}
+}
+
+func TestConfigMeltMintLimit(t *testing.T) {
+
+	const posgrespassword = "password"
+	const postgresuser = "user"
+	ctx := context.Background()
+
+	postgresContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:16.2"),
+		postgres.WithDatabase("postgres"),
+		postgres.WithUsername(postgresuser),
+		postgres.WithPassword(posgrespassword),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	connUri, err := postgresContainer.ConnectionString(ctx)
+
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
+	}
+
+	os.Setenv("DATABASE_URL", connUri)
+	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	os.Setenv(mint.NETWORK_ENV, "regtest")
+
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+
+	router, mint := SetupRoutingForTesting(ctx)
+
+	// MINTING TESTING STARTS
+
+	// TEST MINT CONFIG LIMIT
+	w := httptest.NewRecorder()
+
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+		Amount: 1000,
+		Unit:   cashu.Sat.String(),
+	}
+	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
+
+	req := httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	limit := 999
+	mint.Config.PEG_IN_LIMIT_SATS = &limit
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Errorf("Expected status code 200, got %d", w.Code)
+	}
+	if w.Body.String() != `"Mint amount over the limit"` {
+		t.Errorf(`Expected body message to be: "Mint amount over the limit". Got:  %s`, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+
+	// Test mint ONLY PEGOUT check
+
+	mint.Config.PEG_OUT_ONLY = true
+	req = httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Errorf("Expected status code 200, got %d", w.Code)
+	}
+	if w.Body.String() != `"Peg out only enabled"` {
+		t.Errorf(`Expected body message to be: "Peg out only enabled". Got:  %s`, w.Body.String())
+	}
 
 }

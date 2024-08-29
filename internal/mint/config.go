@@ -32,6 +32,10 @@ type Config struct {
 
 	DATABASE_TYPE string
 	DATABASE_URL  string
+
+	PEG_OUT_ONLY       bool
+	PEG_OUT_LIMIT_SATS *int
+	PEG_IN_LIMIT_SATS  *int
 }
 
 func (c *Config) Default() {
@@ -55,6 +59,9 @@ func (c *Config) Default() {
 
 	c.DATABASE_TYPE = database.DOCKERDATABASE
 
+	c.PEG_OUT_ONLY = false
+	c.PEG_OUT_LIMIT_SATS = nil
+	c.PEG_IN_LIMIT_SATS = nil
 }
 func (c *Config) UseEnviromentVars() {
 	c.NAME = os.Getenv("NAME")

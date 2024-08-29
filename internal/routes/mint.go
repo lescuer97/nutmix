@@ -97,8 +97,57 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		for _, nut := range baseNuts {
 			b := false
-			nuts[nut] = cashu.SwapMintInfo{
-				Disabled: &b,
+
+			switch nut {
+			case "4":
+				bolt11Method := cashu.SwapMintMethod{
+					Method:    cashu.MethodBolt11,
+					Unit:      cashu.Sat.String(),
+					MinAmount: 0,
+				}
+
+				if mint.Config.PEG_IN_LIMIT_SATS != nil {
+					bolt11Method.MaxAmount = *mint.Config.PEG_IN_LIMIT_SATS
+				}
+
+				nuts[nut] = cashu.SwapMintInfo{
+					Methods: &[]cashu.SwapMintMethod{
+						bolt11Method,
+					},
+					Disabled: &b,
+				}
+				if entry, ok := nuts[nut]; ok {
+
+					// Then we modify the copy
+					entry.Disabled = &mint.Config.PEG_OUT_ONLY
+
+					// Then we reassign map entry
+					nuts[nut] = entry
+				}
+
+			case "5":
+				bolt11Method := cashu.SwapMintMethod{
+					Method:    cashu.MethodBolt11,
+					Unit:      cashu.Sat.String(),
+					MinAmount: 0,
+				}
+
+				if mint.Config.PEG_OUT_LIMIT_SATS != nil {
+					bolt11Method.MaxAmount = *mint.Config.PEG_OUT_LIMIT_SATS
+				}
+
+				nuts[nut] = cashu.SwapMintInfo{
+					Methods: &[]cashu.SwapMintMethod{
+						bolt11Method,
+					},
+					Disabled: &b,
+				}
+
+			default:
+				nuts[nut] = cashu.SwapMintInfo{
+					Disabled: &b,
+				}
+
 			}
 		}
 
