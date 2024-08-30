@@ -25,12 +25,12 @@ var (
 )
 
 const ConfigFileName string = "config.toml"
-const ConfigDirName string = ".nutmix"
+const ConfigDirName string = "nutmix"
 const logFileName string = "nutmix.log"
 
 func main() {
 
-	dir, err := os.UserHomeDir()
+	dir, err := os.UserConfigDir()
 
 	if err != nil {
 		log.Panicln("Could not get Home directory")

@@ -6,11 +6,12 @@ import (
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"os"
 )
 
 const ConfigFileName string = "config.toml"
-const ConfigDirName string = ".nutmix"
+const ConfigDirName string = "nutmix"
 
 type Config struct {
 	NAME             string
@@ -102,7 +103,7 @@ func (c *Config) ToLightningCommsData() comms.LightingCommsData {
 }
 
 func (c *Config) SetTOMLFile() error {
-	dir, err := os.UserHomeDir()
+	dir, err := os.UserConfigDir()
 
 	if err != nil {
 		return fmt.Errorf("os.UserHomeDir(), %w", err)
@@ -126,34 +127,24 @@ func (c *Config) SetTOMLFile() error {
 }
 
 func SetUpConfigFile() (Config, error) {
-	dir, err := os.UserHomeDir()
+	dir, err := os.UserConfigDir()
 
 	var config Config
 
 	if err != nil {
 		return config, fmt.Errorf("os.UserHomeDir(), %w", err)
 	}
+
 	var pathToProjectDir string = dir + "/" + ConfigDirName
 	var pathToProjectConfigFile string = pathToProjectDir + "/" + ConfigFileName
 
-	_, err = os.Stat(pathToProjectDir)
+	err = utils.CreateDirectoryAndPath(pathToProjectDir, ConfigFileName)
 
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(pathToProjectDir, 0764)
-		if err != nil {
-			return config, fmt.Errorf("os.MkdirAll(pathToProjectDir, 0764) %w", err)
-		}
+	if err != nil {
+		return config, fmt.Errorf("utils.CreateDirectoryAndPath(pathToProjectDir, ConfigFileName), %w", err)
 	}
 
-	_, err = os.Stat(pathToProjectConfigFile)
-	if os.IsNotExist(err) {
-		_, err := os.Create(pathToProjectConfigFile)
-		if err != nil {
-			return config, fmt.Errorf("os.Create(pathToProjectConfigFile) %w", err)
-		}
-	}
-
-	// Manipulate Config file
+	// Manipulate Config file and parse
 	buf, err := os.ReadFile(pathToProjectConfigFile)
 
 	err = toml.Unmarshal(buf, &config)
@@ -161,6 +152,7 @@ func SetUpConfigFile() (Config, error) {
 		return config, fmt.Errorf("toml.Unmarshal(buf,&config ), %w", err)
 	}
 
+	// check if some legacy env variables are set to check if there is a need to migrate
 	networkEnv := os.Getenv(NETWORK_ENV)
 	mint_lightning_backendEnv := os.Getenv(MINT_LIGHTNING_BACKEND_ENV)
 
