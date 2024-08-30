@@ -12,6 +12,7 @@ import (
 
 const ConfigFileName string = "config.toml"
 const ConfigDirName string = "nutmix"
+const LogFileName string = "nutmix.log"
 
 type Config struct {
 	NAME             string

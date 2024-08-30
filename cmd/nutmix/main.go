@@ -26,28 +26,22 @@ var (
 
 const ConfigFileName string = "config.toml"
 const ConfigDirName string = "nutmix"
-const logFileName string = "nutmix.log"
 
 func main() {
 
-	dir, err := os.UserConfigDir()
+	logsdir, err := utils.GetLogsDirectory()
 
 	if err != nil {
-		log.Panicln("Could not get Home directory")
-	}
-	var pathToProjectDir string = dir + "/" + ConfigDirName
-
-	if os.Getenv(DOCKER_ENV) == "true" {
-		pathToProjectDir = "/var/log/nutmix"
+		log.Panicln("Could not get Logs directory")
 	}
 
-	err = utils.CreateDirectoryAndPath(pathToProjectDir, logFileName)
+	err = utils.CreateDirectoryAndPath(logsdir, mint.LogFileName)
 
 	if err != nil {
 		log.Panicf("utils.CreateDirectoryAndPath(pathToProjectDir, logFileName ) %+v", err)
 	}
 
-	pathToConfigFile := pathToProjectDir + "/" + logFileName
+	pathToConfigFile := logsdir + "/" + mint.LogFileName
 
 	// Manipulate Config file
 	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0764)

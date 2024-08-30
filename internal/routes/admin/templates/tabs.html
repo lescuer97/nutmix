@@ -12,6 +12,19 @@
     <div hx-ext="remove-me" id="notifications">
     </div>
         <h3>Mint Settings</h3>
+    <div hx-get="/admin/logs" 
+        hx-target="this" 
+        hx-swap="innerHTML" 
+        hx-trigger="load" 
+
+        style="
+        overflow: scroll;
+        max-height: 500px;
+        display: flex;
+        flex-direction: column;
+        ">
+        
+    </div>
             <label for="MOTD" class="settings-input"> 
                 Mint Notifications (MOTD):
                 <input name="MOTD" value="{{.MOTD}}" type="text"  />
@@ -199,6 +212,23 @@
 </article>
 {{ end }}
 
+{{ define "logs" }}
+    {{range .}}
+
+        <p class="log">
+        Level: {{.Level}}
+
+        Message: {{.Msg}}
+         
+        Time: {{.Time}}
+
+        </p>
+
+
+    {{end}}
+
+{{ end }}
+
 
 {{ define "keysets" }}
     {{range .Keysets}}
@@ -222,15 +252,6 @@
 </div>
 
 {{end}}
-
-
-
-
-
-
-
-
-
 
 
 

@@ -4,10 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"log"
+	"log/slog"
+	"os"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 const JWT_SECRET = "JWT_SECRET"
@@ -49,6 +53,36 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 
 	adminRoute.GET("/lightningdata", LightningDataFormFields(ctx, pool, mint))
 
+	adminRoute.GET("/logs", LogsTab(ctx))
+
+}
+func LogsTab(ctx context.Context) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+		// read logs
+		logsdir, err := utils.GetLogsDirectory()
+
+		if err != nil {
+			log.Panicln("Could not get Logs directory")
+		}
+
+		file, err := os.Open(logsdir + "/" + mint.LogFileName)
+		if err != nil {
+
+			errorMessage := ErrorNotif{
+				Error: "Could not get logs from mint",
+			}
+
+			c.HTML(200, "settings-error", errorMessage)
+			return
+		}
+
+		logs := utils.ParseLogFileByLevel(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo})
+
+        slices.Reverse(logs)
+
+		c.HTML(200, "logs", logs)
+	}
 }
 
 func generateHMACSecret() ([]byte, error) {
