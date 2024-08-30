@@ -74,6 +74,7 @@ services:
       - "traefik.http.routers.mint-http.middlewares=mint-https@docker"
     volumes:
       - /var/log/nutmix:/var/log/nutmix
+      - ${HOME}/.config/nutmix:/root/.config/nutmix
 volumes:
   db:
     driver: local
