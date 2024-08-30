@@ -12,7 +12,7 @@ type ConfigFiles struct {
 }
 
 func CopyConfigFiles() (ConfigFiles, error) {
-	dir, err := os.UserHomeDir()
+	dir, err := os.UserConfigDir()
 
 	var config ConfigFiles
 
@@ -36,7 +36,7 @@ func CopyConfigFiles() (ConfigFiles, error) {
 }
 
 func RemoveConfigFile() error {
-	dir, err := os.UserHomeDir()
+	dir, err := os.UserConfigDir()
 
 	if err != nil {
 		return fmt.Errorf("os.UserHomeDir(), %w", err)
@@ -53,7 +53,7 @@ func RemoveConfigFile() error {
 }
 
 func WriteConfigFile(file []byte) error {
-	dir, err := os.UserHomeDir()
+	dir, err := os.UserConfigDir()
 
 	if err != nil {
 		return fmt.Errorf("os.UserHomeDir(), %w", err)

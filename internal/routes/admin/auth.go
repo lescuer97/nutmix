@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/gin-gonic/gin"
@@ -23,8 +24,14 @@ const AdminAuthKey = "admin-cookie"
 func AuthMiddleware(ctx context.Context) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
-			key := ctx.Value(JWTSECRET).([]byte)
+			key := []byte(os.Getenv(JWT_SECRET))
+
 			token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
+
+				// Don't forget to validate the alg is what you expect:
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+				}
 				return key, nil
 			})
 
@@ -122,7 +129,7 @@ func Login(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Handler
 			return
 		}
 
-		adminPubkey := ctx.Value("ADMIN_NOSTR_NPUB").(string)
+		adminPubkey := os.Getenv("ADMIN_NOSTR_NPUB")
 
 		if adminPubkey == "" {
 			log.Printf("ERROR: NO ADMIN PUBKEY PRESENT %+v", err)
@@ -174,7 +181,7 @@ func Login(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Handler
 			return
 		}
 
-		jwtsecret := ctx.Value(JWTSECRET).([]byte)
+		jwtsecret := []byte(os.Getenv(JWT_SECRET))
 
 		token, err := makeJWTToken(jwtsecret)
 

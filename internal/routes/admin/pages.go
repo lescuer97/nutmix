@@ -2,6 +2,8 @@ package admin
 
 import (
 	"context"
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -26,7 +28,7 @@ func LoginPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Han
 
 		database.SaveNostrLoginAuth(pool, nostrLogin)
 
-		adminNPUB := ctx.Value("ADMIN_NOSTR_NPUB").(string)
+		adminNPUB := os.Getenv("ADMIN_NOSTR_NPUB")
 
 		loginValues := struct {
 			Nonce     string

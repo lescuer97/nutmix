@@ -4,13 +4,17 @@ import (
 	"context"
 	"crypto/rand"
 	"log"
+	"log/slog"
+	"os"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-const JWTSECRET = "JWTSECRET"
+const JWT_SECRET = "JWT_SECRET"
 
 type ErrorNotif struct {
 	Error string
@@ -27,7 +31,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 		log.Panic("ERROR: could not create HMAC secret")
 	}
 
-	ctx = context.WithValue(ctx, JWTSECRET, hmacSecret)
+	ctx = context.WithValue(ctx, JWT_SECRET, hmacSecret)
 
 	adminRoute.Use(AuthMiddleware(ctx))
 
@@ -53,6 +57,36 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.GET("/mint-balance", MintBalance(ctx, pool, mint))
 	adminRoute.GET("/mint-melt", MintMeltActivity(ctx, pool, mint))
 
+	adminRoute.GET("/logs", LogsTab(ctx))
+
+}
+func LogsTab(ctx context.Context) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+		// read logs
+		logsdir, err := utils.GetLogsDirectory()
+
+		if err != nil {
+			log.Panicln("Could not get Logs directory")
+		}
+
+		file, err := os.Open(logsdir + "/" + mint.LogFileName)
+		if err != nil {
+
+			errorMessage := ErrorNotif{
+				Error: "Could not get logs from mint",
+			}
+
+			c.HTML(200, "settings-error", errorMessage)
+			return
+		}
+
+		logs := utils.ParseLogFileByLevel(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo})
+
+		slices.Reverse(logs)
+
+		c.HTML(200, "logs", logs)
+	}
 }
 
 func generateHMACSecret() ([]byte, error) {

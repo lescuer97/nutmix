@@ -28,6 +28,10 @@ var (
 	ErrKeysetForProofNotFound  = errors.New("Keyset for proof not found")
 )
 
+const (
+	MethodBolt11 = "bolt11"
+)
+
 const ExpiryMinutesDefault int64 = 15
 
 func ExpiryTimeMinUnit(minutes int64) int64 {

@@ -9,6 +9,7 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"log"
+	"strconv"
 )
 
 func MintInfoTab(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
@@ -26,6 +27,55 @@ func MintInfoPost(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.
 		mint.Config.DESCRIPTION_LONG = c.Request.PostFormValue("DESCRIPTION_LONG")
 		mint.Config.EMAIL = c.Request.PostFormValue("EMAIL")
 		mint.Config.MOTD = c.Request.PostFormValue("MOTD")
+
+		pegoutOnly := c.Request.PostFormValue("PEG_OUT_ONLY")
+		if pegoutOnly == "on" {
+			mint.Config.PEG_OUT_ONLY = true
+
+		} else {
+			mint.Config.PEG_OUT_ONLY = false
+		}
+
+		pegInLimitStr := c.Request.PostFormValue("PEG_IN_LIMIT_SATS")
+		switch pegInLimitStr {
+
+		case "":
+
+			mint.Config.PEG_IN_LIMIT_SATS = nil
+		default:
+
+			pegInLimit, err := strconv.Atoi(pegInLimitStr)
+			if err != nil {
+				errorMessage := ErrorNotif{
+					Error: "Peg in limit is not an integer",
+				}
+				c.HTML(200, "settings-error", errorMessage)
+				return
+			}
+
+			mint.Config.PEG_IN_LIMIT_SATS = &pegInLimit
+
+		}
+
+		// Check pegout limit.
+		pegOutLimitStr := c.Request.PostFormValue("PEG_OUT_LIMIT_SATS")
+		switch pegOutLimitStr {
+
+		case "":
+			mint.Config.PEG_OUT_LIMIT_SATS = nil
+		default:
+			pegOutLimit, err := strconv.Atoi(pegOutLimitStr)
+			if err != nil {
+				errorMessage := ErrorNotif{
+					Error: "Peg out limit is not an integer",
+				}
+				c.HTML(200, "settings-error", errorMessage)
+				return
+			}
+
+			mint.Config.PEG_OUT_LIMIT_SATS = &pegOutLimit
+
+		}
 
 		nostrKey := c.Request.PostFormValue("NOSTR")
 
