@@ -13,19 +13,6 @@
     <div hx-ext="remove-me" id="notifications">
     </div>
         <h3>Mint Settings</h3>
-    <div hx-get="/admin/logs" 
-        hx-target="this" 
-        hx-swap="innerHTML" 
-        hx-trigger="load" 
-
-        style="
-        overflow: scroll;
-        max-height: 500px;
-        display: flex;
-        flex-direction: column;
-        ">
-        
-    </div>
             <label for="MOTD" class="settings-input"> 
                 Mint Notifications (MOTD):
                 <input name="MOTD" value="{{.MOTD}}" type="text"  />
@@ -54,8 +41,6 @@
                 <input name="NOSTR" value="{{.NOSTR}}" type="text"  />
             </label>
             
-        </div>
-        <div class="form-section">
             <label for="PEG_OUT_ONLY" class="settings-input"> 
                 Only PEG OUT SATS :
                 <input name="PEG_OUT_ONLY"  type="checkbox" {{ if .PEG_OUT_ONLY }} checked {{ end }}  />

@@ -26,7 +26,18 @@
             <div hx-get="/admin/mint-melt" hx-trigger="load" hx-target="this" hx-swap="outerHTML" class="">
             </div>
 
-            <div hx-get="/admin/logs" hx-trigger="load" hx-target="this" hx-swap="outerHTML" class="logs" >
+            <div hx-get="/admin/logs" 
+                hx-target="this" 
+                hx-swap="innerHTML" 
+                hx-trigger="load" 
+
+                style="
+                overflow: scroll;
+                max-height: 500px;
+                display: flex;
+                flex-direction: column;
+                ">
+                
             </div>
         </div>
 
