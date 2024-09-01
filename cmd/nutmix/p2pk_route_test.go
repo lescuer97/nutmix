@@ -83,7 +83,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -375,7 +375,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {

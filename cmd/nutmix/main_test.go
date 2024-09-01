@@ -89,7 +89,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -116,7 +116,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	var postMintQuoteResponseTwo cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponseTwo cashu.MintRequestDB
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -219,7 +219,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.PostMintQuoteBolt11Response{}
+	postMintQuoteResponseTwo = cashu.MintRequestDB{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -666,7 +666,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	routes.V1Routes(ctx, r, pool, mint, logger)
+	routes.V1Routes(r, pool, mint, logger)
 
 	return r, mint
 }
@@ -884,7 +884,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err := json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -910,7 +910,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	var postMintQuoteResponseTwo cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponseTwo cashu.MintRequestDB
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -1079,7 +1079,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.PostMintQuoteBolt11Response{}
+	postMintQuoteResponseTwo = cashu.MintRequestDB{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"os"
 	"slices"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -64,15 +64,9 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 	v1.GET("/info", func(c *gin.Context) {
 
-		name := os.Getenv("NAME")
-		description := os.Getenv("DESCRIPTION")
-		description_long := os.Getenv("DESCRIPTION_LONG")
-		motd := os.Getenv("MOTD")
-
 		contacts := []cashu.ContactInfo{}
 
-		email := os.Getenv("EMAIL")
-		log.Printf("Getting info")
+		email := mint.Config.EMAIL
 
 		if len(email) > 0 {
 			contacts = append(contacts, cashu.ContactInfo{
@@ -81,7 +75,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 			})
 		}
 
-		nostr := os.Getenv("NOSTR")
+		nostr := mint.Config.NOSTR
 
 		if len(nostr) > 0 {
 			contacts = append(contacts, cashu.ContactInfo{
@@ -159,12 +153,12 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		}
 
 		response := cashu.GetInfoResponse{
-			Name:            name,
+			Name:            mint.Config.NAME,
 			Version:         "NutMix/0.1.1",
 			Pubkey:          mint.MintPubkey,
-			Description:     description,
-			DescriptionLong: description_long,
-			Motd:            motd,
+			Description:     mint.Config.DESCRIPTION,
+			DescriptionLong: mint.Config.DESCRIPTION_LONG,
+			Motd:            mint.Config.MOTD,
 			Contact:         contacts,
 			Nuts:            nuts,
 		}
@@ -191,6 +185,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 			return
 		}
 
+		now := time.Now().Unix()
 		// check proof have the same amount as blindedSignatures
 		for i, proof := range swapRequest.Inputs {
 			AmountProofs += proof.Amount
@@ -205,6 +200,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 				return
 			}
 			swapRequest.Inputs[i] = p
+			swapRequest.Inputs[i].SeenAt = now
 		}
 
 		for _, output := range swapRequest.Outputs {

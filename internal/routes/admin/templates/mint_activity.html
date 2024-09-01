@@ -1,0 +1,81 @@
+
+{{ define "mint-activity" }}
+<nav class="tab-list" role="tablist">
+	<button hx-get="/admin/mintactivity" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint Activity</button>
+	<button hx-get="/admin/keysets"  role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+	<button hx-get="/admin/mintsettings"  role="tab" aria-selected="true" aria-controls="tab-content">Mint
+        settings</button>
+	<button hx-get="/admin/bolt11"  role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+</nav>
+
+<article id="tab-content" role="tabpanel" class="tab-content">
+   
+
+    <div hx-ext="remove-me" id="notifications">
+    </div>
+
+    <div class="">
+
+        
+        <h2>Last 24 hours activity</h2>
+        
+        <div class="balance">
+            
+            <div hx-get="/admin/mint-balance" hx-trigger="load" hx-target="this" hx-swap="innerHTML" class="">
+            </div>
+
+            <div hx-get="/admin/mint-melt" hx-trigger="load" hx-target="this" hx-swap="outerHTML" class="">
+            </div>
+
+            <div hx-get="/admin/logs" 
+                hx-target="this" 
+                hx-swap="innerHTML" 
+                hx-trigger="load" 
+
+                style="
+                overflow: scroll;
+                max-height: 500px;
+                display: flex;
+                flex-direction: column;
+                ">
+                
+            </div>
+        </div>
+
+    </div>
+
+    <!-- <div hx-get="/admin/mint-logs" hx-trigger="load" hx-target="this" hx-swap="outerHTML" class=""> -->
+    <!-- </div> -->
+
+
+</article>
+{{ end }}
+
+{{ define "node-balance"}}
+    <div class="card">
+        <h2>Node Balance:</h2>
+            {{.}} Sats
+    </div>
+{{ end }}
+
+{{ define "fake-wallet-balance"}}
+    <div class="card">
+        <h2>Fake Wallet doesn't have a balance</h2>
+    </div>
+{{ end }}
+
+{{ define "mint-melt-activity"}}
+    <div class="card">
+       <div class="">
+        <b>Mint:</b>  {{.Mint}} Sats
+       </div> 
+        
+       <div class="">
+        <b>Melt:</b> {{.Melt}} Sats
+       </div>
+        
+       <div class="">
+           <b>Net inflows:</b> {{.Net}} Sats
+       </div>
+    </div>
+{{ end }}

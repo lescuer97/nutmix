@@ -1,10 +1,15 @@
 package routes
 
 import (
-	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
+	"slices"
+	"time"
+
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,13 +22,10 @@ import (
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log"
 	"log/slog"
-	"slices"
-	"strings"
 )
 
-func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
+func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
 
 	v1.POST("/mint/quote/bolt11", func(c *gin.Context) {
@@ -47,6 +49,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
+		var mintRequestDB cashu.MintRequestDB
 		if mint.Config.PEG_OUT_ONLY {
 			c.JSON(400, "Peg out only enabled")
 			return
@@ -61,9 +64,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		}
 
-		var response cashu.PostMintQuoteBolt11Response
-
 		expireTime := cashu.ExpiryTimeMinUnit(15)
+		now := time.Now().Unix()
 
 		switch mint.Config.MINT_LIGHTNING_BACKEND {
 		case comms.FAKE_WALLET:
@@ -83,13 +85,14 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				return
 			}
 
-			response = cashu.PostMintQuoteBolt11Response{
+			mintRequestDB = cashu.MintRequestDB{
 				Quote:       randUuid.String(),
 				Request:     payReq,
 				RequestPaid: true,
 				Expiry:      expireTime,
 				Unit:        mintRequest.Unit,
 				State:       cashu.PAID,
+				SeenAt:      now,
 			}
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:
@@ -101,20 +104,21 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				return
 			}
 
-			response = cashu.PostMintQuoteBolt11Response{
+			mintRequestDB = cashu.MintRequestDB{
 				Quote:       resInvoice.Rhash,
 				Request:     resInvoice.PaymentRequest,
 				RequestPaid: false,
 				Expiry:      expireTime,
 				Unit:        mintRequest.Unit,
 				State:       cashu.UNPAID,
+				SeenAt:      now,
 			}
 
 		default:
 			log.Fatalf("Unknown lightning backend: %s", mint.Config.MINT_LIGHTNING_BACKEND)
 		}
 
-		err = database.SaveQuoteMintRequest(pool, response)
+		err = database.SaveMintRequestDB(pool, mintRequestDB)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("SaveQuoteRequest: %w", err).Error())
@@ -122,7 +126,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		c.JSON(200, response)
+		c.JSON(200, mintRequestDB.PostMintQuoteBolt11Response())
 	})
 
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
@@ -140,7 +144,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		state, _, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
+		state, _, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
 
 		if err != nil {
 			logger.Warn(fmt.Errorf("VerifyLightingPaymentHappened: %w", err).Error())
@@ -243,7 +247,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:
 
-			state, _, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
+			state, _, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
 			if err != nil {
 				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
@@ -312,7 +316,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		quote.Minted = true
 		quote.State = cashu.ISSUED
 
-		err = database.ModifyQuoteMintMintedStatus(ctx, pool, quote.Minted, quote.State, quote.Quote)
+		err = database.ModifyQuoteMintMintedStatus(pool, quote.Minted, quote.State, quote.Quote)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
@@ -391,6 +395,8 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				PaymentPreimage: "",
 			}
 
+			now := time.Now().Unix()
+
 			dbRequest = cashu.MeltRequestDB{
 				Quote:           response.Quote,
 				Request:         meltRequest.Request,
@@ -401,6 +407,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				RequestPaid:     response.Paid,
 				State:           response.State,
 				PaymentPreimage: response.PaymentPreimage,
+				SeenAt:          now,
 			}
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:
@@ -467,7 +474,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			return
 		}
 
-		state, preimage, err := mint.VerifyLightingPaymentHappened(ctx, pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMeltPayStatus)
+		state, preimage, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMeltPayStatus)
 		if err != nil {
 			if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 				c.JSON(200, quote.GetPostMeltQuoteResponse())

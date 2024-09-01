@@ -15,7 +15,7 @@ import (
 func MintInfoTab(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		c.HTML(200, "mintinfo", mint.Config)
+		c.HTML(200, "mint-settings", mint.Config)
 	}
 }
 func MintInfoPost(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
@@ -188,8 +188,8 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 				}
 
 				// check connection
-				validConnection, err := lightningComs.ConnectionCheck()
-				if err != nil || !validConnection {
+				_, err = lightningComs.WalletBalance()
+				if err != nil /* || !validConnection */ {
 					errorMessage := ErrorNotif{
 						Error: "Could not check stablished connection with Node",
 					}
@@ -200,6 +200,7 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 					return
 
 				}
+				mint.LightningComs = *lightningComs
 				mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
 				mint.Config.LND_GRPC_HOST = newCommsData.LND_GRPC_HOST
 				mint.Config.LND_MACAROON = newCommsData.LND_MACAROON
@@ -216,44 +217,42 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 			lnbitsKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
 			lnbitsEndpoint := c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
 
-			if lnbitsKey != mint.Config.MINT_LNBITS_KEY || lnbitsEndpoint != mint.Config.MINT_LNBITS_ENDPOINT {
-				newCommsData := comms.LightingCommsData{
-					MINT_LIGHTNING_BACKEND: comms.LNBITS_WALLET,
-					MINT_LNBITS_ENDPOINT:   lnbitsEndpoint,
-					MINT_LNBITS_KEY:        lnbitsKey,
-				}
-				lightningComs, err := comms.SetupLightingComms(newCommsData)
+			newCommsData := comms.LightingCommsData{
+				MINT_LIGHTNING_BACKEND: comms.LNBITS_WALLET,
+				MINT_LNBITS_ENDPOINT:   lnbitsEndpoint,
+				MINT_LNBITS_KEY:        lnbitsKey,
+			}
+			lightningComs, err := comms.SetupLightingComms(newCommsData)
 
-				if err != nil {
-					errorMessage := ErrorNotif{
-						Error: "Something went wrong setting up LNBITS communications",
-					}
-
-					c.HTML(200, "settings-error", errorMessage)
-					return
-
+			if err != nil {
+				errorMessage := ErrorNotif{
+					Error: "Something went wrong setting up LNBITS communications",
 				}
 
-				// check connection
-				validConnection, err := lightningComs.ConnectionCheck()
-				if err != nil || !validConnection {
-					errorMessage := ErrorNotif{
-						Error: "Could not check stablished connection with Node",
-					}
-
-					log.Printf("Error message %+v", errorMessage)
-
-					c.HTML(200, "settings-error", errorMessage)
-					return
-
-				}
-
-				mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
-				mint.Config.MINT_LNBITS_KEY = newCommsData.MINT_LNBITS_KEY
-				mint.Config.MINT_LNBITS_ENDPOINT = newCommsData.MINT_LNBITS_ENDPOINT
-				c.HTML(200, "settings-success", successMessage)
+				c.HTML(200, "settings-error", errorMessage)
+				return
 
 			}
+
+			// check connection
+			_, err = lightningComs.WalletBalance()
+			if err != nil {
+				errorMessage := ErrorNotif{
+					Error: "Could not check stablished connection with Node",
+				}
+
+				log.Printf("Error message %+v", errorMessage)
+
+				c.HTML(200, "settings-error", errorMessage)
+				return
+
+			}
+			mint.LightningComs = *lightningComs
+
+			mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
+			mint.Config.MINT_LNBITS_KEY = newCommsData.MINT_LNBITS_KEY
+			mint.Config.MINT_LNBITS_ENDPOINT = newCommsData.MINT_LNBITS_ENDPOINT
+			c.HTML(200, "settings-success", successMessage)
 
 		}
 

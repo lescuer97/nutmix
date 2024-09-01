@@ -1,30 +1,19 @@
-{{ define "mintinfo" }}
+{{ define "mint-settings" }}
 <nav class="tab-list" role="tablist">
-	<button hx-get="/admin/mintinfo" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint Activity</button>
 	<button hx-get="/admin/keysets" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+	<button hx-get="/admin/mintsettings" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint
+        settings</button>
+	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">
 
 
-    <form hx-post="/admin/mintinfo" hx-target="#notifications" hx-swap="innerHTML">
+    <form hx-post="/admin/mintsettings" hx-target="#notifications" hx-swap="innerHTML">
     <div hx-ext="remove-me" id="notifications">
     </div>
         <h3>Mint Settings</h3>
-    <div hx-get="/admin/logs" 
-        hx-target="this" 
-        hx-swap="innerHTML" 
-        hx-trigger="load" 
-
-        style="
-        overflow: scroll;
-        max-height: 500px;
-        display: flex;
-        flex-direction: column;
-        ">
-        
-    </div>
             <label for="MOTD" class="settings-input"> 
                 Mint Notifications (MOTD):
                 <input name="MOTD" value="{{.MOTD}}" type="text"  />
@@ -53,8 +42,6 @@
                 <input name="NOSTR" value="{{.NOSTR}}" type="text"  />
             </label>
             
-        </div>
-        <div class="form-section">
             <label for="PEG_OUT_ONLY" class="settings-input"> 
                 Only PEG OUT SATS :
                 <input name="PEG_OUT_ONLY"  type="checkbox" {{ if .PEG_OUT_ONLY }} checked {{ end }}  />
@@ -79,9 +66,11 @@
 
 {{ define "bolt11-info" }}
 <nav class="tab-list" role="tablist">
-	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/bolt11" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint Activity</button>
 	<button hx-get="/admin/keysets" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+	<button hx-get="/admin/mintsettings"  role="tab" aria-selected="true" aria-controls="tab-content">Mint
+        settings</button>
+	<button hx-get="/admin/bolt11" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">
@@ -159,9 +148,11 @@
 
 {{ define "keysets-page" }}
 <nav class="tab-list" role="tablist">
-	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint Activity</button>
 	<button hx-get="/admin/keysets" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+	<button hx-get="/admin/mintsettings"  role="tab" aria-selected="true" aria-controls="tab-content">Mint
+        settings</button>
+	<button hx-get="/admin/bolt11"  role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">
@@ -230,6 +221,7 @@
 {{ end }}
 
 
+
 {{ define "keysets" }}
     {{range .Keysets}}
 
@@ -242,7 +234,7 @@
 
 {{ define "keyset-card" }}
 
-<div class="keyset_card">
+<div class="card">
     <span>Id: {{.Id}}</span>
     <span>Active: {{.Active}}</span>
     <span>Unit: {{.Unit}}</span>
