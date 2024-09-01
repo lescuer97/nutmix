@@ -1,15 +1,16 @@
-{{ define "mintinfo" }}
+{{ define "mint-settings" }}
 <nav class="tab-list" role="tablist">
-	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/mintinfo" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint Activity</button>
 	<button hx-get="/admin/keysets" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+	<button hx-get="/admin/mintsettings" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint
+        settings</button>
+	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">
 
 
-    <form hx-post="/admin/mintinfo" hx-target="#notifications" hx-swap="innerHTML">
+    <form hx-post="/admin/mintsettings" hx-target="#notifications" hx-swap="innerHTML">
     <div hx-ext="remove-me" id="notifications">
     </div>
         <h3>Mint Settings</h3>
@@ -65,10 +66,11 @@
 
 {{ define "bolt11-info" }}
 <nav class="tab-list" role="tablist">
-	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/bolt11" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint Activity</button>
 	<button hx-get="/admin/keysets" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+	<button hx-get="/admin/mintsettings"  role="tab" aria-selected="true" aria-controls="tab-content">Mint
+        settings</button>
+	<button hx-get="/admin/bolt11" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">
@@ -146,10 +148,11 @@
 
 {{ define "keysets-page" }}
 <nav class="tab-list" role="tablist">
-	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/mintactivity"  role="tab" aria-selected="true" aria-controls="tab-content">Mint Activity</button>
 	<button hx-get="/admin/keysets" class="selected" role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+	<button hx-get="/admin/mintsettings"  role="tab" aria-selected="true" aria-controls="tab-content">Mint
+        settings</button>
+	<button hx-get="/admin/bolt11"  role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">

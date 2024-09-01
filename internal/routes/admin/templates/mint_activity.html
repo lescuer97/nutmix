@@ -1,10 +1,11 @@
 
 {{ define "mint-activity" }}
 <nav class="tab-list" role="tablist">
-	<button hx-get="/admin/mintactivity" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/mintinfo"  role="tab" aria-selected="true" aria-controls="tab-content">Mint info</button>
-	<button hx-get="/admin/bolt11" role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
+	<button hx-get="/admin/mintactivity" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint Activity</button>
 	<button hx-get="/admin/keysets"  role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
+	<button hx-get="/admin/mintsettings"  role="tab" aria-selected="true" aria-controls="tab-content">Mint
+        settings</button>
+	<button hx-get="/admin/bolt11"  role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
 </nav>
 
 <article id="tab-content" role="tabpanel" class="tab-content">

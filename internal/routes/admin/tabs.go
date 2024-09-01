@@ -15,7 +15,7 @@ import (
 func MintInfoTab(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		c.HTML(200, "mintinfo", mint.Config)
+		c.HTML(200, "mint-settings", mint.Config)
 	}
 }
 func MintInfoPost(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {

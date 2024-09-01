@@ -40,8 +40,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.POST("/login", Login(ctx, pool, mint))
 
 	// partial template routes
-	adminRoute.GET("/mintinfo", MintInfoTab(ctx, pool, mint))
-	adminRoute.POST("/mintinfo", MintInfoPost(ctx, pool, mint))
+	adminRoute.GET("/mintsettings", MintInfoTab(ctx, pool, mint))
+	adminRoute.POST("/mintsettings", MintInfoPost(ctx, pool, mint))
 
 	adminRoute.GET("/bolt11", Bolt11Tab(ctx, pool, mint))
 	adminRoute.POST("/bolt11", Bolt11Post(ctx, pool, mint))
