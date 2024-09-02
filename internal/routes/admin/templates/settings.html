@@ -1,0 +1,58 @@
+
+{{ template "base" }}
+
+{{template "navigation"}}
+
+
+<article id="tab-content" role="tabpanel" class="tab-content">
+<form hx-post="/admin/mintsettings" hx-target="#notifications" hx-swap="innerHTML">
+    <div hx-ext="remove-me" id="notifications">
+    </div>
+        <h3>Mint Settings</h3>
+            <label for="MOTD" class="settings-input"> 
+                Mint Notifications (MOTD):
+                <input name="MOTD" value="{{.MOTD}}" type="text"  />
+            </label>
+            <label for="NAME" class="settings-input"> 
+                Name:
+                <input name="NAME"value="{{.NAME}}" type="text"  />
+            </label>
+
+            <label for="DESCRIPTION" class="settings-input"> 
+                Description:
+                <input name="DESCRIPTION"value="{{.DESCRIPTION}}" type="text"  />
+            </label>
+            <label for="DESCRIPTION_LONG" class="settings-input"> 
+                Long Description:
+                <textarea name="DESCRIPTION_LONG"  type="text">{{.DESCRIPTION_LONG}}</textarea>
+            </label>
+
+        <div class="form-section">
+            <label for="EMAIL" class="settings-input"> 
+                Contact email:
+                <input name="EMAIL" value="{{.EMAIL}}" type="email"  />
+            </label>
+            <label for="NOSTR" class="settings-input"> 
+                Nostr contact info:
+                <input name="NOSTR" value="{{.NOSTR}}" type="text"  />
+            </label>
+            
+            <label for="PEG_OUT_ONLY" class="settings-input"> 
+                Only PEG OUT SATS :
+                <input name="PEG_OUT_ONLY"  type="checkbox" {{ if .PEG_OUT_ONLY }} checked {{ end }}  />
+            </label>
+            <label for="PEG_IN_LIMIT_SATS" class="settings-input"> 
+                PEG IN LIMIT (SATS)
+                <input name="PEG_IN_LIMIT_SATS" value="{{.PEG_IN_LIMIT_SATS}}" type="number"  step="1" />
+            </label>
+            <label for="PEG_OUT_LIMIT_SATS" class="settings-input"> 
+                PEG OUT LIMIT (SATS)
+                <input name="PEG_OUT_LIMIT_SATS" value="{{.PEG_OUT_LIMIT_SATS}}" type="number" step="1"  />
+            </label>
+            <!--  -->
+        </div>
+
+    <button type="submit">Save Settings</button>
+</form>
+
+</article>

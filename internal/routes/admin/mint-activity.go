@@ -15,13 +15,6 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func MintActivityTab(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
-
-	return func(c *gin.Context) {
-		c.HTML(200, "mint-activity", nil)
-	}
-}
-
 func MintBalance(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {

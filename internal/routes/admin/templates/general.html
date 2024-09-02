@@ -1,0 +1,29 @@
+{{define "navigation"}}
+<header>
+    Dashboard
+    
+<nav class="tab-list" role="tablist">
+	<a  href="/admin">Mint Activity</a>
+	<a  href="/admin/keysets">Keysets</a>
+	<a  href="/admin/settings">Mint settings</a>
+	<a  href="/admin/bolt11">Lightning Info</a>
+</nav>
+</header>
+
+{{end}}
+
+{{ define "settings-error" }}
+    
+<div remove-me="3s" class="error">
+    <span>{{.Error}}</span>
+</div>
+
+{{end}}
+
+{{ define "settings-success" }}
+    
+<div remove-me="3s" class="success">
+    <span>{{.Success}}</span>
+</div>
+
+{{end}}

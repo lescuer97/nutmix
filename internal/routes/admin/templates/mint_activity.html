@@ -1,16 +1,9 @@
 
-{{ define "mint-activity" }}
-<nav class="tab-list" role="tablist">
-	<button hx-get="/admin/mintactivity" class="selected" role="tab" aria-selected="true" aria-controls="tab-content">Mint Activity</button>
-	<button hx-get="/admin/keysets"  role="tab" aria-selected="false" aria-controls="tab-content">Keysets</button>
-	<button hx-get="/admin/mintsettings"  role="tab" aria-selected="true" aria-controls="tab-content">Mint
-        settings</button>
-	<button hx-get="/admin/bolt11"  role="tab" aria-selected="false" aria-controls="tab-content">Lightning Info</button>
-</nav>
+{{ template "base" }}
+
+{{template "navigation"}}
 
 <article id="tab-content" role="tabpanel" class="tab-content">
-   
-
     <div hx-ext="remove-me" id="notifications">
     </div>
 
@@ -43,13 +36,7 @@
         </div>
 
     </div>
-
-    <!-- <div hx-get="/admin/mint-logs" hx-trigger="load" hx-target="this" hx-swap="outerHTML" class=""> -->
-    <!-- </div> -->
-
-
 </article>
-{{ end }}
 
 {{ define "node-balance"}}
     <div class="card">
@@ -78,4 +65,21 @@
            <b>Net inflows:</b> {{.Net}} Sats
        </div>
     </div>
+{{ end }}
+
+{{ define "logs" }}
+    {{range .}}
+
+        <p class="log">
+        Level: {{.Level}}
+
+        Message: {{.Msg}}
+         
+        Time: {{.Time}}
+
+        </p>
+
+
+    {{end}}
+
 {{ end }}

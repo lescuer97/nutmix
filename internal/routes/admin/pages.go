@@ -44,6 +44,6 @@ func LoginPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Han
 
 func InitPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.HTML(200, "index.html", nil)
+		c.HTML(200, "mint_activity.html", nil)
 	}
 }

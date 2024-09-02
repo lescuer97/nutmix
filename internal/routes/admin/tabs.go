@@ -12,13 +12,13 @@ import (
 	"strconv"
 )
 
-func MintInfoTab(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
-
+func MintSettingsPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.HTML(200, "mint-settings", mint.Config)
+		c.HTML(200, "settings.html", mint.Config)
 	}
 }
-func MintInfoPost(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+
+func MintSettingsForm(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		// check the different variables that could change
@@ -135,12 +135,13 @@ func MintInfoPost(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.
 		c.HTML(200, "settings-success", successMessage)
 	}
 }
-func Bolt11Tab(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
+func LightningNodePage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.HTML(200, "bolt11-info", mint.Config)
+		c.HTML(200, "bolt11.html", mint.Config)
 	}
 }
+
 func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
@@ -152,16 +153,16 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 		}
 
 		// check if the the lightning values have change if yes try to setup a new connection client for mint
-		mint.Config.NAME = c.Request.PostFormValue("NETWORK")
-
+		if mint.Config.NETWORK != c.Request.PostFormValue("NETWORK") {
+			mint.Config.NETWORK = c.Request.PostFormValue("NETWORK")
+			successMessage.Success = "Network changed"
+		}
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
 
 		case comms.FAKE_WALLET:
 
 			mint.Config.MINT_LIGHTNING_BACKEND = comms.FAKE_WALLET
 
-			successMessage.Success = "Nothing to change"
-			c.HTML(200, "settings-success", successMessage)
 		case comms.LND_WALLET:
 
 			lndHost := c.Request.PostFormValue("LND_GRPC_HOST")
@@ -205,12 +206,9 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 				mint.Config.LND_GRPC_HOST = newCommsData.LND_GRPC_HOST
 				mint.Config.LND_MACAROON = newCommsData.LND_MACAROON
 				mint.Config.LND_TLS_CERT = newCommsData.LND_TLS_CERT
-				c.HTML(200, "settings-success", successMessage)
 
 			} else {
 				successMessage.Success = "Nothing to change"
-				c.HTML(200, "settings-success", successMessage)
-
 			}
 
 		case comms.LNBITS_WALLET:
@@ -252,7 +250,6 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 			mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
 			mint.Config.MINT_LNBITS_KEY = newCommsData.MINT_LNBITS_KEY
 			mint.Config.MINT_LNBITS_ENDPOINT = newCommsData.MINT_LNBITS_ENDPOINT
-			c.HTML(200, "settings-success", successMessage)
 
 		}
 
@@ -260,7 +257,7 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 		if err != nil {
 			log.Println("mint.Config.SetTOMLFile() %w", err)
 			errorMessage := ErrorNotif{
-				Error: "there was a problem in the server",
+				Error: "There was a problem setting your config",
 			}
 
 			c.HTML(200, "settings-error", errorMessage)
@@ -268,6 +265,7 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 
 		}
 
+		c.HTML(200, "settings-success", successMessage)
 		return
 	}
 }

@@ -35,28 +35,25 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 
 	adminRoute.Use(AuthMiddleware(ctx))
 
+	// PAGES SETUP
+	// This is /admin
 	adminRoute.GET("", InitPage(ctx, pool, mint))
-	adminRoute.GET("/login", LoginPage(ctx, pool, mint))
-	adminRoute.POST("/login", Login(ctx, pool, mint))
-
-	// partial template routes
-	adminRoute.GET("/mintsettings", MintInfoTab(ctx, pool, mint))
-	adminRoute.POST("/mintsettings", MintInfoPost(ctx, pool, mint))
-
-	adminRoute.GET("/bolt11", Bolt11Tab(ctx, pool, mint))
-	adminRoute.POST("/bolt11", Bolt11Post(ctx, pool, mint))
-
 	adminRoute.GET("/keysets", KeysetsPage(ctx, pool, mint))
+	adminRoute.GET("/settings", MintSettingsPage(ctx, pool, mint))
+	adminRoute.GET("/login", LoginPage(ctx, pool, mint))
+	adminRoute.GET("/bolt11", LightningNodePage(ctx, pool, mint))
 
+	// change routes
+	adminRoute.POST("/login", Login(ctx, pool, mint))
+	adminRoute.POST("/mintsettings", MintSettingsForm(ctx, pool, mint))
+	adminRoute.POST("/bolt11", Bolt11Post(ctx, pool, mint))
 	adminRoute.POST("/rotate/sats", RotateSatsSeed(ctx, pool, mint))
+
+	// fractional html components
 	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(ctx, pool, mint))
-
 	adminRoute.GET("/lightningdata", LightningDataFormFields(ctx, pool, mint))
-
-	adminRoute.GET("/mintactivity", MintActivityTab(ctx, pool, mint))
 	adminRoute.GET("/mint-balance", MintBalance(ctx, pool, mint))
 	adminRoute.GET("/mint-melt", MintMeltActivity(ctx, pool, mint))
-
 	adminRoute.GET("/logs", LogsTab(ctx))
 
 }
