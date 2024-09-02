@@ -1,10 +1,10 @@
 {{ template "base" }}
 
-{{template "navigation"}}
+{{template "navigation" "bolt11"}}
 
-<article id="tab-content" role="tabpanel" class="tab-content">
+<main >
     <form hx-post="/admin/bolt11" hx-target="#notifications" hx-swap="innerHTML">
-    <div hx-ext="remove-me" id="notifications"/>
+    <div hx-ext="remove-me" id="notifications">
 
     </div>
         <h3>Lightning Node info</h3>
@@ -33,7 +33,7 @@
 
         <button type="submit">Save Settings</button>
     </form>
-</article>
+</main>
 
 {{ define "lnd-grpc-form" }}
 

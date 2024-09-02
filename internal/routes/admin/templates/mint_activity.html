@@ -1,9 +1,9 @@
 
 {{ template "base" }}
 
-{{template "navigation"}}
+{{template "navigation" "activity"}}
 
-<article id="tab-content" role="tabpanel" class="tab-content">
+<main >
     <div hx-ext="remove-me" id="notifications">
     </div>
 
@@ -36,7 +36,7 @@
         </div>
 
     </div>
-</article>
+</main>
 
 {{ define "node-balance"}}
     <div class="card">

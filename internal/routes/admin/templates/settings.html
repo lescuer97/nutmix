@@ -1,10 +1,10 @@
 
 {{ template "base" }}
 
-{{template "navigation"}}
+{{template "navigation" "settings"}}
 
 
-<article id="tab-content" role="tabpanel" class="tab-content">
+<main >
 <form hx-post="/admin/mintsettings" hx-target="#notifications" hx-swap="innerHTML">
     <div hx-ext="remove-me" id="notifications">
     </div>
@@ -55,4 +55,4 @@
     <button type="submit">Save Settings</button>
 </form>
 
-</article>
+</main>
