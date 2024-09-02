@@ -3,15 +3,10 @@
 
 {{template "navigation" "activity"}}
 
-<main >
     <div hx-ext="remove-me" id="notifications">
     </div>
+<main >
 
-    <div class="">
-
-        
-        <h2>Last 24 hours activity</h2>
-        
         <div class="balance">
             
             <div hx-get="/admin/mint-balance" hx-trigger="load" hx-target="this" hx-swap="innerHTML" class="">
@@ -20,6 +15,8 @@
             <div hx-get="/admin/mint-melt" hx-trigger="load" hx-target="this" hx-swap="outerHTML" class="">
             </div>
 
+
+    </div>
             <div hx-get="/admin/logs" 
                 hx-target="this" 
                 hx-swap="innerHTML" 
@@ -32,10 +29,7 @@
                 flex-direction: column;
                 ">
                 
-            </div>
         </div>
-
-    </div>
 </main>
 
 {{ define "node-balance"}}

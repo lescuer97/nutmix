@@ -2,11 +2,8 @@
 
 {{template "navigation" "keysets"}}
 
-<main class="content">
-
-
+<main class="keysets">
    
-
     <div hx-ext="remove-me" id="notifications">
     </div>
 
@@ -16,13 +13,12 @@
         hx-swap="innerHTML" 
         hx-post="/admin/rotate/sats"
         class="fees-form"
-
         >
-            <label for="FEE" class=""> 
-
+            <label  for="FEE" class="settings-input"> 
                     Fees (PPK).
-                    
+
                     Ex: 100 PPK = 1 sat / 10 Inputs
+
                 
                     <input type="number" name="FEE" value="0"/>
             </label>
@@ -42,7 +38,8 @@
 
 
 
-    <div hx-get="/admin/keysets-layout" hx-trigger="load, recharge-keyset from:body" hx-swap="innerHTML" hx-target="this" class="keysets">
+    <div hx-get="/admin/keysets-layout" hx-trigger="load, recharge-keyset from:body" hx-swap="innerHTML"
+        hx-target="this" class="keysets-list">
         
     </div>
 

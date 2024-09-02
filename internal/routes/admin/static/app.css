@@ -1,5 +1,7 @@
 @import url("settings.css");
 @import url("bolt11.css");
+@import url("keysets.css");
+@import url("activity.css");
 
 :root {
 /** CSS DARK THEME PRIMARY COLORS */
@@ -228,21 +230,6 @@ select, option {
     gap: 15px;
 }
 
-.fees-form {
-    flex-direction: row;
-    padding: 15px;
-    margin: 0px;
-    align-items: center;
-    width: fit-content;
-
-}
-
-.keysets {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin-top: 30px;
-}
 
 .balance {
     display: flex;
@@ -254,7 +241,7 @@ select, option {
     flex-direction: column;
     gap: 5px;
     border: 1px solid var(--color-primary-500);
-    width: fit-content;
+    min-width: 200px;
     padding: 10px 15px;
 }
 
