@@ -1,3 +1,6 @@
+@import url("settings.css");
+@import url("bolt11.css");
+
 :root {
 /** CSS DARK THEME PRIMARY COLORS */
 --color-primary-100: #2196f3;
@@ -84,6 +87,8 @@ a.selected {
 main {
     width: 100%;
     padding: 15px;
+    display: flex;
+    flex-direction: column;
 }
 
 form {
@@ -113,40 +118,59 @@ button.selected {
     cursor: default;
 }
 
-input {
+input, textarea, select, option {
     padding: 10px;
     letter-spacing: 1px;
-
+    background: transparent;
+    color: var(--white);
 }
 
-.content {
-    min-width: 90%;
-}
-
-.tab-content {
-    margin-top: 36px;
-}
-.tab-list {
-    margin-top: 25px;
-
+option {
+    background-color: var(--color-surface-200);
 }
 
 .settings-input {
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    background-color: var(--color-surface-300);
-    border-radius: 25px;
+    padding: 5px;
     gap: 10px;
+    width: 100%;
+}
+.settings-input input {
+    border: solid 1px var(--white) ;
+    background-color: transparent;
+}
+.settings-input input:focus {
+    outline: var(--color-primary-100) solid 1px ;
+    border:  solid 1px var(--color-primary-100);
 }
 
 .settings-input textarea {
+    background-color: transparent;
     min-height: 120px;
+    border: solid 1px var(--white) ;
+}
+.settings-input textarea:focus {
+    outline: var(--color-primary-100) solid 1px ;
+    border:  solid 1px var(--color-primary-100);
 }
 
-select {
+.settings-input-checkbox {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
     padding: 20px;
+    background-color: transparent;
     border-radius: 25px;
+    gap: 10px;
+    width: 100%;
+
+}
+
+select, option {
+    /* padding: 20px; */
+    /* border-radius: 25px; */
     gap: 10px;
 
 }
@@ -155,6 +179,7 @@ select {
     display: flex;
     flex-direction: row;
     gap: 15px;
+    width: 100%;
 
 }
 
@@ -179,6 +204,13 @@ select {
     border-radius: 25px;
 }
 
+.login {
+    display: flex;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+}
+
 .login-form {
     align-content: center;
     justify-content: center;
@@ -187,6 +219,7 @@ select {
 #nip07-form {
     display: flex;
     flex-direction: column;
+    max-width: 560px;
 }
 
 #lightning-data {
@@ -200,7 +233,7 @@ select {
     padding: 15px;
     margin: 0px;
     align-items: center;
-    /* margin: 15px; */
+    width: fit-content;
 
 }
 

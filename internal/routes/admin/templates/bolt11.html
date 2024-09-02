@@ -2,12 +2,12 @@
 
 {{template "navigation" "bolt11"}}
 
-<main >
-    <form hx-post="/admin/bolt11" hx-target="#notifications" hx-swap="innerHTML">
     <div hx-ext="remove-me" id="notifications">
 
     </div>
-        <h3>Lightning Node info</h3>
+<main class="bolt11" >
+    <form hx-post="/admin/bolt11" hx-target="#notifications" hx-swap="innerHTML">
+        <h2>Lightning Node info</h2>
 
             <label for="NETWORK" class="settings-input"> 
                 Network Type
@@ -38,16 +38,16 @@
 {{ define "lnd-grpc-form" }}
 
             <label for="LND_GRPC_HOST" class="settings-input"> 
-                LND GRPC Host:
+                LND GRPC Host
                 <input type="text" name="LND_GRPC_HOST" value="{{.LND_GRPC_HOST}}"/>
             </label>
             <label for="LND_GRPC_HOST" class="settings-input"> 
-                LND TLS Certificate:
+                LND TLS Certificate
                 <textarea name="LND_TLS_CERT"  type="text">{{.LND_TLS_CERT}}</textarea>
                 <!-- <input type="text" name="LND_TLS_CERT" value="{{.LND_TLS_CERT}}"/> -->
             </label>
             <label for="LND_MACAROON" class="settings-input"> 
-                LND Macaroon:
+                LND Macaroon
                 <input type="text" name="LND_MACAROON" value="{{.LND_MACAROON}}"/>
             </label>
 
@@ -62,11 +62,11 @@
 {{ define "lnbits-wallet-form" }}
 
             <label for="MINT_LNBITS_ENDPOINT" class="settings-input"> 
-                LNBITS endpoint:
+                LNBITS endpoint
                 <input type="text" name="MINT_LNBITS_ENDPOINT" value="{{.MINT_LNBITS_ENDPOINT}}"/>
             </label>
             <label for="MINT_LNBITS_KEY" class="settings-input"> 
-                LNBITS Key:
+                LNBITS Key
                 <input type="text" name="MINT_LNBITS_KEY" value="{{.MINT_LNBITS_KEY}}"/>
             </label>
 
