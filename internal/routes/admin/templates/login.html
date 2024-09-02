@@ -1,35 +1,31 @@
 {{ template "base" }}
 
 <main class="login">
-    
+  {{ if eq .ADMINNPUB "" }}
 
-{{ if eq .ADMINNPUB  "" }}
+  <div class="admin-notif">
+    <h2>
+      Please set the <span>"ADMIN_NOSTR_NPUB"</span> in the .env file to be able
+      to access the Admin dashboard
+    </h2>
+  </div>
 
-<div class="admin-notif">
-
-    <h2>Please set the <span>"ADMIN_NOSTR_NPUB"</span> in the .env file to be able to access the Admin dashboard </h2>
-    
-</div>
-
-{{ else }}
-<div class="login-form">
+  {{ else }}
+  <div class="login-form">
     <form id="nip07-form">
-        <h3>Please make sure that you have a NIP-07 Browser add on.</h3>  
-        <input name="passwordNonce"  hidden value="{{.Nonce}}" />
-        <button type="submit" >Login with Browser Add-On</button>
+      <h3>Please make sure that you have a NIP-07 Browser add on.</h3>
+      <input name="passwordNonce" hidden value="{{.Nonce}}" />
+      <button type="submit">Login with Browser Add-On</button>
     </form>
 
-    <div id="error-message" hx-target="error-message" hx-swap-oob="true"> </div>
-</div>
+    <div id="error-message" hx-target="error-message" hx-swap-oob="true"></div>
+  </div>
 
-{{ end }}
+  {{ end }}
 </main>
-
 
 {{ define "incorrect-key-error" }}
 
-<div class="error">
-    The correct private key was not used to sign in.
-</div>
+<div class="error">The correct private key was not used to sign in.</div>
 
 {{ end }}

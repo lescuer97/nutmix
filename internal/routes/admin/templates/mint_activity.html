@@ -1,79 +1,57 @@
+{{ template "base" }} {{template "navigation" "activity"}}
 
-{{ template "base" }}
+<div hx-ext="remove-me" id="notifications"></div>
+<main>
+  <div class="balance">
+    <div
+      hx-get="/admin/mint-balance"
+      hx-trigger="load"
+      hx-target="this"
+      hx-swap="innerHTML"
+      class=""
+    ></div>
 
-{{template "navigation" "activity"}}
-
-    <div hx-ext="remove-me" id="notifications">
-    </div>
-<main >
-
-        <div class="balance">
-            
-            <div hx-get="/admin/mint-balance" hx-trigger="load" hx-target="this" hx-swap="innerHTML" class="">
-            </div>
-
-            <div hx-get="/admin/mint-melt" hx-trigger="load" hx-target="this" hx-swap="outerHTML" class="">
-            </div>
-
-
-    </div>
-            <div hx-get="/admin/logs" 
-                hx-target="this" 
-                hx-swap="innerHTML" 
-                hx-trigger="load" 
-
-                style="
-                overflow: scroll;
-                max-height: 500px;
-                display: flex;
-                flex-direction: column;
-                ">
-                
-        </div>
+    <div
+      hx-get="/admin/mint-melt"
+      hx-trigger="load"
+      hx-target="this"
+      hx-swap="outerHTML"
+      class=""
+    ></div>
+  </div>
+  <div
+    hx-get="/admin/logs"
+    hx-target="this"
+    hx-swap="innerHTML"
+    hx-trigger="load"
+    style="
+      overflow: scroll;
+      max-height: 500px;
+      display: flex;
+      flex-direction: column;
+    "
+  ></div>
 </main>
 
 {{ define "node-balance"}}
-    <div class="card">
-        <h2>Node Balance:</h2>
-            {{.}} Sats
-    </div>
-{{ end }}
+<div class="card">
+  <h2>Node Balance:</h2>
+  {{.}} Sats
+</div>
+{{ end }} {{ define "fake-wallet-balance"}}
+<div class="card">
+  <h2>Fake Wallet doesn't have a balance</h2>
+</div>
+{{ end }} {{ define "mint-melt-activity"}}
+<div class="card">
+  <div class=""><b>Mint:</b> {{.Mint}} Sats</div>
 
-{{ define "fake-wallet-balance"}}
-    <div class="card">
-        <h2>Fake Wallet doesn't have a balance</h2>
-    </div>
-{{ end }}
+  <div class=""><b>Melt:</b> {{.Melt}} Sats</div>
 
-{{ define "mint-melt-activity"}}
-    <div class="card">
-       <div class="">
-        <b>Mint:</b>  {{.Mint}} Sats
-       </div> 
-        
-       <div class="">
-        <b>Melt:</b> {{.Melt}} Sats
-       </div>
-        
-       <div class="">
-           <b>Net inflows:</b> {{.Net}} Sats
-       </div>
-    </div>
-{{ end }}
+  <div class=""><b>Net inflows:</b> {{.Net}} Sats</div>
+</div>
+{{ end }} {{ define "logs" }} {{range .}}
 
-{{ define "logs" }}
-    {{range .}}
+<p class="log">Level: {{.Level}} Message: {{.Msg}} Time: {{.Time}}</p>
 
-        <p class="log">
-        Level: {{.Level}}
-
-        Message: {{.Msg}}
-         
-        Time: {{.Time}}
-
-        </p>
-
-
-    {{end}}
-
-{{ end }}
+{{end}} {{ end }}

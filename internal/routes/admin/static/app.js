@@ -39,7 +39,7 @@ nip07form?.addEventListener("submit", (e) => {
       (
         /**
         @type {SignedNostrEvent}
-        */ signedEvent,
+        */ signedEvent
       ) => {
         const loginRequest = new Request("/admin/login", {
           method: "POST",
@@ -71,7 +71,7 @@ nip07form?.addEventListener("submit", (e) => {
             console.log("Error message");
             console.log({ err });
           });
-      },
+      }
     )
     .catch((err) => {
       console.log({ err });

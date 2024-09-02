@@ -1,20 +1,18 @@
-
 .fees-form {
-    flex-direction: row;
-    padding: 15px;
-    margin: 0px;
-    align-items: center;
-    width: fit-content;
-
+  flex-direction: row;
+  padding: 15px;
+  margin: 0px;
+  align-items: center;
+  width: fit-content;
 }
 
 .keysets-list {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    background-color: var(--color-surface-200);
-    gap: 15px;
-    margin-top: 30px;
-    padding: 15px;
-    border-radius: 15px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  background-color: var(--color-surface-200);
+  gap: 15px;
+  margin-top: 30px;
+  padding: 15px;
+  border-radius: 15px;
 }

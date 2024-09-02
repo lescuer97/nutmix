@@ -4,270 +4,250 @@
 @import url("activity.css");
 
 :root {
-/** CSS DARK THEME PRIMARY COLORS */
---color-primary-100: #2196f3;
---color-primary-200: #50a1f5;
---color-primary-300: #6eacf6;
---color-primary-400: #87b8f8;
---color-primary-500: #9dc3f9;
---color-primary-600: #b2cffb;
-/** CSS DARK THEME SURFACE COLORS */
---color-surface-100: #000000;
---color-surface-200: #1e1e1e;
---color-surface-300: #353535;
---color-surface-400: #4e4e4e;
---color-surface-500: #696969;
---color-surface-600: #858585;
-/** CSS DARK THEME MIXED SURFACE COLORS */
---color-surface-mixed-100: #0f141b;
---color-surface-mixed-200: #252930;
---color-surface-mixed-300: #3c4046;
---color-surface-mixed-400: #55585e;
---color-surface-mixed-500: #6f7277;
---color-surface-mixed-600: #8a8c90;
+  /** CSS DARK THEME PRIMARY COLORS */
+  --color-primary-100: #2196f3;
+  --color-primary-200: #50a1f5;
+  --color-primary-300: #6eacf6;
+  --color-primary-400: #87b8f8;
+  --color-primary-500: #9dc3f9;
+  --color-primary-600: #b2cffb;
+  /** CSS DARK THEME SURFACE COLORS */
+  --color-surface-100: #000000;
+  --color-surface-200: #1e1e1e;
+  --color-surface-300: #353535;
+  --color-surface-400: #4e4e4e;
+  --color-surface-500: #696969;
+  --color-surface-600: #858585;
+  /** CSS DARK THEME MIXED SURFACE COLORS */
+  --color-surface-mixed-100: #0f141b;
+  --color-surface-mixed-200: #252930;
+  --color-surface-mixed-300: #3c4046;
+  --color-surface-mixed-400: #55585e;
+  --color-surface-mixed-500: #6f7277;
+  --color-surface-mixed-600: #8a8c90;
 
---white: #FFFFFF;
+  --white: #ffffff;
 }
 
 * {
-    box-sizing: border-box;
-    
-}
-    
-        
-html, body {
-    display: flex;
-    background-color: var(--color-surface-100);
-    color: var(--white);
+  box-sizing: border-box;
 }
 
+html,
+body {
+  display: flex;
+  background-color: var(--color-surface-100);
+  color: var(--white);
+}
 
 body {
-    display: flex;
-    flex-direction: column;
-    width: 100vw;
-    height: 100vh;
-    margin: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
 }
 
 header {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    width: 100%;
-    padding: 15px;
-    align-self: flex-start;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
+  padding: 15px;
+  align-self: flex-start;
 }
 
 nav {
-    display: flex;
-    flex-direction: row;
-    gap: 10px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
 }
 
 nav a {
-    align-self: center;
-    font-weight: 600;
+  align-self: center;
+  font-weight: 600;
 }
 
 a {
-    color: inherit;
-    text-decoration: none;
+  color: inherit;
+  text-decoration: none;
 }
 
 a:hover {
-    color: var(--color-primary-400);
+  color: var(--color-primary-400);
 }
 
 a.selected {
-    color: var(--color-primary-100);
-    font-weight: 700;
+  color: var(--color-primary-100);
+  font-weight: 700;
 }
 
 /* a:vi */
 
 main {
-    width: 100%;
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
+  width: 100%;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
 }
 
 form {
-    display: flex;
-    flex-direction: column;
-    background-color: var(--color-surface-200);
-    gap: 15px;
-    padding: 0px 30px 30px 30px;
-    border-radius: 15px;
-    border: 2px solid #020000;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface-200);
+  gap: 15px;
+  padding: 0px 30px 30px 30px;
+  border-radius: 15px;
+  border: 2px solid #020000;
 }
 
 button {
-    background-color: var(--color-primary-500);
-    padding: 15px;
-    border-radius: 50px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    cursor: pointer;
+  background-color: var(--color-primary-500);
+  padding: 15px;
+  border-radius: 50px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
 }
 button.square {
-    border-radius: 0px;
+  border-radius: 0px;
 }
 
 button.selected {
-    background-color: var(--color-primary-200);
-    cursor: default;
+  background-color: var(--color-primary-200);
+  cursor: default;
 }
 
-input, textarea, select, option {
-    padding: 10px;
-    letter-spacing: 1px;
-    background: transparent;
-    color: var(--white);
+input,
+textarea,
+select,
+option {
+  padding: 10px;
+  letter-spacing: 1px;
+  background: transparent;
+  color: var(--white);
 }
 
 option {
-    background-color: var(--color-surface-200);
+  background-color: var(--color-surface-200);
 }
 
 .settings-input {
-    display: flex;
-    flex-direction: column;
-    padding: 5px;
-    gap: 10px;
-    width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  gap: 10px;
+  width: 100%;
 }
 .settings-input input {
-    border: solid 1px var(--white) ;
-    background-color: transparent;
+  border: solid 1px var(--white);
+  background-color: transparent;
 }
 .settings-input input:focus {
-    outline: var(--color-primary-100) solid 1px ;
-    border:  solid 1px var(--color-primary-100);
+  outline: var(--color-primary-100) solid 1px;
+  border: solid 1px var(--color-primary-100);
 }
 
 .settings-input textarea {
-    background-color: transparent;
-    min-height: 120px;
-    border: solid 1px var(--white) ;
+  background-color: transparent;
+  min-height: 120px;
+  border: solid 1px var(--white);
 }
 .settings-input textarea:focus {
-    outline: var(--color-primary-100) solid 1px ;
-    border:  solid 1px var(--color-primary-100);
+  outline: var(--color-primary-100) solid 1px;
+  border: solid 1px var(--color-primary-100);
 }
 
 .settings-input-checkbox {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    padding: 20px;
-    background-color: transparent;
-    border-radius: 25px;
-    gap: 10px;
-    width: 100%;
-
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background-color: transparent;
+  border-radius: 25px;
+  gap: 10px;
+  width: 100%;
 }
 
-select, option {
-    /* padding: 20px; */
-    /* border-radius: 25px; */
-    gap: 10px;
-
+select,
+option {
+  /* padding: 20px; */
+  /* border-radius: 25px; */
+  gap: 10px;
 }
 
 .form-section {
-    display: flex;
-    flex-direction: row;
-    gap: 15px;
-    width: 100%;
-
+  display: flex;
+  flex-direction: row;
+  gap: 15px;
+  width: 100%;
 }
 
 #notifications {
-    display: flex;
-    justify-content: center;
-    color: black;
+  display: flex;
+  justify-content: center;
+  color: black;
 }
 
 #notifications > .success {
-    background-color: #90ef6e;
-    margin-top: 15px;
-    margin-bottom: -15px;
-    padding: 10px 25px;
-    border-radius: 25px;
+  background-color: #90ef6e;
+  margin-top: 15px;
+  margin-bottom: -15px;
+  padding: 10px 25px;
+  border-radius: 25px;
 }
 #notifications > .error {
-    background-color: #ff6666;
-    margin-top: 15px;
-    margin-bottom: -15px;
-    padding: 10px 25px;
-    border-radius: 25px;
+  background-color: #ff6666;
+  margin-top: 15px;
+  margin-bottom: -15px;
+  padding: 10px 25px;
+  border-radius: 25px;
 }
 
 .login {
-    display: flex;
-    height: 100%;
-    justify-content: center;
-    align-items: center;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
 }
 
 .login-form {
-    align-content: center;
-    justify-content: center;
+  align-content: center;
+  justify-content: center;
 }
 
 #nip07-form {
-    display: flex;
-    flex-direction: column;
-    max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
 }
 
 #lightning-data {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
 
-
 .balance {
-    display: flex;
-    gap: 35px;
+  display: flex;
+  gap: 35px;
 }
 
 .card {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    border: 1px solid var(--color-primary-500);
-    min-width: 200px;
-    padding: 10px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid var(--color-primary-500);
+  min-width: 200px;
+  padding: 10px 15px;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* lds loading ring */
 .lds-dual-ring {
   /* change color here */
   color: #1c4c5b;
-  margin-bottom:15px;
+  margin-bottom: 15px;
 }
 .lds-dual-ring,
 .lds-dual-ring:after {
@@ -297,25 +277,3 @@ select, option {
     transform: rotate(360deg);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
