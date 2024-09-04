@@ -1,0 +1,56 @@
+.balance {
+  background-color: var(--color-surface-200);
+  padding: 25px;
+  border-radius: 15px;
+}
+
+.data-list {
+    display: flex;
+    flex-direction: row;
+    /* width: 100; */
+}
+
+.log-table {
+      overflow-y: scroll;
+      overflow-x: hidden;
+      max-height: 500px;
+      display: flex;
+      flex-direction: column;
+      width: 50%;
+      overflow-wrap: break-word;
+}
+.mint-melt-table {
+      overflow-y: scroll;
+      overflow-x: hidden;
+      max-height: 500px;
+      display: flex;
+      flex-direction: column;
+      width: 50%;
+      overflow-wrap: break-word;
+}
+
+.request-row {
+    max-width: 300px;
+    text-overflow: ellipsis;
+}
+
+th,
+td {
+  border: 1px solid rgb(160 160 160);
+  padding: 8px 10px;
+  text-align: center;
+}
+
+td.unit {
+    text-transform: uppercase;
+}
+
+tr.Mint {
+    background-color: #94ed74;
+    color: black;
+}
+
+tr.Melt {
+    background-color: #ed6565;
+    color: black;
+}

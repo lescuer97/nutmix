@@ -2,14 +2,16 @@ package admin
 
 import (
 	"context"
+	"fmt"
+	"log"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
-	"log"
-	"strconv"
 )
 
 func MintSettingsPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
@@ -208,6 +210,7 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 				mint.Config.LND_TLS_CERT = newCommsData.LND_TLS_CERT
 
 			} else {
+				mint.Config.MINT_LIGHTNING_BACKEND = comms.LND_WALLET
 				successMessage.Success = "Nothing to change"
 			}
 

@@ -1,4 +1,6 @@
-{{ template "base" }} {{template "navigation" "activity"}}
+{{ template "base" }} 
+
+{{template "navigation" "activity"}}
 
 <div hx-ext="remove-me" id="notifications"></div>
 <main>
@@ -12,25 +14,31 @@
     ></div>
 
     <div
-      hx-get="/admin/mint-melt"
+      hx-get="/admin/mint-melt-summary"
       hx-trigger="load"
       hx-target="this"
       hx-swap="outerHTML"
       class=""
     ></div>
   </div>
+  <div class="data-list">
   <div
     hx-get="/admin/logs"
     hx-target="this"
     hx-swap="innerHTML"
     hx-trigger="load"
-    style="
-      overflow: scroll;
-      max-height: 500px;
-      display: flex;
-      flex-direction: column;
-    "
+
+    class="log-table"
   ></div>
+  <div
+    hx-get="/admin/mint-melt-list"
+    hx-target="this"
+    hx-swap="innerHTML"
+    hx-trigger="load"
+    class="mint-melt-table"
+  ></div>
+    
+  </div>
 </main>
 
 {{ define "node-balance"}}
@@ -38,11 +46,15 @@
   <h2>Node Balance:</h2>
   {{.}} Sats
 </div>
-{{ end }} {{ define "fake-wallet-balance"}}
+{{ end }} 
+
+{{ define "fake-wallet-balance"}}
 <div class="card">
   <h2>Fake Wallet doesn't have a balance</h2>
 </div>
-{{ end }} {{ define "mint-melt-activity"}}
+{{ end }} 
+
+{{ define "mint-melt-activity"}}
 <div class="card">
   <div class=""><b>Mint:</b> {{.Mint}} Sats</div>
 
@@ -50,8 +62,41 @@
 
   <div class=""><b>Net inflows:</b> {{.Net}} Sats</div>
 </div>
-{{ end }} {{ define "logs" }} {{range .}}
+{{ end }} 
 
-<p class="log">Level: {{.Level}} Message: {{.Msg}} Time: {{.Time}}</p>
+{{ define "logs" }} 
 
-{{end}} {{ end }}
+    {{range .}}
+    
+        <p class="log">Level: {{.Level}} Message: {{.Msg}} Time: {{.Time}}</p>
+    
+    {{end}} 
+
+{{ end }}
+
+{{ define "mint-melt-list" }} 
+
+    <table class="">
+        <thead>
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col">Request</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Status</th>
+              <th scope="col">Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .}}
+            <tr class="{{.Type}}">
+                    <th scope="row">{{.Type}}</th>
+                    <td class="request-row">{{.Request}}</td>
+                    <td class="unit">{{.Unit}}</td>
+                    <td>{{.Status}}</td>
+                    <td>{{.SeenAt}}</td>
+                </tr>
+            {{end}} 
+        </tbody>
+    </table>
+
+{{ end }}

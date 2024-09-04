@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
@@ -39,7 +40,7 @@ func MintBalance(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.H
 	}
 }
 
-func MintMeltActivity(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		duration := time.Duration(24) * time.Hour
@@ -90,4 +91,91 @@ func MintMeltActivity(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) 
 
 		c.HTML(200, "mint-melt-activity", mintMeltTotal)
 	}
+}
+func MintMeltList(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		duration := time.Duration(24) * time.Hour
+		previous24hours := time.Now().Add(-duration).Unix()
+
+		mintMeltBalance, err := database.GetMintMeltBalanceByTime(pool, previous24hours)
+
+		if err != nil {
+			log.Println(err)
+			errorMessage := ErrorNotif{
+
+				Error: "There was an error getting mint activity",
+			}
+
+			c.HTML(200, "settings-error", errorMessage)
+			return
+		}
+
+		mintMeltRequestVisual := ListMintMeltVisual{}
+
+		// sum up mint
+		for _, mintRequest := range mintMeltBalance.Mint {
+			// invoice, err := zpay32.Decode(mintRequest.Request, &mint.Network)
+			//
+			// if err != nil {
+			// 	log.Println(fmt.Errorf("Could not decode invoice %w", err))
+			// 	errorMessage := ErrorNotif{
+			//
+			// 		Error: "Could not decode invoice",
+			// 	}
+			//
+			// 	c.HTML(200, "settings-error", errorMessage)
+			// 	return
+			// }
+
+			utc := time.Unix(mintRequest.SeenAt, 0).UTC().Format("2006-Jan-2  15:04:05 MST")
+
+			mintMeltRequestVisual = append(mintMeltRequestVisual, MintMeltRequestVisual{
+				Type:    "Mint",
+				Unit:    mintRequest.Unit,
+				Request: mintRequest.Request,
+				Status:  string(mintRequest.State),
+				SeenAt:  utc,
+			})
+
+		}
+
+		// sum up melt amount
+		for _, meltRequest := range mintMeltBalance.Melt {
+			utc := time.Unix(meltRequest.SeenAt, 0).UTC().Format("2006-Jan-2  15:04:05 MST")
+
+			mintMeltRequestVisual = append(mintMeltRequestVisual, MintMeltRequestVisual{
+				Type:    "Melt",
+				Unit:    meltRequest.Unit,
+				Request: meltRequest.Request,
+				Status:  string(meltRequest.State),
+				SeenAt:  utc,
+			})
+		}
+
+		sort.Sort(mintMeltRequestVisual)
+
+		c.HTML(200, "mint-melt-list", mintMeltRequestVisual)
+	}
+}
+
+type MintMeltRequestVisual struct {
+	Type    string
+	Unit    string
+	Request string
+	Status  string
+	SeenAt  string
+}
+
+type ListMintMeltVisual []MintMeltRequestVisual
+
+func (ms ListMintMeltVisual) Len() int {
+	return len(ms)
+}
+
+func (ms ListMintMeltVisual) Less(i, j int) bool {
+	return ms[i].SeenAt < ms[j].SeenAt
+}
+
+func (ms ListMintMeltVisual) Swap(i, j int) {
+	ms[i], ms[j] = ms[j], ms[i]
 }

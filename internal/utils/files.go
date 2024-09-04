@@ -26,10 +26,14 @@ type SlogRecordJSON struct {
 	Level slog.Level
 }
 
-func ParseLogFileByLevel(file *os.File, wantedLevel []slog.Level) []SlogRecordJSON {
+func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level) []SlogRecordJSON {
 
 	var logRecords []SlogRecordJSON
 	scanner := bufio.NewScanner(file)
+
+	// scanner.Scan
+	// scanner.ReadString
+	// file.Chdir
 	// optionally, resize scanner's capacity for lines over 64K, see next example
 	for scanner.Scan() {
 

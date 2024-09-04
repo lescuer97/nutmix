@@ -53,7 +53,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(ctx, pool, mint))
 	adminRoute.GET("/lightningdata", LightningDataFormFields(ctx, pool, mint))
 	adminRoute.GET("/mint-balance", MintBalance(ctx, pool, mint))
-	adminRoute.GET("/mint-melt", MintMeltActivity(ctx, pool, mint))
+	adminRoute.GET("/mint-melt-summary", MintMeltSummary(ctx, pool, mint))
+	adminRoute.GET("/mint-melt-list", MintMeltList(ctx, pool, mint))
 	adminRoute.GET("/logs", LogsTab(ctx))
 
 }
@@ -78,7 +79,7 @@ func LogsTab(ctx context.Context) gin.HandlerFunc {
 			return
 		}
 
-		logs := utils.ParseLogFileByLevel(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo})
+		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo})
 
 		slices.Reverse(logs)
 
