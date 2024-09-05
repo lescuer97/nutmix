@@ -5,29 +5,38 @@
 
 :root {
   /** CSS DARK THEME PRIMARY COLORS */
-  --color-primary-100: #2196f3;
-  --color-primary-200: #50a1f5;
-  --color-primary-300: #6eacf6;
-  --color-primary-400: #87b8f8;
-  --color-primary-500: #9dc3f9;
-  --color-primary-600: #b2cffb;
-  /** CSS DARK THEME SURFACE COLORS */
-  --color-surface-100: #000000;
-  --color-surface-200: #1e1e1e;
-  --color-surface-300: #353535;
-  --color-surface-400: #4e4e4e;
-  --color-surface-500: #696969;
-  --color-surface-600: #858585;
-  /** CSS DARK THEME MIXED SURFACE COLORS */
-  --color-surface-mixed-100: #0f141b;
-  --color-surface-mixed-200: #252930;
-  --color-surface-mixed-300: #3c4046;
-  --color-surface-mixed-400: #55585e;
-  --color-surface-mixed-500: #6f7277;
-  --color-surface-mixed-600: #8a8c90;
+  --color-primary-100: #382bf0;
+  --color-primary-200: #5e43f3;
+  --color-primary-300: #7a5af5;
+  --color-primary-400: #9171f8;
+  --color-primary-500: #a688fa;
+  --color-primary-600: #ba9ffb;
 
-  --white: #ffffff;
+  /** CSS DARK THEME SURFACE COLORS */
+  --color-surface-100: #121212;
+  --color-surface-200: #282828;
+  --color-surface-300: #3f3f3f;
+  --color-surface-400: #575757;
+  --color-surface-500: #717171;
+  --color-surface-600: #8b8b8b;
+
+  /** CSS DARK THEME MIXED SURFACE COLORS */
+  --color-surface-mixed-100: #1a1625;
+  --color-surface-mixed-200: #2f2b3a;
+  --color-surface-mixed-300: #46424f;
+  --color-surface-mixed-400: #5e5a66;
+  --color-surface-mixed-500: #76737e;
+  --color-surface-mixed-600: #908d96;
+
+  --white: rgb(232, 230, 227);
+
+  --darkreader-inline-bgcolor: #230578;
+  --darkreader-inline-color: #ac8bfa;
 }
+
+
+          
+
 
 * {
   box-sizing: border-box;
@@ -53,7 +62,7 @@ header {
   flex-direction: row;
   justify-content: space-between;
   width: 100%;
-  padding: 15px;
+  padding: 15px 10%;
   align-self: flex-start;
 }
 
@@ -66,6 +75,7 @@ nav {
 nav a {
   align-self: center;
   font-weight: 600;
+  font-size: 20px;
 }
 
 a {
@@ -78,7 +88,7 @@ a:hover {
 }
 
 a.selected {
-  color: var(--color-primary-100);
+  color: var(--darkreader-inline-color);
   font-weight: 700;
 }
 
@@ -102,15 +112,20 @@ form {
 }
 
 button {
-  background-color: var(--color-primary-500);
-  padding: 15px;
+  background-color: var(--darkreader-inline-bgcolor);
+  color: var(--white);
+  padding: 15px 20px;
   border-radius: 50px;
+
   font-weight: 800;
+  font-size: 14px;
   letter-spacing: 1px;
-  cursor: pointer;
+  border: 0px;
 }
-button.square {
-  border-radius: 0px;
+
+button:hover {
+  cursor: pointer;
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 1px 20px 0px;
 }
 
 button.selected {
@@ -229,18 +244,16 @@ option {
   gap: 15px;
 }
 
-.balance {
-  display: flex;
-  gap: 35px;
-}
 
 .card {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  border: 1px solid var(--color-primary-500);
+  background-color: var(--color-surface-200);
+  border: 1px solid var(--white);
   min-width: 200px;
-  padding: 10px 15px;
+  padding: 15px 15px;
+  border-radius: 15px;
 }
 
 /* lds loading ring */

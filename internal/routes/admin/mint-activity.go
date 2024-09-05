@@ -90,7 +90,7 @@ func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) g
 		mintMeltTotal["Melt"] = mintMeltTotal["Melt"] * -1
 
 		// get net flows
-		mintMeltTotal["Net"] = mintMeltTotal["Mint"] - mintMeltTotal["Melt"]
+		mintMeltTotal["Net"] = mintMeltTotal["Mint"] + mintMeltTotal["Melt"]
 
 		c.HTML(200, "mint-melt-activity", mintMeltTotal)
 	}

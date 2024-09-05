@@ -1,6 +1,12 @@
+.activity {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    padding: 0% 10%
+}
 .balance {
-  background-color: var(--color-surface-200);
-  padding: 25px;
+  display: flex;
+  gap: 35px;
   border-radius: 15px;
 }
 
@@ -18,12 +24,16 @@
 
 button.time-button {
     border-radius: 0px;
-    background-color: var(--color-surface-mixed-400);
-    padding: 10px;
-    color: var(--color-primary-100);
+    background-color: transparent;
+    color: var(--white);
+    border: 1px solid var(--white);
+    margin-left: 10px;
+    margin-right: 10px;
 }
+
 button.time-button.selected {
-    background-color: var(--color-surface-mixed-600);
+    background-color: transparent;
+    color: var(--darkreader-inline-color);
 }
 
 .log-table {

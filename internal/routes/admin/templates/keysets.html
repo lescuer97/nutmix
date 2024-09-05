@@ -33,13 +33,16 @@
 </main>
 
 {{ define "keysets" }} {{range .Keysets}} {{template "keyset-card" .}} {{end}}
-{{ end }} {{ define "keyset-card" }}
+{{ end }} 
+
+
+{{ define "keyset-card" }}
 
 <div class="card">
   <span>Id: {{.Id}}</span>
   <span>Active: {{.Active}}</span>
-  <span>Unit: {{.Unit}}</span>
-  <span>Fees (PPK): {{.Fees}}</span>
+  <span>Unit: <span class="unit"> {{.Unit}}</span></span>
+  <span >Fees (PPK): {{.Fees}}</span>
   <span>Version: {{.Version}}</span>
 </div>
 

@@ -3,9 +3,9 @@ package utils
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
-    "fmt"
 	"slices"
 	"time"
 )

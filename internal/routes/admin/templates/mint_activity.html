@@ -3,7 +3,7 @@
 {{template "navigation" "activity"}}
 
 <div hx-ext="remove-me" id="notifications"></div>
-<main>
+<main class="activity">
     <div class="time-select">
         <button class="time-button selected" value="24h"  hx-target="#mint-summary" hx-trigger="click"  type="button">24h</button>
         <button class="time-button" value="48h"     type="button">48h</button>
@@ -66,11 +66,11 @@
 
 {{ define "mint-melt-activity"}}
 <div class="card">
-  <div class=""><b>Mint:</b> {{.Mint}} Sats</div>
+  <div class=""><b>Inflows:</b> {{.Mint}} Sats</div>
 
-  <div class=""><b>Melt:</b> {{.Melt}} Sats</div>
+  <div class=""><b>Outflows:</b> {{.Melt}} Sats</div>
 
-  <div class=""><b>Net inflows:</b> {{.Net}} Sats</div>
+  <div class=""><b>Net flows:</b> {{.Net}} Sats</div>
 </div>
 {{ end }} 
 

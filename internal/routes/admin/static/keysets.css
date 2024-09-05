@@ -1,9 +1,18 @@
+.keysets {
+
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    padding: 0% 10%
+
+}
 .fees-form {
   flex-direction: row;
   padding: 15px;
   margin: 0px;
   align-items: center;
   width: fit-content;
+  border: 1px solid var(--white);
 }
 
 .keysets-list {
@@ -11,14 +20,13 @@
   flex-wrap: wrap;
   justify-content: flex-start;
   align-self: center;
-  background-color: var(--color-surface-200);
-  width: 75%;
   gap: 15px;
   margin-top: 30px;
-  padding: 15px;
   border-radius: 15px;
 }
 
-button:hover {
-  background-color: var(--color-primary-400);
+.unit {
+    text-transform: uppercase;
+
 }
+
