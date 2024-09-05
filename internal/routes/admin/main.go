@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -58,9 +59,69 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.GET("/logs", LogsTab(ctx))
 
 }
+
+type TIME_REQUEST string
+
+var (
+	h24 TIME_REQUEST = "24h"
+	h48 TIME_REQUEST = "48h"
+	h72 TIME_REQUEST = "72h"
+	d7  TIME_REQUEST = "7D"
+	ALL TIME_REQUEST = "all"
+)
+
+func ParseToTimeRequest(str string) TIME_REQUEST {
+
+	switch str {
+	case "24h":
+		return h24
+	case "48h":
+		return h48
+	case "72h":
+		return h72
+	case "7d":
+		return d7
+	case "all":
+		return ALL
+	default:
+		return h24
+	}
+
+}
+
+// return 24 hours by default
+func (t TIME_REQUEST) RollBackFromNow() time.Time {
+
+	rollBackHour := time.Now()
+
+	switch t {
+	case h24:
+		duration := time.Duration(24) * time.Hour
+		return rollBackHour.Add(-duration)
+	case h48:
+		duration := time.Duration(48) * time.Hour
+		return rollBackHour.Add(-duration)
+	case h72:
+		duration := time.Duration(72) * time.Hour
+		return rollBackHour.Add(-duration)
+	case d7:
+		duration := time.Duration((7 * 24)) * time.Hour
+		return rollBackHour.Add(-duration)
+	case ALL:
+		return time.Unix(1, 0)
+	}
+	duration := time.Duration(24) * time.Hour
+	return rollBackHour.Add(-duration)
+}
+
 func LogsTab(ctx context.Context) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
+
+		timeHeader := c.GetHeader("time")
+
+		timeRequestDuration := ParseToTimeRequest(timeHeader)
+
 		// read logs
 		logsdir, err := utils.GetLogsDirectory()
 
@@ -69,6 +130,7 @@ func LogsTab(ctx context.Context) gin.HandlerFunc {
 		}
 
 		file, err := os.Open(logsdir + "/" + mint.LogFileName)
+		defer file.Close()
 		if err != nil {
 
 			errorMessage := ErrorNotif{
@@ -79,7 +141,7 @@ func LogsTab(ctx context.Context) gin.HandlerFunc {
 			return
 		}
 
-		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo})
+		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo, slog.LevelDebug}, timeRequestDuration.RollBackFromNow())
 
 		slices.Reverse(logs)
 

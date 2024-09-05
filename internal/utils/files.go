@@ -3,7 +3,6 @@ package utils
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"os"
 	"slices"
@@ -26,14 +25,11 @@ type SlogRecordJSON struct {
 	Level slog.Level
 }
 
-func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level) []SlogRecordJSON {
+func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTime time.Time) []SlogRecordJSON {
 
 	var logRecords []SlogRecordJSON
 	scanner := bufio.NewScanner(file)
 
-	// scanner.Scan
-	// scanner.ReadString
-	// file.Chdir
 	// optionally, resize scanner's capacity for lines over 64K, see next example
 	for scanner.Scan() {
 
@@ -44,10 +40,8 @@ func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level) []SlogR
 			continue
 		}
 
-		if slices.Contains(wantedLevel, logRecord.Level) {
-
+		if slices.Contains(wantedLevel, logRecord.Level) && logRecord.Time.Unix() > limitTime.Unix() {
 			logRecords = append(logRecords, logRecord)
-
 		}
 
 	}

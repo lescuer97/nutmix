@@ -7,7 +7,23 @@
 .data-list {
     display: flex;
     flex-direction: row;
+    margin-top: 25px;
+    gap: 15px;
     /* width: 100; */
+}
+
+.time-select {
+    margin-bottom: 15px;
+}
+
+button.time-button {
+    border-radius: 0px;
+    background-color: var(--color-surface-mixed-400);
+    padding: 10px;
+    color: var(--color-primary-100);
+}
+button.time-button.selected {
+    background-color: var(--color-surface-mixed-600);
 }
 
 .log-table {
@@ -19,6 +35,7 @@
       width: 50%;
       overflow-wrap: break-word;
 }
+
 .mint-melt-table {
       overflow-y: scroll;
       overflow-x: hidden;
@@ -27,6 +44,21 @@
       flex-direction: column;
       width: 50%;
       overflow-wrap: break-word;
+}
+
+tr.DEBUG {
+    background-color: #94ed74;
+    color: black;
+}
+
+tr.WARN {
+    background-color: #f1fc74;
+    color: black;
+}
+
+tr.ERROR {
+    background-color: #ed6565;
+    color: black;
 }
 
 .request-row {

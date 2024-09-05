@@ -4,6 +4,13 @@
 
 <div hx-ext="remove-me" id="notifications"></div>
 <main>
+    <div class="time-select">
+        <button class="time-button selected" value="24h"  hx-target="#mint-summary" hx-trigger="click"  type="button">24h</button>
+        <button class="time-button" value="48h"     type="button">48h</button>
+        <button class="time-button" value="72h"  type="button">72h</button>
+        <button class="time-button" value="7d"   type="button">7d</button>
+        <button class="time-button" value="all"  type="button">All</button>
+    </div>
   <div class="balance">
     <div
       hx-get="/admin/mint-balance"
@@ -15,28 +22,31 @@
 
     <div
       hx-get="/admin/mint-melt-summary"
-      hx-trigger="load"
       hx-target="this"
-      hx-swap="outerHTML"
-      class=""
+      hx-swap="innerHTML"
+      hx-trigger="load, reload"
+      hx-headers='javascript:{time: event?.detail?.time}'
+      id="mint-summary"
+      class="summary-table"
     ></div>
   </div>
   <div class="data-list">
-  <div
-    hx-get="/admin/logs"
-    hx-target="this"
-    hx-swap="innerHTML"
-    hx-trigger="load"
-
-    class="log-table"
-  ></div>
-  <div
-    hx-get="/admin/mint-melt-list"
-    hx-target="this"
-    hx-swap="innerHTML"
-    hx-trigger="load"
-    class="mint-melt-table"
-  ></div>
+    <div
+      hx-get="/admin/logs"
+      hx-target="this"
+      hx-swap="innerHTML"
+      hx-trigger="load, reload"
+      hx-headers='javascript:{time: event?.detail?.time}'
+      class="log-table"
+    ></div>
+    <div
+      hx-get="/admin/mint-melt-list"
+      hx-target="this"
+      hx-swap="innerHTML"
+      hx-trigger="load, reload"
+      hx-headers='javascript:{time: event?.detail?.time}'
+      class="mint-melt-table"
+    ></div>
     
   </div>
 </main>
@@ -65,12 +75,24 @@
 {{ end }} 
 
 {{ define "logs" }} 
-
-    {{range .}}
-    
-        <p class="log">Level: {{.Level}} Message: {{.Msg}} Time: {{.Time}}</p>
-    
-    {{end}} 
+    <table class="">
+        <thead>
+            <tr>
+              <th class="level" scope="col">Level</th>
+              <th scope="col">Message</th>
+              <th scope="col">Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .}}
+            <tr class="{{.Level}}">
+                    <th scope="row">{{.Level}}</th>
+                    <td class="request-row">{{.Msg}}</td>
+                    <td class="time">{{.Time}}</td>
+                </tr>
+            {{end}} 
+        </tbody>
+    </table>
 
 {{ end }}
 

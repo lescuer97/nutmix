@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"slices"
 	"sort"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 func MintBalance(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
+
 		if mint.Config.MINT_LIGHTNING_BACKEND == comms.FAKE_WALLET {
 			c.HTML(200, "fake-wallet-balance", nil)
 			return
@@ -43,10 +45,11 @@ func MintBalance(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.H
 func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		duration := time.Duration(24) * time.Hour
-		previous24hours := time.Now().Add(-duration).Unix()
+		timeHeader := c.GetHeader("time")
 
-		mintMeltBalance, err := database.GetMintMeltBalanceByTime(pool, previous24hours)
+		timeRequestDuration := ParseToTimeRequest(timeHeader)
+
+		mintMeltBalance, err := database.GetMintMeltBalanceByTime(pool, timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
 			log.Println(err)
@@ -60,7 +63,7 @@ func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) g
 		}
 
 		mintMeltTotal := make(map[string]float64)
-
+		mintMeltTotal["Mint"] += 0
 		// sum up mint
 		for _, mintRequest := range mintMeltBalance.Mint {
 			invoice, err := zpay32.Decode(mintRequest.Request, &mint.Network)
@@ -94,10 +97,10 @@ func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) g
 }
 func MintMeltList(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		duration := time.Duration(24) * time.Hour
-		previous24hours := time.Now().Add(-duration).Unix()
+		timeHeader := c.GetHeader("time")
+		timeRequestDuration := ParseToTimeRequest(timeHeader)
 
-		mintMeltBalance, err := database.GetMintMeltBalanceByTime(pool, previous24hours)
+		mintMeltBalance, err := database.GetMintMeltBalanceByTime(pool, timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
 			log.Println(err)
@@ -114,19 +117,6 @@ func MintMeltList(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.
 
 		// sum up mint
 		for _, mintRequest := range mintMeltBalance.Mint {
-			// invoice, err := zpay32.Decode(mintRequest.Request, &mint.Network)
-			//
-			// if err != nil {
-			// 	log.Println(fmt.Errorf("Could not decode invoice %w", err))
-			// 	errorMessage := ErrorNotif{
-			//
-			// 		Error: "Could not decode invoice",
-			// 	}
-			//
-			// 	c.HTML(200, "settings-error", errorMessage)
-			// 	return
-			// }
-
 			utc := time.Unix(mintRequest.SeenAt, 0).UTC().Format("2006-Jan-2  15:04:05 MST")
 
 			mintMeltRequestVisual = append(mintMeltRequestVisual, MintMeltRequestVisual{
@@ -153,6 +143,7 @@ func MintMeltList(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.
 		}
 
 		sort.Sort(mintMeltRequestVisual)
+		slices.Reverse(mintMeltRequestVisual)
 
 		c.HTML(200, "mint-melt-list", mintMeltRequestVisual)
 	}

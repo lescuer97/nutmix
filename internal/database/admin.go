@@ -24,6 +24,8 @@ func GetMintMeltBalanceByTime(pool *pgxpool.Pool, time int64) (MintMeltBalance, 
 
 	results := pool.SendBatch(context.Background(), &batch)
 
+	defer results.Close()
+
 	mintRows, err := results.Query()
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -47,6 +49,7 @@ func GetMintMeltBalanceByTime(pool *pgxpool.Pool, time int64) (MintMeltBalance, 
 		}
 		return mintMeltBalance, databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
+	defer meltRows.Close()
 	meltRequest, err := pgx.CollectRows(meltRows, pgx.RowToStructByName[cashu.MeltRequestDB])
 
 	if err != nil {
