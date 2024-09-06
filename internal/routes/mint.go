@@ -305,15 +305,15 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 			return
 		}
 
-		mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-
 		err = database.SetRestoreSigs(pool, recoverySigsDb)
 		if err != nil {
+			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
 			log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
 			c.JSON(200, response)
 			return
 		}
+		mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 
 		c.JSON(200, response)
 	})
@@ -330,7 +330,6 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		checkStateResponse := cashu.PostCheckStateResponse{
 			States: make([]cashu.CheckState, 0),
 		}
-
 		// set as unspent
 		proofs, err := database.CheckListOfProofsBySecretCurve(pool, checkStateRequest.Ys)
 
