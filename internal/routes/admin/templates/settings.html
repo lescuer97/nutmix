@@ -52,14 +52,10 @@
         <input
           name="PEG_OUT_ONLY"
           type="checkbox"
-          {{
-          if
-          .PEG_OUT_ONLY
-          }}
-          checked
-          {{
-          end
-          }}
+
+          {{ if .PEG_OUT_ONLY }}
+            checked
+          {{ end }}
         />
       </label>
       <label for="PEG_IN_LIMIT_SATS" class="settings-input">
@@ -82,6 +78,6 @@
       </label>
     </div>
 
-    <button type="submit">Save Settings</button>
+    <button class="md-button" type="submit">Save Settings</button>
   </form>
 </main>

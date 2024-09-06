@@ -244,6 +244,10 @@ option {
   gap: 15px;
 }
 
+.md-button {
+    max-width: 360px;
+}
+
 
 .card {
   display: flex;
