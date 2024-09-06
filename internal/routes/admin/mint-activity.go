@@ -62,7 +62,7 @@ func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) g
 			return
 		}
 
-		mintMeltTotal := make(map[string]float64)
+		mintMeltTotal := make(map[string]int64)
 		mintMeltTotal["Mint"] += 0
 		// sum up mint
 		for _, mintRequest := range mintMeltBalance.Mint {
@@ -79,13 +79,13 @@ func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) g
 				return
 			}
 
-			mintMeltTotal["Mint"] += invoice.MilliSat.ToSatoshis().ToUnit(btcutil.AmountSatoshi)
+			mintMeltTotal["Mint"] += int64( invoice.MilliSat.ToSatoshis().ToUnit(btcutil.AmountSatoshi))
 		}
 
 		// sum up melt amount
 		for _, meltRequest := range mintMeltBalance.Melt {
 
-			mintMeltTotal["Melt"] += float64(meltRequest.Amount)
+			mintMeltTotal["Melt"] += int64(meltRequest.Amount)
 		}
 		mintMeltTotal["Melt"] = mintMeltTotal["Melt"] * -1
 

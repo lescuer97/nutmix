@@ -19,8 +19,8 @@ func GetMintMeltBalanceByTime(pool *pgxpool.Pool, time int64) (MintMeltBalance, 
 	var mintMeltBalance MintMeltBalance
 	// change the paid status of the quote
 	batch := pgx.Batch{}
-	batch.Queue("SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE seen_at >= $1", time)
-	batch.Queue("SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at  FROM melt_request WHERE seen_at >= $1", time)
+	batch.Queue("SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID') ", time)
+	batch.Queue("SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at FROM melt_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID')", time)
 
 	results := pool.SendBatch(context.Background(), &batch)
 

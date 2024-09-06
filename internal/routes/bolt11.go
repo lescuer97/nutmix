@@ -373,6 +373,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		dbRequest := cashu.MeltRequestDB{}
 
 		expireTime := cashu.ExpiryTimeMinUnit(15)
+		now := time.Now().Unix()
 
 		switch mint.Config.MINT_LIGHTNING_BACKEND {
 		case comms.FAKE_WALLET:
@@ -395,8 +396,6 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 				State:           cashu.PAID,
 				PaymentPreimage: "",
 			}
-
-			now := time.Now().Unix()
 
 			dbRequest = cashu.MeltRequestDB{
 				Quote:           response.Quote,
@@ -442,6 +441,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 				RequestPaid:     response.Paid,
 				State:           response.State,
 				PaymentPreimage: response.PaymentPreimage,
+				SeenAt:          now,
 			}
 
 		default:

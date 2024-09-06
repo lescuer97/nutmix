@@ -65,8 +65,8 @@
 {{ end }} 
 
 {{ define "mint-melt-activity"}}
-<div class="card">
-  <div class=""><b>Inflows:</b> {{.Mint}} Sats</div>
+<div class="card activity">
+    <div class=""><b>Inflows:</b> {{printf "%d" .Mint }}  Sats</div>
 
   <div class=""><b>Outflows:</b> {{.Melt}} Sats</div>
 
