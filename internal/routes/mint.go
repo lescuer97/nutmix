@@ -32,7 +32,8 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 
 		if err != nil {
 			log.Printf("GetKeysetById: %+v ", err)
-			c.JSON(500, "Server side error")
+
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
 
@@ -161,8 +162,8 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 
 		if err != nil {
 			mint.RemoveProofs(swapRequest.Inputs)
-			log.Printf("CheckProofsAreSameUnit: %+v", err)
-			c.JSON(400, "Proofs are not the same unit")
+			detail := "Proofs are not the same unit"
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, &detail))
 			return
 		}
 
@@ -171,13 +172,13 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 		if err != nil {
 			mint.RemoveProofs(swapRequest.Inputs)
 			log.Printf("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()]): %+v", err)
-			c.JSON(400, "Could not find keyset for proof id")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
 
 		if AmountProofs < (uint64(fee) + AmountSignature) {
 			log.Printf("didn't provide enough fees. ProofAmount: %v, needed Proofs: %v", AmountProofs, (uint64(fee) + AmountSignature))
-			c.JSON(400, "Not enough proofs for signatures")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TRANSACTION_NOT_BALANCED, nil))
 			return
 		}
 
@@ -186,12 +187,12 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 
 		if err != nil {
 			log.Printf("CheckListOfProofs: %+v", err)
-			c.JSON(400, "Malformed body request")
+			c.JSON(400, "There was a problem viewing proofs")
 			return
 		}
 
 		if len(knownProofs) != 0 {
-			c.JSON(400, "Proofs already used")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}
 
@@ -199,7 +200,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 
 		if err != nil {
 			log.Printf("mint.AddProof: %+v", err)
-			c.JSON(400, "Proofs are already in use")
+			c.JSON(400, "There was a problem during swapping")
 			return
 		}
 
@@ -214,10 +215,10 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 				c.JSON(403, "Empty Witness")
 				return
 			case errors.Is(err, cashu.ErrNoValidSignatures):
-				c.JSON(403, "No valid signatures")
+				c.JSON(403, cashu.ErrorCodeToResponse(cashu.TOKEN_NOT_VERIFIED, nil))
 				return
 			case errors.Is(err, cashu.ErrNotEnoughSignatures):
-				c.JSON(403, cashu.ErrNotEnoughSignatures.Error())
+				c.JSON(403, cashu.ErrorCodeToResponse(cashu.TOKEN_NOT_VERIFIED, nil))
 				return
 			case errors.Is(err, cashu.ErrLocktimePassed):
 				c.JSON(403, cashu.ErrLocktimePassed.Error())
@@ -227,7 +228,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
 				return
 			}
 
-			c.JSON(403, "Invalid Proof")
+			c.JSON(403, cashu.ErrorCodeToResponse(cashu.TOKEN_NOT_VERIFIED, nil))
 			return
 		}
 
