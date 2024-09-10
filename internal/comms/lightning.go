@@ -122,8 +122,12 @@ func (l *LightingComms) LnbitsInvoiceRequest(method string, endpoint string, req
 		return fmt.Errorf("json.Unmarshal(detailBody): %w", err)
 	}
 
-	if detailBody.Status == "failed" {
-		return fmt.Errorf("LNBITS payment failed %+v", reqBody)
+	switch {
+	case detailBody.Status == "failed":
+		return fmt.Errorf("LNBITS payment failed %+v", detailBody)
+
+	case len(detailBody.Detail) > 0:
+		return fmt.Errorf("LNBITS Unknown error %+v", detailBody)
 	}
 
 	err = json.Unmarshal(body, &responseType)
