@@ -222,7 +222,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 				mint.RemoveActiveMintQuote(quote.Quote)
 				if errors.Is(err, m.ErrInvalidBlindMessage) {
-			        log.Printf("Invalid Blind Message %+v", m.ErrInvalidBlindMessage.Error())
+					log.Printf("Invalid Blind Message %+v", m.ErrInvalidBlindMessage.Error())
 					c.JSON(400, m.ErrInvalidBlindMessage.Error())
 					return
 				}
@@ -250,7 +250,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				quote.RequestPaid = true
 			} else {
 				mint.RemoveActiveMintQuote(quote.Quote)
-			    log.Printf("Quote not paid")
+				log.Printf("Quote not paid")
 				c.JSON(400, "Quote not paid")
 				return
 			}
@@ -653,7 +653,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			quote.PaymentPreimage = payment.PaymentRequest
 
 			// if fees where lower than expected return sats to the user
-			feesInSat := uint64(1000 / 1000)
+			feesInSat := uint64(payment.PaidfeeMsat / 1000)
 
 			if feesInSat < quote.FeeReserve && len(meltRequest.Outputs) > 0 {
 

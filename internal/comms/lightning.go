@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -50,6 +51,23 @@ type LNBitsData struct {
 	Endpoint string
 }
 
+type LNBitsDetailErrorData struct {
+	Detail string
+	Status string
+}
+
+type LNBitsPaymentStatusDetail struct {
+	Memo    string
+	Fee     int64
+	Pending bool
+}
+type LNBitsPaymentStatus struct {
+	Paid     bool   `json:"paid"`
+	Pending  bool   `json:"pending"`
+	Preimage string `json:"preimage"`
+	Details  LNBitsPaymentStatusDetail
+}
+
 type LightningInvoiceRequest struct {
 	Amount int64  `json:"amount"`
 	Unit   string `json:"unit"`
@@ -69,6 +87,7 @@ type LightningPaymentResponse struct {
 	PaymentError   error
 	PaymentRequest string
 	Rhash          string
+	PaidfeeMsat    int64
 }
 
 func (l *LightingComms) LnbitsInvoiceRequest(method string, endpoint string, reqBody any, responseType any) error {
@@ -95,6 +114,16 @@ func (l *LightingComms) LnbitsInvoiceRequest(method string, endpoint string, req
 
 	if err != nil {
 		return fmt.Errorf("ioutil.ReadAll: %w", err)
+	}
+
+	detailBody := LNBitsDetailErrorData{}
+	err = json.Unmarshal(body, &detailBody)
+	if err != nil {
+		return fmt.Errorf("json.Unmarshal(detailBody): %w", err)
+	}
+
+	if detailBody.Status == "failed" {
+		return fmt.Errorf("LNBITS payment failed %+v", reqBody)
 	}
 
 	err = json.Unmarshal(body, &responseType)
@@ -181,11 +210,8 @@ func (l *LightingComms) CheckIfInvoicePayed(quote string) (cashu.ACTION_STATE, s
 
 		}
 	case LNBITS:
-		var paymentStatus struct {
-			Paid     bool   `json:"paid"`
-			Pending  bool   `json:"pending"`
-			Preimage string `json:"preimage"`
-		}
+		var paymentStatus LNBitsPaymentStatus
+
 		err := l.LnbitsInvoiceRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
 		if err != nil {
 			return cashu.UNPAID, "", fmt.Errorf("json.Marshal: %w", err)
@@ -234,6 +260,7 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 		invoiceRes.PaymentRequest = invoice
 		invoiceRes.Preimage = hex.EncodeToString(res.PaymentPreimage)
 		invoiceRes.PaymentError = fmt.Errorf(res.PaymentError)
+		invoiceRes.PaidfeeMsat = res.PaymentRoute.TotalFeesMsat
 
 		return &invoiceRes, nil
 
@@ -244,11 +271,22 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 		}
 		err := l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 		if err != nil {
-			return &invoiceRes, fmt.Errorf("json.Marshal: %w", err)
+			return &invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
+		}
+
+		var paymentStatus LNBitsPaymentStatus
+
+		// check invoice payment to get the preimage and fee
+		err = l.LnbitsInvoiceRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus)
+		if err != nil {
+
+			return &invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus): %w`, err)
 		}
 
 		invoiceRes.PaymentRequest = lnbitsInvoice.PaymentRequest
 		invoiceRes.Rhash = lnbitsInvoice.PaymentHash
+		invoiceRes.Preimage = paymentStatus.Preimage
+		invoiceRes.PaidfeeMsat = int64(math.Abs(float64(paymentStatus.Details.Fee)))
 		invoiceRes.PaymentError = errors.New("")
 
 		return &invoiceRes, nil
