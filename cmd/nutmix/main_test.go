@@ -1309,9 +1309,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	if postMeltQuoteResponse.Paid {
 		t.Errorf("Expected paid to be false because it's a LND Node, got %v", postMeltQuoteResponse.Paid)
 	}
-	if postMeltQuoteResponse.State != cashu.UNPAID {
 
-		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponseTwo.State)
+	if postMeltQuoteResponse.State != cashu.UNPAID {
+		t.Errorf("Expected to not be paid have: %s ", postMeltQuoteResponse.State)
 	}
 
 	if postMeltQuoteResponse.Amount != 900 {
@@ -1329,7 +1329,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
-
 	}
 
 	if postMeltQuoteResponse.Paid {

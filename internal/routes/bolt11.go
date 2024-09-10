@@ -469,7 +469,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		err = database.AddPaymentPreimageToMeltRequest(pool, preimage, quote.Quote)
 		if err != nil {
-			log.Println(fmt.Errorf("database.GetMeltQuoteById: %w", err))
+			log.Println(fmt.Errorf("database.AddPaymentPreimageToMeltRequest(pool,: %w", err))
 			c.JSON(200, quote.GetPostMeltQuoteResponse())
 			return
 		}
