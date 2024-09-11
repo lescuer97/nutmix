@@ -618,12 +618,16 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		lightningBackendType := ctx.Value("MINT_LIGHTNING_BACKEND").(string)
 
+		var paidLightningFeeSat uint64
 		var changeResponse []cashu.BlindSignature
+
 		switch lightningBackendType {
 		case comms.FAKE_WALLET:
 			quote.RequestPaid = true
 			quote.State = cashu.PAID
 			quote.PaymentPreimage = "MockPaymentPreimage"
+
+			paidLightningFeeSat = 0
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:
 			payment, err := mint.LightningComs.PayInvoice(quote.Request, quote.FeeReserve)
@@ -650,57 +654,55 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			}
 			quote.RequestPaid = true
 			quote.State = cashu.PAID
-			quote.PaymentPreimage = payment.PaymentRequest
+			quote.PaymentPreimage = payment.Preimage
 
 			// if fees where lower than expected return sats to the user
-			feesInSat := uint64(payment.PaidfeeMsat / 1000)
-
-			if feesInSat < quote.FeeReserve && len(meltRequest.Outputs) > 0 {
-
-				overpaidFees := quote.FeeReserve - feesInSat
-				amounts := cashu.AmountSplit(overpaidFees)
-				change := meltRequest.Outputs
-				switch {
-				case len(amounts) > len(meltRequest.Outputs):
-					for i := range change {
-						change[i].Amount = amounts[i]
-					}
-
-				default:
-					change = change[:len(amounts)]
-
-					for i := range change {
-						change[i].Amount = amounts[i]
-					}
-
-				}
-				blindSignatures, recoverySigsDb, err := mint.SignBlindedMessages(change, quote.Unit)
-
-				if err != nil {
-					mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-					log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
-					c.JSON(500, "Opps!, something went wrong")
-					return
-				}
-
-				err = database.SetRestoreSigs(pool, recoverySigsDb)
-
-				if err != nil {
-					mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-					log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
-					log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
-				}
-
-				changeResponse = blindSignatures
-
-			}
+			paidLightningFeeSat = uint64(payment.PaidFeeSat)
 
 		default:
 			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
 		}
 
-		quote.Melted = true
+		// check for fee usage
+		if paidLightningFeeSat < quote.FeeReserve && len(meltRequest.Outputs) > 0 {
+			overpaidFees := quote.FeeReserve - paidLightningFeeSat
+			amounts := cashu.AmountSplit(overpaidFees)
+			change := meltRequest.Outputs
+			switch {
+			case len(amounts) > len(meltRequest.Outputs):
+				for i := range change {
+					change[i].Amount = amounts[i]
+				}
 
+			default:
+				change = change[:len(amounts)]
+
+				for i := range change {
+					change[i].Amount = amounts[i]
+				}
+
+			}
+			blindSignatures, recoverySigsDb, err := mint.SignBlindedMessages(change, quote.Unit)
+
+			if err != nil {
+				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
+			err = database.SetRestoreSigs(pool, recoverySigsDb)
+
+			if err != nil {
+				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+				log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
+				log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
+			}
+
+			changeResponse = blindSignatures
+		}
+
+		quote.Melted = true
 		response := quote.GetPostMeltQuoteResponse()
 		response.Change = changeResponse
 

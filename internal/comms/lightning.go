@@ -87,7 +87,7 @@ type LightningPaymentResponse struct {
 	PaymentError   error
 	PaymentRequest string
 	Rhash          string
-	PaidfeeMsat    int64
+	PaidFeeSat     int64
 }
 
 func (l *LightingComms) LnbitsInvoiceRequest(method string, endpoint string, reqBody any, responseType any) error {
@@ -265,7 +265,7 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 		invoiceRes.PaymentRequest = invoice
 		invoiceRes.Preimage = hex.EncodeToString(res.PaymentPreimage)
 		invoiceRes.PaymentError = fmt.Errorf(res.PaymentError)
-		invoiceRes.PaidfeeMsat = res.PaymentRoute.TotalFeesMsat
+		invoiceRes.PaidFeeSat = res.PaymentRoute.TotalFeesMsat / 1000
 
 		return &invoiceRes, nil
 
@@ -291,7 +291,7 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 		invoiceRes.PaymentRequest = lnbitsInvoice.PaymentRequest
 		invoiceRes.Rhash = lnbitsInvoice.PaymentHash
 		invoiceRes.Preimage = paymentStatus.Preimage
-		invoiceRes.PaidfeeMsat = int64(math.Abs(float64(paymentStatus.Details.Fee)))
+		invoiceRes.PaidFeeSat = int64(math.Abs(float64(paymentStatus.Details.Fee)))
 		invoiceRes.PaymentError = errors.New("")
 
 		return &invoiceRes, nil

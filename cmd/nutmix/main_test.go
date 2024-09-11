@@ -1497,3 +1497,149 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 	}
 
 }
+func TestFeeReturnAmount(t *testing.T) {
+	const posgrespassword = "password"
+	const postgresuser = "user"
+	ctx := context.Background()
+
+	postgresContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:16.2"),
+		postgres.WithDatabase("postgres"),
+		postgres.WithUsername(postgresuser),
+		postgres.WithPassword(posgrespassword),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	connUri, err := postgresContainer.ConnectionString(ctx)
+
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
+	}
+
+	os.Setenv("DATABASE_URL", connUri)
+	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	os.Setenv(mint.NETWORK_ENV, "regtest")
+
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+
+	router, mint := SetupRoutingForTesting(ctx)
+
+	// Mint check incorrect unit
+	w := httptest.NewRecorder()
+
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+		Amount: 10000,
+		Unit:   cashu.Sat.String(),
+	}
+	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
+
+	req := httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("Expected status code 200, got %d", w.Code)
+	}
+
+	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
+
+	if err != nil {
+		t.Errorf("Error unmarshalling response: %v", err)
+	}
+
+	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+
+	// mint cashu tokens
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, referenceKeyset)
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	mintRequest := cashu.PostMintBolt11Request{
+		Quote:   postMintQuoteResponse.Quote,
+		Outputs: blindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(mintRequest)
+
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	var postMintResponse cashu.PostMintBolt11Response
+
+	if w.Code != 200 {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
+	}
+
+	err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
+
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+	// request melt quote for 1000 sats
+	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
+		Unit:    cashu.Sat.String(),
+		Request: RegtestRequest,
+	}
+
+	jsonRequestBody, _ = json.Marshal(meltQuoteRequest)
+
+	req = httptest.NewRequest("POST", "/v1/melt/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	var postMeltQuoteResponse cashu.PostMeltQuoteBolt11Response
+	err = json.Unmarshal(w.Body.Bytes(), &postMeltQuoteResponse)
+
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+	w.Flush()
+
+	// test melt tokens
+	meltProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+
+	// mint cashu tokens
+	changeBlindedMessages, _, _, err := CreateBlindedMessages(10000, referenceKeyset)
+	if err != nil {
+		t.Errorf("Error CreateBlindedMessages(10000, referenceKeyset): %v", err)
+	}
+
+	meltRequest := cashu.PostMeltBolt11Request{
+		Quote:   postMeltQuoteResponse.Quote,
+		Inputs:  meltProofs,
+		Outputs: changeBlindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(meltRequest)
+
+	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	var postMeltResponse cashu.PostMeltQuoteBolt11Response
+
+	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
+
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+}
