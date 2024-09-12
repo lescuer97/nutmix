@@ -247,13 +247,21 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
+	var errorResponse cashu.ErrorResponse
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 400, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Quote already minted"` {
-		t.Errorf("Expected Quote already minted, got %s", w.Body.String())
+	if errorResponse.Code != 20002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Tokens have already been issued for quote" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// Minting with invalid signatures
@@ -327,12 +335,21 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 400, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough proofs for signatures"` {
-		t.Errorf("Expected Not enough proofs for signatures, got %s", w.Body.String())
+	if errorResponse.Code != 11002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// TRY TO SWAP SUCCESSFULLY
@@ -413,13 +430,23 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Invalid Proof"` {
-		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	if errorResponse.Code != 10003 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
 	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
+	}
+
 	w.Flush()
 
 	// swap with  not enought proofs for compared to signatures
@@ -445,13 +472,23 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough proofs for signatures"` {
-		t.Errorf("Not enough proofs for signatures, got %s", w.Body.String())
+	if errorResponse.Code != 11002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
 	}
+	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
+	}
+
 	w.Flush()
 
 	// SWAP TESTING ENDS
@@ -588,11 +625,21 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 400, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
-	if w.Body.String() != `"Quote already melted"` {
-		t.Errorf("Expected Quote already melted, got %s", w.Body.String())
+
+	if errorResponse.Code != 20006 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Invoice already paid" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// MELTING TESTING ENDS
@@ -937,12 +984,21 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 200, got %d", w.Code)
+	var errorResponse cashu.ErrorResponse
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Quote not paid"` {
-		t.Errorf("Expected Invoice not paid, got %s", w.Body.String())
+	if errorResponse.Code != 20001 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Quote request is not paid" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// needs to wait a second for the containers to catch up
@@ -1091,13 +1147,21 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
+	errorResponse = cashu.ErrorResponse{}
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 400, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Quote already minted"` {
-		t.Errorf("Expected Quote already minted, got %s", w.Body.String())
+	if errorResponse.Code != 20002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Tokens have already been issued for quote" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// MINTING TESTING ENDS
@@ -1128,12 +1192,21 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 400, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough proofs for signatures"` {
-		t.Errorf("Expected Not enough proofs for signatures, got %s", w.Body.String())
+	if errorResponse.Code != 11002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// try to swap tokens
@@ -1214,13 +1287,23 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Invalid Proof"` {
-		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	if errorResponse.Code != 10003 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
 	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
+	}
+
 	w.Flush()
 
 	// swap with  not enought proofs for compared to signatures
@@ -1246,13 +1329,23 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough proofs for signatures"` {
-		t.Errorf("Not enough proofs for signatures, got %s", w.Body.String())
+	if errorResponse.Code != 11002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
 	}
+	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
+	}
+
 	w.Flush()
 
 	// SWAP TESTING ENDS
@@ -1410,11 +1503,21 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 400, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
-	if w.Body.String() != `"Quote already melted"` {
-		t.Errorf("Expected Quote already melted, got %s", w.Body.String())
+
+	if errorResponse.Code != 20006 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Invoice already paid" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// MELTING TESTING ENDS
@@ -1470,11 +1573,21 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 200, got %d", w.Code)
+	errorResponse := cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
-	if w.Body.String() != `"Incorrect Unit for minting"` {
-		t.Errorf("Expected `Incorrect Unit for minting`, got %s", w.Body.String())
+
+	if errorResponse.Code != 11005 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Unit in request is not supported" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// melt quote with incorrect unit
@@ -1488,14 +1601,21 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 	req = httptest.NewRequest("POST", "/v1/melt/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
 
 	router.ServeHTTP(w, req)
+	errorResponse = cashu.ErrorResponse{}
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 400, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
-	fmt.Println("body:  ", w.Body.String())
 
-	if w.Body.String() != `"Incorrect Unit for melting"` {
-		t.Errorf("Expected `Incorrect Unit for melting`, got %s", w.Body.String())
+	if errorResponse.Code != 11005 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Unit in request is not supported" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 }
