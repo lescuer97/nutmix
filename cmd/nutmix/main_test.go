@@ -1642,4 +1642,13 @@ func TestFeeReturnAmount(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
+	changeAmount := uint64(0)
+	for _, sig := range postMeltResponse.Change {
+		changeAmount += sig.Amount
+	}
+
+	if changeAmount != 9000 {
+		t.Errorf("Change amount is incorrect %v", changeAmount)
+
+	}
 }
