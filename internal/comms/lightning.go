@@ -70,7 +70,7 @@ type LNBitsPaymentStatus struct {
 
 type LightningInvoiceRequest struct {
 	Amount int64  `json:"amount"`
-	Unit   string `json:"unit"`
+	Unit   string `json:"unit,omitempty"`
 	Memo   string `json:"memo"`
 	Out    bool   `json:"out"`
 	Expiry int64  `json:"expiry"`
