@@ -39,7 +39,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if mintRequest.Unit != cashu.Sat.String() {
 			log.Printf("Incorrect Unit for minting: %+v", mintRequest.Unit)
-			c.JSON(400, "Incorrect Unit for minting")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
 			return
 		}
 
@@ -164,9 +164,10 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+
 		if quote.Minted {
 			log.Printf("Quote already minted")
-			c.JSON(400, "Quote already minted")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_ISSUED, nil))
 			return
 		}
 
@@ -251,7 +252,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			} else {
 				mint.RemoveActiveMintQuote(quote.Quote)
 				log.Printf("Quote not paid")
-				c.JSON(400, "Quote not paid")
+				c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
 				return
 			}
 
@@ -335,7 +336,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if meltRequest.Unit != cashu.Sat.String() {
 			log.Printf("Incorrect Unit for minting: %+v", meltRequest.Unit)
-			c.JSON(400, "Incorrect Unit for melting")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
 			return
 		}
 
@@ -502,7 +503,7 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if quote.Melted {
 			log.Printf("Quote already melted")
-			c.JSON(400, "Quote already melted")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
 			return
 		}
 
@@ -523,11 +524,12 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			c.JSON(400, "Proofs are not the same unit")
 			return
 		}
+
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if unit != cashu.Sat {
 			log.Printf("Incorrect Unit for minting: %+v", unit)
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			c.JSON(400, "Incorrect Unit for minting")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
 			return
 		}
 
@@ -565,8 +567,18 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 		if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Printf("Not enought proofs to expend. Needs: %v", quote.Amount)
-			c.JSON(403, "Not enought proofs to expend. Needs: %v")
+
+			log.Printf("Not enought proofs to expend. Needs: %v", quote.Amount+quote.FeeReserve+uint64(fee))
+			if AmountProofs < (quote.Amount + quote.FeeReserve) {
+
+				c.JSON(403, cashu.ErrorCodeToResponse(cashu.TRANSACTION_NOT_BALANCED, nil))
+			} else {
+				log.Printf("Not enought proofs to expend. Lacking fees.. Needs: %v", quote.Amount+quote.FeeReserve+uint64(fee))
+
+				c.JSON(403, cashu.ErrorCodeToResponse(cashu.INSUFICIENT_FEE, nil))
+				c.JSON(403, "Not enought proofs to expend. Needs: %v")
+
+			}
 			return
 		}
 
@@ -576,14 +588,14 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 			log.Printf("CheckListOfProofs: %+v", err)
-			c.JSON(400, "Malformed body request")
+			c.JSON(500, "Opps! there was an issue")
 			return
 		}
 
 		if len(knownProofs) != 0 {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 			log.Printf("Proofs already used %+v \n", knownProofs)
-			c.JSON(400, "Proofs already used")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}
 
@@ -598,10 +610,10 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 				c.JSON(403, "Empty Witness")
 				return
 			case errors.Is(err, cashu.ErrNoValidSignatures):
-				c.JSON(403, "No valid signatures")
+				c.JSON(403, cashu.ErrorCodeToResponse(cashu.TOKEN_NOT_VERIFIED, nil))
 				return
 			case errors.Is(err, cashu.ErrNotEnoughSignatures):
-				c.JSON(403, cashu.ErrNotEnoughSignatures.Error())
+				c.JSON(403, cashu.ErrorCodeToResponse(cashu.TOKEN_NOT_VERIFIED, nil))
 				return
 			case errors.Is(err, cashu.ErrLocktimePassed):
 				c.JSON(403, cashu.ErrLocktimePassed.Error())
@@ -641,14 +653,15 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 
 			switch {
 			case payment.PaymentError.Error() == "invoice is already paid":
-				c.JSON(400, "invoice is already paid")
+				c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
 				return
 			case payment.PaymentError.Error() == "unable to find a path to destination":
 				c.JSON(400, "unable to find a path to destination")
 				return
 			case payment.PaymentError.Error() != "":
 				log.Printf("unknown lighting error: %+v", payment.PaymentError)
-				c.JSON(500, "Unknown error happend while paying")
+				detail := "There was an unknown during the lightning payment"
+				c.JSON(500, cashu.ErrorCodeToResponse(cashu.UNKNOWN, &detail))
 				return
 
 			}

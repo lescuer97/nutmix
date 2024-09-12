@@ -201,8 +201,21 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatalf("Expected status code 403, got %d", w.Code)
 	}
 
-	if w.Body.String() != `"No valid signatures"` {
-		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	var errorResponse cashu.ErrorResponse
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
+	}
+
+	if errorResponse.Code != 10003 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// TRY SWAPING with WRONG Preimage
@@ -608,13 +621,21 @@ func TestHTLCMultisigSigning(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
+	var errorResponse cashu.ErrorResponse
 
-	if w.Code != 403 {
-		t.Fatalf("Expected status code 403, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough signatures"` {
-		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	if errorResponse.Code != 10003 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// Try swapping with not enough signatures
@@ -642,13 +663,21 @@ func TestHTLCMultisigSigning(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
+	errorResponse = cashu.ErrorResponse{}
 
-	if w.Code != 403 {
-		t.Fatalf("Expected status code 403, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough signatures"` {
-		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	if errorResponse.Code != 10003 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// Try swapping with correct signatures but wrong preimage
