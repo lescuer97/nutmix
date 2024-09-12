@@ -663,9 +663,9 @@ func v1bolt11Routes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint
 			log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
 		}
 
+        //  if total expent is lower that the amount of proofs that where given 
+        //  change is returned
 		totalExpent := quote.Amount + paidLightningFeeSat + uint64(fee)
-
-		// check for fee usage
 		if AmountProofs > totalExpent && len(meltRequest.Outputs) > 0 {
 			overpaidFees := AmountProofs - totalExpent
 
