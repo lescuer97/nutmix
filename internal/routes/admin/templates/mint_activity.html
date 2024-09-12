@@ -37,7 +37,7 @@
       hx-swap="innerHTML"
       hx-trigger="load, reload"
       hx-headers='javascript:{time: event?.detail?.time}'
-      class="log-table"
+      class="data-table"
     ></div>
     <div
       hx-get="/admin/mint-melt-list"
@@ -45,7 +45,7 @@
       hx-swap="innerHTML"
       hx-trigger="load, reload"
       hx-headers='javascript:{time: event?.detail?.time}'
-      class="mint-melt-table"
+      class="data-table"
     ></div>
     
   </div>
@@ -75,6 +75,8 @@
 {{ end }} 
 
 {{ define "logs" }} 
+<h2>Logs</h2>
+<div class="">
     <table class="">
         <thead>
             <tr>
@@ -93,11 +95,14 @@
             {{end}} 
         </tbody>
     </table>
+</div>
 
 {{ end }}
 
 {{ define "mint-melt-list" }} 
 
+        <h2>Mint & Melt</h2>
+<div>
     <table class="">
         <thead>
             <tr>
@@ -120,5 +125,6 @@
             {{end}} 
         </tbody>
     </table>
+</div>
 
 {{ end }}

@@ -36,25 +36,27 @@ button.time-button.selected {
     color: var(--darkreader-inline-color);
 }
 
-.log-table {
-      overflow-y: scroll;
-      overflow-x: hidden;
-      max-height: 500px;
-      display: flex;
-      flex-direction: column;
+.data-table {
       width: 50%;
-      overflow-wrap: break-word;
+}
+.data-table h2 {
+    padding-left: 10px;
 }
 
-.mint-melt-table {
-      overflow-y: scroll;
-      overflow-x: hidden;
-      max-height: 500px;
+.data-table div {
       display: flex;
       flex-direction: column;
-      width: 50%;
+      overflow-y: scroll;
+      overflow-x: hidden;
       overflow-wrap: break-word;
+      max-height: 500px;
 }
+
+.data-table caption {
+    text-align: left;
+    padding-left: 15px;
+}
+
 
 tr.DEBUG {
     background-color: #94ed74;

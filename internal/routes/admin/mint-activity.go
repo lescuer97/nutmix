@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"slices"
 	"sort"
 	"time"
-
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -143,7 +141,6 @@ func MintMeltList(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.
 		}
 
 		sort.Sort(mintMeltRequestVisual)
-		slices.Reverse(mintMeltRequestVisual)
 
 		c.HTML(200, "mint-melt-list", mintMeltRequestVisual)
 	}
