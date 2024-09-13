@@ -339,7 +339,7 @@ func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) 
 
 	var proofList []cashu.Proof
 
-	rows, err := pool.Query(context.Background(), "SELECT amount, id, secret, c, y, witness  FROM proofs WHERE C = ANY($1) OR secret = ANY($2)", CList, SecretList)
+	rows, err := pool.Query(context.Background(), "SELECT amount, id, secret, c, y, witness, seen_at  FROM proofs WHERE C = ANY($1) OR secret = ANY($2)", CList, SecretList)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -394,9 +394,10 @@ func CheckListOfProofsBySecretCurve(pool *pgxpool.Pool, Ys []string) ([]cashu.Pr
 
 	var proofList []cashu.Proof
 
-	rows, err := pool.Query(context.Background(), "SELECT amount, id, secret, c, y, witness FROM proofs WHERE Y = ANY($1)", Ys)
+	rows, err := pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at FROM proofs WHERE y = ANY($1)`, Ys)
 
 	if err != nil {
+
 		if err == pgx.ErrNoRows {
 			return proofList, nil
 		}

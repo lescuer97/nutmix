@@ -49,6 +49,8 @@ func main() {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
 
+	defer logFile.Close()
+
 	w := io.MultiWriter(os.Stdout, logFile)
 
 	opts := &slog.HandlerOptions{

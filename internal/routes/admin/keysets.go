@@ -16,7 +16,7 @@ func KeysetsPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.H
 
 	return func(c *gin.Context) {
 
-		c.HTML(200, "keysets-page", nil)
+		c.HTML(200, "keysets.html", nil)
 	}
 }
 func KeysetsLayoutPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {

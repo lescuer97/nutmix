@@ -68,7 +68,9 @@ func AuthMiddleware(ctx context.Context) gin.HandlerFunc {
 			return
 		default:
 			c.Redirect(http.StatusTemporaryRedirect, "/admin/login")
-			c.Next()
+			c.Header("HX-Location", "/admin/login")
+			c.Abort()
+			c.JSON(200, nil)
 
 		}
 	}
