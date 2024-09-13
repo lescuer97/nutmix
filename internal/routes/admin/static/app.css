@@ -203,6 +203,8 @@ option {
   display: flex;
   justify-content: center;
   color: black;
+  min-height: 40px;
+  margin: 10px 0px;
 }
 
 #notifications > .success {
