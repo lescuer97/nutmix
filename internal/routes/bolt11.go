@@ -265,7 +265,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			if quote.State == cashu.PAID {
 				quote.RequestPaid = true
 			} else {
-				mint.RemoveActiveMintQuote(quote.Quote)
+				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				log.Printf("Quote not paid")
 				c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
 				return
