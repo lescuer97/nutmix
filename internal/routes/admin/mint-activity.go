@@ -3,9 +3,6 @@ package admin
 import (
 	"context"
 	"fmt"
-	"log"
-	"sort"
-	"time"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,6 +10,9 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lightningnetwork/lnd/zpay32"
+	"log"
+	"sort"
+	"time"
 )
 
 func MintBalance(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
@@ -77,7 +77,7 @@ func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) g
 				return
 			}
 
-			mintMeltTotal["Mint"] += int64( invoice.MilliSat.ToSatoshis().ToUnit(btcutil.AmountSatoshi))
+			mintMeltTotal["Mint"] += int64(invoice.MilliSat.ToSatoshis().ToUnit(btcutil.AmountSatoshi))
 		}
 
 		// sum up melt amount
