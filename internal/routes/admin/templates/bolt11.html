@@ -43,12 +43,11 @@
             </label>
             <label for="LND_GRPC_HOST" class="settings-input"> 
                 LND TLS Certificate
-                <textarea name="LND_TLS_CERT"  type="text">{{.LND_TLS_CERT}}</textarea>
-                <!-- <input type="text" name="LND_TLS_CERT" value="{{.LND_TLS_CERT}}"/> -->
+                <textarea name="LND_TLS_CERT"  type="password">{{.LND_TLS_CERT}}</textarea>
             </label>
             <label for="LND_MACAROON" class="settings-input"> 
                 LND Macaroon (HEX)
-                <input type="text" name="LND_MACAROON" value="{{.LND_MACAROON}}"/>
+                <input type="password" name="LND_MACAROON" value="{{.LND_MACAROON}}"/>
             </label>
 
 {{ end }}
@@ -67,7 +66,7 @@
             </label>
             <label for="MINT_LNBITS_KEY" class="settings-input"> 
                 LNBITS Key
-                <input type="text" name="MINT_LNBITS_KEY" value="{{.MINT_LNBITS_KEY}}"/>
+                <input type="password" name="MINT_LNBITS_KEY" value="{{.MINT_LNBITS_KEY}}"/>
             </label>
 
 {{ end }}

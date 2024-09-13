@@ -256,7 +256,7 @@ func (l *LightingComms) WalletBalance() (uint64, error) {
 		balance, err := client.ChannelBalance(ctx, &channelRequest)
 
 		if err != nil {
-			return balance.LocalBalance.GetMsat(), err
+			return 0, err
 		}
 		return balance.LocalBalance.GetMsat(), nil
 
