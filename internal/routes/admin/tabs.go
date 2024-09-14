@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"log"
 	"strconv"
 
@@ -13,13 +12,13 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
-func MintSettingsPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintSettingsPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(200, "settings.html", mint.Config)
 	}
 }
 
-func MintSettingsForm(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		// check the different variables that could change
@@ -137,13 +136,13 @@ func MintSettingsForm(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) 
 	}
 }
 
-func LightningNodePage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func LightningNodePage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(200, "bolt11.html", mint.Config)
 	}
 }
 
-func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -180,6 +179,7 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 				lightningComs, err := comms.SetupLightingComms(newCommsData)
 
 				if err != nil {
+					log.Printf("comms.SetupLightingComms(newCommsData). %+v", err)
 					errorMessage := ErrorNotif{
 						Error: "Something went wrong setting up LND communications",
 					}
@@ -196,7 +196,7 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 						Error: "Could not check stablished connection with Node",
 					}
 
-					log.Printf("Error message %+v", errorMessage)
+					log.Printf("Error message %+v", err)
 
 					c.HTML(200, "settings-error", errorMessage)
 					return
@@ -225,6 +225,8 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 			lightningComs, err := comms.SetupLightingComms(newCommsData)
 
 			if err != nil {
+
+				log.Printf("comms.SetupLightingComms(newCommsData). %+v", err)
 				errorMessage := ErrorNotif{
 					Error: "Something went wrong setting up LNBITS communications",
 				}
@@ -241,7 +243,7 @@ func Bolt11Post(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Ha
 					Error: "Could not check stablished connection with Node",
 				}
 
-				log.Printf("Error message %+v", errorMessage)
+				log.Printf("Error message %+v. ", err)
 
 				c.HTML(200, "settings-error", errorMessage)
 				return

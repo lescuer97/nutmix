@@ -210,7 +210,7 @@ func main() {
 
 	routes.V1Routes(r, pool, mint, logger)
 
-	admin.AdminRoutes(ctx, r, pool, mint)
+	admin.AdminRoutes(ctx, r, pool, mint, logger)
 
 	defer pool.Close()
 

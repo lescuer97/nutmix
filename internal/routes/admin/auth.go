@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -21,7 +20,7 @@ import (
 
 const AdminAuthKey = "admin-cookie"
 
-func AuthMiddleware(ctx context.Context) gin.HandlerFunc {
+func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
 			key := []byte(os.Getenv(JWT_SECRET))
@@ -76,7 +75,7 @@ func AuthMiddleware(ctx context.Context) gin.HandlerFunc {
 	}
 }
 
-func Login(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		var nostrEvent nostr.Event

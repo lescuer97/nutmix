@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -11,7 +10,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 )
 
-func LoginPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func LoginPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		// generate nonce for login nostr
@@ -42,7 +41,7 @@ func LoginPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.Han
 	}
 }
 
-func InitPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func InitPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(200, "mint_activity.html", nil)
 	}

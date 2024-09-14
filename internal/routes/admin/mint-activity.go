@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"fmt"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/gin-gonic/gin"
@@ -15,7 +14,7 @@ import (
 	"time"
 )
 
-func MintBalance(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintBalance(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -40,7 +39,7 @@ func MintBalance(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.H
 	}
 }
 
-func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
@@ -93,7 +92,7 @@ func MintMeltSummary(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) g
 		c.HTML(200, "mint-melt-activity", mintMeltTotal)
 	}
 }
-func MintMeltList(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintMeltList(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
 		timeRequestDuration := ParseToTimeRequest(timeHeader)

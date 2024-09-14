@@ -21,42 +21,40 @@ type ErrorNotif struct {
 	Error string
 }
 
-func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint) {
+func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
 	r.Static("static", "internal/routes/admin/static")
 	r.LoadHTMLGlob("internal/routes/admin/templates/**")
 	adminRoute := r.Group("/admin")
 
-	hmacSecret, err := generateHMACSecret()
+	// hmacSecret, err := generateHMACSecret()
 
-	if err != nil {
-		log.Panic("ERROR: could not create HMAC secret")
-	}
+	// if err != nil {
+	// 	log.Panic("ERROR: could not create HMAC secret")
+	// }
 
-	ctx = context.WithValue(ctx, JWT_SECRET, hmacSecret)
-
-	adminRoute.Use(AuthMiddleware(ctx))
+	adminRoute.Use(AuthMiddleware())
 
 	// PAGES SETUP
 	// This is /admin
-	adminRoute.GET("", InitPage(ctx, pool, mint))
-	adminRoute.GET("/keysets", KeysetsPage(ctx, pool, mint))
-	adminRoute.GET("/settings", MintSettingsPage(ctx, pool, mint))
-	adminRoute.GET("/login", LoginPage(ctx, pool, mint))
-	adminRoute.GET("/bolt11", LightningNodePage(ctx, pool, mint))
+	adminRoute.GET("", InitPage(pool, mint))
+	adminRoute.GET("/keysets", KeysetsPage(pool, mint))
+	adminRoute.GET("/settings", MintSettingsPage(pool, mint))
+	adminRoute.GET("/login", LoginPage(pool, mint))
+	adminRoute.GET("/bolt11", LightningNodePage(pool, mint))
 
 	// change routes
-	adminRoute.POST("/login", Login(ctx, pool, mint))
-	adminRoute.POST("/mintsettings", MintSettingsForm(ctx, pool, mint))
-	adminRoute.POST("/bolt11", Bolt11Post(ctx, pool, mint))
-	adminRoute.POST("/rotate/sats", RotateSatsSeed(ctx, pool, mint))
+	adminRoute.POST("/login", Login(pool, mint))
+	adminRoute.POST("/mintsettings", MintSettingsForm(pool, mint))
+	adminRoute.POST("/bolt11", Bolt11Post(pool, mint))
+	adminRoute.POST("/rotate/sats", RotateSatsSeed(pool, mint))
 
 	// fractional html components
-	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(ctx, pool, mint))
-	adminRoute.GET("/lightningdata", LightningDataFormFields(ctx, pool, mint))
-	adminRoute.GET("/mint-balance", MintBalance(ctx, pool, mint))
-	adminRoute.GET("/mint-melt-summary", MintMeltSummary(ctx, pool, mint))
-	adminRoute.GET("/mint-melt-list", MintMeltList(ctx, pool, mint))
-	adminRoute.GET("/logs", LogsTab(ctx))
+	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(pool, mint, logger))
+	adminRoute.GET("/lightningdata", LightningDataFormFields(pool, mint))
+	adminRoute.GET("/mint-balance", MintBalance(pool, mint))
+	adminRoute.GET("/mint-melt-summary", MintMeltSummary(pool, mint))
+	adminRoute.GET("/mint-melt-list", MintMeltList(pool, mint))
+	adminRoute.GET("/logs", LogsTab())
 
 }
 
@@ -114,7 +112,7 @@ func (t TIME_REQUEST) RollBackFromNow() time.Time {
 	return rollBackHour.Add(-duration)
 }
 
-func LogsTab(ctx context.Context) gin.HandlerFunc {
+func LogsTab() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 

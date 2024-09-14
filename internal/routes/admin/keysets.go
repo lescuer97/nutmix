@@ -1,25 +1,26 @@
 package admin
 
 import (
-	"context"
+	"log"
+	"log/slog"
+	"os"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
-	"log"
-	"os"
-	"strconv"
 )
 
-func KeysetsPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func KeysetsPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
 		c.HTML(200, "keysets.html", nil)
 	}
 }
-func KeysetsLayoutPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func KeysetsLayoutPage(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		type KeysetData struct {
@@ -34,8 +35,10 @@ func KeysetsLayoutPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint)
 		keysetArr := struct {
 			Keysets []KeysetData
 		}{}
+
 		seeds, err := database.GetAllSeeds(pool)
 		if err != nil {
+			logger.Error("database.GetAllSeeds(pool) %+v", err)
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -55,7 +58,7 @@ func KeysetsLayoutPage(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint)
 	}
 }
 
-func RotateSatsSeed(ctx context.Context, pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		seeds, err := database.GetSeedsByUnit(pool, cashu.Sat)
