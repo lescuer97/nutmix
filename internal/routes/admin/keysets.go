@@ -10,6 +10,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 func KeysetsPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
@@ -37,7 +38,7 @@ func KeysetsLayoutPage(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger)
 
 		seeds, err := database.GetAllSeeds(pool)
 		if err != nil {
-			logger.Error("database.GetAllSeeds(pool) %+v", slog.String("extra-info", err.Error()))
+			logger.Error("database.GetAllSeeds(pool) %+v", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -64,7 +65,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 		if err != nil {
 			logger.Error(
 				"database.GetSeedsByUnit(pool, cashu.Sat)",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "There was an error getting the seeds",
 			}
@@ -80,7 +81,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 		if err != nil {
 			logger.Error(
 				"Err: There was a problem rotating the key",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorMessage := ErrorNotif{
 				Error: "Fee was not an integer",
@@ -107,7 +108,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 		if mint_privkey == "" {
 			logger.Error(
 				"Err: could not get mint private key",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "There was a problem getting the mint private key",
 			}
@@ -122,7 +123,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 		if err != nil {
 			logger.Warn(
 				"There was a problem rotating the key",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorMessage := ErrorNotif{
 				Error: "There was a problem rotating the key",
@@ -139,7 +140,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 		if err != nil {
 			logger.Error(
 				"Could not save key",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "There was a problem saving the new seed",
 			}
@@ -151,7 +152,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 		if err != nil {
 			logger.Error(
 				"database.UpdateActiveStatusSeeds",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorMessage := ErrorNotif{
 				Error: "there was a problem modifying the seeds",
@@ -172,7 +173,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 			if err != nil {
 				logger.Error(
 					"There was a problem deriving the keyset",
-					slog.String("extra-info", err.Error()))
+					slog.String(utils.LogExtraInfo, err.Error()))
 				errorMessage := ErrorNotif{
 					Error: "There was a problem deriving the keyset",
 				}

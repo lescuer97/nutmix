@@ -12,6 +12,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
@@ -170,7 +171,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		err := c.BindJSON(&swapRequest)
 		if err != nil {
-			logger.Info("Incorrect body: %+v", slog.String("extra-info", err.Error()))
+			logger.Info("Incorrect body: %+v", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -194,7 +195,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 			p, err := proof.HashSecretToCurve()
 
 			if err != nil {
-				logger.Warn("proof.HashSecretToCurve()", slog.String("extra-info", err.Error()))
+				logger.Warn("proof.HashSecretToCurve()", slog.String(utils.LogExtraInfo, err.Error()))
 				c.JSON(400, "Problem processing proofs")
 				return
 			}
@@ -209,7 +210,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			logger.Warn("CheckProofsAreSameUnit", slog.String("extra-info", err.Error()))
+			logger.Warn("CheckProofsAreSameUnit", slog.String(utils.LogExtraInfo, err.Error()))
 			detail := "Proofs are not the same unit"
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, &detail))
 			return
@@ -219,7 +220,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		fee, err := cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			logger.Warn("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])", slog.String("extra-info", err.Error()))
+			logger.Warn("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -233,7 +234,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		err = mint.ActiveProofs.AddProofs(swapRequest.Inputs)
 
 		if err != nil {
-			logger.Error("mint.ActiveProofs.AddProofs(swapRequest.Inputs)", slog.String("extra-info", err.Error()))
+			logger.Error("mint.ActiveProofs.AddProofs(swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "There was a problem during swapping")
 			return
 		}
@@ -242,7 +243,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		knownProofs, err := database.CheckListOfProofs(pool, CList, SecretsList)
 
 		if err != nil {
-			logger.Error("database.CheckListOfProofs(pool, CList, SecretsList)", slog.String("extra-info", err.Error()))
+			logger.Error("database.CheckListOfProofs(pool, CList, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -256,7 +257,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			logger.Warn("mint.VerifyListOfProofs", slog.String("extra-info", err.Error()))
+			logger.Warn("mint.VerifyListOfProofs", slog.String(utils.LogExtraInfo, err.Error()))
 
 			switch {
 			case errors.Is(err, cashu.ErrEmptyWitness):
@@ -285,7 +286,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			logger.Error("mint.SignBlindedMessages", slog.String("extra-info", err.Error()))
+			logger.Error("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -299,8 +300,8 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			logger.Error("database.SaveProofs", slog.String("extra-info", err.Error()))
-			logger.Error("Proofs", slog.String("extra-info", fmt.Sprintf("%+v", swapRequest.Inputs)))
+			logger.Error("database.SaveProofs", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("Proofs", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", swapRequest.Inputs)))
 			c.JSON(200, response)
 			return
 		}
@@ -308,8 +309,8 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		err = database.SetRestoreSigs(pool, recoverySigsDb)
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			logger.Error("database.SetRestoreSigs", slog.String("extra-info", err.Error()))
-			logger.Error("recoverySigsDb", slog.String("extra-info", fmt.Sprintf("%+v", recoverySigsDb)))
+			logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
 			c.JSON(200, response)
 			return
 		}
@@ -322,7 +323,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		var checkStateRequest cashu.PostCheckStateRequest
 		err := c.BindJSON(&checkStateRequest)
 		if err != nil {
-			logger.Info("c.BindJSON(&checkStateRequest)", slog.String("extra-info", err.Error()))
+			logger.Info("c.BindJSON(&checkStateRequest)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "Malformed Body")
 			return
 		}
@@ -387,7 +388,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		err := c.BindJSON(&restoreRequest)
 
 		if err != nil {
-			logger.Info("c.BindJSON(&restoreRequest)", slog.String("extra-info", err.Error()))
+			logger.Info("c.BindJSON(&restoreRequest)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -400,7 +401,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		blindRecoverySigs, err := database.GetRestoreSigsFromBlindedMessages(pool, blindingFactors)
 		if err != nil {
-			logger.Error("database.GetRestoreSigsFromBlindedMessages", slog.String("extra-info", err.Error()))
+			logger.Error("database.GetRestoreSigsFromBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}

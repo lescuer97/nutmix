@@ -11,6 +11,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
@@ -29,7 +30,7 @@ func MintBalance(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.H
 
 			logger.Warn(
 				"mint.LightningComs.WalletBalance()",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorMessage := ErrorNotif{
 				Error: "There was a problem getting the balance",
@@ -55,7 +56,7 @@ func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) g
 		if err != nil {
 			logger.Error(
 				"database.GetMintMeltBalanceByTime(pool",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
 
 				Error: "There was an error getting mint activity",
@@ -74,7 +75,7 @@ func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) g
 			if err != nil {
 				logger.Debug(
 					"zpay32.Decode",
-					slog.String("extra-info", err.Error()))
+					slog.String(utils.LogExtraInfo, err.Error()))
 
 				errorMessage := ErrorNotif{
 
@@ -111,7 +112,7 @@ func MintMeltList(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.
 		if err != nil {
 			logger.Error(
 				"database.GetMintMeltBalanceByTime(pool",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorMessage := ErrorNotif{
 

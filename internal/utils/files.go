@@ -13,6 +13,7 @@ import (
 const ConfigFileName string = "config.toml"
 const ConfigDirName string = "nutmix"
 const logFileName string = "nutmix.log"
+const LogExtraInfo string = "extra-info"
 
 var (
 	DOCKER_ENV           = "DOCKER"
@@ -24,7 +25,7 @@ type SlogRecordJSON struct {
 	Time      time.Time
 	Msg       string
 	Level     slog.Level
-	ExtraInfo string `json:"extra-info"`
+	ExtraInfo string `json:utils.LogExtraInfo`
 }
 
 func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTime time.Time) []SlogRecordJSON {

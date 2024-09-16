@@ -125,7 +125,7 @@ func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 		if err != nil {
 			logger.Warn(
 				"utils.GetLogsDirectory()",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 
 		}
 
@@ -134,7 +134,7 @@ func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 		if err != nil {
 			logger.Warn(
 				"os.Open(logsdir ",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorMessage := ErrorNotif{
 				Error: "Could not get logs from mint",

@@ -10,6 +10,8 @@ import (
 
 	"strings"
 
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,10 +21,10 @@ import (
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/mint"
 	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log/slog"
 )
 
 func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
@@ -39,7 +41,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		}
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if mintRequest.Unit != cashu.Sat.String() {
-			logger.Warn("Incorrect Unit for minting: %+v", slog.String("extra-info", mintRequest.Unit))
+			logger.Warn("Incorrect Unit for minting: %+v", slog.String(utils.LogExtraInfo, mintRequest.Unit))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
 			return
 		}
@@ -59,7 +61,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		if mint.Config.PEG_IN_LIMIT_SATS != nil {
 			if mintRequest.Amount > int64(*mint.Config.PEG_IN_LIMIT_SATS) {
-				logger.Info("Mint amount over the limit", slog.String("extra-info", fmt.Sprint(mintRequest.Amount)))
+				logger.Info("Mint amount over the limit", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
 
 				c.JSON(400, "Mint amount over the limit")
 				return
@@ -185,7 +187,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		}
 
 		if quote.Minted {
-			logger.Warn("Quote already minted", slog.String("extra-info", quote.Quote))
+			logger.Warn("Quote already minted", slog.String(utils.LogExtraInfo, quote.Quote))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_ISSUED, nil))
 			return
 		}
@@ -241,7 +243,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				if errors.Is(err, m.ErrInvalidBlindMessage) {
-					logger.Error("Invalid Blind Message", slog.String("extra-info", err.Error()))
+					logger.Error("Invalid Blind Message", slog.String(utils.LogExtraInfo, err.Error()))
 					c.JSON(400, m.ErrInvalidBlindMessage.Error())
 					return
 				}
@@ -353,7 +355,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if meltRequest.Unit != cashu.Sat.String() {
-			logger.Info("Incorrect Unit for minting", slog.String("extra-info", meltRequest.Unit))
+			logger.Info("Incorrect Unit for minting", slog.String(utils.LogExtraInfo, meltRequest.Unit))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
 			return
 		}
@@ -529,7 +531,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		}
 
 		if quote.Melted {
-			logger.Info("Quote already melted", slog.String("extra-info", quote.Quote))
+			logger.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
 			return
 		}
@@ -554,7 +556,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if unit != cashu.Sat {
-			logger.Info("Incorrect Unit for minting", slog.String("extra-info", quote.Unit))
+			logger.Info("Incorrect Unit for minting", slog.String(utils.LogExtraInfo, quote.Unit))
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
 			return
@@ -611,7 +613,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		if len(knownProofs) != 0 {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			logger.Info("Proofs already used", slog.String("extra-info", fmt.Sprintf("%+v", knownProofs)))
+			logger.Info("Proofs already used", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", knownProofs)))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}
@@ -620,7 +622,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			logger.Debug("Could not verify Proofs", slog.String("extra-info", err.Error()))
+			logger.Debug("Could not verify Proofs", slog.String(utils.LogExtraInfo, err.Error()))
 
 			switch {
 			case errors.Is(err, cashu.ErrEmptyWitness):
@@ -719,7 +721,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 			if err != nil {
 				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-				logger.Info("mint.SignBlindedMessages", slog.String("extra-info", err.Error()))
+				logger.Info("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -728,8 +730,8 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 			if err != nil {
 				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-				logger.Error("database.SetRestoreSigs", slog.String("extra-info", err.Error()))
-				logger.Error("recoverySigsDb", slog.String("extra-info", fmt.Sprintf("%+v", recoverySigsDb)))
+				logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
+				logger.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
 			}
 
 			changeResponse = blindSignatures

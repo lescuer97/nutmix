@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
@@ -48,7 +49,7 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) 
 			if err != nil {
 				logger.Debug(
 					"strconv.Atoi(pegInLimitStr)",
-					slog.String("extra-info", err.Error()))
+					slog.String(utils.LogExtraInfo, err.Error()))
 				errorMessage := ErrorNotif{
 					Error: "Peg in limit is not an integer",
 				}
@@ -72,7 +73,7 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) 
 			if err != nil {
 				logger.Debug(
 					"strconv.Atoi(pegInLimitStr)",
-					slog.String("extra-info", err.Error()))
+					slog.String(utils.LogExtraInfo, err.Error()))
 				errorMessage := ErrorNotif{
 					Error: "Peg out limit is not an integer",
 				}
@@ -93,7 +94,7 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) 
 			if err != nil {
 				logger.Warn(
 					"nip19.Decode(nostrKey)",
-					slog.String("extra-info", err.Error()))
+					slog.String(utils.LogExtraInfo, err.Error()))
 
 				errorMessage := ErrorNotif{
 					Error: "Nostr npub is not valid",
@@ -129,7 +130,7 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) 
 		if err != nil {
 			logger.Error(
 				"mint.Config.SetTOMLFile()",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "there was a problem in the server",
 			}
@@ -195,7 +196,7 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Ha
 				if err != nil {
 					logger.Error(
 						"comms.SetupLightingComms(newCommsData).",
-						slog.String("extra-info", err.Error()))
+						slog.String(utils.LogExtraInfo, err.Error()))
 
 					errorMessage := ErrorNotif{
 						Error: "Something went wrong setting up LND communications",
@@ -211,7 +212,7 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Ha
 				if err != nil /* || !validConnection */ {
 					logger.Warn(
 						"Could not get lightning balance",
-						slog.String("extra-info", err.Error()))
+						slog.String(utils.LogExtraInfo, err.Error()))
 					errorMessage := ErrorNotif{
 						Error: "Could not check stablished connection with Node",
 					}
@@ -245,7 +246,7 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Ha
 			if err != nil {
 				logger.Warn(
 					"comms.SetupLightingComms(newCommsData)",
-					slog.String("extra-info", err.Error()))
+					slog.String(utils.LogExtraInfo, err.Error()))
 				errorMessage := ErrorNotif{
 					Error: "Something went wrong setting up LNBITS communications",
 				}
@@ -263,7 +264,7 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Ha
 				}
 				logger.Warn(
 					"Could not get lightning balance",
-					slog.String("extra-info", err.Error()))
+					slog.String(utils.LogExtraInfo, err.Error()))
 
 				c.HTML(200, "settings-error", errorMessage)
 				return
@@ -281,7 +282,7 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Ha
 		if err != nil {
 			logger.Error(
 				"mint.Config.SetTOMLFile()",
-				slog.String("extra-info", err.Error()))
+				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "There was a problem setting your config",
 			}
