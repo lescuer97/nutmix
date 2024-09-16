@@ -136,6 +136,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 	})
 
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
+		fmt.Println("RUNING Mint :QUOTE")
 		quoteId := c.Param("quote")
 
 		quote, err := database.GetMintQuoteById(pool, quoteId)
@@ -177,26 +178,27 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			c.JSON(400, "Malformed body request")
 			return
 		}
+		err = mint.ActiveQuotes.AddQuote(mintRequest.Quote)
+
+		if err != nil {
+			logger.Warn(fmt.Errorf("AddActiveMintQuote: %w", err).Error())
+			c.JSON(400, "Proof already being minted")
+			return
+		}
 
 		quote, err := database.GetMintQuoteById(pool, mintRequest.Quote)
 
 		if err != nil {
+			mint.ActiveQuotes.RemoveQuote(quote.Quote)
 			logger.Error(fmt.Errorf("Incorrect body: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
 		if quote.Minted {
+			mint.ActiveQuotes.RemoveQuote(quote.Quote)
 			logger.Warn("Quote already minted", slog.String(utils.LogExtraInfo, quote.Quote))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_ISSUED, nil))
-			return
-		}
-
-		err = mint.ActiveQuotes.AddQuote(quote.Quote)
-
-		if err != nil {
-			logger.Warn(fmt.Errorf("AddActiveMintQuote: %w", err).Error())
-			c.JSON(400, "Proof already being minted")
 			return
 		}
 
@@ -521,27 +523,27 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			c.JSON(400, "Outputs are empty")
 			return
 		}
+		err = mint.AddQuotesAndProofs(meltRequest.Quote, meltRequest.Inputs)
+
+		if err != nil {
+			logger.Warn(fmt.Errorf("mint.AddQuotesAndProofs(quote.Quote, meltRequest.Inputs): %w", err).Error())
+			c.JSON(400, "Quote already being melted")
+			return
+		}
 
 		quote, err := database.GetMeltQuoteById(pool, meltRequest.Quote)
 
 		if err != nil {
+			mint.RemoveQuotesAndProofs(meltRequest.Quote, meltRequest.Inputs)
 			logger.Info(fmt.Errorf("GetMeltQuoteById: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
 		if quote.Melted {
+			mint.RemoveQuotesAndProofs(meltRequest.Quote, meltRequest.Inputs)
 			logger.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
-			return
-		}
-
-		err = mint.AddQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-
-		if err != nil {
-			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			logger.Warn(fmt.Errorf("mint.AddQuotesAndProofs(quote.Quote, meltRequest.Inputs): %w", err).Error())
-			c.JSON(400, "Quote already being melted")
 			return
 		}
 

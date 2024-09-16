@@ -41,29 +41,28 @@ type ActiveProofs struct {
 
 func (a *ActiveProofs) AddProofs(proofs []cashu.Proof) error {
 	a.Lock()
+	defer a.Unlock()
 	// check if proof already exists
 	for _, p := range proofs {
 
 		if a.Proofs[p] {
-			a.Unlock()
 			return AlreadyActiveProof
 		}
 
 		a.Proofs[p] = true
 	}
-	a.Unlock()
 	return nil
 }
 
 func (a *ActiveProofs) RemoveProofs(proofs []cashu.Proof) error {
 	a.Lock()
+	defer a.Unlock()
 	// check if proof already exists
 	for _, p := range proofs {
 
 		delete(a.Proofs, p)
 
 	}
-	a.Unlock()
 	return nil
 }
 
@@ -75,22 +74,22 @@ type ActiveQuote struct {
 func (q *ActiveQuote) AddQuote(quote string) error {
 	q.Lock()
 
+	defer q.Unlock()
+
 	if q.Quote[quote] {
-		q.Unlock()
 		return AlreadyActiveQuote
 	}
 
 	q.Quote[quote] = true
 
-	q.Unlock()
 	return nil
 }
 func (q *ActiveQuote) RemoveQuote(quote string) error {
 	q.Lock()
+	defer q.Unlock()
 
 	delete(q.Quote, quote)
 
-	q.Unlock()
 	return nil
 }
 func (m *Mint) AddQuotesAndProofs(quote string, proofs []cashu.Proof) error {

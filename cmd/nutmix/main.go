@@ -45,11 +45,10 @@ func main() {
 
 	// Manipulate Config file
 	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0764)
+	defer logFile.Close()
 	if err != nil {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
-
-	defer logFile.Close()
 
 	w := io.MultiWriter(os.Stdout, logFile)
 
@@ -89,6 +88,7 @@ func main() {
 	}
 
 	pool, err := database.DatabaseSetup(ctx, "migrations")
+	defer pool.Close()
 
 	if err != nil {
 		logger.Error(fmt.Sprintf("Error conecting to db %+v", err))
@@ -211,8 +211,6 @@ func main() {
 	routes.V1Routes(r, pool, mint, logger)
 
 	admin.AdminRoutes(ctx, r, pool, mint, logger)
-
-	defer pool.Close()
 
 	logger.Info("Nutmix started in port 8080")
 

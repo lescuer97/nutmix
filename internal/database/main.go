@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -62,6 +61,7 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 
 	rows, err := pool.Query(context.Background(), `SELECT seed, created_at, active, version, unit, id, encrypted, "input_fee_ppk" FROM seeds ORDER BY version DESC`)
+	defer rows.Close()
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -70,8 +70,6 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 
 		return seeds, fmt.Errorf("Error checking for  seeds: %w", err)
 	}
-
-	defer rows.Close()
 
 	seeds_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
 
@@ -84,10 +82,10 @@ func GetAllSeeds(pool *pgxpool.Pool) ([]cashu.Seed, error) {
 
 func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
 	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id, encrypted, input_fee_ppk FROM seeds WHERE active")
+	defer rows.Close()
 	if err != nil {
 		return cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
-	defer rows.Close()
 
 	seed, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.Seed])
 
@@ -99,10 +97,10 @@ func GetActiveSeed(pool *pgxpool.Pool) (cashu.Seed, error) {
 }
 func GetSeedsByUnit(pool *pgxpool.Pool, unit cashu.Unit) ([]cashu.Seed, error) {
 	rows, err := pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id, encrypted, input_fee_ppk FROM seeds WHERE unit = $1", unit.String())
+	defer rows.Close()
 	if err != nil {
 		return []cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
-	defer rows.Close()
 
 	seeds, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
 
@@ -170,16 +168,16 @@ func UpdateActiveStatusSeeds(pool *pgxpool.Pool, seeds []cashu.Seed) error {
 
 	}
 	results := pool.SendBatch(context.Background(), &batch)
+	defer results.Close()
 
 	rows, err := results.Query()
+	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return err
 		}
 		return databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
-
-	defer rows.Close()
 
 	return nil
 
@@ -196,8 +194,9 @@ func UpdateSeed(pool *pgxpool.Pool, seed cashu.Seed) error {
 }
 
 func SaveMintRequestDB(pool *pgxpool.Pool, request cashu.MintRequestDB) error {
+	ctx := context.Background()
 
-	_, err := pool.Exec(context.Background(), "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt)
+	_, err := pool.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 
@@ -215,7 +214,6 @@ func ModifyQuoteMintPayStatus(pool *pgxpool.Pool, requestPaid bool, state cashu.
 }
 
 func ModifyQuoteMintMintedStatus(pool *pgxpool.Pool, minted bool, state cashu.ACTION_STATE, quote string) error {
-	ctx := context.Background()
 
 	args := pgx.NamedArgs{
 		"state":  state,
@@ -225,21 +223,11 @@ func ModifyQuoteMintMintedStatus(pool *pgxpool.Pool, minted bool, state cashu.AC
 
 	query := `UPDATE mint_request SET minted = @minted, state = @state WHERE quote = @quote`
 
-	conn, err := pool.Acquire(ctx)
-
-	if err != nil {
-		return databaseError(fmt.Errorf("pool.Acquire(ctx): %w", err))
-	}
-
 	// change the paid status of the quote
-	_, err = conn.Exec(context.Background(), query, args)
+	_, err := pool.Exec(context.Background(), query, args)
 
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
-
-	}
-	if err != conn.Conn().Close(ctx) {
-		return databaseError(fmt.Errorf("conn.Conn().Close(): %w", err))
 
 	}
 	return nil
@@ -294,15 +282,15 @@ func ModifyQuoteMeltMeltedStatus(pool *pgxpool.Pool, melted bool, quote string) 
 func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.MintRequestDB, error) {
 
 	rows, err := pool.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE quote = $1", id)
+	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.MintRequestDB{}, err
 		}
 	}
-	defer rows.Close()
 
 	quote, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MintRequestDB])
-
+	rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.MintRequestDB{}, err
@@ -315,12 +303,12 @@ func GetMintQuoteById(pool *pgxpool.Pool, id string) (cashu.MintRequestDB, error
 func GetMeltQuoteById(pool *pgxpool.Pool, id string) (cashu.MeltRequestDB, error) {
 
 	rows, err := pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at  FROM melt_request WHERE quote = $1", id)
+	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.MeltRequestDB{}, err
 		}
 	}
-	defer rows.Close()
 
 	quote, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
 
@@ -339,16 +327,19 @@ func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) 
 
 	var proofList []cashu.Proof
 
-	rows, err := pool.Query(context.Background(), "SELECT amount, id, secret, c, y, witness, seen_at  FROM proofs WHERE C = ANY($1) OR secret = ANY($2)", CList, SecretList)
+	ctx := context.Background()
+	rows, err := pool.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at  FROM proofs WHERE C = ANY($1) OR secret = ANY($2)", CList, SecretList)
+
+	defer rows.Close()
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return proofList, nil
 		}
 	}
-	defer rows.Close()
 
 	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
+	rows.Close()
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -395,6 +386,7 @@ func CheckListOfProofsBySecretCurve(pool *pgxpool.Pool, Ys []string) ([]cashu.Pr
 	var proofList []cashu.Proof
 
 	rows, err := pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at FROM proofs WHERE y = ANY($1)`, Ys)
+	defer rows.Close()
 
 	if err != nil {
 
@@ -402,7 +394,6 @@ func CheckListOfProofsBySecretCurve(pool *pgxpool.Pool, Ys []string) ([]cashu.Pr
 			return proofList, nil
 		}
 	}
-	defer rows.Close()
 
 	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
 
@@ -423,6 +414,7 @@ func GetRestoreSigsFromBlindedMessages(pool *pgxpool.Pool, B_ []string) ([]cashu
 	var signaturesList []cashu.RecoverSigDB
 
 	rows, err := pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, witness  FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
+	defer rows.Close()
 
 	if err != nil {
 		if err == pgx.ErrNoRows {

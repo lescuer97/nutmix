@@ -31,10 +31,10 @@ func UpdateNostrLoginActivation(pool *pgxpool.Pool, auth cashu.NostrLoginAuth) e
 
 func GetNostrLogin(pool *pgxpool.Pool, nonce string) (cashu.NostrLoginAuth, error) {
 	rows, err := pool.Query(context.Background(), "SELECT nonce, activated, expiry FROM nostr_login WHERE nonce = $1", nonce)
+	defer rows.Close()
 	if err != nil {
 		return cashu.NostrLoginAuth{}, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
-	defer rows.Close()
 
 	nostrLogin, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.NostrLoginAuth])
 
