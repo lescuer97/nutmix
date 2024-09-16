@@ -89,7 +89,7 @@
             {{range .}}
             <tr class="{{.Level}}">
                     <th scope="row">{{.Level}}</th>
-                    <td class="request-row">{{.Msg}}</td>
+                    <td class="request-row">{{.Msg}} {{.ExtraInfo}} </td>
                     <td class="time">{{.Time}}</td>
                 </tr>
             {{end}} 
