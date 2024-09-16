@@ -4,10 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"log"
-	"net/http"
-	"os"
-
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -16,11 +12,14 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
+	"log/slog"
+	"net/http"
+	"os"
 )
 
 const AdminAuthKey = "admin-cookie"
 
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
 			key := []byte(os.Getenv(JWT_SECRET))
@@ -29,13 +28,18 @@ func AuthMiddleware() gin.HandlerFunc {
 
 				// Don't forget to validate the alg is what you expect:
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					logger.Warn(fmt.Sprintf("Unexpected signing method: %v", token.Header["alg"]))
 					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 				}
 				return key, nil
 			})
 
 			if err != nil {
-				log.Printf("jwt.Parse(cookie) %+v", err)
+				logger.Debug(
+					"jwt.Parse(cookie)",
+					slog.String("extra-info", err.Error()),
+				)
+
 				c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
 				c.Redirect(http.StatusTemporaryRedirect, "/admin/login")
 				return
@@ -75,14 +79,18 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func Login(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
+		logger.Debug("Attempting log in")
 		var nostrEvent nostr.Event
 		err := c.BindJSON(&nostrEvent)
 
 		if err != nil {
-			log.Printf("Incorrect body: %+v", err)
+			logger.Debug(
+				"Incorrect body",
+				slog.String("extra-info", err.Error()),
+			)
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -90,7 +98,10 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		nostrLogin, err := database.GetNostrLogin(pool, nostrEvent.Content)
 
 		if err != nil {
-			log.Printf("database.GetNostrLogin(pool, nostrEvent.Content ): %+v", err)
+			logger.Error(
+				"database.GetNostrLogin(pool, nostrEvent.Content )",
+				slog.String("extra-info", err.Error()),
+			)
 			c.JSON(500, "Opps!, something wrong happened")
 			return
 		}
@@ -104,13 +115,13 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		// check valid signature
 		validSig, err := nostrEvent.CheckSignature()
 		if err != nil {
-			log.Printf("nostrEvent.CheckSignature(): %+v", err)
+			logger.Info("nostrEvent.CheckSignature()", slog.String("extra-info", err.Error()))
 			c.JSON(400, "Invalid signature")
 			return
 		}
 
 		if !validSig {
-			log.Printf("Invalid Signature: %+v", err)
+			logger.Warn("Invalid Signature")
 			c.JSON(403, "Invalid signature")
 			return
 		}
@@ -118,14 +129,14 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		// check signature happened with the correct private key.
 		sigBytes, err := hex.DecodeString(nostrEvent.Sig)
 		if err != nil {
-			log.Printf("hex.DecodeString(nostrEvent.Sig): %+v", err)
+			logger.Info("hex.DecodeString(nostrEvent.Sig)", slog.String("extra-info", err.Error()))
 			c.JSON(500, "Something happend!")
 			return
 		}
 
 		sig, err := schnorr.ParseSignature(sigBytes)
 		if err != nil {
-			log.Printf("schnorr.ParseSignature(sigBytes): %+v", err)
+			logger.Info("schnorr.ParseSignature(sigBytes)", slog.String("extra-info", err.Error()))
 			c.JSON(500, "Something happend!")
 			return
 		}
@@ -133,7 +144,7 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		adminPubkey := os.Getenv("ADMIN_NOSTR_NPUB")
 
 		if adminPubkey == "" {
-			log.Printf("ERROR: NO ADMIN PUBKEY PRESENT %+v", err)
+			logger.Error("ERROR: NO ADMIN PUBKEY PRESENT")
 			c.JSON(500, "Something happend!")
 			return
 
@@ -141,14 +152,14 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 		_, value, err := nip19.Decode(adminPubkey)
 		if err != nil {
-			log.Printf("bech32.Decode(adminPubkey): %+v", err)
+			logger.Info("nip19.Decode(adminPubkey)", slog.String("extra-info", err.Error()))
 			c.JSON(500, "Something happend!")
 			return
 		}
 
 		decodedKey, err := hex.DecodeString(value.(string))
 		if err != nil {
-			log.Printf("hex.DecodeString(value.(string)): %+v", err)
+			logger.Info("hex.DecodeString(value.(string))", slog.String("extra-info", err.Error()))
 			c.JSON(500, "Something happend!")
 			return
 		}
@@ -156,7 +167,7 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		pubkey, err := schnorr.ParsePubKey(decodedKey)
 
 		if err != nil {
-			log.Printf("btcec.ParsePubKey: %+v", err)
+			logger.Info("schnorr.ParsePubKey(decodedKey)", slog.String("extra-info", err.Error()))
 			c.JSON(500, "Something happend!")
 			return
 		}
@@ -166,7 +177,7 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		verified := sig.Verify(eventHash[:], pubkey)
 
 		if !verified {
-			log.Printf("Private key used is not correct")
+			logger.Warn("Private key used is not correct")
 			c.Header("HX-RETARGET", "error-message")
 			c.HTML(400, "incorrect-key-error", nil)
 			return
@@ -177,7 +188,7 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		err = database.UpdateNostrLoginActivation(pool, nostrLogin)
 
 		if err != nil {
-			log.Printf("database.UpdateNostrLoginActivation(pool, nostrLogin): %+v", err)
+			logger.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.String("extra-info", err.Error()))
 			c.JSON(500, "Opps!, something wrong happened")
 			return
 		}
@@ -187,7 +198,7 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		token, err := makeJWTToken(jwtsecret)
 
 		if err != nil {
-			log.Printf("Could not makeJWTToken %+v", err)
+			logger.Warn("Could not makeJWTToken ", slog.String("extra-info", err.Error()))
 			c.JSON(500, nil)
 			return
 		}

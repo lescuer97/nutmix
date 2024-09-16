@@ -39,24 +39,27 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		}
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if mintRequest.Unit != cashu.Sat.String() {
-			log.Printf("Incorrect Unit for minting: %+v", mintRequest.Unit)
+			logger.Warn("Incorrect Unit for minting: %+v", slog.String("extra-info", mintRequest.Unit))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
 			return
 		}
 
 		if mintRequest.Amount == 0 {
-			c.JSON(400, "amount missing")
+			logger.Info("Amount missing")
+			c.JSON(400, "Amount missing")
 			return
 		}
 
 		var mintRequestDB cashu.MintRequestDB
 		if mint.Config.PEG_OUT_ONLY {
+			logger.Info("Peg out only enables")
 			c.JSON(400, "Peg out only enabled")
 			return
 		}
 
 		if mint.Config.PEG_IN_LIMIT_SATS != nil {
 			if mintRequest.Amount > int64(*mint.Config.PEG_IN_LIMIT_SATS) {
+				logger.Info("Mint amount over the limit", slog.String("extra-info", fmt.Sprint(mintRequest.Amount)))
 
 				c.JSON(400, "Mint amount over the limit")
 				return
@@ -176,13 +179,13 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		quote, err := database.GetMintQuoteById(pool, mintRequest.Quote)
 
 		if err != nil {
-			logger.Warn(fmt.Errorf("Incorrect body: %w", err).Error())
+			logger.Error(fmt.Errorf("Incorrect body: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
 		if quote.Minted {
-			log.Printf("Quote already minted")
+			logger.Warn("Quote already minted", slog.String("extra-info", quote.Quote))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_ISSUED, nil))
 			return
 		}
@@ -238,7 +241,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 				mint.ActiveQuotes.RemoveQuote(quote.Quote)
 				if errors.Is(err, m.ErrInvalidBlindMessage) {
-					log.Printf("Invalid Blind Message %+v", m.ErrInvalidBlindMessage.Error())
+					logger.Error("Invalid Blind Message", slog.String("extra-info", err.Error()))
 					c.JSON(400, m.ErrInvalidBlindMessage.Error())
 					return
 				}
@@ -266,7 +269,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 				quote.RequestPaid = true
 			} else {
 				mint.ActiveQuotes.RemoveQuote(quote.Quote)
-				log.Printf("Quote not paid")
+				logger.Debug("Quote not paid")
 				c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
 				return
 			}
@@ -350,7 +353,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if meltRequest.Unit != cashu.Sat.String() {
-			log.Printf("Incorrect Unit for minting: %+v", meltRequest.Unit)
+			logger.Info("Incorrect Unit for minting", slog.String("extra-info", meltRequest.Unit))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
 			return
 		}
@@ -512,7 +515,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		}
 
 		if len(meltRequest.Inputs) == 0 {
-			log.Printf("Outputs are empty")
+			logger.Info("Outputs are empty")
 			c.JSON(400, "Outputs are empty")
 			return
 		}
@@ -526,7 +529,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		}
 
 		if quote.Melted {
-			log.Printf("Quote already melted")
+			logger.Info("Quote already melted", slog.String("extra-info", quote.Quote))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
 			return
 		}
@@ -551,7 +554,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if unit != cashu.Sat {
-			log.Printf("Incorrect Unit for minting: %+v", unit)
+			logger.Info("Incorrect Unit for minting", slog.String("extra-info", quote.Unit))
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
 			return
@@ -608,7 +611,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		if len(knownProofs) != 0 {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Printf("Proofs already used %+v \n", knownProofs)
+			logger.Info("Proofs already used", slog.String("extra-info", fmt.Sprintf("%+v", knownProofs)))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}
@@ -617,7 +620,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		if err != nil {
 			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			log.Printf("Could not verify Proofs %+v", err.Error())
+			logger.Debug("Could not verify Proofs", slog.String("extra-info", err.Error()))
 
 			switch {
 			case errors.Is(err, cashu.ErrEmptyWitness):
@@ -716,7 +719,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 			if err != nil {
 				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-				log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+				logger.Info("mint.SignBlindedMessages", slog.String("extra-info", err.Error()))
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -725,8 +728,8 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 			if err != nil {
 				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-				log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
-				log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
+				logger.Error("database.SetRestoreSigs", slog.String("extra-info", err.Error()))
+				logger.Error("recoverySigsDb", slog.String("extra-info", fmt.Sprintf("%+v", recoverySigsDb)))
 			}
 
 			changeResponse = blindSignatures

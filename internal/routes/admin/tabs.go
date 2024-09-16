@@ -1,7 +1,7 @@
 package admin
 
 import (
-	"log"
+	"log/slog"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +18,7 @@ func MintSettingsPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	}
 }
 
-func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		// check the different variables that could change
@@ -46,9 +46,13 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 			pegInLimit, err := strconv.Atoi(pegInLimitStr)
 			if err != nil {
+				logger.Debug(
+					"strconv.Atoi(pegInLimitStr)",
+					slog.String("extra-info", err.Error()))
 				errorMessage := ErrorNotif{
 					Error: "Peg in limit is not an integer",
 				}
+
 				c.HTML(200, "settings-error", errorMessage)
 				return
 			}
@@ -66,6 +70,9 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		default:
 			pegOutLimit, err := strconv.Atoi(pegOutLimitStr)
 			if err != nil {
+				logger.Debug(
+					"strconv.Atoi(pegInLimitStr)",
+					slog.String("extra-info", err.Error()))
 				errorMessage := ErrorNotif{
 					Error: "Peg out limit is not an integer",
 				}
@@ -84,6 +91,10 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 			_, key, err := nip19.Decode(nostrKey)
 
 			if err != nil {
+				logger.Warn(
+					"nip19.Decode(nostrKey)",
+					slog.String("extra-info", err.Error()))
+
 				errorMessage := ErrorNotif{
 					Error: "Nostr npub is not valid",
 				}
@@ -98,6 +109,7 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 			case true:
 				mint.Config.NOSTR = nostrKey
 			case false:
+				logger.Warn("Nostr npub is not valid")
 				errorMessage := ErrorNotif{
 					Error: "Nostr npub is not valid",
 				}
@@ -115,7 +127,9 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 		err := mint.Config.SetTOMLFile()
 		if err != nil {
-			log.Println("mint.Config.SetTOMLFile() %w", err)
+			logger.Error(
+				"mint.Config.SetTOMLFile()",
+				slog.String("extra-info", err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "there was a problem in the server",
 			}
@@ -142,7 +156,7 @@ func LightningNodePage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	}
 }
 
-func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -179,7 +193,10 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 				lightningComs, err := comms.SetupLightingComms(newCommsData)
 
 				if err != nil {
-					log.Printf("comms.SetupLightingComms(newCommsData). %+v", err)
+					logger.Error(
+						"comms.SetupLightingComms(newCommsData).",
+						slog.String("extra-info", err.Error()))
+
 					errorMessage := ErrorNotif{
 						Error: "Something went wrong setting up LND communications",
 					}
@@ -192,11 +209,12 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 				// check connection
 				_, err = lightningComs.WalletBalance()
 				if err != nil /* || !validConnection */ {
+					logger.Warn(
+						"Could not get lightning balance",
+						slog.String("extra-info", err.Error()))
 					errorMessage := ErrorNotif{
 						Error: "Could not check stablished connection with Node",
 					}
-
-					log.Printf("Error message %+v", err)
 
 					c.HTML(200, "settings-error", errorMessage)
 					return
@@ -225,8 +243,9 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 			lightningComs, err := comms.SetupLightingComms(newCommsData)
 
 			if err != nil {
-
-				log.Printf("comms.SetupLightingComms(newCommsData). %+v", err)
+				logger.Warn(
+					"comms.SetupLightingComms(newCommsData)",
+					slog.String("extra-info", err.Error()))
 				errorMessage := ErrorNotif{
 					Error: "Something went wrong setting up LNBITS communications",
 				}
@@ -242,8 +261,9 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 				errorMessage := ErrorNotif{
 					Error: "Could not check stablished connection with Node",
 				}
-
-				log.Printf("Error message %+v. ", err)
+				logger.Warn(
+					"Could not get lightning balance",
+					slog.String("extra-info", err.Error()))
 
 				c.HTML(200, "settings-error", errorMessage)
 				return
@@ -259,7 +279,9 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 		err := mint.Config.SetTOMLFile()
 		if err != nil {
-			log.Println("mint.Config.SetTOMLFile() %w", err)
+			logger.Error(
+				"mint.Config.SetTOMLFile()",
+				slog.String("extra-info", err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "There was a problem setting your config",
 			}

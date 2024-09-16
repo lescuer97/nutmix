@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"net/http"
 
@@ -490,7 +489,6 @@ func SetupLndRpcComms(lightningComs *LightingComms, config LightingCommsData) er
 	appendOk := certPool.AppendCertsFromPEM([]byte(pem_cert))
 
 	if !appendOk {
-		log.Printf("x509.AppendCertsFromPEM(): failed")
 		return fmt.Errorf("x509.AppendCertsFromPEM(): failed")
 	}
 

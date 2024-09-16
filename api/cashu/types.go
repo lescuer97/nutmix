@@ -9,15 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log"
-	"time"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/tyler-smith/go-bip32"
+	"io"
+	"time"
 )
 
 var (
@@ -111,15 +109,13 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 	decodedBlindFactor, err := hex.DecodeString(b.B_)
 
 	if err != nil {
-		log.Println(fmt.Errorf("DecodeString: %w", err))
-		return BlindSignature{}, err
+		return BlindSignature{}, fmt.Errorf("DecodeString: %w", err)
 	}
 
 	B_, err := secp256k1.ParsePubKey(decodedBlindFactor)
 
 	if err != nil {
-		log.Println(fmt.Errorf("ParsePubKey: %w", err))
-		return BlindSignature{}, err
+		return BlindSignature{}, fmt.Errorf("ParsePubKey: %w", err)
 	}
 
 	C_ := crypto.SignBlindedMessage(B_, k)
@@ -239,8 +235,7 @@ func (p Proof) HashSecretToCurve() (Proof, error) {
 	y, err := crypto.HashToCurve(parsedProof)
 
 	if err != nil {
-		log.Printf("crypto.HashToCurve: %+v", err)
-		return p, err
+		return p, fmt.Errorf("crypto.HashToCurve: %+v", err)
 	}
 
 	Y_hex := hex.EncodeToString(y.SerializeCompressed())

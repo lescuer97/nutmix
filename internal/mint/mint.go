@@ -219,7 +219,6 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
 
 	if err != nil {
-		log.Printf("proof.IsProofSpendConditioned(): %+v", err)
 		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", err)
 	}
 
@@ -239,14 +238,12 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	parsedBlinding, err := hex.DecodeString(proof.C)
 
 	if err != nil {
-		log.Printf("hex.DecodeString: %+v", err)
-		return err
+		return fmt.Errorf("hex.DecodeString: %w", err)
 	}
 
 	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
 	if err != nil {
-		log.Printf("secp256k1.ParsePubKey: %+v", err)
-		return err
+		return fmt.Errorf("secp256k1.ParsePubKey: %+v", err)
 	}
 
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)

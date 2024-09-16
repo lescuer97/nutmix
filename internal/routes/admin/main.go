@@ -3,7 +3,6 @@ package admin
 import (
 	"context"
 	"crypto/rand"
-	"log"
 	"log/slog"
 	"os"
 	"slices"
@@ -32,7 +31,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	// 	log.Panic("ERROR: could not create HMAC secret")
 	// }
 
-	adminRoute.Use(AuthMiddleware())
+	adminRoute.Use(AuthMiddleware(logger))
 
 	// PAGES SETUP
 	// This is /admin
@@ -43,18 +42,18 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.GET("/bolt11", LightningNodePage(pool, mint))
 
 	// change routes
-	adminRoute.POST("/login", Login(pool, mint))
-	adminRoute.POST("/mintsettings", MintSettingsForm(pool, mint))
-	adminRoute.POST("/bolt11", Bolt11Post(pool, mint))
-	adminRoute.POST("/rotate/sats", RotateSatsSeed(pool, mint))
+	adminRoute.POST("/login", Login(pool, mint, logger))
+	adminRoute.POST("/mintsettings", MintSettingsForm(pool, mint, logger))
+	adminRoute.POST("/bolt11", Bolt11Post(pool, mint, logger))
+	adminRoute.POST("/rotate/sats", RotateSatsSeed(pool, mint, logger))
 
 	// fractional html components
 	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(pool, mint, logger))
 	adminRoute.GET("/lightningdata", LightningDataFormFields(pool, mint))
-	adminRoute.GET("/mint-balance", MintBalance(pool, mint))
-	adminRoute.GET("/mint-melt-summary", MintMeltSummary(pool, mint))
-	adminRoute.GET("/mint-melt-list", MintMeltList(pool, mint))
-	adminRoute.GET("/logs", LogsTab())
+	adminRoute.GET("/mint-balance", MintBalance(pool, mint, logger))
+	adminRoute.GET("/mint-melt-summary", MintMeltSummary(pool, mint, logger))
+	adminRoute.GET("/mint-melt-list", MintMeltList(pool, mint, logger))
+	adminRoute.GET("/logs", LogsTab(logger))
 
 }
 
@@ -112,7 +111,7 @@ func (t TIME_REQUEST) RollBackFromNow() time.Time {
 	return rollBackHour.Add(-duration)
 }
 
-func LogsTab() gin.HandlerFunc {
+func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -124,12 +123,18 @@ func LogsTab() gin.HandlerFunc {
 		logsdir, err := utils.GetLogsDirectory()
 
 		if err != nil {
-			log.Panicln("Could not get Logs directory")
+			logger.Warn(
+				"utils.GetLogsDirectory()",
+				slog.String("extra-info", err.Error()))
+
 		}
 
 		file, err := os.Open(logsdir + "/" + mint.LogFileName)
 		defer file.Close()
 		if err != nil {
+			logger.Warn(
+				"os.Open(logsdir ",
+				slog.String("extra-info", err.Error()))
 
 			errorMessage := ErrorNotif{
 				Error: "Could not get logs from mint",

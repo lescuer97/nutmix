@@ -1,7 +1,10 @@
 package admin
 
 import (
-	"fmt"
+	"log/slog"
+	"sort"
+	"time"
+
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -9,12 +12,9 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log"
-	"sort"
-	"time"
 )
 
-func MintBalance(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintBalance(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -26,6 +26,10 @@ func MintBalance(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 		milillisatBalance, err := mint.LightningComs.WalletBalance()
 		if err != nil {
+
+			logger.Warn(
+				"mint.LightningComs.WalletBalance()",
+				slog.String("extra-info", err.Error()))
 
 			errorMessage := ErrorNotif{
 				Error: "There was a problem getting the balance",
@@ -39,7 +43,7 @@ func MintBalance(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	}
 }
 
-func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
@@ -49,7 +53,9 @@ func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		mintMeltBalance, err := database.GetMintMeltBalanceByTime(pool, timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
-			log.Println(err)
+			logger.Error(
+				"database.GetMintMeltBalanceByTime(pool",
+				slog.String("extra-info", err.Error()))
 			errorMessage := ErrorNotif{
 
 				Error: "There was an error getting mint activity",
@@ -66,7 +72,10 @@ func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 			invoice, err := zpay32.Decode(mintRequest.Request, &mint.Network)
 
 			if err != nil {
-				log.Println(fmt.Errorf("Could not decode invoice %w", err))
+				logger.Debug(
+					"zpay32.Decode",
+					slog.String("extra-info", err.Error()))
+
 				errorMessage := ErrorNotif{
 
 					Error: "Could not decode invoice",
@@ -92,7 +101,7 @@ func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		c.HTML(200, "mint-melt-activity", mintMeltTotal)
 	}
 }
-func MintMeltList(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintMeltList(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
 		timeRequestDuration := ParseToTimeRequest(timeHeader)
@@ -100,7 +109,10 @@ func MintMeltList(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		mintMeltBalance, err := database.GetMintMeltBalanceByTime(pool, timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
-			log.Println(err)
+			logger.Error(
+				"database.GetMintMeltBalanceByTime(pool",
+				slog.String("extra-info", err.Error()))
+
 			errorMessage := ErrorNotif{
 
 				Error: "There was an error getting mint activity",

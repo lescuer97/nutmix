@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"log"
 	"log/slog"
 	"os"
 	"strconv"
@@ -38,7 +37,7 @@ func KeysetsLayoutPage(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger)
 
 		seeds, err := database.GetAllSeeds(pool)
 		if err != nil {
-			logger.Error("database.GetAllSeeds(pool) %+v", err)
+			logger.Error("database.GetAllSeeds(pool) %+v", slog.String("extra-info", err.Error()))
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -58,11 +57,14 @@ func KeysetsLayoutPage(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger)
 	}
 }
 
-func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		seeds, err := database.GetSeedsByUnit(pool, cashu.Sat)
 		if err != nil {
+			logger.Error(
+				"database.GetSeedsByUnit(pool, cashu.Sat)",
+				slog.String("extra-info", err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "There was an error getting the seeds",
 			}
@@ -76,7 +78,10 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		newSeedFee, err := strconv.Atoi(feeString)
 
 		if err != nil {
-			log.Printf("Err: There was a problem rotating the key")
+			logger.Error(
+				"Err: There was a problem rotating the key",
+				slog.String("extra-info", err.Error()))
+
 			errorMessage := ErrorNotif{
 				Error: "Fee was not an integer",
 			}
@@ -100,7 +105,9 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 		if mint_privkey == "" {
-			log.Printf("Err: could not get mint private key")
+			logger.Error(
+				"Err: could not get mint private key",
+				slog.String("extra-info", err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "There was a problem getting the mint private key",
 			}
@@ -113,7 +120,10 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		generatedSeed, err := cashu.DeriveIndividualSeedFromKey(mint_privkey, highestSeed.Version+1, cashu.Sat)
 
 		if err != nil {
-			log.Printf("Err: There was a problem rotating the key")
+			logger.Warn(
+				"There was a problem rotating the key",
+				slog.String("extra-info", err.Error()))
+
 			errorMessage := ErrorNotif{
 				Error: "There was a problem rotating the key",
 			}
@@ -127,7 +137,9 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		// add new key to db
 		err = database.SaveNewSeed(pool, &generatedSeed)
 		if err != nil {
-			log.Printf("Err: Could not save key %+v", err)
+			logger.Error(
+				"Could not save key",
+				slog.String("extra-info", err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "There was a problem saving the new seed",
 			}
@@ -137,7 +149,10 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		}
 		err = database.UpdateActiveStatusSeeds(pool, seeds)
 		if err != nil {
-			log.Printf("Err: database.UpdateActiveStatusSeeds %+v", err)
+			logger.Error(
+				"database.UpdateActiveStatusSeeds",
+				slog.String("extra-info", err.Error()))
+
 			errorMessage := ErrorNotif{
 				Error: "there was a problem modifying the seeds",
 			}
@@ -155,9 +170,11 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 		for _, seed := range seeds {
 			keysets, err := seed.DeriveKeyset(mint_privkey)
 			if err != nil {
-				log.Printf("Err: There was a problem generating the new seed %+v", err)
+				logger.Error(
+					"There was a problem deriving the keyset",
+					slog.String("extra-info", err.Error()))
 				errorMessage := ErrorNotif{
-					Error: "There was a problem generating the new seed",
+					Error: "There was a problem deriving the keyset",
 				}
 
 				c.HTML(200, "settings-error", errorMessage)

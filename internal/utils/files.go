@@ -21,9 +21,10 @@ var (
 )
 
 type SlogRecordJSON struct {
-	Time  time.Time
-	Msg   string
-	Level slog.Level
+	Time      time.Time
+	Msg       string
+	Level     slog.Level
+	ExtraInfo string `json:"extra-info"`
 }
 
 func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTime time.Time) []SlogRecordJSON {
