@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -84,7 +83,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -193,12 +192,21 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Fatalf("Expected status code 403, got %d", w.Code)
+	errorResponse := cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"No valid signatures"` {
-		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	if errorResponse.Code != 10003 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 }
@@ -259,18 +267,17 @@ func makeP2PKSpendCondition(pubkey *secp256k1.PublicKey, nSigs int, pubkeys []*s
 	spendCondition.Data.Tags.Sigflag = sigflag
 	spendCondition.Data.Tags.Refund = refundPubkey
 
+	nonce, err := cashu.GenerateNonceHex()
 	// generate random Nonce
-	nonce := make([]byte, 32)  // create a slice with length 16 for the nonce
-	_, err := rand.Read(nonce) // read random bytes into the nonce slice
 	if err != nil {
 		return spendCondition, err
 	}
-	spendCondition.Data.Nonce = hex.EncodeToString(nonce)
+	spendCondition.Data.Nonce = nonce
 
 	return spendCondition, nil
 }
 
-func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]cashu.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 	// try to swap tokens
 	var proofs []cashu.Proof
 	// unblid the signatures and make proofs
@@ -377,7 +384,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -560,13 +567,21 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
+	errorResponse := cashu.ErrorResponse{}
 
-	if w.Code != 403 {
-		t.Fatalf("Expected status code 403, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough signatures"` {
-		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	if errorResponse.Code != 10003 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 }

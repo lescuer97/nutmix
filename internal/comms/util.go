@@ -32,8 +32,8 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	)
 
 	if err != nil {
-		log.Fatalln("Error: ", err)
-		return nil, nil, nil, nil, err
+		// log.Fatalln("Error: ", err)
+		return nil, nil, nil, nil, fmt.Errorf("Could not setup network: %w", err)
 	}
 
 	// Create bitcoind regtest node
@@ -79,9 +79,8 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		WaitingFor:   wait.ForLog("Server listening on"),
 		ExposedPorts: []string{"18445/tcp", "10009/tcp", "8080/tcp", "9735/tcp"},
 		Name:         "lndAlice" + names,
-
-		Networks: []string{net.Name},
-		Cmd:      []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=alice" /* "--externalip=alice", */, "--tlsextradomain=alice", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9735", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8080", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
+		Networks:     []string{net.Name},
+		Cmd:          []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=alice" /* "--externalip=alice", */, "--tlsextradomain=alice", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9735", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8080", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
 	}
 
 	lndAliceC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

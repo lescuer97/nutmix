@@ -27,7 +27,7 @@ services:
     restart: always
     ports:
       - 127.0.0.1:5432:5432
-    volumes: 
+    volumes:
       - db:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -37,7 +37,6 @@ services:
       interval: 30s
       timeout: 30s
       retries: 3
-
 
   mint:
     env_file:
@@ -75,6 +74,7 @@ services:
       - "traefik.http.routers.mint-http.middlewares=mint-https@docker"
     volumes:
       - /var/log/nutmix:/var/log/nutmix
+      - ${HOME}/.config/nutmix:/root/.config/nutmix
 volumes:
   db:
     driver: local

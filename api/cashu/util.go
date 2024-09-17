@@ -1,6 +1,7 @@
 package cashu
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"strconv"
 )
@@ -36,6 +37,17 @@ func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
 	}
 	return res
 
+}
+func GenerateNonceHex() (string, error) {
+
+	// generate random Nonce
+	nonce := make([]byte, 32)  // create a slice with length 16 for the nonce
+	_, err := rand.Read(nonce) // read random bytes into the nonce slice
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(nonce), nil
 }
 
 func Fees(proofs []Proof, keysets []Keyset) (int, error) {

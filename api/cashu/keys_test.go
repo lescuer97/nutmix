@@ -2,8 +2,9 @@ package cashu
 
 import (
 	"encoding/hex"
-	"github.com/tyler-smith/go-bip32"
 	"testing"
+
+	"github.com/tyler-smith/go-bip32"
 )
 
 func TestGenerateKeysetsAndIdGeneration(t *testing.T) {

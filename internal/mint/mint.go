@@ -12,22 +12,20 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/pkg/crypto"
-	"github.com/tyler-smith/go-bip32"
 	"log"
 	"sync"
 	"time"
 )
 
-type KeysetMap map[uint64]cashu.Keyset
-
 type Mint struct {
-	ActiveKeysets map[string]KeysetMap
+	ActiveKeysets map[string]cashu.KeysetMap
 	Keysets       map[string][]cashu.Keyset
 	LightningComs comms.LightingComms
 	Network       chaincfg.Params
 	PendingProofs []cashu.Proof
 	ActiveProofs  *ActiveProofs
 	ActiveQuotes  *ActiveQuote
+	Config        Config
 	MintPubkey    string
 }
 
@@ -43,29 +41,28 @@ type ActiveProofs struct {
 
 func (a *ActiveProofs) AddProofs(proofs []cashu.Proof) error {
 	a.Lock()
+	defer a.Unlock()
 	// check if proof already exists
 	for _, p := range proofs {
 
 		if a.Proofs[p] {
-			a.Unlock()
 			return AlreadyActiveProof
 		}
 
 		a.Proofs[p] = true
 	}
-	a.Unlock()
 	return nil
 }
 
 func (a *ActiveProofs) RemoveProofs(proofs []cashu.Proof) error {
 	a.Lock()
+	defer a.Unlock()
 	// check if proof already exists
 	for _, p := range proofs {
 
 		delete(a.Proofs, p)
 
 	}
-	a.Unlock()
 	return nil
 }
 
@@ -77,22 +74,22 @@ type ActiveQuote struct {
 func (q *ActiveQuote) AddQuote(quote string) error {
 	q.Lock()
 
+	defer q.Unlock()
+
 	if q.Quote[quote] {
-		q.Unlock()
 		return AlreadyActiveQuote
 	}
 
 	q.Quote[quote] = true
 
-	q.Unlock()
 	return nil
 }
 func (q *ActiveQuote) RemoveQuote(quote string) error {
 	q.Lock()
+	defer q.Unlock()
 
 	delete(q.Quote, quote)
 
-	q.Unlock()
 	return nil
 }
 func (m *Mint) AddQuotesAndProofs(quote string, proofs []cashu.Proof) error {
@@ -221,7 +218,6 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
 
 	if err != nil {
-		log.Printf("proof.IsProofSpendConditioned(): %+v", err)
 		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", err)
 	}
 
@@ -241,14 +237,12 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	parsedBlinding, err := hex.DecodeString(proof.C)
 
 	if err != nil {
-		log.Printf("hex.DecodeString: %+v", err)
-		return err
+		return fmt.Errorf("hex.DecodeString: %w", err)
 	}
 
 	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
 	if err != nil {
-		log.Printf("secp256k1.ParsePubKey: %+v", err)
-		return err
+		return fmt.Errorf("secp256k1.ParsePubKey: %+v", err)
 	}
 
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
@@ -331,7 +325,7 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 	return orderedKeys
 }
 
-func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*Mint, error) {
+func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, config Config) (*Mint, error) {
 	activeProofs := ActiveProofs{
 		Proofs: make(map[cashu.Proof]bool),
 	}
@@ -339,13 +333,14 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*M
 		Quote: make(map[string]bool),
 	}
 	mint := Mint{
-		ActiveKeysets: make(map[string]KeysetMap),
+		ActiveKeysets: make(map[string]cashu.KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
+		Config:        config,
 		ActiveProofs:  &activeProofs,
 		ActiveQuotes:  &activeQuotes,
 	}
 
-	network := ctx.Value(NETWORK_ENV)
+	network := config.NETWORK
 	switch network {
 	case "testnet":
 		mint.Network = chaincfg.TestNet3Params
@@ -359,20 +354,19 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*M
 		return &mint, fmt.Errorf("Invalid network: %s", network)
 	}
 
-	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
-	switch lightningBackendType {
+	switch config.MINT_LIGHTNING_BACKEND {
 
 	case comms.FAKE_WALLET:
 
 	case comms.LND_WALLET, comms.LNBITS_WALLET:
-		lightningComs, err := comms.SetupLightingComms(ctx)
+		lightningComs, err := comms.SetupLightingComms(config.ToLightningCommsData())
 
 		if err != nil {
 			return &mint, err
 		}
 		mint.LightningComs = *lightningComs
 	default:
-		log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
+		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)
 	}
 
 	mint.PendingProofs = make([]cashu.Proof, 0)
@@ -382,32 +376,13 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*M
 
 		// decrypt seed
 
-		// decrypt seed first
-		err := seed.DecryptSeed(mint_privkey)
-
+		keysets, err := seed.DeriveKeyset(mint_privkey)
 		if err != nil {
-			log.Println(fmt.Errorf("seed.DecryptSeed: %w", err))
-		}
-		masterKey, err := bip32.NewMasterKey(seed.Seed)
-		if err != nil {
-			log.Println(fmt.Errorf("NewMasterKey: %w", err))
-			return &mint, err
-		}
-
-		unit, err := cashu.UnitFromString(seed.Unit)
-		if err != nil {
-			log.Println(fmt.Errorf("cashu.UnitFromString: %w", err))
-			return &mint, err
-		}
-
-		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk)
-
-		if err != nil {
-			return &mint, fmt.Errorf("GenerateKeysets: %w", err)
+			return &mint, fmt.Errorf("seed.DeriveKeyset(mint_privkey): %w", err)
 		}
 
 		if seed.Active {
-			mint.ActiveKeysets[seed.Unit] = make(KeysetMap)
+			mint.ActiveKeysets[seed.Unit] = make(cashu.KeysetMap)
 			for _, keyset := range keysets {
 				mint.ActiveKeysets[seed.Unit][keyset.Amount] = keyset
 			}
@@ -434,9 +409,8 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*M
 
 type AddToDBFunc func(*pgxpool.Pool, bool, cashu.ACTION_STATE, string) error
 
-func (m *Mint) VerifyLightingPaymentHappened(ctx context.Context, pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
-	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
-	switch lightningBackendType {
+func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
+	switch m.Config.MINT_LIGHTNING_BACKEND {
 
 	case comms.FAKE_WALLET:
 		err := dbCall(pool, true, cashu.PAID, quote)

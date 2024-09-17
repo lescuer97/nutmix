@@ -29,6 +29,7 @@ services:
       - db
     volumes:
       - /var/log/nutmix:/var/log/nutmix
+      - ${HOME}/.config/nutmix:/root/.config/nutmix
 volumes:
   db:
     driver: local

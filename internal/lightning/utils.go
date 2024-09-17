@@ -2,6 +2,13 @@ package lightning
 
 import "github.com/lightningnetwork/lnd/lnrpc"
 
+const (
+	MAINNET = "mainnet"
+	REGTEST = "regtest"
+	TESTNET = "testnet"
+	SIGNET  = "signet"
+)
+
 func GetAverageRouteFee(routes []*lnrpc.Route) uint64 {
 	var fees uint64
 	var amount_routes uint64

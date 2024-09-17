@@ -3,20 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
-	"log/slog"
-	"os"
-
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
+	"github.com/lescuer97/nutmix/internal/routes/admin"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"io"
+	"log"
+	"log/slog"
+	"os"
 )
 
 var (
@@ -26,32 +25,27 @@ var (
 )
 
 const ConfigFileName string = "config.toml"
-const ConfigDirName string = ".nutmix"
-const logFileName string = "nutmix.log"
+const ConfigDirName string = "nutmix"
 
 func main() {
 
-	dir, err := os.UserHomeDir()
+	logsdir, err := utils.GetLogsDirectory()
 
 	if err != nil {
-		log.Panicln("Could not get Home directory")
-	}
-	var pathToProjectDir string = dir + "/" + ConfigDirName
-
-	if os.Getenv(DOCKER_ENV) == "true" {
-		pathToProjectDir = "/var/log/nutmix"
+		log.Panicln("Could not get Logs directory")
 	}
 
-	err = utils.CreateDirectoryAndPath(pathToProjectDir, logFileName)
+	err = utils.CreateDirectoryAndPath(logsdir, mint.LogFileName)
 
 	if err != nil {
 		log.Panicf("utils.CreateDirectoryAndPath(pathToProjectDir, logFileName ) %+v", err)
 	}
 
-	pathToConfigFile := pathToProjectDir + "/" + logFileName
+	pathToConfigFile := logsdir + "/" + mint.LogFileName
 
 	// Manipulate Config file
 	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0764)
+	defer logFile.Close()
 	if err != nil {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
@@ -71,28 +65,30 @@ func main() {
 		log.Panic()
 	}
 
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, DOCKER_ENV, os.Getenv(DOCKER_ENV))
-	ctx = context.WithValue(ctx, MODE_ENV, os.Getenv(MODE_ENV))
-	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
-	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
-	ctx = context.WithValue(ctx, comms.LND_HOST, os.Getenv(comms.LND_HOST))
-	ctx = context.WithValue(ctx, comms.LND_TLS_CERT, os.Getenv(comms.LND_TLS_CERT))
-	ctx = context.WithValue(ctx, comms.LND_MACAROON, os.Getenv(comms.LND_MACAROON))
-	ctx = context.WithValue(ctx, comms.MINT_LNBITS_KEY, os.Getenv(comms.MINT_LNBITS_KEY))
-	ctx = context.WithValue(ctx, comms.MINT_LNBITS_ENDPOINT, os.Getenv(comms.MINT_LNBITS_ENDPOINT))
+	// check in ADMIN_NOSTR_NPUB is not empty
+	if os.Getenv("ADMIN_NOSTR_NPUB") == "" {
+		logger.Error("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")
+		log.Panicln("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")
+	}
+	// check in JWT_SECRET is not empty
+	if os.Getenv(admin.JWT_SECRET) == "" {
+		logger.Error("Please setup the JWT_SECRET so you can setup your mint")
+		log.Panicln("Please setup the JWT_SECRET so you can setup your mint")
+	}
 
-	if ctx.Value(DOCKER_ENV) == "true" {
+	ctx := context.Background()
+
+	if os.Getenv(DOCKER_ENV) == "true" {
 		logger.Info("Running in docker")
 	}
 
-	if ctx.Value(MODE_ENV) == "prod" {
+	if os.Getenv(MODE_ENV) == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 		logger.Info("Running in Release mode")
 	}
 
 	pool, err := database.DatabaseSetup(ctx, "migrations")
+	defer pool.Close()
 
 	if err != nil {
 		logger.Error(fmt.Sprintf("Error conecting to db %+v", err))
@@ -187,9 +183,13 @@ func main() {
 		}
 	}
 
-	// remove mint private key from variable
+	config, err := mint.SetUpConfigFile()
+	if err != nil {
+		log.Fatalf("mint.SetUpConfigFile(): %+v ", err)
+	}
 
-	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds)
+	// remove mint private key from variable
+	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds, config)
 
 	// clear mint seeds and privatekey
 	seeds = []cashu.Seed{}
@@ -203,14 +203,14 @@ func main() {
 	r := gin.Default()
 
 	r.Use(gin.LoggerWithWriter(w))
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
 
 	r.Use(cors.Default())
 
-	routes.V1Routes(ctx, r, pool, mint, logger)
+	routes.V1Routes(r, pool, mint, logger)
 
-	defer pool.Close()
+	admin.AdminRoutes(ctx, r, pool, mint, logger)
 
 	logger.Info("Nutmix started in port 8080")
 

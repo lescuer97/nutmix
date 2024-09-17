@@ -9,14 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log"
-	"time"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
+	"github.com/tyler-smith/go-bip32"
+	"io"
+	"time"
 )
 
 var (
@@ -27,10 +26,15 @@ var (
 	ErrKeysetForProofNotFound  = errors.New("Keyset for proof not found")
 )
 
+const (
+	MethodBolt11 = "bolt11"
+)
+
 const ExpiryMinutesDefault int64 = 15
 
-func ExpiryTime() int64 {
-	return time.Now().Add(15 * time.Minute).Unix()
+func ExpiryTimeMinUnit(minutes int64) int64 {
+	duration := time.Duration(minutes) * time.Minute
+	return time.Now().Add(duration).Unix()
 }
 
 type Unit int
@@ -105,15 +109,13 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 	decodedBlindFactor, err := hex.DecodeString(b.B_)
 
 	if err != nil {
-		log.Println(fmt.Errorf("DecodeString: %w", err))
-		return BlindSignature{}, err
+		return BlindSignature{}, fmt.Errorf("DecodeString: %w", err)
 	}
 
 	B_, err := secp256k1.ParsePubKey(decodedBlindFactor)
 
 	if err != nil {
-		log.Println(fmt.Errorf("ParsePubKey: %w", err))
-		return BlindSignature{}, err
+		return BlindSignature{}, fmt.Errorf("ParsePubKey: %w", err)
 	}
 
 	C_ := crypto.SignBlindedMessage(B_, k)
@@ -153,6 +155,7 @@ type Proof struct {
 	C       string `json:"C" db:"c"`
 	Y       string `json:"Y" db:"Y"`
 	Witness string `json:"witness" db:"witness"`
+	SeenAt  int64  `json:"seen_at"`
 }
 
 func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
@@ -232,8 +235,7 @@ func (p Proof) HashSecretToCurve() (Proof, error) {
 	y, err := crypto.HashToCurve(parsedProof)
 
 	if err != nil {
-		log.Printf("crypto.HashToCurve: %+v", err)
-		return p, err
+		return p, fmt.Errorf("crypto.HashToCurve: %+v", err)
 	}
 
 	Y_hex := hex.EncodeToString(y.SerializeCompressed())
@@ -298,6 +300,7 @@ type MintError struct {
 	Code   int8   `json:"code"`
 }
 
+type KeysetMap map[uint64]Keyset
 type Keyset struct {
 	Id          string                `json:"id"`
 	Active      bool                  `json:"active" db:"active"`
@@ -352,6 +355,34 @@ func (seed *Seed) EncryptSeed(mintPrivateKey string) error {
 
 	return nil
 }
+
+func (seed *Seed) DeriveKeyset(mint_privkey string) ([]Keyset, error) {
+	var keysets []Keyset
+	err := seed.DecryptSeed(mint_privkey)
+
+	if err != nil {
+		return keysets, fmt.Errorf("seed.DecryptSeed: %w", err)
+	}
+	masterKey, err := bip32.NewMasterKey(seed.Seed)
+	if err != nil {
+		return keysets, fmt.Errorf("NewMasterKey: %w", err)
+	}
+
+	unit, err := UnitFromString(seed.Unit)
+	if err != nil {
+		return keysets, fmt.Errorf("cashu.UnitFromString: %w", err)
+	}
+
+	keysets, err = GenerateKeysets(masterKey, GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk)
+
+	if err != nil {
+		return keysets, fmt.Errorf("GenerateKeysets(masterKey, GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk): %w", err)
+	}
+
+	return keysets, nil
+
+}
+
 func (seed *Seed) DecryptSeed(mintPrivateKey string) error {
 	key_bytes, err := hex.DecodeString(mintPrivateKey)
 	if err != nil {
@@ -437,6 +468,30 @@ type PostMintQuoteBolt11Response struct {
 	Minted      bool         `json:"minted"`
 	State       ACTION_STATE `json:"state"`
 }
+type MintRequestDB struct {
+	Quote   string `json:"quote"`
+	Request string `json:"request"`
+	// Deprecated: Should be removed after all main wallets change to the new State format
+	RequestPaid bool         `json:"paid" db:"request_paid"`
+	Expiry      int64        `json:"expiry"`
+	Unit        string       `json:"unit"`
+	Minted      bool         `json:"minted"`
+	State       ACTION_STATE `json:"state"`
+	SeenAt      int64        `json:"seen_at"`
+}
+
+func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
+	res := PostMintQuoteBolt11Response{
+		Quote:       m.Quote,
+		Request:     m.Request,
+		RequestPaid: m.RequestPaid,
+		Expiry:      m.Expiry,
+		Unit:        m.Unit,
+		Minted:      m.Minted,
+		State:       m.State,
+	}
+	return res
+}
 
 type PostMintBolt11Request struct {
 	Quote   string           `json:"quote"`
@@ -475,6 +530,7 @@ type MeltRequestDB struct {
 	Melted          bool         `json:"melted"`
 	State           ACTION_STATE `json:"state"`
 	PaymentPreimage string       `json:"payment_preimage"`
+	SeenAt          int64        `json:"seen_at"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
@@ -744,4 +800,10 @@ func (b *BlindSignature) VerifyDLEQ(
 	// I negate the hashed_keys_priv because the original key got altered when multiplying for A
 	return hashed_keys_priv.Key.Negate().String() == e.Key.String(), nil
 
+}
+
+type NostrLoginAuth struct {
+	Nonce     string
+	Activated bool
+	Expiry    int
 }

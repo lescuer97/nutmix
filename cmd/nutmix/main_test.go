@@ -89,7 +89,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -116,7 +116,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	var postMintQuoteResponseTwo cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponseTwo cashu.MintRequestDB
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -219,7 +219,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.PostMintQuoteBolt11Response{}
+	postMintQuoteResponseTwo = cashu.MintRequestDB{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -248,13 +248,21 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
+	var errorResponse cashu.ErrorResponse
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 400, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Quote already minted"` {
-		t.Errorf("Expected Quote already minted, got %s", w.Body.String())
+	if errorResponse.Code != 20002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Tokens have already been issued for quote" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// Minting with invalid signatures
@@ -328,12 +336,21 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 400, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough proofs for signatures"` {
-		t.Errorf("Expected Not enough proofs for signatures, got %s", w.Body.String())
+	if errorResponse.Code != 11002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// TRY TO SWAP SUCCESSFULLY
@@ -414,13 +431,23 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Invalid Proof"` {
-		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	if errorResponse.Code != 10003 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
 	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
+	}
+
 	w.Flush()
 
 	// swap with  not enought proofs for compared to signatures
@@ -446,13 +473,23 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough proofs for signatures"` {
-		t.Errorf("Not enough proofs for signatures, got %s", w.Body.String())
+	if errorResponse.Code != 11002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
 	}
+	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
+	}
+
 	w.Flush()
 
 	// SWAP TESTING ENDS
@@ -589,11 +626,21 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 400, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
-	if w.Body.String() != `"Quote already melted"` {
-		t.Errorf("Expected Quote already melted, got %s", w.Body.String())
+
+	if errorResponse.Code != 20006 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Invoice already paid" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// MELTING TESTING ENDS
@@ -642,7 +689,21 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	}
 
-	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds)
+	config, err := mint.SetUpConfigFile()
+
+	config.MINT_LIGHTNING_BACKEND = ctx.Value(mint.MINT_LIGHTNING_BACKEND_ENV).(string)
+	config.DATABASE_URL = ctx.Value(database.DATABASE_URL_ENV).(string)
+	config.NETWORK = ctx.Value(mint.NETWORK_ENV).(string)
+	config.LND_GRPC_HOST = os.Getenv(comms.LND_HOST)
+	config.LND_TLS_CERT = os.Getenv(comms.LND_TLS_CERT)
+	config.LND_MACAROON = os.Getenv(comms.LND_MACAROON)
+	config.MINT_LNBITS_KEY = os.Getenv(comms.MINT_LNBITS_KEY)
+	config.MINT_LNBITS_ENDPOINT = os.Getenv(comms.MINT_LNBITS_ENDPOINT)
+
+	if err != nil {
+		log.Fatalf("could not setup config file: %+v ", err)
+	}
+	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds, config)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -652,7 +713,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	routes.V1Routes(ctx, r, pool, mint, logger)
+	routes.V1Routes(r, pool, mint, logger)
 
 	return r, mint
 }
@@ -817,7 +878,7 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 
 }
 
-func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]cashu.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 
 	// try to swap tokens
 	var proofs []cashu.Proof
@@ -870,7 +931,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err := json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -896,7 +957,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	var postMintQuoteResponseTwo cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponseTwo cashu.MintRequestDB
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -940,12 +1001,21 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 200, got %d", w.Code)
+	var errorResponse cashu.ErrorResponse
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Quote not paid"` {
-		t.Errorf("Expected Invoice not paid, got %s", w.Body.String())
+	if errorResponse.Code != 20001 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Quote request is not paid" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// needs to wait a second for the containers to catch up
@@ -1065,7 +1135,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.PostMintQuoteBolt11Response{}
+	postMintQuoteResponseTwo = cashu.MintRequestDB{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -1094,13 +1164,21 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
+	errorResponse = cashu.ErrorResponse{}
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 400, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Quote already minted"` {
-		t.Errorf("Expected Quote already minted, got %s", w.Body.String())
+	if errorResponse.Code != 20002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Tokens have already been issued for quote" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// MINTING TESTING ENDS
@@ -1131,12 +1209,21 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Fatalf("Expected status code 400, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough proofs for signatures"` {
-		t.Errorf("Expected Not enough proofs for signatures, got %s", w.Body.String())
+	if errorResponse.Code != 11002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// try to swap tokens
@@ -1217,13 +1304,23 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Invalid Proof"` {
-		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	if errorResponse.Code != 10003 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
 	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
+	}
+
 	w.Flush()
 
 	// swap with  not enought proofs for compared to signatures
@@ -1249,13 +1346,23 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Not enough proofs for signatures"` {
-		t.Errorf("Not enough proofs for signatures, got %s", w.Body.String())
+	if errorResponse.Code != 11002 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
 	}
+	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
+	}
+
 	w.Flush()
 
 	// SWAP TESTING ENDS
@@ -1312,9 +1419,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	if postMeltQuoteResponse.Paid {
 		t.Errorf("Expected paid to be false because it's a LND Node, got %v", postMeltQuoteResponse.Paid)
 	}
-	if postMeltQuoteResponse.State != cashu.UNPAID {
 
-		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponseTwo.State)
+	if postMeltQuoteResponse.State != cashu.UNPAID {
+		t.Errorf("Expected to not be paid have: %s ", postMeltQuoteResponse.State)
 	}
 
 	if postMeltQuoteResponse.Amount != 900 {
@@ -1332,7 +1439,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
-
 	}
 
 	if postMeltQuoteResponse.Paid {
@@ -1413,11 +1519,21 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 400, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
-	if w.Body.String() != `"Quote already melted"` {
-		t.Errorf("Expected Quote already melted, got %s", w.Body.String())
+
+	if errorResponse.Code != 20006 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Invoice already paid" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// MELTING TESTING ENDS
@@ -1473,11 +1589,21 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 200, got %d", w.Code)
+	errorResponse := cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
-	if w.Body.String() != `"Incorrect Unit for minting"` {
-		t.Errorf("Expected `Incorrect Unit for minting`, got %s", w.Body.String())
+
+	if errorResponse.Code != 11005 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Unit in request is not supported" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
 	}
 
 	// melt quote with incorrect unit
@@ -1491,13 +1617,255 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 	req = httptest.NewRequest("POST", "/v1/melt/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
 
 	router.ServeHTTP(w, req)
+	errorResponse = cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
+	}
+
+	if errorResponse.Code != 11005 {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+	if errorResponse.Error != "Unit in request is not supported" {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+
+	}
+}
+
+func TestConfigMeltMintLimit(t *testing.T) {
+
+	const posgrespassword = "password"
+	const postgresuser = "user"
+	ctx := context.Background()
+
+	postgresContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:16.2"),
+		postgres.WithDatabase("postgres"),
+		postgres.WithUsername(postgresuser),
+		postgres.WithPassword(posgrespassword),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	connUri, err := postgresContainer.ConnectionString(ctx)
+
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
+	}
+
+	os.Setenv("DATABASE_URL", connUri)
+	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	os.Setenv(mint.NETWORK_ENV, "regtest")
+
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+
+	router, mint := SetupRoutingForTesting(ctx)
+
+	// MINTING TESTING STARTS
+
+	// TEST MINT CONFIG LIMIT
+	w := httptest.NewRecorder()
+
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+		Amount: 1000,
+		Unit:   cashu.Sat.String(),
+	}
+	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
+
+	req := httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	limit := 999
+	mint.Config.PEG_IN_LIMIT_SATS = &limit
+
+	router.ServeHTTP(w, req)
 
 	if w.Code != 400 {
-		t.Errorf("Expected status code 400, got %d", w.Code)
+		t.Errorf("Expected status code 200, got %d", w.Code)
+	}
+	if w.Body.String() != `"Mint amount over the limit"` {
+		t.Errorf(`Expected body message to be: "Mint amount over the limit". Got:  %s`, w.Body.String())
 	}
 
-	if w.Body.String() != `"Incorrect Unit for melting"` {
-		t.Errorf("Expected `Incorrect Unit for melting`, got %s", w.Body.String())
+	w = httptest.NewRecorder()
+
+	// Test mint ONLY PEGOUT check
+
+	mint.Config.PEG_OUT_ONLY = true
+	req = httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Errorf("Expected status code 200, got %d", w.Code)
+	}
+	if w.Body.String() != `"Peg out only enabled"` {
+		t.Errorf(`Expected body message to be: "Peg out only enabled". Got:  %s`, w.Body.String())
 	}
 
+}
+func TestFeeReturnAmount(t *testing.T) {
+	const posgrespassword = "password"
+	const postgresuser = "user"
+	ctx := context.Background()
+
+	postgresContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:16.2"),
+		postgres.WithDatabase("postgres"),
+		postgres.WithUsername(postgresuser),
+		postgres.WithPassword(posgrespassword),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	connUri, err := postgresContainer.ConnectionString(ctx)
+
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
+	}
+
+	os.Setenv("DATABASE_URL", connUri)
+	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	os.Setenv(mint.NETWORK_ENV, "regtest")
+
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+
+	router, mint := SetupRoutingForTesting(ctx)
+
+	// Mint check incorrect unit
+	w := httptest.NewRecorder()
+
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+		Amount: 10000,
+		Unit:   cashu.Sat.String(),
+	}
+	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
+
+	req := httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("Expected status code 200, got %d", w.Code)
+	}
+
+	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
+
+	if err != nil {
+		t.Errorf("Error unmarshalling response: %v", err)
+	}
+
+	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+
+	// mint cashu tokens
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, referenceKeyset)
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	mintRequest := cashu.PostMintBolt11Request{
+		Quote:   postMintQuoteResponse.Quote,
+		Outputs: blindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(mintRequest)
+
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	var postMintResponse cashu.PostMintBolt11Response
+
+	if w.Code != 200 {
+		t.Fatalf("Expected status code 200, got %d", w.Code)
+	}
+
+	err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
+
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+	// request melt quote for 1000 sats
+	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
+		Unit:    cashu.Sat.String(),
+		Request: RegtestRequest,
+	}
+
+	jsonRequestBody, _ = json.Marshal(meltQuoteRequest)
+
+	req = httptest.NewRequest("POST", "/v1/melt/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	var postMeltQuoteResponse cashu.PostMeltQuoteBolt11Response
+	err = json.Unmarshal(w.Body.Bytes(), &postMeltQuoteResponse)
+
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+	w.Flush()
+
+	// test melt tokens
+	meltProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+
+	// mint cashu tokens
+	changeBlindedMessages, _, _, err := CreateBlindedMessages(10000, referenceKeyset)
+	if err != nil {
+		t.Errorf("Error CreateBlindedMessages(10000, referenceKeyset): %v", err)
+	}
+
+	meltRequest := cashu.PostMeltBolt11Request{
+		Quote:   postMeltQuoteResponse.Quote,
+		Inputs:  meltProofs,
+		Outputs: changeBlindedMessages,
+	}
+
+	jsonRequestBody, _ = json.Marshal(meltRequest)
+
+	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	var postMeltResponse cashu.PostMeltQuoteBolt11Response
+
+	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
+
+	if err != nil {
+		t.Fatalf("Error unmarshalling response: %v", err)
+	}
+
+	changeAmount := uint64(0)
+	for _, sig := range postMeltResponse.Change {
+		changeAmount += sig.Amount
+	}
+
+	if changeAmount != 9000 {
+		t.Errorf("Change amount is incorrect %v", changeAmount)
+
+	}
 }

@@ -2,6 +2,7 @@ package mint
 
 import (
 	"context"
+	// "fmt"
 	"os"
 	"testing"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/tyler-smith/go-bip32"
 )
+
+const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
 
 func TestSetUpMint(t *testing.T) {
 
@@ -21,6 +24,9 @@ func TestSetUpMint(t *testing.T) {
 		Unit:      cashu.Sat.String(),
 		Id:        "id",
 	}
+	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+
+	seed.EncryptSeed(MintPrivateKey)
 
 	err := os.Setenv(NETWORK_ENV, "regtest")
 
@@ -37,6 +43,7 @@ func TestSetUpMint(t *testing.T) {
 	seeds := []cashu.Seed{
 		seed,
 	}
+	// t.T
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, MINT_LIGHTNING_BACKEND_ENV, os.Getenv(MINT_LIGHTNING_BACKEND_ENV))
@@ -44,7 +51,13 @@ func TestSetUpMint(t *testing.T) {
 
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 
-	mint, err := SetUpMint(ctx, mint_privkey, seeds)
+	config, err := SetUpConfigFile()
+
+	if err != nil {
+		t.Errorf("could not setup config file: %+v", err)
+	}
+
+	mint, err := SetUpMint(ctx, mint_privkey, seeds, config)
 
 	if err != nil {
 		t.Errorf("could not setup mint: %+v", err)

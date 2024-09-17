@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"math"
 	"net/http"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -50,9 +50,26 @@ type LNBitsData struct {
 	Endpoint string
 }
 
+type LNBitsDetailErrorData struct {
+	Detail string
+	Status string
+}
+
+type LNBitsPaymentStatusDetail struct {
+	Memo    string
+	Fee     int64
+	Pending bool
+}
+type LNBitsPaymentStatus struct {
+	Paid     bool   `json:"paid"`
+	Pending  bool   `json:"pending"`
+	Preimage string `json:"preimage"`
+	Details  LNBitsPaymentStatusDetail
+}
+
 type LightningInvoiceRequest struct {
 	Amount int64  `json:"amount"`
-	Unit   string `json:"unit"`
+	Unit   string `json:"unit,omitempty"`
 	Memo   string `json:"memo"`
 	Out    bool   `json:"out"`
 	Expiry int64  `json:"expiry"`
@@ -69,9 +86,20 @@ type LightningPaymentResponse struct {
 	PaymentError   error
 	PaymentRequest string
 	Rhash          string
+	PaidFeeSat     int64
 }
 
-func (l *LightingComms) LnbitsInvoiceRequest(method string, endpoint string, reqBody any, responseType any) error {
+type LightingCommsData struct {
+	MINT_LIGHTNING_BACKEND string
+	LND_GRPC_HOST          string
+	LND_TLS_CERT           string
+	LND_MACAROON           string
+
+	MINT_LNBITS_ENDPOINT string
+	MINT_LNBITS_KEY      string
+}
+
+func (l *LightingComms) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{}
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
@@ -95,6 +123,21 @@ func (l *LightingComms) LnbitsInvoiceRequest(method string, endpoint string, req
 
 	if err != nil {
 		return fmt.Errorf("ioutil.ReadAll: %w", err)
+	}
+
+	detailBody := LNBitsDetailErrorData{}
+	err = json.Unmarshal(body, &detailBody)
+	if err != nil {
+		return fmt.Errorf("json.Unmarshal(detailBody): %w", err)
+	}
+
+	switch {
+	case detailBody.Status == "failed":
+		return fmt.Errorf("LNBITS payment failed %+v. Request Body %+v", detailBody, reqBody)
+
+	case detailBody.Detail == "Payment does not exist.":
+	case len(detailBody.Detail) > 0:
+		return fmt.Errorf("LNBITS Unknown error %+v. Request Body %+v", detailBody, reqBody)
 	}
 
 	err = json.Unmarshal(body, &responseType)
@@ -136,7 +179,7 @@ func (l *LightingComms) RequestInvoice(amount int64) (LightningInvoiceResponse, 
 			PaymentHash    string `json:"payment_hash"`
 			PaymentRequest string `json:"payment_request"`
 		}
-		err := l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
+		err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 		if err != nil {
 			return invoiceRes, fmt.Errorf("json.Marshal: %w", err)
 		}
@@ -181,12 +224,9 @@ func (l *LightingComms) CheckIfInvoicePayed(quote string) (cashu.ACTION_STATE, s
 
 		}
 	case LNBITS:
-		var paymentStatus struct {
-			Paid     bool   `json:"paid"`
-			Pending  bool   `json:"pending"`
-			Preimage string `json:"preimage"`
-		}
-		err := l.LnbitsInvoiceRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
+		var paymentStatus LNBitsPaymentStatus
+
+		err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
 		if err != nil {
 			return cashu.UNPAID, "", fmt.Errorf("json.Marshal: %w", err)
 		}
@@ -198,6 +238,42 @@ func (l *LightingComms) CheckIfInvoicePayed(quote string) (cashu.ACTION_STATE, s
 
 	}
 	return cashu.UNPAID, "", nil
+
+}
+
+// return in milisat
+func (l *LightingComms) WalletBalance() (uint64, error) {
+	switch l.LightningBackend {
+	case LNDGRPC:
+
+		ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
+
+		client := lnrpc.NewLightningClient(l.LndRpcClient)
+
+		channelRequest := lnrpc.ChannelBalanceRequest{}
+
+		balance, err := client.ChannelBalance(ctx, &channelRequest)
+
+		if err != nil {
+			return 0, err
+		}
+		return balance.LocalBalance.GetMsat(), nil
+
+	case LNBITS:
+		var channelBalance struct {
+			Id      string `json:"id"`
+			Name    string `json:"name"`
+			Balance int    `json:"balance"`
+		}
+		err := l.LnbitsRequest("GET", "/api/v1/wallet", nil, &channelBalance)
+		if err != nil {
+			return 0, fmt.Errorf("l.LnbitsInvoiceRequest: %w", err)
+		}
+
+		return uint64(channelBalance.Balance), nil
+
+	}
+	return 0, fmt.Errorf("Incorrent lightning backend")
 
 }
 
@@ -234,6 +310,7 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 		invoiceRes.PaymentRequest = invoice
 		invoiceRes.Preimage = hex.EncodeToString(res.PaymentPreimage)
 		invoiceRes.PaymentError = fmt.Errorf(res.PaymentError)
+		invoiceRes.PaidFeeSat = res.PaymentRoute.TotalFeesMsat / 1000
 
 		return &invoiceRes, nil
 
@@ -242,13 +319,24 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 			PaymentHash    string `json:"payment_hash"`
 			PaymentRequest string `json:"payment_request"`
 		}
-		err := l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
+		err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 		if err != nil {
-			return &invoiceRes, fmt.Errorf("json.Marshal: %w", err)
+			return &invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
+		}
+
+		var paymentStatus LNBitsPaymentStatus
+
+		// check invoice payment to get the preimage and fee
+		err = l.LnbitsRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus)
+		if err != nil {
+
+			return &invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus): %w`, err)
 		}
 
 		invoiceRes.PaymentRequest = lnbitsInvoice.PaymentRequest
 		invoiceRes.Rhash = lnbitsInvoice.PaymentHash
+		invoiceRes.Preimage = paymentStatus.Preimage
+		invoiceRes.PaidFeeSat = int64(math.Abs(float64(paymentStatus.Details.Fee)))
 		invoiceRes.PaymentError = errors.New("")
 
 		return &invoiceRes, nil
@@ -335,7 +423,7 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 	case LNBITS:
 		invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
-		err := l.LnbitsInvoiceRequest("GET", invoiceString, nil, &queryResponse)
+		err := l.LnbitsRequest("GET", invoiceString, nil, &queryResponse)
 		queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
 
 		if err != nil {
@@ -349,13 +437,13 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 
 }
 
-func SetupLightingComms(ctx context.Context) (*LightingComms, error) {
-	usedLightningBackend := ctx.Value("MINT_LIGHTNING_BACKEND")
+func SetupLightingComms(config LightingCommsData) (*LightingComms, error) {
+	usedLightningBackend := config.MINT_LIGHTNING_BACKEND
 
 	var lightningComs LightingComms
 	switch usedLightningBackend {
 	case LND_WALLET:
-		err := setupLndRpcComms(ctx, &lightningComs)
+		err := SetupLndRpcComms(&lightningComs, config)
 		lightningComs.LightningBackend = LNDGRPC
 
 		if err != nil {
@@ -364,12 +452,12 @@ func SetupLightingComms(ctx context.Context) (*LightingComms, error) {
 
 	case LNBITS_WALLET:
 
-		mint_key := ctx.Value(MINT_LNBITS_KEY).(string)
+		mint_key := config.MINT_LNBITS_KEY
 
 		if mint_key == "" {
 			return nil, fmt.Errorf("MINT_LNBITS_KEY not available")
 		}
-		mint_endpoint := ctx.Value(MINT_LNBITS_ENDPOINT).(string)
+		mint_endpoint := config.MINT_LNBITS_ENDPOINT
 		if mint_endpoint == "" {
 			return nil, fmt.Errorf("MINT_LNBITS_ENDPOINT not available")
 		}
@@ -386,12 +474,12 @@ func SetupLightingComms(ctx context.Context) (*LightingComms, error) {
 
 }
 
-func setupLndRpcComms(ctx context.Context, lightningComs *LightingComms) error {
-	host := ctx.Value(LND_HOST).(string)
+func SetupLndRpcComms(lightningComs *LightingComms, config LightingCommsData) error {
+	host := config.LND_GRPC_HOST
 	if host == "" {
 		return fmt.Errorf("LND_HOST not available")
 	}
-	pem_cert := ctx.Value(LND_TLS_CERT).(string)
+	pem_cert := config.LND_TLS_CERT
 
 	if pem_cert == "" {
 		return fmt.Errorf("LND_CERT_PATH not available")
@@ -401,7 +489,6 @@ func setupLndRpcComms(ctx context.Context, lightningComs *LightingComms) error {
 	appendOk := certPool.AppendCertsFromPEM([]byte(pem_cert))
 
 	if !appendOk {
-		log.Printf("x509.AppendCertsFromPEM(): failed")
 		return fmt.Errorf("x509.AppendCertsFromPEM(): failed")
 	}
 
@@ -419,7 +506,7 @@ func setupLndRpcComms(ctx context.Context, lightningComs *LightingComms) error {
 		return err
 	}
 
-	macaroon := ctx.Value(LND_MACAROON).(string)
+	macaroon := config.LND_MACAROON
 
 	if macaroon == "" {
 		return fmt.Errorf("LND_MACAROON_PATH not available")

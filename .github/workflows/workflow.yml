@@ -1,7 +1,7 @@
 name: Nutmix
 on:
   pull_request:
-    branches: [master, signet]
+    branches: [master, signet, admin_dashboard]
 
 jobs:
   test:

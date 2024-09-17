@@ -47,12 +47,12 @@ At this moment NUTS are up to P2PK (NUT-11) are implemented and working. I plan 
 1. ~~Finish Milestones for [V1](https://github.com/lescuer97/nutmix/milestone/1).~~
 2. Finish NUTS until NUT-15. 
 3. Add dashboard for controlling aspects of the mint.
-    - Nostr Login
-    - Rotate keysets.
+    - ~~Nostr Login~~
+    - ~~Rotate keysets.~~
     - Monitor Mint activity.
     - Emmit blind signatures for certain users.
     - Activate Nostr only mode.
-    - Change mint messages
+    - ~~Change mint messages~~
 5. Add support for other lightning nodes. Ex: core-lighting, Strike, Greenlight.
 4. Add Monero Support this would probably include a way to exchange in between Bitcoin and Monero.
 5. Tor only mode
@@ -65,33 +65,32 @@ At this moment NUTS are up to P2PK (NUT-11) are implemented and working. I plan 
 
 This project is thought to be able to be ran on a docker container or locally.
 
-if you want to run the project in docker you will need two things.
+Here is what you need to know to change to run nutmix in docker:
+*Most of the setup process will happen inside the Admin dashboard.* 
 
-You'll need  the correct variables in an `.env` file. Use the env.example file as reference.
+You'll need  the correct variables in an `.env` file first. Use the env.example file as reference.
 
-You need to make sure to use a strong `POSTGRES_PASSWORD` and make user the username and password are the same in the
+- You need to make sure to use a strong `POSTGRES_PASSWORD` and make user the username and password are the same in the
 `DATABASE_URL`
 
-It's important to set up the variables under `LIGHTNING CONNECTION` for connecting to a node. 
+- Add you mint in: MINT_PRIVATE_KEY. Please use a secure Private key.
 
-Please use a secure Private for deriving keysets.
+- To login into the admin dashboard and change the rest of settings add your npub to ADMIN_NOSTR_NPUB. 
+
+The mint will fail and Print out what you are missing if you don't have this 4 Items setup.
+
+You can now login and setup your Lightning node and Mint information.
+It's important to set up the variables under `LIGHTNING CONNECTION` for connecting to a node. 
 
 if you want to run with docker traefik and you also need to fill variables below `HOSTING` for your domains.
 
 If you have this correctly setup it should be as easy as running a simple docker command on linux:
 
-If you missed and important variable for the mint. The mint should panic and let you know.
-
 ``` docker compose up -d ```
 
 #### How to rotate a keyset up
 
-key rotation schema:  /keydenomition/version/amount.
-
-In case that you want to rotate the keys from a given keyset, you should set the given seed to active=false in your
-Database. Then restart the mint. The mint will automatically catch not having any active seed for a given unit and will rotate the key. 
-
-if you have a key: /sat/1/1 and rotate up it will turn out /sat/2/1
+Login to the admin dashboard and click the rotate button on the keyset sections.
 
 ### Development
 

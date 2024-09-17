@@ -3,16 +3,16 @@ package routes
 import (
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
-	"os"
 	"slices"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
@@ -34,7 +34,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		if err != nil {
 			logger.Error(fmt.Sprintf("GetKeysetById: %+v ", err))
-			c.JSON(500, "Server side error")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
 
@@ -64,15 +64,9 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 	v1.GET("/info", func(c *gin.Context) {
 
-		name := os.Getenv("NAME")
-		description := os.Getenv("DESCRIPTION")
-		description_long := os.Getenv("DESCRIPTION_LONG")
-		motd := os.Getenv("MOTD")
-
 		contacts := []cashu.ContactInfo{}
 
-		email := os.Getenv("EMAIL")
-		log.Printf("Getting info")
+		email := mint.Config.EMAIL
 
 		if len(email) > 0 {
 			contacts = append(contacts, cashu.ContactInfo{
@@ -81,7 +75,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 			})
 		}
 
-		nostr := os.Getenv("NOSTR")
+		nostr := mint.Config.NOSTR
 
 		if len(nostr) > 0 {
 			contacts = append(contacts, cashu.ContactInfo{
@@ -97,8 +91,57 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		for _, nut := range baseNuts {
 			b := false
-			nuts[nut] = cashu.SwapMintInfo{
-				Disabled: &b,
+
+			switch nut {
+			case "4":
+				bolt11Method := cashu.SwapMintMethod{
+					Method:    cashu.MethodBolt11,
+					Unit:      cashu.Sat.String(),
+					MinAmount: 0,
+				}
+
+				if mint.Config.PEG_IN_LIMIT_SATS != nil {
+					bolt11Method.MaxAmount = *mint.Config.PEG_IN_LIMIT_SATS
+				}
+
+				nuts[nut] = cashu.SwapMintInfo{
+					Methods: &[]cashu.SwapMintMethod{
+						bolt11Method,
+					},
+					Disabled: &b,
+				}
+				if entry, ok := nuts[nut]; ok {
+
+					// Then we modify the copy
+					entry.Disabled = &mint.Config.PEG_OUT_ONLY
+
+					// Then we reassign map entry
+					nuts[nut] = entry
+				}
+
+			case "5":
+				bolt11Method := cashu.SwapMintMethod{
+					Method:    cashu.MethodBolt11,
+					Unit:      cashu.Sat.String(),
+					MinAmount: 0,
+				}
+
+				if mint.Config.PEG_OUT_LIMIT_SATS != nil {
+					bolt11Method.MaxAmount = *mint.Config.PEG_OUT_LIMIT_SATS
+				}
+
+				nuts[nut] = cashu.SwapMintInfo{
+					Methods: &[]cashu.SwapMintMethod{
+						bolt11Method,
+					},
+					Disabled: &b,
+				}
+
+			default:
+				nuts[nut] = cashu.SwapMintInfo{
+					Disabled: &b,
+				}
+
 			}
 		}
 
@@ -110,12 +153,12 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		}
 
 		response := cashu.GetInfoResponse{
-			Name:            name,
+			Name:            mint.Config.NAME,
 			Version:         "NutMix/0.1.1",
 			Pubkey:          mint.MintPubkey,
-			Description:     description,
-			DescriptionLong: description_long,
-			Motd:            motd,
+			Description:     mint.Config.DESCRIPTION,
+			DescriptionLong: mint.Config.DESCRIPTION_LONG,
+			Motd:            mint.Config.MOTD,
 			Contact:         contacts,
 			Nuts:            nuts,
 		}
@@ -128,7 +171,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		err := c.BindJSON(&swapRequest)
 		if err != nil {
-			log.Printf("Incorrect body: %+v", err)
+			logger.Info("Incorrect body: %+v", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -137,11 +180,12 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		var CList, SecretsList []string
 
 		if len(swapRequest.Inputs) == 0 || len(swapRequest.Outputs) == 0 {
-			log.Println("Inputs or Outputs are empty")
+			logger.Info("Inputs or Outputs are empty")
 			c.JSON(400, "Inputs or Outputs are empty")
 			return
 		}
 
+		now := time.Now().Unix()
 		// check proof have the same amount as blindedSignatures
 		for i, proof := range swapRequest.Inputs {
 			AmountProofs += proof.Amount
@@ -151,11 +195,12 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 			p, err := proof.HashSecretToCurve()
 
 			if err != nil {
-				log.Printf("proof.HashSecretToCurve(): %+v", err)
+				logger.Warn("proof.HashSecretToCurve()", slog.String(utils.LogExtraInfo, err.Error()))
 				c.JSON(400, "Problem processing proofs")
 				return
 			}
 			swapRequest.Inputs[i] = p
+			swapRequest.Inputs[i].SeenAt = now
 		}
 
 		for _, output := range swapRequest.Outputs {
@@ -165,8 +210,9 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			log.Printf("CheckProofsAreSameUnit: %+v", err)
-			c.JSON(400, "Proofs are not the same unit")
+			logger.Warn("CheckProofsAreSameUnit", slog.String(utils.LogExtraInfo, err.Error()))
+			detail := "Proofs are not the same unit"
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, &detail))
 			return
 		}
 
@@ -174,14 +220,22 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		fee, err := cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			log.Printf("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()]): %+v", err)
-			c.JSON(400, "Could not find keyset for proof id")
+			logger.Warn("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])", slog.String(utils.LogExtraInfo, err.Error()))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
 
 		if AmountProofs < (uint64(fee) + AmountSignature) {
-			log.Printf("didn't provide enough fees. ProofAmount: %v, needed Proofs: %v", AmountProofs, (uint64(fee) + AmountSignature))
-			c.JSON(400, "Not enough proofs for signatures")
+			logger.Info(fmt.Sprintf("didn't provide enough fees. ProofAmount: %v, needed Proofs: %v", AmountProofs, (uint64(fee) + AmountSignature)))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TRANSACTION_NOT_BALANCED, nil))
+			return
+		}
+
+		err = mint.ActiveProofs.AddProofs(swapRequest.Inputs)
+
+		if err != nil {
+			logger.Error("mint.ActiveProofs.AddProofs(swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+			c.JSON(400, "There was a problem during swapping")
 			return
 		}
 
@@ -189,21 +243,13 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		knownProofs, err := database.CheckListOfProofs(pool, CList, SecretsList)
 
 		if err != nil {
-			log.Printf("CheckListOfProofs: %+v", err)
-			c.JSON(400, "Malformed body request")
+			logger.Error("database.CheckListOfProofs(pool, CList, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
 
 		if len(knownProofs) != 0 {
-			c.JSON(400, "Proofs already used")
-			return
-		}
-
-		err = mint.ActiveProofs.AddProofs(swapRequest.Inputs)
-
-		if err != nil {
-			log.Printf("mint.AddProof: %+v", err)
-			c.JSON(400, "Proofs are already in use")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}
 
@@ -211,17 +257,17 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			log.Println(fmt.Errorf("mint.VerifyListOfProofs: %w", err))
+			logger.Warn("mint.VerifyListOfProofs", slog.String(utils.LogExtraInfo, err.Error()))
 
 			switch {
 			case errors.Is(err, cashu.ErrEmptyWitness):
 				c.JSON(403, "Empty Witness")
 				return
 			case errors.Is(err, cashu.ErrNoValidSignatures):
-				c.JSON(403, "No valid signatures")
+				c.JSON(403, cashu.ErrorCodeToResponse(cashu.TOKEN_NOT_VERIFIED, nil))
 				return
 			case errors.Is(err, cashu.ErrNotEnoughSignatures):
-				c.JSON(403, cashu.ErrNotEnoughSignatures.Error())
+				c.JSON(403, cashu.ErrorCodeToResponse(cashu.TOKEN_NOT_VERIFIED, nil))
 				return
 			case errors.Is(err, cashu.ErrLocktimePassed):
 				c.JSON(403, cashu.ErrLocktimePassed.Error())
@@ -231,7 +277,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 				return
 			}
 
-			c.JSON(403, "Invalid Proof")
+			c.JSON(403, cashu.ErrorCodeToResponse(cashu.TOKEN_NOT_VERIFIED, nil))
 			return
 		}
 
@@ -240,7 +286,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			log.Println(fmt.Errorf("mint.SignBlindedMessages: %w", err))
+			logger.Error("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -254,21 +300,21 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
-			log.Println(fmt.Errorf("SaveProofs: %w", err))
-			log.Println(fmt.Errorf("Proofs: %+v", swapRequest.Inputs))
+			logger.Error("database.SaveProofs", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("Proofs", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", swapRequest.Inputs)))
 			c.JSON(200, response)
 			return
 		}
-
-		mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 
 		err = database.SetRestoreSigs(pool, recoverySigsDb)
 		if err != nil {
-			log.Println(fmt.Errorf("SetRecoverySigs: %w", err))
-			log.Println(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb))
+			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
+			logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
 			c.JSON(200, response)
 			return
 		}
+		mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 
 		c.JSON(200, response)
 	})
@@ -277,7 +323,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		var checkStateRequest cashu.PostCheckStateRequest
 		err := c.BindJSON(&checkStateRequest)
 		if err != nil {
-			log.Println(fmt.Errorf("c.BindJSON: %w", err))
+			logger.Info("c.BindJSON(&checkStateRequest)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "Malformed Body")
 			return
 		}
@@ -285,7 +331,6 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		checkStateResponse := cashu.PostCheckStateResponse{
 			States: make([]cashu.CheckState, 0),
 		}
-
 		// set as unspent
 		proofs, err := database.CheckListOfProofsBySecretCurve(pool, checkStateRequest.Ys)
 
@@ -343,7 +388,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		err := c.BindJSON(&restoreRequest)
 
 		if err != nil {
-			log.Println(fmt.Errorf("c.BindJSON: %w", err))
+			logger.Info("c.BindJSON(&restoreRequest)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -356,7 +401,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		blindRecoverySigs, err := database.GetRestoreSigsFromBlindedMessages(pool, blindingFactors)
 		if err != nil {
-			log.Println(fmt.Errorf("GetRestoreSigsFromBlindedMessages: %w", err))
+			logger.Error("database.GetRestoreSigsFromBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
