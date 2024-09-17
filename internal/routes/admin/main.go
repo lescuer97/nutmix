@@ -7,7 +7,6 @@ import (
 	"os"
 	"slices"
 	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/mint"
@@ -144,7 +143,7 @@ func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo, slog.LevelDebug}, timeRequestDuration.RollBackFromNow())
+		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo}, timeRequestDuration.RollBackFromNow())
 
 		slices.Reverse(logs)
 
