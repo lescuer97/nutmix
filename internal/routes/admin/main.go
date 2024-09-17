@@ -3,14 +3,14 @@ package admin
 import (
 	"context"
 	"crypto/rand"
-	"log/slog"
-	"os"
-	"slices"
-	"time"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"log/slog"
+	"os"
+	"slices"
+	"time"
 )
 
 const JWT_SECRET = "JWT_SECRET"

@@ -278,7 +278,6 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 				return
 			}
 
-            
 			invoice, err := zpay32.Decode(quote.Request, &mint.Network)
 
 			if err != nil {

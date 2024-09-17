@@ -325,6 +325,22 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 	return orderedKeys
 }
 
+func CheckChainParams(network string) (chaincfg.Params, error) {
+	switch network {
+	case "testnet":
+		return chaincfg.TestNet3Params, nil
+	case "mainnet":
+		return chaincfg.MainNetParams, nil
+	case "regtest":
+		return chaincfg.RegressionNetParams, nil
+	case "signet":
+		return chaincfg.SigNetParams, nil
+	default:
+		return chaincfg.MainNetParams, fmt.Errorf("Invalid network: %s", network)
+	}
+
+}
+
 func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, config Config) (*Mint, error) {
 	activeProofs := ActiveProofs{
 		Proofs: make(map[cashu.Proof]bool),
@@ -340,19 +356,12 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 		ActiveQuotes:  &activeQuotes,
 	}
 
-	network := config.NETWORK
-	switch network {
-	case "testnet":
-		mint.Network = chaincfg.TestNet3Params
-	case "mainnet":
-		mint.Network = chaincfg.MainNetParams
-	case "regtest":
-		mint.Network = chaincfg.RegressionNetParams
-	case "signet":
-		mint.Network = chaincfg.SigNetParams
-	default:
-		return &mint, fmt.Errorf("Invalid network: %s", network)
+	chainparam, err := CheckChainParams(config.NETWORK)
+	if err != nil {
+		return &mint, fmt.Errorf("CheckChainParams(config.NETWORK) %w", err)
 	}
+
+	mint.Network = chainparam
 
 	switch config.MINT_LIGHTNING_BACKEND {
 

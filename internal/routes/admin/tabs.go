@@ -7,19 +7,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/comms"
-	"github.com/lescuer97/nutmix/internal/mint"
+	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
-func MintSettingsPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func MintSettingsPage(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(200, "settings.html", mint.Config)
 	}
 }
 
-func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintSettingsForm(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		// check the different variables that could change
@@ -151,13 +151,13 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) 
 	}
 }
 
-func LightningNodePage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func LightningNodePage(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(200, "bolt11.html", mint.Config)
 	}
 }
 
-func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -167,9 +167,26 @@ func Bolt11Post(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Ha
 			Success: "Lighning node settings changed successfully set",
 		}
 
+		formNetwork := c.Request.PostFormValue("NETWORK")
 		// check if the the lightning values have change if yes try to setup a new connection client for mint
-		if mint.Config.NETWORK != c.Request.PostFormValue("NETWORK") {
-			mint.Config.NETWORK = c.Request.PostFormValue("NETWORK")
+		if mint.Config.NETWORK != formNetwork {
+			chainparam, err := m.CheckChainParams(formNetwork)
+			if err != nil {
+				logger.Error(
+					"m.CheckChainParams(formNetwork)",
+					slog.String(utils.LogExtraInfo, err.Error()))
+
+				errorMessage := ErrorNotif{
+					Error: "Could not setup network for lightning",
+				}
+
+				c.HTML(200, "settings-error", errorMessage)
+				return
+			}
+			mint.Config.NETWORK = formNetwork
+			mint.Network = chainparam
+
+			mint.Network = chainparam
 			successMessage.Success = "Network changed"
 		}
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
