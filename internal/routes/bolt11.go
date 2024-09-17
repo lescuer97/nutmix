@@ -278,11 +278,13 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 				return
 			}
 
+            
+            logger.Info(fmt.Sprintf("Network: %+v", &mint.Network))
 			invoice, err := zpay32.Decode(quote.Request, &mint.Network)
 
 			if err != nil {
 				mint.ActiveQuotes.RemoveQuote(quote.Quote)
-				logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
+				logger.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}

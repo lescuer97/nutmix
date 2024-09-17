@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"fmt"
 	"log/slog"
 	"sort"
 	"time"
@@ -70,6 +71,7 @@ func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) g
 		mintMeltTotal["Mint"] += 0
 		// sum up mint
 		for _, mintRequest := range mintMeltBalance.Mint {
+            logger.Info(fmt.Sprintf("Network: %+v", &mint.Network))
 			invoice, err := zpay32.Decode(mintRequest.Request, &mint.Network)
 
 			if err != nil {
