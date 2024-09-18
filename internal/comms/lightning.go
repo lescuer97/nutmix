@@ -277,12 +277,13 @@ func (l *LightingComms) WalletBalance() (uint64, error) {
 
 }
 
-func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*LightningPaymentResponse, error) {
+func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64, mpp bool, amount_sat uint64) (*LightningPaymentResponse, error) {
 	var invoiceRes LightningPaymentResponse
 
 	reqInvoice := LightningInvoiceRequest{
 		Out:    true,
 		Bolt11: invoice,
+        Amount: int64(amount_sat) ,
 	}
 
 	switch l.LightningBackend {
@@ -299,9 +300,14 @@ func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*Lightnin
 		feeLimit := lnrpc.FeeLimit{
 			Limit: &fixedLimit,
 		}
-		sendRequest := lnrpc.SendRequest{PaymentRequest: invoice, AllowSelfPayment: true, FeeLimit: &feeLimit}
+
+
+        fmt.Println("Amount sat: ", int64(amount_sat) )
+		sendRequest := lnrpc.SendRequest{PaymentRequest: invoice, AllowSelfPayment: true, FeeLimit: &feeLimit, Amt: int64(amount_sat)}
 
 		res, err := client.SendPaymentSync(ctx, &sendRequest)
+
+        fmt.Printf("\nresponse : %+v\n", res)
 
 		if err != nil {
 			return nil, err
@@ -382,9 +388,10 @@ func getFeatureBits(features *lnwire.FeatureVector) []lnrpc.FeatureBit {
 
 type QueryRoutesResponse struct {
 	FeeReserve uint64 `json:"fee_reserve"`
+    Amount uint64`json:"amount"`
 }
 
-func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string) (*QueryRoutesResponse, error) {
+func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string, mpp bool, amount_sat uint64) (*QueryRoutesResponse, error) {
 	var queryResponse QueryRoutesResponse
 
 	switch l.LightningBackend {
@@ -400,10 +407,11 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 
 		queryRoutes := lnrpc.QueryRoutesRequest{
 			PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
-			AmtMsat:           int64(*zpayInvoice.MilliSat),
+			// AmtMsat:           int64(amount_sat),
 			RouteHints:        routeHints,
 			DestFeatures:      featureBits,
 			UseMissionControl: true,
+            Amt: int64(amount_sat),
 		}
 
 		res, err := client.QueryRoutes(ctx, &queryRoutes)

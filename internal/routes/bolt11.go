@@ -345,6 +345,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			Signatures: blindedSignatures,
 		})
 	})
+
 	v1.POST("/melt/quote/bolt11", func(c *gin.Context) {
 		var meltRequest cashu.PostMeltQuoteBolt11Request
 		err := c.BindJSON(&meltRequest)
@@ -354,6 +355,8 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			c.JSON(400, "Malformed body request")
 			return
 		}
+
+		fmt.Printf("\n meltRequest %+v\n", meltRequest)
 
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if meltRequest.Unit != cashu.Sat.String() {
@@ -383,6 +386,17 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 		now := time.Now().Unix()
 
+		amount := uint64(*invoice.MilliSat) / 1000
+
+		isMpp := false
+		mppAmount := meltRequest.IsMpp()
+
+        // if mpp is valid than change amount to mpp amount
+		if mppAmount != 0 {
+			isMpp = true
+			amount = mppAmount
+		}
+
 		switch mint.Config.MINT_LIGHTNING_BACKEND {
 		case comms.FAKE_WALLET:
 
@@ -399,7 +413,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 				Paid:            true,
 				Expiry:          expireTime,
 				FeeReserve:      1,
-				Amount:          uint64(*invoice.MilliSat) / 1000,
+				Amount:          amount,
 				Quote:           randUuid.String(),
 				State:           cashu.PAID,
 				PaymentPreimage: "",
@@ -416,10 +430,11 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 				State:           response.State,
 				PaymentPreimage: response.PaymentPreimage,
 				SeenAt:          now,
+				Mpp:             isMpp,
 			}
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:
-			queryFee, err := mint.LightningComs.QueryPayment(invoice, meltRequest.Request)
+			queryFee, err := mint.LightningComs.QueryPayment(invoice, meltRequest.Request, isMpp, amount)
 
 			if err != nil {
 				logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
@@ -433,7 +448,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 				Paid:            false,
 				Expiry:          expireTime,
 				FeeReserve:      (queryFee.FeeReserve + 1),
-				Amount:          uint64(*invoice.MilliSat) / 1000,
+				Amount:          amount,
 				Quote:           hexHash,
 				State:           cashu.UNPAID,
 				PaymentPreimage: "",
@@ -450,6 +465,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 				State:           response.State,
 				PaymentPreimage: response.PaymentPreimage,
 				SeenAt:          now,
+				Mpp:             isMpp,
 			}
 
 		default:
@@ -663,7 +679,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			paidLightningFeeSat = 0
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:
-			payment, err := mint.LightningComs.PayInvoice(quote.Request, quote.FeeReserve)
+			payment, err := mint.LightningComs.PayInvoice(quote.Request, quote.FeeReserve, quote.Mpp, quote.Amount)
 
 			if err != nil {
 				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)

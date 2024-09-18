@@ -84,10 +84,10 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 			})
 		}
 
-		nuts := make(map[string]cashu.SwapMintInfo)
+		nuts := make(map[string]any)
 		var baseNuts []string = []string{"1", "2", "3", "4", "5", "6"}
 
-		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12"}
+		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12", "15"}
 
 		for _, nut := range baseNuts {
 			b := false
@@ -112,11 +112,12 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 				}
 				if entry, ok := nuts[nut]; ok {
 
+					mintInfo := entry.(cashu.SwapMintInfo)
 					// Then we modify the copy
-					entry.Disabled = &mint.Config.PEG_OUT_ONLY
+					mintInfo.Disabled = &mint.Config.PEG_OUT_ONLY
 
 					// Then we reassign map entry
-					nuts[nut] = entry
+					nuts[nut] = mintInfo
 				}
 
 			case "5":
@@ -147,8 +148,26 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 
 		for _, nut := range optionalNuts {
 			b := true
-			nuts[nut] = cashu.SwapMintInfo{
-				Supported: &b,
+			switch nut {
+			case "15":
+				bolt11Method := cashu.SwapMintMethod{
+					Method:    cashu.MethodBolt11,
+					Mpp:       true,
+					Unit:      cashu.Sat.String(),
+					MinAmount: 0,
+				}
+
+				info := []cashu.SwapMintMethod{
+					bolt11Method,
+				}
+
+				nuts[nut] = info
+
+			default:
+				nuts[nut] = cashu.SwapMintInfo{
+					Supported: &b,
+				}
+
 			}
 		}
 
