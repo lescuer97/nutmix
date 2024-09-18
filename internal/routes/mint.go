@@ -10,12 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
-	"github.com/lescuer97/nutmix/internal/mint"
+	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
+func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
@@ -87,7 +88,11 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *sl
 		nuts := make(map[string]any)
 		var baseNuts []string = []string{"1", "2", "3", "4", "5", "6"}
 
-		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12", "15"}
+		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12"}
+
+		if mint.LightningComs.LightningBackend == comms.LNDGRPC {
+			optionalNuts = append(optionalNuts, "15")
+		}
 
 		for _, nut := range baseNuts {
 			b := false

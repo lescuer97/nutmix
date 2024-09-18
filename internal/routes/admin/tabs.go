@@ -240,12 +240,14 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 				}
 				mint.LightningComs = *lightningComs
 				mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
+				mint.LightningComs.LightningBackend = comms.LNDGRPC
 				mint.Config.LND_GRPC_HOST = newCommsData.LND_GRPC_HOST
 				mint.Config.LND_MACAROON = newCommsData.LND_MACAROON
 				mint.Config.LND_TLS_CERT = newCommsData.LND_TLS_CERT
 
 			} else {
 				mint.Config.MINT_LIGHTNING_BACKEND = comms.LND_WALLET
+				mint.LightningComs.LightningBackend = comms.LNDGRPC
 				successMessage.Success = "Nothing to change"
 			}
 
@@ -289,6 +291,7 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 			}
 			mint.LightningComs = *lightningComs
 
+			mint.LightningComs.LightningBackend = comms.LNBITS
 			mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
 			mint.Config.MINT_LNBITS_KEY = newCommsData.MINT_LNBITS_KEY
 			mint.Config.MINT_LNBITS_ENDPOINT = newCommsData.MINT_LNBITS_ENDPOINT

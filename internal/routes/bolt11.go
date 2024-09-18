@@ -369,6 +369,11 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			return
 		}
 
+		if uint64(*invoice.MilliSat) == 0 {
+			c.JSON(400, "Invoice has no amount")
+			return
+		}
+
 		if mint.Config.PEG_OUT_LIMIT_SATS != nil {
 			if int64(*invoice.MilliSat) > (int64(*mint.Config.PEG_OUT_LIMIT_SATS) * 1000) {
 				c.JSON(400, "Melt amount over the limit")
@@ -394,6 +399,11 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			amount = mppAmount
 		}
 
+		if isMpp && mint.LightningComs.LightningBackend != comms.LNDGRPC {
+			logger.Info("Tried to do mpp when it is not available")
+			c.JSON(400, "Sorry! MPP is not available")
+			return
+		}
 		switch mint.Config.MINT_LIGHTNING_BACKEND {
 		case comms.FAKE_WALLET:
 
