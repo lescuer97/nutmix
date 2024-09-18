@@ -136,7 +136,6 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 	})
 
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
-		fmt.Println("RUNING Mint :QUOTE")
 		quoteId := c.Param("quote")
 
 		quote, err := database.GetMintQuoteById(pool, quoteId)
@@ -356,8 +355,6 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			return
 		}
 
-		fmt.Printf("\n meltRequest %+v\n", meltRequest)
-
 		// TODO - REMOVE this when doing multi denomination tokens with Milisats
 		if meltRequest.Unit != cashu.Sat.String() {
 			logger.Info("Incorrect Unit for minting", slog.String(utils.LogExtraInfo, meltRequest.Unit))
@@ -391,7 +388,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		isMpp := false
 		mppAmount := meltRequest.IsMpp()
 
-        // if mpp is valid than change amount to mpp amount
+		// if mpp is valid than change amount to mpp amount
 		if mppAmount != 0 {
 			isMpp = true
 			amount = mppAmount
@@ -665,6 +662,13 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			return
 		}
 
+		invoice, err := zpay32.Decode(quote.Request, &mint.Network)
+		if err != nil {
+			logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
 		lightningBackendType := mint.Config.MINT_LIGHTNING_BACKEND
 
 		var paidLightningFeeSat uint64
@@ -679,7 +683,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			paidLightningFeeSat = 0
 
 		case comms.LND_WALLET, comms.LNBITS_WALLET:
-			payment, err := mint.LightningComs.PayInvoice(quote.Request, quote.FeeReserve, quote.Mpp, quote.Amount)
+			payment, err := mint.LightningComs.PayInvoice(quote.Request, invoice, quote.FeeReserve, quote.Mpp, quote.Amount)
 
 			if err != nil {
 				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)

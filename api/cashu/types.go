@@ -560,7 +560,6 @@ type PostMeltQuoteBolt11Request struct {
 
 func (p PostMeltQuoteBolt11Request) IsMpp() uint64 {
 	if p.Options.Mpp["amount"] != 0 {
-		fmt.Println("Amount: ", p.Options.Mpp["amount"])
 		return p.Options.Mpp["amount"]
 	}
 	return 0
