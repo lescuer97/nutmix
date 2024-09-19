@@ -1,5 +1,10 @@
 package lightning
 
+import (
+	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lightningnetwork/lnd/zpay32"
+)
+
 type Backend uint
 
 const LNDGRPC Backend = iota + 1
@@ -8,10 +13,10 @@ const CLNGRPC Backend = iota + 3
 const FAKEWALLET Backend = iota + 4
 
 type LightningBackend interface {
-	PayInvoice() (PaymentResponse, error)
-	CheckPayed()
-	QueryFees()
-	RequestInvoice(amount int64)
+	PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error)
+	CheckPayed(quote string) (cashu.ACTION_STATE, string, error)
+	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (uint64, error)
+	RequestInvoice(amount int64) (InvoiceResponse, error)
 	WalletBalance() (uint64, error)
 	LightningType() Backend
 }
@@ -22,8 +27,11 @@ type PaymentResponse struct {
 	Rhash          string
 	PaidFeeSat     int64
 }
+type QueryRoutesResponse struct {
+	FeeReserve uint64 `json:"fee_reserve"`
+}
 
-type InvoicePayment struct {
+type InvoiceResponse struct {
 	PaymentRequest string
 	Rhash          string
 }
