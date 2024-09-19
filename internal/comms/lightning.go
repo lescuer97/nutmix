@@ -360,7 +360,7 @@ func (l *LightingComms) lndGrpcPayPartialInvoice(invoice string, zpayInvoice *zp
 	for {
 		switch res.Status {
 		case lnrpc.HTLCAttempt_FAILED:
-			return fmt.Errorf("PaymentFailed  %w", res.GetFailure())
+			return fmt.Errorf("PaymentFailed  %+v", res.GetFailure())
 		case lnrpc.HTLCAttempt_SUCCEEDED:
 			lightningResponse.PaymentRequest = invoice
 			lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
