@@ -279,6 +279,7 @@ func (l *LightingComms) WalletBalance() (uint64, error) {
 }
 
 func (l *LightingComms) lndGrpcPayInvoice(invoice string, feeReserve uint64, lightningResponse *LightningPaymentResponse) error {
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
 	client := lnrpc.NewLightningClient(l.LndRpcClient)
 
 	fixedLimit := lnrpc.FeeLimit_Fixed{
@@ -291,7 +292,7 @@ func (l *LightingComms) lndGrpcPayInvoice(invoice string, feeReserve uint64, lig
 
 	sendRequest := lnrpc.SendRequest{PaymentRequest: invoice, AllowSelfPayment: true, FeeLimit: &feeLimit}
 
-	res, err := client.SendPaymentSync(context.Background(), &sendRequest)
+	res, err := client.SendPaymentSync(ctx, &sendRequest)
 
 	if err != nil {
 		return err
