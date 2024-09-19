@@ -420,6 +420,7 @@ type SwapMintMethod struct {
 	Unit      string `json:"unit"`
 	MinAmount int    `json:"min_amount"`
 	MaxAmount int    `json:"max_amount"`
+	Mpp       bool   `json:"mpp,omitempty"`
 }
 
 type SwapMintInfo struct {
@@ -434,14 +435,14 @@ type ContactInfo struct {
 }
 
 type GetInfoResponse struct {
-	Name            string                  `json:"name"`
-	Version         string                  `json:"version"`
-	Pubkey          string                  `json:"pubkey"`
-	Description     string                  `json:"description"`
-	DescriptionLong string                  `json:"description_long"`
-	Contact         []ContactInfo           `json:"contact"`
-	Motd            string                  `json:"motd"`
-	Nuts            map[string]SwapMintInfo `json:"nuts"`
+	Name            string         `json:"name"`
+	Version         string         `json:"version"`
+	Pubkey          string         `json:"pubkey"`
+	Description     string         `json:"description"`
+	DescriptionLong string         `json:"description_long"`
+	Contact         []ContactInfo  `json:"contact"`
+	Motd            string         `json:"motd"`
+	Nuts            map[string]any `json:"nuts"`
 }
 
 type KeysResponse map[string][]KeysetResponse
@@ -531,6 +532,7 @@ type MeltRequestDB struct {
 	State           ACTION_STATE `json:"state"`
 	PaymentPreimage string       `json:"payment_preimage"`
 	SeenAt          int64        `json:"seen_at"`
+	Mpp             bool         `json:"mpp"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
@@ -546,9 +548,21 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 
 }
 
+type PostMeltQuoteBolt11Options struct {
+	Mpp map[string]uint64 `json:"mpp"`
+}
+
 type PostMeltQuoteBolt11Request struct {
-	Request string `json:"request"`
-	Unit    string `json:"unit"`
+	Request string                     `json:"request"`
+	Unit    string                     `json:"unit"`
+	Options PostMeltQuoteBolt11Options `json:"options"`
+}
+
+func (p PostMeltQuoteBolt11Request) IsMpp() uint64 {
+	if p.Options.Mpp["amount"] != 0 {
+		return p.Options.Mpp["amount"]
+	}
+	return 0
 }
 
 type PostMeltQuoteBolt11Response struct {

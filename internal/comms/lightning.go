@@ -11,6 +11,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lightningnetwork/lnd/lnrpc"
+	"github.com/lightningnetwork/lnd/lnrpc/routerrpc"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"google.golang.org/grpc"
@@ -276,43 +277,128 @@ func (l *LightingComms) WalletBalance() (uint64, error) {
 
 }
 
-func (l *LightingComms) PayInvoice(invoice string, feeReserve uint64) (*LightningPaymentResponse, error) {
+func (l *LightingComms) lndGrpcPayInvoice(invoice string, feeReserve uint64, lightningResponse *LightningPaymentResponse) error {
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
+	client := lnrpc.NewLightningClient(l.LndRpcClient)
+
+	fixedLimit := lnrpc.FeeLimit_Fixed{
+		Fixed: int64(feeReserve),
+	}
+
+	feeLimit := lnrpc.FeeLimit{
+		Limit: &fixedLimit,
+	}
+
+	sendRequest := lnrpc.SendRequest{PaymentRequest: invoice, AllowSelfPayment: true, FeeLimit: &feeLimit}
+
+	res, err := client.SendPaymentSync(ctx, &sendRequest)
+
+	if err != nil {
+		return err
+	}
+
+	lightningResponse.PaymentRequest = invoice
+	lightningResponse.Preimage = hex.EncodeToString(res.PaymentPreimage)
+	lightningResponse.PaymentError = fmt.Errorf(res.PaymentError)
+	lightningResponse.PaidFeeSat = res.PaymentRoute.TotalFeesMsat / 1000
+
+	return nil
+
+}
+func (l *LightingComms) lndGrpcPayPartialInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, amount_sat uint64, lightningResponse *LightningPaymentResponse) error {
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
+
+	client := lnrpc.NewLightningClient(l.LndRpcClient)
+
+	fixedLimit := lnrpc.FeeLimit_Fixed{
+		Fixed: int64(feeReserve),
+	}
+
+	feeLimit := lnrpc.FeeLimit{
+		Limit: &fixedLimit,
+	}
+	queryRoutes := lnrpc.QueryRoutesRequest{
+		PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
+		UseMissionControl: true,
+		Amt:               int64(amount_sat),
+		FeeLimit:          &feeLimit,
+	}
+
+	// check for query hops
+	queryResponse, err := client.QueryRoutes(ctx, &queryRoutes)
+	if err != nil {
+		return fmt.Errorf("client.QueryRoutes(ctx, &queryRoutes) %w", err)
+	}
+
+	firstRoute := queryResponse.Routes[0]
+
+	if firstRoute == nil {
+		return fmt.Errorf("No Route found %w", err)
+	}
+
+	lastHop := firstRoute.Hops[len(firstRoute.Hops)-1]
+
+	totalMilisats := int64(*zpayInvoice.MilliSat)
+
+	mppRecord := lnrpc.MPPRecord{
+		TotalAmtMsat: totalMilisats,
+		PaymentAddr:  zpayInvoice.PaymentAddr[:],
+	}
+	lastHop.MppRecord = &mppRecord
+	firstRoute.Hops[len(firstRoute.Hops)-1] = lastHop
+
+	streamerClient := routerrpc.NewRouterClient(l.LndRpcClient)
+
+	sendRequest := routerrpc.SendToRouteRequest{PaymentHash: zpayInvoice.PaymentHash[:], Route: firstRoute, SkipTempErr: true}
+
+	res, err := streamerClient.SendToRouteV2(ctx, &sendRequest)
+
+	if err != nil {
+		return fmt.Errorf("client.SendPaymentV2(ctx, &sendRequest) %w", err)
+	}
+
+	for {
+		switch res.Status {
+		case lnrpc.HTLCAttempt_FAILED:
+			return fmt.Errorf("PaymentFailed  %+v", res.GetFailure())
+		case lnrpc.HTLCAttempt_SUCCEEDED:
+			lightningResponse.PaymentRequest = invoice
+			lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
+			lightningResponse.PaymentError = errors.New("")
+			lightningResponse.PaidFeeSat = res.Route.TotalAmt
+			return nil
+		default:
+			continue
+
+		}
+	}
+
+}
+
+func (l *LightingComms) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (*LightningPaymentResponse, error) {
 	var invoiceRes LightningPaymentResponse
 
 	reqInvoice := LightningInvoiceRequest{
 		Out:    true,
 		Bolt11: invoice,
+		Amount: int64(amount_sat),
 	}
 
 	switch l.LightningBackend {
 	case LNDGRPC:
-
-		ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.Macaroon)
-
-		client := lnrpc.NewLightningClient(l.LndRpcClient)
-
-		fixedLimit := lnrpc.FeeLimit_Fixed{
-			Fixed: int64(feeReserve),
+		if mpp {
+			err := l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes)
+			if err != nil {
+				return &invoiceRes, fmt.Errorf(`l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes) %w`, err)
+			}
+		} else {
+			err := l.lndGrpcPayInvoice(invoice, feeReserve, &invoiceRes)
+			if err != nil {
+				return &invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
+			}
 		}
-
-		feeLimit := lnrpc.FeeLimit{
-			Limit: &fixedLimit,
-		}
-		sendRequest := lnrpc.SendRequest{PaymentRequest: invoice, AllowSelfPayment: true, FeeLimit: &feeLimit}
-
-		res, err := client.SendPaymentSync(ctx, &sendRequest)
-
-		if err != nil {
-			return nil, err
-		}
-
-		invoiceRes.PaymentRequest = invoice
-		invoiceRes.Preimage = hex.EncodeToString(res.PaymentPreimage)
-		invoiceRes.PaymentError = fmt.Errorf(res.PaymentError)
-		invoiceRes.PaidFeeSat = res.PaymentRoute.TotalFeesMsat / 1000
 
 		return &invoiceRes, nil
-
 	case LNBITS:
 		var lnbitsInvoice struct {
 			PaymentHash    string `json:"payment_hash"`
@@ -381,9 +467,10 @@ func getFeatureBits(features *lnwire.FeatureVector) []lnrpc.FeatureBit {
 
 type QueryRoutesResponse struct {
 	FeeReserve uint64 `json:"fee_reserve"`
+	Amount     uint64 `json:"amount"`
 }
 
-func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string) (*QueryRoutesResponse, error) {
+func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string, mpp bool, amount_sat uint64) (*QueryRoutesResponse, error) {
 	var queryResponse QueryRoutesResponse
 
 	switch l.LightningBackend {
@@ -398,22 +485,23 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 		featureBits := getFeatureBits(zpayInvoice.Features)
 
 		queryRoutes := lnrpc.QueryRoutesRequest{
-			PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
-			AmtMsat:           int64(*zpayInvoice.MilliSat),
+			PubKey: hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
+			// AmtMsat:           int64(amount_sat),
 			RouteHints:        routeHints,
 			DestFeatures:      featureBits,
 			UseMissionControl: true,
+			Amt:               int64(amount_sat),
 		}
 
 		res, err := client.QueryRoutes(ctx, &queryRoutes)
 
+		if err != nil {
+			return nil, err
+		}
 		if res == nil {
 			return nil, fmt.Errorf("No routes found")
 		}
 
-		if err != nil {
-			return nil, err
-		}
 		fee := lightning.GetAverageRouteFee(res.Routes) / 1000
 		queryResponse.FeeReserve = fee
 
