@@ -248,51 +248,19 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 				successMessage.Success = "Nothing to change"
 			}
 
-			// case comms.LNBITS_WALLET:
-			// 	lnbitsKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
-			// 	lnbitsEndpoint := c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
-			//
-			// 	newCommsData := comms.LightingCommsData{
-			// 		MINT_LIGHTNING_BACKEND: comms.LNBITS_WALLET,
-			// 		MINT_LNBITS_ENDPOINT:   lnbitsEndpoint,
-			// 		MINT_LNBITS_KEY:        lnbitsKey,
-			// 	}
-			// 	lightningComs, err := comms.SetupLightingComms(newCommsData)
-			//
-			// 	if err != nil {
-			// 		logger.Warn(
-			// 			"comms.SetupLightingComms(newCommsData)",
-			// 			slog.String(utils.LogExtraInfo, err.Error()))
-			// 		errorMessage := ErrorNotif{
-			// 			Error: "Something went wrong setting up LNBITS communications",
-			// 		}
-			//
-			// 		c.HTML(200, "settings-error", errorMessage)
-			// 		return
-			//
-			// 	}
-			//
-			// 	// check connection
-			// 	_, err = lightningComs.WalletBalance()
-			// 	if err != nil {
-			// 		errorMessage := ErrorNotif{
-			// 			Error: "Could not check stablished connection with Node",
-			// 		}
-			// 		logger.Warn(
-			// 			"Could not get lightning balance",
-			// 			slog.String(utils.LogExtraInfo, err.Error()))
-			//
-			// 		c.HTML(200, "settings-error", errorMessage)
-			// 		return
-			//
-			// 	}
-			// 	mint.LightningBackend = *lightningComs
-			//
-			// 	mint.LightningBackend.LightningBackend = comms.LNBITS
-			// 	mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
-			// 	mint.Config.MINT_LNBITS_KEY = newCommsData.MINT_LNBITS_KEY
-			// 	mint.Config.MINT_LNBITS_ENDPOINT = newCommsData.MINT_LNBITS_ENDPOINT
-			//
+		case string(m.LNBITS):
+			lnbitsKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
+			lnbitsEndpoint := c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
+
+			lnbitsWallet := lightning.LnbitsWallet{
+				Network:  *mint.LightningBackend.GetNetwork(),
+				Key:      lnbitsKey,
+				Endpoint: lnbitsEndpoint,
+			}
+			mint.LightningBackend = lnbitsWallet
+			mint.Config.MINT_LIGHTNING_BACKEND = m.LNBITS
+			mint.Config.MINT_LNBITS_KEY = lnbitsKey
+			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
 		}
 
 		err := mint.Config.SetTOMLFile()

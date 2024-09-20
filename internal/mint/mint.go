@@ -371,7 +371,6 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 		mint.LightningBackend = fake_wallet
 
 	case LNDGRPC:
-
 		lndWallet := lightning.LndGrpcWallet{
 			Network: chainparam,
 		}
@@ -381,6 +380,13 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
 		}
 		mint.LightningBackend = lndWallet
+	case LNBITS:
+		lnbitsWallet := lightning.LnbitsWallet{
+			Network:  chainparam,
+			Endpoint: config.MINT_LNBITS_KEY,
+			Key:      config.MINT_LNBITS_KEY,
+		}
+		mint.LightningBackend = lnbitsWallet
 
 	default:
 		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)

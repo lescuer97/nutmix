@@ -23,9 +23,7 @@ const LNBITS LightningBackend = "LNbitsWallet"
 func StringToLightningBackend(text string) LightningBackend {
 
 	switch text {
-
 	case string(FAKE_WALLET):
-
 		return FAKE_WALLET
 	case string(LNDGRPC):
 		return LNDGRPC
