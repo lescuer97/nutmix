@@ -1,4 +1,4 @@
-package comms
+package utils
 
 import (
 	"bytes"
@@ -15,6 +15,14 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
+)
+
+const (
+	LND_HOST             = "LND_GRPC_HOST"
+	LND_TLS_CERT         = "LND_TLS_CERT"
+	LND_MACAROON         = "LND_MACAROON"
+	MINT_LNBITS_ENDPOINT = "MINT_LNBITS_ENDPOINT"
+	MINT_LNBITS_KEY      = "MINT_LNBITS_KEY"
 )
 
 // This is used for testing purpose
