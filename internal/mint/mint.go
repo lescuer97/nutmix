@@ -5,28 +5,28 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
+	"sync"
+	"time"
+
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/comms"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/pkg/crypto"
-	"log"
-	"sync"
-	"time"
 )
 
 type Mint struct {
-	ActiveKeysets map[string]cashu.KeysetMap
-	Keysets       map[string][]cashu.Keyset
-	LightningComs comms.LightingComms
-	Network       chaincfg.Params
-	PendingProofs []cashu.Proof
-	ActiveProofs  *ActiveProofs
-	ActiveQuotes  *ActiveQuote
-	Config        Config
-	MintPubkey    string
+	ActiveKeysets    map[string]cashu.KeysetMap
+	Keysets          map[string][]cashu.Keyset
+	LightningBackend lightning.LightningBackend
+	PendingProofs    []cashu.Proof
+	ActiveProofs     *ActiveProofs
+	ActiveQuotes     *ActiveQuote
+	Config           Config
+	MintPubkey       string
 }
 
 var (
@@ -361,19 +361,27 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 		return &mint, fmt.Errorf("CheckChainParams(config.NETWORK) %w", err)
 	}
 
-	mint.Network = chainparam
-
 	switch config.MINT_LIGHTNING_BACKEND {
 
-	case comms.FAKE_WALLET:
-
-	case comms.LND_WALLET, comms.LNBITS_WALLET:
-		lightningComs, err := comms.SetupLightingComms(config.ToLightningCommsData())
-
-		if err != nil {
-			return &mint, err
+	case FAKE_WALLET:
+		fake_wallet := lightning.FakeWallet{
+			Network: chainparam,
 		}
-		mint.LightningComs = *lightningComs
+
+		mint.LightningBackend = fake_wallet
+
+	case LNDGRPC:
+
+		lndWallet := lightning.LndGrpcWallet{
+			Network: chainparam,
+		}
+
+		err := lndWallet.SetupGrpc(config.LND_GRPC_HOST, config.LND_MACAROON, config.LND_TLS_CERT)
+		if err != nil {
+			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
+		}
+		mint.LightningBackend = lndWallet
+
 	default:
 		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)
 	}
@@ -419,39 +427,27 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 type AddToDBFunc func(*pgxpool.Pool, bool, cashu.ACTION_STATE, string) error
 
 func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
-	switch m.Config.MINT_LIGHTNING_BACKEND {
+	state, preimage, err := m.LightningBackend.CheckPayed(quote)
+	if err != nil {
+		return cashu.UNPAID, "", fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
+	}
 
-	case comms.FAKE_WALLET:
+	switch {
+	case state == cashu.PAID:
 		err := dbCall(pool, true, cashu.PAID, quote)
 		if err != nil {
-			return cashu.UNPAID, "", fmt.Errorf("dbCall: %w", err)
+			return cashu.PAID, preimage, fmt.Errorf("dbCall: %w", err)
 		}
+		return cashu.PAID, preimage, nil
 
-		return cashu.PAID, "", nil
-
-	case comms.LND_WALLET, comms.LNBITS_WALLET:
-		state, preimage, err := m.LightningComs.CheckIfInvoicePayed(quote)
+	case state == cashu.UNPAID:
+		err := dbCall(pool, true, cashu.UNPAID, quote)
 		if err != nil {
-			return cashu.UNPAID, "", fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
+			return cashu.UNPAID, preimage, fmt.Errorf("dbCall: %w", err)
 		}
-
-		switch {
-		case state == cashu.PAID:
-			err := dbCall(pool, true, cashu.PAID, quote)
-			if err != nil {
-				return cashu.PAID, preimage, fmt.Errorf("dbCall: %w", err)
-			}
-			return cashu.PAID, preimage, nil
-
-		case state == cashu.UNPAID:
-			err := dbCall(pool, true, cashu.UNPAID, quote)
-			if err != nil {
-				return cashu.UNPAID, preimage, fmt.Errorf("dbCall: %w", err)
-			}
-			return cashu.UNPAID, preimage, nil
-
-		}
+		return cashu.UNPAID, preimage, nil
 
 	}
+
 	return cashu.UNPAID, "", nil
 }

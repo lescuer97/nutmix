@@ -3,11 +3,15 @@ package comms
 import (
 	"bytes"
 	"context"
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"math"
+	"net/http"
+
+	"crypto/x509"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lightningnetwork/lnd/lnrpc"
@@ -17,18 +21,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
-	"io"
-	"math"
-	"net/http"
 )
 
 const (
-	FAKE_WALLET          = "FakeWallet"
-	LND_WALLET           = "LndGrpcWallet"
 	LND_HOST             = "LND_GRPC_HOST"
 	LND_TLS_CERT         = "LND_TLS_CERT"
 	LND_MACAROON         = "LND_MACAROON"
-	LNBITS_WALLET        = "LNbitsWallet"
 	MINT_LNBITS_ENDPOINT = "MINT_LNBITS_ENDPOINT"
 	MINT_LNBITS_KEY      = "MINT_LNBITS_KEY"
 )
@@ -313,6 +311,7 @@ func (l *LightingComms) lndGrpcPayPartialInvoice(invoice string, zpayInvoice *zp
 	fixedLimit := lnrpc.FeeLimit_Fixed{
 		Fixed: int64(feeReserve),
 	}
+	// zpayInvoice.PaymentHash
 
 	feeLimit := lnrpc.FeeLimit{
 		Limit: &fixedLimit,
@@ -467,7 +466,6 @@ func getFeatureBits(features *lnwire.FeatureVector) []lnrpc.FeatureBit {
 
 type QueryRoutesResponse struct {
 	FeeReserve uint64 `json:"fee_reserve"`
-	Amount     uint64 `json:"amount"`
 }
 
 func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string, mpp bool, amount_sat uint64) (*QueryRoutesResponse, error) {
@@ -524,42 +522,42 @@ func (l *LightingComms) QueryPayment(zpayInvoice *zpay32.Invoice, invoice string
 
 }
 
-func SetupLightingComms(config LightingCommsData) (*LightingComms, error) {
-	usedLightningBackend := config.MINT_LIGHTNING_BACKEND
-
-	var lightningComs LightingComms
-	switch usedLightningBackend {
-	case LND_WALLET:
-		err := SetupLndRpcComms(&lightningComs, config)
-		lightningComs.LightningBackend = LNDGRPC
-
-		if err != nil {
-			return nil, fmt.Errorf("Could not setup LND comms: %w", err)
-		}
-
-	case LNBITS_WALLET:
-
-		mint_key := config.MINT_LNBITS_KEY
-
-		if mint_key == "" {
-			return nil, fmt.Errorf("MINT_LNBITS_KEY not available")
-		}
-		mint_endpoint := config.MINT_LNBITS_ENDPOINT
-		if mint_endpoint == "" {
-			return nil, fmt.Errorf("MINT_LNBITS_ENDPOINT not available")
-		}
-
-		lightningComs.LightningBackend = LNBITS
-		lightningComs.LnBitsData = LNBitsData{
-			Key:      mint_key,
-			Endpoint: mint_endpoint,
-		}
-
-	}
-
-	return &lightningComs, nil
-
-}
+// func SetupLightingComms(config LightingCommsData) (*LightingComms, error) {
+// 	usedLightningBackend := config.MINT_LIGHTNING_BACKEND
+//
+// 	var lightningComs LightingComms
+// 	switch usedLightningBackend {
+// 	case LND_WALLET:
+// 		err := SetupLndRpcComms(&lightningComs, config)
+// 		lightningComs.LightningBackend = LNDGRPC
+//
+// 		if err != nil {
+// 			return nil, fmt.Errorf("Could not setup LND comms: %w", err)
+// 		}
+//
+// 	case LNBITS_WALLET:
+//
+// 		mint_key := config.MINT_LNBITS_KEY
+//
+// 		if mint_key == "" {
+// 			return nil, fmt.Errorf("MINT_LNBITS_KEY not available")
+// 		}
+// 		mint_endpoint := config.MINT_LNBITS_ENDPOINT
+// 		if mint_endpoint == "" {
+// 			return nil, fmt.Errorf("MINT_LNBITS_ENDPOINT not available")
+// 		}
+//
+// 		lightningComs.LightningBackend = LNBITS
+// 		lightningComs.LnBitsData = LNBitsData{
+// 			Key:      mint_key,
+// 			Endpoint: mint_endpoint,
+// 		}
+//
+// 	}
+//
+// 	return &lightningComs, nil
+//
+// }
 
 func SetupLndRpcComms(lightningComs *LightingComms, config LightingCommsData) error {
 	host := config.LND_GRPC_HOST

@@ -1,6 +1,7 @@
 package lightning
 
 import (
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
@@ -15,10 +16,14 @@ const FAKEWALLET Backend = iota + 4
 type LightningBackend interface {
 	PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error)
 	CheckPayed(quote string) (cashu.ACTION_STATE, string, error)
-	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (uint64, error)
+	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error)
 	RequestInvoice(amount int64) (InvoiceResponse, error)
 	WalletBalance() (uint64, error)
 	LightningType() Backend
+	GetNetwork() *chaincfg.Params
+	// TODO CHECK that the inner pointer change work on network
+	ChangeNetwork(network chaincfg.Params)
+	ActiveMPP() bool
 }
 type PaymentResponse struct {
 	Preimage       string

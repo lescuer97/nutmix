@@ -2,17 +2,41 @@ package mint
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/BurntSushi/toml"
-	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"os"
 )
 
 const ConfigFileName string = "config.toml"
 const ConfigDirName string = "nutmix"
 const LogFileName string = "nutmix.log"
+
+type LightningBackend string
+
+const FAKE_WALLET LightningBackend = "FakeWallet"
+const LNDGRPC LightningBackend = "LndGrpcWallet"
+const LNBITS LightningBackend = "LNbitsWallet"
+
+func StringToLightningBackend(text string) LightningBackend {
+
+	switch text {
+
+	case string(FAKE_WALLET):
+
+		return FAKE_WALLET
+	case string(LNDGRPC):
+		return LNDGRPC
+	case string(LNBITS):
+		return LNBITS
+	default:
+		return FAKE_WALLET
+
+	}
+
+}
 
 type Config struct {
 	NAME             string
@@ -24,7 +48,7 @@ type Config struct {
 
 	NETWORK string
 
-	MINT_LIGHTNING_BACKEND string
+	MINT_LIGHTNING_BACKEND LightningBackend
 	LND_GRPC_HOST          string
 	LND_TLS_CERT           string
 	LND_MACAROON           string
@@ -50,7 +74,7 @@ func (c *Config) Default() {
 
 	c.NETWORK = lightning.MAINNET
 
-	c.MINT_LIGHTNING_BACKEND = comms.FAKE_WALLET
+	c.MINT_LIGHTNING_BACKEND = FAKE_WALLET
 
 	c.LND_GRPC_HOST = ""
 	c.LND_TLS_CERT = ""
@@ -75,7 +99,7 @@ func (c *Config) UseEnviromentVars() {
 
 	c.NETWORK = os.Getenv("NETWORK")
 
-	c.MINT_LIGHTNING_BACKEND = os.Getenv("MINT_LIGHTNING_BACKEND")
+	c.MINT_LIGHTNING_BACKEND = StringToLightningBackend(os.Getenv("MINT_LIGHTNING_BACKEND"))
 
 	c.LND_GRPC_HOST = os.Getenv("LND_GRPC_HOST")
 	c.LND_TLS_CERT = os.Getenv("LND_TLS_CERT")
@@ -86,20 +110,6 @@ func (c *Config) UseEnviromentVars() {
 
 	c.DATABASE_TYPE = database.CUSTOMDATABASE
 	c.DATABASE_URL = os.Getenv("DATABASE_URL")
-
-}
-
-func (c *Config) ToLightningCommsData() comms.LightingCommsData {
-
-	return comms.LightingCommsData{
-		MINT_LIGHTNING_BACKEND: c.MINT_LIGHTNING_BACKEND,
-		LND_GRPC_HOST:          c.LND_GRPC_HOST,
-		LND_TLS_CERT:           c.LND_TLS_CERT,
-		LND_MACAROON:           c.LND_MACAROON,
-
-		MINT_LNBITS_KEY:      c.MINT_LNBITS_KEY,
-		MINT_LNBITS_ENDPOINT: c.MINT_LNBITS_ENDPOINT,
-	}
 
 }
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lescuer97/nutmix/internal/comms"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
@@ -184,35 +184,36 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 				return
 			}
 			mint.Config.NETWORK = formNetwork
-			mint.Network = chainparam
 
-			mint.Network = chainparam
+			mint.LightningBackend.ChangeNetwork(chainparam)
 			successMessage.Success = "Network changed"
 		}
+
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
 
-		case comms.FAKE_WALLET:
+		case string(m.FAKE_WALLET):
 
-			mint.Config.MINT_LIGHTNING_BACKEND = comms.FAKE_WALLET
+			mint.Config.MINT_LIGHTNING_BACKEND = m.FAKE_WALLET
 
-		case comms.LND_WALLET:
+			fakeWalletBackend := lightning.FakeWallet{
+				Network: *mint.LightningBackend.GetNetwork(),
+			}
 
+			mint.LightningBackend = fakeWalletBackend
+		case string(m.LNDGRPC):
 			lndHost := c.Request.PostFormValue("LND_GRPC_HOST")
 			tlsCert := c.Request.PostFormValue("LND_TLS_CERT")
 			macaroon := c.Request.PostFormValue("LND_MACAROON")
-
 			if lndHost != mint.Config.LND_GRPC_HOST || tlsCert != mint.Config.LND_TLS_CERT || macaroon != mint.Config.LND_MACAROON {
-				newCommsData := comms.LightingCommsData{
-					MINT_LIGHTNING_BACKEND: comms.LND_WALLET,
-					LND_GRPC_HOST:          lndHost,
-					LND_TLS_CERT:           tlsCert,
-					LND_MACAROON:           macaroon,
-				}
-				lightningComs, err := comms.SetupLightingComms(newCommsData)
 
+				lndWallet := lightning.LndGrpcWallet{
+					Network: *mint.LightningBackend.GetNetwork(),
+				}
+
+				err := lndWallet.SetupGrpc(lndHost, macaroon, tlsCert)
 				if err != nil {
 					logger.Error(
-						"comms.SetupLightingComms(newCommsData).",
+						"lndWallet.SetupGrpc",
 						slog.String(utils.LogExtraInfo, err.Error()))
 
 					errorMessage := ErrorNotif{
@@ -221,12 +222,11 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 
 					c.HTML(200, "settings-error", errorMessage)
 					return
-
 				}
 
 				// check connection
-				_, err = lightningComs.WalletBalance()
-				if err != nil /* || !validConnection */ {
+				_, err = lndWallet.WalletBalance()
+				if err != nil {
 					logger.Warn(
 						"Could not get lightning balance",
 						slog.String(utils.LogExtraInfo, err.Error()))
@@ -238,64 +238,61 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 					return
 
 				}
-				mint.LightningComs = *lightningComs
-				mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
-				mint.LightningComs.LightningBackend = comms.LNDGRPC
-				mint.Config.LND_GRPC_HOST = newCommsData.LND_GRPC_HOST
-				mint.Config.LND_MACAROON = newCommsData.LND_MACAROON
-				mint.Config.LND_TLS_CERT = newCommsData.LND_TLS_CERT
+				mint.LightningBackend = lndWallet
+				mint.Config.MINT_LIGHTNING_BACKEND = m.LNDGRPC
+				mint.Config.LND_GRPC_HOST = lndHost
+				mint.Config.LND_MACAROON = macaroon
+				mint.Config.LND_TLS_CERT = tlsCert
 
 			} else {
-				mint.Config.MINT_LIGHTNING_BACKEND = comms.LND_WALLET
-				mint.LightningComs.LightningBackend = comms.LNDGRPC
 				successMessage.Success = "Nothing to change"
 			}
 
-		case comms.LNBITS_WALLET:
-			lnbitsKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
-			lnbitsEndpoint := c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
-
-			newCommsData := comms.LightingCommsData{
-				MINT_LIGHTNING_BACKEND: comms.LNBITS_WALLET,
-				MINT_LNBITS_ENDPOINT:   lnbitsEndpoint,
-				MINT_LNBITS_KEY:        lnbitsKey,
-			}
-			lightningComs, err := comms.SetupLightingComms(newCommsData)
-
-			if err != nil {
-				logger.Warn(
-					"comms.SetupLightingComms(newCommsData)",
-					slog.String(utils.LogExtraInfo, err.Error()))
-				errorMessage := ErrorNotif{
-					Error: "Something went wrong setting up LNBITS communications",
-				}
-
-				c.HTML(200, "settings-error", errorMessage)
-				return
-
-			}
-
-			// check connection
-			_, err = lightningComs.WalletBalance()
-			if err != nil {
-				errorMessage := ErrorNotif{
-					Error: "Could not check stablished connection with Node",
-				}
-				logger.Warn(
-					"Could not get lightning balance",
-					slog.String(utils.LogExtraInfo, err.Error()))
-
-				c.HTML(200, "settings-error", errorMessage)
-				return
-
-			}
-			mint.LightningComs = *lightningComs
-
-			mint.LightningComs.LightningBackend = comms.LNBITS
-			mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
-			mint.Config.MINT_LNBITS_KEY = newCommsData.MINT_LNBITS_KEY
-			mint.Config.MINT_LNBITS_ENDPOINT = newCommsData.MINT_LNBITS_ENDPOINT
-
+			// case comms.LNBITS_WALLET:
+			// 	lnbitsKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
+			// 	lnbitsEndpoint := c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
+			//
+			// 	newCommsData := comms.LightingCommsData{
+			// 		MINT_LIGHTNING_BACKEND: comms.LNBITS_WALLET,
+			// 		MINT_LNBITS_ENDPOINT:   lnbitsEndpoint,
+			// 		MINT_LNBITS_KEY:        lnbitsKey,
+			// 	}
+			// 	lightningComs, err := comms.SetupLightingComms(newCommsData)
+			//
+			// 	if err != nil {
+			// 		logger.Warn(
+			// 			"comms.SetupLightingComms(newCommsData)",
+			// 			slog.String(utils.LogExtraInfo, err.Error()))
+			// 		errorMessage := ErrorNotif{
+			// 			Error: "Something went wrong setting up LNBITS communications",
+			// 		}
+			//
+			// 		c.HTML(200, "settings-error", errorMessage)
+			// 		return
+			//
+			// 	}
+			//
+			// 	// check connection
+			// 	_, err = lightningComs.WalletBalance()
+			// 	if err != nil {
+			// 		errorMessage := ErrorNotif{
+			// 			Error: "Could not check stablished connection with Node",
+			// 		}
+			// 		logger.Warn(
+			// 			"Could not get lightning balance",
+			// 			slog.String(utils.LogExtraInfo, err.Error()))
+			//
+			// 		c.HTML(200, "settings-error", errorMessage)
+			// 		return
+			//
+			// 	}
+			// 	mint.LightningBackend = *lightningComs
+			//
+			// 	mint.LightningBackend.LightningBackend = comms.LNBITS
+			// 	mint.Config.MINT_LIGHTNING_BACKEND = newCommsData.MINT_LIGHTNING_BACKEND
+			// 	mint.Config.MINT_LNBITS_KEY = newCommsData.MINT_LNBITS_KEY
+			// 	mint.Config.MINT_LNBITS_ENDPOINT = newCommsData.MINT_LNBITS_ENDPOINT
+			//
 		}
 
 		err := mint.Config.SetTOMLFile()

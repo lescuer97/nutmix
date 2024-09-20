@@ -29,7 +29,7 @@ func (f FakeWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, error)
 	return cashu.PAID, mock_preimage, nil
 }
 
-func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (uint64, error) {
+func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
 	return 0, nil
 }
 
@@ -60,4 +60,19 @@ func (f FakeWallet) WalletBalance() (uint64, error) {
 
 func (f FakeWallet) LightningType() Backend {
 	return FAKEWALLET
+}
+
+func (f FakeWallet) GetNetwork() *chaincfg.Params {
+	return &f.Network
+}
+func (f FakeWallet) ChangeNetwork(network chaincfg.Params) {
+	f.changeNetwork(network)
+	return
+}
+func (f *FakeWallet) changeNetwork(network chaincfg.Params) {
+	f.Network = network
+	return
+}
+func (f FakeWallet) ActiveMPP() bool {
+	return false
 }
