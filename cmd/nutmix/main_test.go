@@ -18,10 +18,10 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -58,10 +58,10 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", string(mint.FAKE_WALLET))
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
@@ -300,8 +300,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 400, got %d", w.Code)
+	if w.Code != 403 {
+		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
 
 	if w.Body.String() != `"Invalid blind message"` {
@@ -616,7 +616,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if postMeltResponse.State != cashu.PAID {
 		t.Errorf("Expected state to be MINTED, got %v", postMintQuoteResponseTwo.State)
 	}
-	if postMeltResponse.PaymentPreimage != "MockPaymentPreimage" {
+	if postMeltResponse.PaymentPreimage != "fakewalletpreimage" {
 		t.Errorf("Expected payment preimage to be empty, got %s", postMeltResponse.PaymentPreimage)
 	}
 
@@ -691,14 +691,15 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	config, err := mint.SetUpConfigFile()
 
-	config.MINT_LIGHTNING_BACKEND = ctx.Value(mint.MINT_LIGHTNING_BACKEND_ENV).(string)
+	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(ctx.Value(mint.MINT_LIGHTNING_BACKEND_ENV).(string))
+
 	config.DATABASE_URL = ctx.Value(database.DATABASE_URL_ENV).(string)
 	config.NETWORK = ctx.Value(mint.NETWORK_ENV).(string)
-	config.LND_GRPC_HOST = os.Getenv(comms.LND_HOST)
-	config.LND_TLS_CERT = os.Getenv(comms.LND_TLS_CERT)
-	config.LND_MACAROON = os.Getenv(comms.LND_MACAROON)
-	config.MINT_LNBITS_KEY = os.Getenv(comms.MINT_LNBITS_KEY)
-	config.MINT_LNBITS_ENDPOINT = os.Getenv(comms.MINT_LNBITS_ENDPOINT)
+	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
+	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
+	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
+	config.MINT_LNBITS_KEY = os.Getenv(utils.MINT_LNBITS_KEY)
+	config.MINT_LNBITS_ENDPOINT = os.Getenv(utils.MINT_LNBITS_ENDPOINT)
 
 	if err != nil {
 		log.Fatalf("could not setup config file: %+v ", err)
@@ -800,11 +801,11 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	_, bobLnd, _, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
+	_, bobLnd, _, _, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
 
-	ctx = context.WithValue(ctx, comms.LND_HOST, os.Getenv(comms.LND_HOST))
-	ctx = context.WithValue(ctx, comms.LND_TLS_CERT, os.Getenv(comms.LND_TLS_CERT))
-	ctx = context.WithValue(ctx, comms.LND_MACAROON, os.Getenv(comms.LND_MACAROON))
+	ctx = context.WithValue(ctx, utils.LND_HOST, os.Getenv(utils.LND_HOST))
+	ctx = context.WithValue(ctx, utils.LND_TLS_CERT, os.Getenv(utils.LND_TLS_CERT))
+	ctx = context.WithValue(ctx, utils.LND_MACAROON, os.Getenv(utils.LND_MACAROON))
 
 	if err != nil {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
@@ -857,10 +858,10 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	_, bobLnd, _, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-bolt11-tests")
+	_, bobLnd, _, _, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-bolt11-tests")
 
-	ctx = context.WithValue(ctx, comms.MINT_LNBITS_ENDPOINT, os.Getenv(comms.MINT_LNBITS_ENDPOINT))
-	ctx = context.WithValue(ctx, comms.MINT_LNBITS_KEY, os.Getenv(comms.MINT_LNBITS_KEY))
+	ctx = context.WithValue(ctx, utils.MINT_LNBITS_ENDPOINT, os.Getenv(utils.MINT_LNBITS_ENDPOINT))
+	ctx = context.WithValue(ctx, utils.MINT_LNBITS_KEY, os.Getenv(utils.MINT_LNBITS_KEY))
 
 	if err != nil {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)

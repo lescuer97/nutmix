@@ -1,7 +1,9 @@
 package lightning
 
 import (
+	"errors"
 	"fmt"
+
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -18,7 +20,7 @@ func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeR
 
 	return PaymentResponse{
 		Preimage:       mock_preimage,
-		PaymentError:   nil,
+		PaymentError:   errors.New(""),
 		PaymentRequest: invoice,
 		Rhash:          "",
 		PaidFeeSat:     0,

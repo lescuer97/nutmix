@@ -383,7 +383,7 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 	case LNBITS:
 		lnbitsWallet := lightning.LnbitsWallet{
 			Network:  chainparam,
-			Endpoint: config.MINT_LNBITS_KEY,
+			Endpoint: config.MINT_LNBITS_ENDPOINT,
 			Key:      config.MINT_LNBITS_KEY,
 		}
 		mint.LightningBackend = lnbitsWallet

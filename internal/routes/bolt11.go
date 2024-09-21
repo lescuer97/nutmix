@@ -4,20 +4,22 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
+	"slices"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/mint"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log/slog"
-	"slices"
-	"strings"
-	"time"
 )
 
 func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
@@ -83,6 +85,11 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			Unit:        mintRequest.Unit,
 			State:       cashu.UNPAID,
 			SeenAt:      now,
+		}
+
+		if mint.LightningBackend.LightningType() == lightning.FAKEWALLET {
+			mintRequestDB.RequestPaid = true
+			mintRequestDB.State = cashu.PAID
 		}
 
 		err = database.SaveMintRequestDB(pool, mintRequestDB)
@@ -334,6 +341,10 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			Quote:           hexHash,
 			State:           cashu.UNPAID,
 			PaymentPreimage: "",
+		}
+		if mint.LightningBackend.LightningType() == lightning.FAKEWALLET {
+			response.Paid = true
+			response.State = cashu.PAID
 		}
 
 		dbRequest = cashu.MeltRequestDB{
