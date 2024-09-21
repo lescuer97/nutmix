@@ -67,14 +67,7 @@ func (f FakeWallet) LightningType() Backend {
 func (f FakeWallet) GetNetwork() *chaincfg.Params {
 	return &f.Network
 }
-func (f FakeWallet) ChangeNetwork(network chaincfg.Params) {
-	f.changeNetwork(network)
-	return
-}
-func (f *FakeWallet) changeNetwork(network chaincfg.Params) {
-	f.Network = network
-	return
-}
+
 func (f FakeWallet) ActiveMPP() bool {
 	return false
 }

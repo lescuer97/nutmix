@@ -318,7 +318,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			amount = mppAmount
 		}
 
-		if isMpp && mint.LightningBackend.ActiveMPP() {
+		if isMpp && !mint.LightningBackend.ActiveMPP() {
 			logger.Info("Tried to do mpp when it is not available")
 			c.JSON(400, "Sorry! MPP is not available")
 			return

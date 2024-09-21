@@ -22,7 +22,6 @@ type LightningBackend interface {
 	LightningType() Backend
 	GetNetwork() *chaincfg.Params
 	// TODO CHECK that the inner pointer change work on network
-	ChangeNetwork(network chaincfg.Params)
 	ActiveMPP() bool
 }
 type PaymentResponse struct {

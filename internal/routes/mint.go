@@ -89,8 +89,6 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 
 		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12"}
 
-		fmt.Printf("LightningBackend: %+v ", mint.LightningBackend)
-
 		if mint.LightningBackend.ActiveMPP() {
 			optionalNuts = append(optionalNuts, "15")
 		}

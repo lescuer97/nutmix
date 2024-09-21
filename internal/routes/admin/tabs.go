@@ -1,9 +1,6 @@
 package admin
 
 import (
-	"log/slog"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/lightning"
@@ -11,6 +8,8 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
+	"log/slog"
+	"strconv"
 )
 
 func MintSettingsPage(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
@@ -168,25 +167,19 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 		}
 
 		formNetwork := c.Request.PostFormValue("NETWORK")
-		// check if the the lightning values have change if yes try to setup a new connection client for mint
-		if mint.Config.NETWORK != formNetwork {
-			chainparam, err := m.CheckChainParams(formNetwork)
-			if err != nil {
-				logger.Error(
-					"m.CheckChainParams(formNetwork)",
-					slog.String(utils.LogExtraInfo, err.Error()))
 
-				errorMessage := ErrorNotif{
-					Error: "Could not setup network for lightning",
-				}
+		chainparam, err := m.CheckChainParams(formNetwork)
+		if err != nil {
+			logger.Error(
+				"m.CheckChainParams(formNetwork)",
+				slog.String(utils.LogExtraInfo, err.Error()))
 
-				c.HTML(200, "settings-error", errorMessage)
-				return
+			errorMessage := ErrorNotif{
+				Error: "Could not setup network for lightning",
 			}
-			mint.Config.NETWORK = formNetwork
 
-			mint.LightningBackend.ChangeNetwork(chainparam)
-			successMessage.Success = "Network changed"
+			c.HTML(200, "settings-error", errorMessage)
+			return
 		}
 
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
@@ -196,7 +189,7 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 			mint.Config.MINT_LIGHTNING_BACKEND = m.FAKE_WALLET
 
 			fakeWalletBackend := lightning.FakeWallet{
-				Network: *mint.LightningBackend.GetNetwork(),
+				Network: chainparam,
 			}
 
 			mint.LightningBackend = fakeWalletBackend
@@ -204,56 +197,51 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 			lndHost := c.Request.PostFormValue("LND_GRPC_HOST")
 			tlsCert := c.Request.PostFormValue("LND_TLS_CERT")
 			macaroon := c.Request.PostFormValue("LND_MACAROON")
-			if lndHost != mint.Config.LND_GRPC_HOST || tlsCert != mint.Config.LND_TLS_CERT || macaroon != mint.Config.LND_MACAROON {
 
-				lndWallet := lightning.LndGrpcWallet{
-					Network: *mint.LightningBackend.GetNetwork(),
-				}
-
-				err := lndWallet.SetupGrpc(lndHost, macaroon, tlsCert)
-				if err != nil {
-					logger.Error(
-						"lndWallet.SetupGrpc",
-						slog.String(utils.LogExtraInfo, err.Error()))
-
-					errorMessage := ErrorNotif{
-						Error: "Something went wrong setting up LND communications",
-					}
-
-					c.HTML(200, "settings-error", errorMessage)
-					return
-				}
-
-				// check connection
-				_, err = lndWallet.WalletBalance()
-				if err != nil {
-					logger.Warn(
-						"Could not get lightning balance",
-						slog.String(utils.LogExtraInfo, err.Error()))
-					errorMessage := ErrorNotif{
-						Error: "Could not check stablished connection with Node",
-					}
-
-					c.HTML(200, "settings-error", errorMessage)
-					return
-
-				}
-				mint.LightningBackend = lndWallet
-				mint.Config.MINT_LIGHTNING_BACKEND = m.LNDGRPC
-				mint.Config.LND_GRPC_HOST = lndHost
-				mint.Config.LND_MACAROON = macaroon
-				mint.Config.LND_TLS_CERT = tlsCert
-
-			} else {
-				successMessage.Success = "Nothing to change"
+			lndWallet := lightning.LndGrpcWallet{
+				Network: chainparam,
 			}
+
+			err := lndWallet.SetupGrpc(lndHost, macaroon, tlsCert)
+			if err != nil {
+				logger.Error(
+					"lndWallet.SetupGrpc",
+					slog.String(utils.LogExtraInfo, err.Error()))
+
+				errorMessage := ErrorNotif{
+					Error: "Something went wrong setting up LND communications",
+				}
+
+				c.HTML(200, "settings-error", errorMessage)
+				return
+			}
+
+			// check connection
+			_, err = lndWallet.WalletBalance()
+			if err != nil {
+				logger.Warn(
+					"Could not get lightning balance",
+					slog.String(utils.LogExtraInfo, err.Error()))
+				errorMessage := ErrorNotif{
+					Error: "Could not check stablished connection with Node",
+				}
+
+				c.HTML(200, "settings-error", errorMessage)
+				return
+
+			}
+			mint.LightningBackend = lndWallet
+			mint.Config.MINT_LIGHTNING_BACKEND = m.LNDGRPC
+			mint.Config.LND_GRPC_HOST = lndHost
+			mint.Config.LND_MACAROON = macaroon
+			mint.Config.LND_TLS_CERT = tlsCert
 
 		case string(m.LNBITS):
 			lnbitsKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
 			lnbitsEndpoint := c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
 
 			lnbitsWallet := lightning.LnbitsWallet{
-				Network:  *mint.LightningBackend.GetNetwork(),
+				Network:  chainparam,
 				Key:      lnbitsKey,
 				Endpoint: lnbitsEndpoint,
 			}
@@ -263,7 +251,7 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
 		}
 
-		err := mint.Config.SetTOMLFile()
+		err = mint.Config.SetTOMLFile()
 		if err != nil {
 			logger.Error(
 				"mint.Config.SetTOMLFile()",

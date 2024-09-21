@@ -320,14 +320,6 @@ func (f LndGrpcWallet) LightningType() Backend {
 func (f LndGrpcWallet) GetNetwork() *chaincfg.Params {
 	return &f.Network
 }
-func (f LndGrpcWallet) ChangeNetwork(network chaincfg.Params) {
-	f.changeNetwork(network)
-	return
-}
-func (f *LndGrpcWallet) changeNetwork(network chaincfg.Params) {
-	f.Network = network
-	return
-}
 func (f LndGrpcWallet) ActiveMPP() bool {
 	return true
 }
