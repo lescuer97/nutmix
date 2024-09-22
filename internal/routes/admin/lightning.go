@@ -16,6 +16,9 @@ func LightningDataFormFields(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
 		case backend == string(m.LNDGRPC):
 			c.HTML(200, "lnd-grpc-form", mint.Config)
 			break
+		case backend == string(m.CLNGRPC):
+			c.HTML(200, "cln-grpc-form", mint.Config)
+			break
 
 		case backend == string(m.FAKE_WALLET):
 			c.HTML(200, "fake-wallet-form", mint.Config)

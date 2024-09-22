@@ -6,15 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/network"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
-
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/network"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 const (
@@ -23,6 +22,10 @@ const (
 	LND_MACAROON         = "LND_MACAROON"
 	MINT_LNBITS_ENDPOINT = "MINT_LNBITS_ENDPOINT"
 	MINT_LNBITS_KEY      = "MINT_LNBITS_KEY"
+
+	CLN_HOST     = "CLN_GRPC_HOST"
+	CLN_TLS_CERT = "CLN_TLS_CERT"
+	CLN_MACAROON = "CLN_MACAROON"
 )
 
 // This is used for testing purpose

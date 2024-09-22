@@ -1,6 +1,9 @@
 package admin
 
 import (
+	"log/slog"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/lightning"
@@ -8,8 +11,6 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
-	"log/slog"
-	"strconv"
 )
 
 func MintSettingsPage(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
@@ -249,6 +250,52 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 			mint.Config.MINT_LIGHTNING_BACKEND = m.LNBITS
 			mint.Config.MINT_LNBITS_KEY = lnbitsKey
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
+		case string(m.CLNGRPC):
+			clnHost := c.Request.PostFormValue("CLN_GRPC_HOST")
+			clnCaCert := c.Request.PostFormValue("CLN_CA_CERT")
+			clnClientCert := c.Request.PostFormValue("CLN_CLIENT_CERT")
+			clnClientKey := c.Request.PostFormValue("CLN_CLIENT_KEY")
+			macaroon := c.Request.PostFormValue("CLN_MACAROON")
+
+			clnWallet := lightning.CLNGRPCWallet{
+				Network: chainparam,
+			}
+
+			err := clnWallet.SetupGrpc(clnHost, clnCaCert, clnClientCert, clnClientKey, macaroon)
+			if err != nil {
+				logger.Error(
+					"lndWallet.SetupGrpc",
+					slog.String(utils.LogExtraInfo, err.Error()))
+
+				errorMessage := ErrorNotif{
+					Error: "Something went wrong setting up CLN communications",
+				}
+
+				c.HTML(200, "settings-error", errorMessage)
+				return
+			}
+
+			// check connection
+			_, err = clnWallet.WalletBalance()
+			if err != nil {
+				logger.Warn(
+					"Could not get lightning balance",
+					slog.String(utils.LogExtraInfo, err.Error()))
+				errorMessage := ErrorNotif{
+					Error: "Could not check stablished connection with Node",
+				}
+
+				c.HTML(200, "settings-error", errorMessage)
+				return
+
+			}
+			mint.LightningBackend = clnWallet
+			mint.Config.MINT_LIGHTNING_BACKEND = m.CLNGRPC
+			mint.Config.CLN_GRPC_HOST = clnHost
+			mint.Config.CLN_MACAROON = macaroon
+			mint.Config.CLN_CA_CERT = clnCaCert
+			mint.Config.CLN_CLIENT_KEY = clnClientKey
+			mint.Config.CLN_CLIENT_CERT = clnClientCert
 		}
 
 		err = mint.Config.SetTOMLFile()

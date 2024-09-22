@@ -19,6 +19,7 @@ type LightningBackend string
 const FAKE_WALLET LightningBackend = "FakeWallet"
 const LNDGRPC LightningBackend = "LndGrpcWallet"
 const LNBITS LightningBackend = "LNbitsWallet"
+const CLNGRPC LightningBackend = "ClnGrpcWallet"
 
 func StringToLightningBackend(text string) LightningBackend {
 
@@ -53,6 +54,12 @@ type Config struct {
 
 	MINT_LNBITS_ENDPOINT string
 	MINT_LNBITS_KEY      string
+
+	CLN_GRPC_HOST   string
+	CLN_CA_CERT     string
+	CLN_CLIENT_CERT string
+	CLN_CLIENT_KEY  string
+	CLN_MACAROON    string
 
 	DATABASE_TYPE string
 	DATABASE_URL  string

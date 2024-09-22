@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"crypto/x509"
+
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/lnrpc"
