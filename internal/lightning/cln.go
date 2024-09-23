@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
 	cln_grpc "github.com/lescuer97/nutmix/internal/lightning/proto"
 	"github.com/lightningnetwork/lnd/zpay32"
@@ -191,9 +192,6 @@ func (l CLNGRPCWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, err
 		return cashu.UNPAID, "", err
 	}
 
-	fmt.Printf("\n pays %+v\n", pays)
-	fmt.Printf("\n invice %+v\n", invoices)
-
 	for _, pay := range pays.Pays {
 		switch {
 		case pay.Status == cln_grpc.ListpaysPays_COMPLETE:
@@ -255,11 +253,6 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	return fee, nil
 }
 
-// type AmountAny struct {
-//     Amount: *ccln_grpc.
-//
-// }
-
 func (l CLNGRPCWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
@@ -273,12 +266,17 @@ func (l CLNGRPCWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
 	amountOrAllCln := cln_grpc.AmountOrAny_Amount{
 		Amount: &amountCln,
 	}
+	randUuid, err := uuid.NewRandom()
+
+	if err != nil {
+		return response, fmt.Errorf(`uuid.NewRandom() %w`, err)
+	}
 
 	req := cln_grpc.InvoiceRequest{
 		AmountMsat: &cln_grpc.AmountOrAny{
 			Value: &amountOrAllCln,
 		},
-		Label:       "",
+        Label: randUuid.String(),
 		Description: "",
 	}
 
