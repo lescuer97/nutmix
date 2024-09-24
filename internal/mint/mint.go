@@ -265,7 +265,7 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 
 		fmt.Printf("correctKeyset: %v", correctKeyset)
 
-		if correctKeyset.PrivKey == nil {
+		if correctKeyset.PrivKey == nil || correctKeyset.Id != output.Id {
 			return nil, nil, UsingInactiveKeyset
 		}
 
