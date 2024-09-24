@@ -275,8 +275,6 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 	fee := GetAverageRouteFee(res.Routes) / 1000
 
-	fmt.Println("Res.Fees: ", GetAverageRouteFee(res.Routes))
-
 	return fee, nil
 }
 
