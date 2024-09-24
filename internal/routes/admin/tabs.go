@@ -183,7 +183,7 @@ func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Handl
 			return
 		}
 
-        mint.Config.NETWORK = chainparam.Name
+		mint.Config.NETWORK = chainparam.Name
 
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
 

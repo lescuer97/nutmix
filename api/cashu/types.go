@@ -153,7 +153,7 @@ type Proof struct {
 	Id      string `json:"id"`
 	Secret  string `json:"secret"`
 	C       string `json:"C" db:"c"`
-	Y       string `json:"Y" db:"Y"`
+	Y       string `json:"Y" db:"y"`
 	Witness string `json:"witness" db:"witness"`
 	SeenAt  int64  `json:"seen_at"`
 }

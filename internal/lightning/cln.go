@@ -276,7 +276,7 @@ func (l CLNGRPCWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
 		AmountMsat: &cln_grpc.AmountOrAny{
 			Value: &amountOrAllCln,
 		},
-        Label: randUuid.String(),
+		Label:       randUuid.String(),
 		Description: "",
 	}
 

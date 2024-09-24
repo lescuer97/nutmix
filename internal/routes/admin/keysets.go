@@ -92,10 +92,8 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 
 		}
 
-		// get current highted seed version
-
+		// get current highest seed version
 		var highestSeed cashu.Seed
-
 		for i, seed := range seeds {
 			if highestSeed.Version < seed.Version {
 				highestSeed = seed
@@ -103,7 +101,6 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 			seeds[i].Active = false
 		}
 		// get mint private_key
-
 		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 		if mint_privkey == "" {
 			logger.Error(

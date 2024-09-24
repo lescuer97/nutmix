@@ -30,8 +30,9 @@ type Mint struct {
 }
 
 var (
-	AlreadyActiveProof = errors.New("Proof already being spent")
-	AlreadyActiveQuote = errors.New("Quote already being spent")
+	AlreadyActiveProof  = errors.New("Proof already being spent")
+	AlreadyActiveQuote  = errors.New("Quote already being spent")
+	UsingInactiveKeyset = errors.New("Trying to use an inactive keyset")
 )
 
 type ActiveProofs struct {
@@ -261,6 +262,12 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 	for _, output := range outputs {
 
 		correctKeyset := m.ActiveKeysets[unit][output.Amount]
+
+		fmt.Printf("correctKeyset: %v", correctKeyset)
+
+		if correctKeyset.PrivKey == nil {
+			return nil, nil, UsingInactiveKeyset
+		}
 
 		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
 
