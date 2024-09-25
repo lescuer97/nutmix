@@ -1,16 +1,15 @@
 package admin
 
 import (
-	"log/slog"
-	"os"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"log/slog"
+	"os"
+	"strconv"
 )
 
 func KeysetsPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
@@ -92,10 +91,8 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 
 		}
 
-		// get current highted seed version
-
+		// get current highest seed version
 		var highestSeed cashu.Seed
-
 		for i, seed := range seeds {
 			if highestSeed.Version < seed.Version {
 				highestSeed = seed
@@ -103,7 +100,6 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 			seeds[i].Active = false
 		}
 		// get mint private_key
-
 		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 		if mint_privkey == "" {
 			logger.Error(
@@ -119,6 +115,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 
 		// rotate one level up
 		generatedSeed, err := cashu.DeriveIndividualSeedFromKey(mint_privkey, highestSeed.Version+1, cashu.Sat)
+		generatedSeed.Active = true
 
 		if err != nil {
 			logger.Warn(
@@ -185,7 +182,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 			if seed.Active {
 				newActiveKeysets[seed.Unit] = make(cashu.KeysetMap)
 				for _, keyset := range keysets {
-					mint.ActiveKeysets[seed.Unit][keyset.Amount] = keyset
+					newActiveKeysets[seed.Unit][keyset.Amount] = keyset
 				}
 
 			}

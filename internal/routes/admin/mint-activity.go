@@ -8,24 +8,23 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
-	"github.com/lescuer97/nutmix/internal/mint"
+	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func MintBalance(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintBalance(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
-		if mint.Config.MINT_LIGHTNING_BACKEND == comms.FAKE_WALLET {
+		if mint.Config.MINT_LIGHTNING_BACKEND == m.FAKE_WALLET {
 			c.HTML(200, "fake-wallet-balance", nil)
 			return
 
 		}
 
-		milillisatBalance, err := mint.LightningComs.WalletBalance()
+		milillisatBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
 
 			logger.Warn(
@@ -44,7 +43,7 @@ func MintBalance(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.H
 	}
 }
 
-func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintMeltSummary(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
@@ -70,7 +69,7 @@ func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) g
 		mintMeltTotal["Mint"] += 0
 		// sum up mint
 		for _, mintRequest := range mintMeltBalance.Mint {
-			invoice, err := zpay32.Decode(mintRequest.Request, &mint.Network)
+			invoice, err := zpay32.Decode(mintRequest.Request, mint.LightningBackend.GetNetwork())
 
 			if err != nil {
 				logger.Debug(
@@ -102,7 +101,7 @@ func MintMeltSummary(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) g
 		c.HTML(200, "mint-melt-activity", mintMeltTotal)
 	}
 }
-func MintMeltList(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintMeltList(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
 		timeRequestDuration := ParseToTimeRequest(timeHeader)

@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -90,7 +89,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 
 		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12"}
 
-		if mint.LightningComs.LightningBackend == comms.LNDGRPC {
+		if mint.LightningBackend.ActiveMPP() {
 			optionalNuts = append(optionalNuts, "15")
 		}
 
