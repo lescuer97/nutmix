@@ -791,10 +791,10 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
@@ -848,10 +848,10 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "LNbitsWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "LNbitsWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
@@ -1565,10 +1565,10 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
@@ -1662,10 +1662,10 @@ func TestConfigMeltMintLimit(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
@@ -1740,10 +1740,10 @@ func TestFeeReturnAmount(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))

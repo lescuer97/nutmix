@@ -24,26 +24,17 @@ func TestSetUpMint(t *testing.T) {
 		Unit:      cashu.Sat.String(),
 		Id:        "id",
 	}
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 
 	seed.EncryptSeed(MintPrivateKey)
 
-	err := os.Setenv(NETWORK_ENV, "regtest")
+	t.Setenv(NETWORK_ENV, "regtest")
 
-	if err != nil {
-		t.Errorf("could not set network %v", err)
-
-	}
-	err = os.Setenv(MINT_LIGHTNING_BACKEND_ENV, "FakeWallet")
-	if err != nil {
-		t.Errorf("could not set lightning backend %v", err)
-
-	}
+	t.Setenv(MINT_LIGHTNING_BACKEND_ENV, "FakeWallet")
 
 	seeds := []cashu.Seed{
 		seed,
 	}
-	// t.T
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, MINT_LIGHTNING_BACKEND_ENV, os.Getenv(MINT_LIGHTNING_BACKEND_ENV))

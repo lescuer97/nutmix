@@ -24,12 +24,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	r.LoadHTMLGlob("internal/routes/admin/templates/**")
 	adminRoute := r.Group("/admin")
 
-	// hmacSecret, err := generateHMACSecret()
-
-	// if err != nil {
-	// 	log.Panic("ERROR: could not create HMAC secret")
-	// }
-
 	adminRoute.Use(AuthMiddleware(logger))
 
 	// PAGES SETUP
