@@ -21,6 +21,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
+	"github.com/lescuer97/nutmix/internal/routes/admin"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/testcontainers/testcontainers-go"
@@ -62,11 +63,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	t.Setenv("MINT_LIGHTNING_BACKEND", string(mint.FAKE_WALLET))
 	t.Setenv(mint.NETWORK_ENV, "regtest")
-
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
-	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
-	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
 	router, mint := SetupRoutingForTesting(ctx)
 
@@ -697,10 +693,10 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	config, err := mint.SetUpConfigFile()
 
-	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(ctx.Value(mint.MINT_LIGHTNING_BACKEND_ENV).(string))
+	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 
-	config.DATABASE_URL = ctx.Value(database.DATABASE_URL_ENV).(string)
-	config.NETWORK = ctx.Value(mint.NETWORK_ENV).(string)
+	config.DATABASE_URL = os.Getenv(database.DATABASE_URL_ENV)
+	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
 	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
 	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
 	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
@@ -722,6 +718,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	routes.V1Routes(r, pool, mint, logger)
+	admin.AdminRoutes(ctx, r, pool, mint, logger)
 
 	return r, mint
 }
