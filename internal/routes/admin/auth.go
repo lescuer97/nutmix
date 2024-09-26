@@ -111,7 +111,6 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Handler
 		if nostrLogin.Activated {
 			c.JSON(403, "This login value was already used, please reload the page")
 			return
-
 		}
 
 		// check valid signature
@@ -200,7 +199,7 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Handler
 		token, err := makeJWTToken(jwtsecret)
 
 		if err != nil {
-			logger.Warn("Could not makeJWTToken ", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Warn("Could not makeJWTToken", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, nil)
 			return
 		}

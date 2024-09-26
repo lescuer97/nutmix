@@ -2,7 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"log"
+	"log/slog"
+	"os"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -12,10 +19,6 @@ import (
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"io"
-	"log"
-	"log/slog"
-	"os"
 )
 
 var (
@@ -108,10 +111,17 @@ func main() {
 		log.Panic()
 	}
 
+	decodedPrivKey, err := hex.DecodeString(mint_privkey)
+	if err != nil {
+		logger.Error("Could not parse private key hex")
+		log.Panic()
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
 
-		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
+		generatedSeeds, err := cashu.DeriveSeedsFromKey(parsedPrivateKey, 1, cashu.AvailableSeeds)
 
 		if err != nil {
 			logger.Error(fmt.Sprintf("ERROR: DeriveSeedsFromKey: %+v ", err))
@@ -128,44 +138,11 @@ func main() {
 		}
 	}
 
-	inactiveUnits, err := mint.CheckForInactiveSeeds(seeds)
-
-	if err != nil {
-		logger.Error(fmt.Sprintf("ERROR: CheckForActiveSeeds: %+v ", err))
-		log.Panic()
-	}
-
-	// if there are inactive seeds we derive new seeds from the mint private key and version up
-	if len(inactiveUnits) > 0 {
-		logger.Info(fmt.Sprintf("Deriving new seeds for activation: %+v", inactiveUnits))
-
-		var versionedUpSeeds []cashu.Seed
-		for _, seedType := range inactiveUnits {
-
-			generatedSeed, err := cashu.DeriveIndividualSeedFromKey(mint_privkey, seedType.Version+1, seedType.Unit)
-
-			if err != nil {
-				logger.Warn(fmt.Sprintf(" cashu.DeriveIndividualSeedFromKey INCREASE Version: %+v ", err))
-				log.Panic()
-			}
-
-			versionedUpSeeds = append(versionedUpSeeds, generatedSeed)
-		}
-
-		err = database.SaveNewSeeds(pool, versionedUpSeeds)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("SaveNewSeed: %+v ", err))
-			log.Panic()
-		}
-
-		seeds = append(seeds, versionedUpSeeds...)
-	}
-
 	// check for seeds that are not encrypted and encrypt them
 	for i, seed := range seeds {
 		if !seed.Encrypted {
 
-			err = seed.EncryptSeed(mint_privkey)
+			err = seed.EncryptSeed(parsedPrivateKey)
 
 			if err != nil {
 				logger.Error(fmt.Sprintf("Could not encrypt seed that was not encrypted %+v", err))
@@ -189,11 +166,12 @@ func main() {
 	}
 
 	// remove mint private key from variable
-	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds, config)
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config)
 
 	// clear mint seeds and privatekey
 	seeds = []cashu.Seed{}
 	mint_privkey = ""
+	parsedPrivateKey = nil
 
 	if err != nil {
 		logger.Warn(fmt.Sprintf("SetUpMint: %+v ", err))

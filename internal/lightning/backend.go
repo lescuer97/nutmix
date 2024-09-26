@@ -21,9 +21,9 @@ type LightningBackend interface {
 	WalletBalance() (uint64, error)
 	LightningType() Backend
 	GetNetwork() *chaincfg.Params
-	// TODO CHECK that the inner pointer change work on network
 	ActiveMPP() bool
 }
+
 type PaymentResponse struct {
 	Preimage       string
 	PaymentError   error
@@ -31,15 +31,8 @@ type PaymentResponse struct {
 	Rhash          string
 	PaidFeeSat     int64
 }
-type QueryRoutesResponse struct {
-	FeeReserve uint64 `json:"fee_reserve"`
-}
 
 type InvoiceResponse struct {
 	PaymentRequest string
 	Rhash          string
-}
-
-type FeesResponse struct {
-	FeeReserve uint64 `json:"fee_reserve"`
 }

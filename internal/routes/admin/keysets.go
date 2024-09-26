@@ -1,25 +1,28 @@
 package admin
 
 import (
+	"encoding/hex"
+	"log/slog"
+	"os"
+	"strconv"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
-	"github.com/lescuer97/nutmix/internal/mint"
+	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"log/slog"
-	"os"
-	"strconv"
 )
 
-func KeysetsPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func KeysetsPage(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
 		c.HTML(200, "keysets.html", nil)
 	}
 }
-func KeysetsLayoutPage(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func KeysetsLayoutPage(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		type KeysetData struct {
@@ -57,7 +60,7 @@ func KeysetsLayoutPage(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger)
 	}
 }
 
-func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func RotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		seeds, err := database.GetSeedsByUnit(pool, cashu.Sat)
@@ -88,7 +91,6 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 
 			c.HTML(200, "settings-error", errorMessage)
 			return
-
 		}
 
 		// get current highest seed version
@@ -99,12 +101,27 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 			}
 			seeds[i].Active = false
 		}
+
 		// get mint private_key
 		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 		if mint_privkey == "" {
 			logger.Error(
 				"Err: could not get mint private key",
-				slog.String(utils.LogExtraInfo, err.Error()))
+				slog.String(utils.LogExtraInfo, "private key is not available"))
+
+			errorMessage := ErrorNotif{
+				Error: "There was a problem getting the mint private key",
+			}
+
+			c.HTML(200, "settings-error", errorMessage)
+			return
+		}
+		decodedPrivKey, err := hex.DecodeString(mint_privkey)
+		if err != nil {
+			logger.Error(
+				"could not parse mint private key",
+				slog.String(utils.LogExtraInfo, "hex.DecodeString(mint_privkey)"))
+
 			errorMessage := ErrorNotif{
 				Error: "There was a problem getting the mint private key",
 			}
@@ -113,8 +130,10 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 			return
 		}
 
+		parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
+
 		// rotate one level up
-		generatedSeed, err := cashu.DeriveIndividualSeedFromKey(mint_privkey, highestSeed.Version+1, cashu.Sat)
+		generatedSeed, err := cashu.DeriveIndividualSeedFromKey(parsedPrivateKey, highestSeed.Version+1, cashu.Sat)
 		generatedSeed.Active = true
 
 		if err != nil {
@@ -161,39 +180,24 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gi
 
 		seeds = append(seeds, generatedSeed)
 
-		// regenerate keysets for mint use
-		newKeysets := make(map[string][]cashu.Keyset)
-		newActiveKeysets := make(map[string]cashu.KeysetMap)
-
-		for _, seed := range seeds {
-			keysets, err := seed.DeriveKeyset(mint_privkey)
-			if err != nil {
-				logger.Error(
-					"There was a problem deriving the keyset",
-					slog.String(utils.LogExtraInfo, err.Error()))
-				errorMessage := ErrorNotif{
-					Error: "There was a problem deriving the keyset",
-				}
-
-				c.HTML(200, "settings-error", errorMessage)
-				return
+		keysets, activeKeysets, err := m.DeriveKeysetFromSeeds(seeds, parsedPrivateKey)
+		if err != nil {
+			logger.Error(
+				"There was a problem deriving the keyset",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			errorMessage := ErrorNotif{
+				Error: "There was a problem deriving the keyset",
 			}
 
-			if seed.Active {
-				newActiveKeysets[seed.Unit] = make(cashu.KeysetMap)
-				for _, keyset := range keysets {
-					newActiveKeysets[seed.Unit][keyset.Amount] = keyset
-				}
-
-			}
-
-			newKeysets[seed.Unit] = append(mint.Keysets[seed.Unit], keysets...)
+			c.HTML(200, "settings-error", errorMessage)
+			return
 		}
 
-		mint.Keysets = newKeysets
-		mint.ActiveKeysets = newActiveKeysets
+		mint.Keysets = keysets
+		mint.ActiveKeysets = activeKeysets
 
 		mint_privkey = ""
+		parsedPrivateKey = nil
 		seeds = []cashu.Seed{}
 
 		successMessage := struct {
