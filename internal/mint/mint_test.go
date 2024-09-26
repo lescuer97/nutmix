@@ -2,6 +2,7 @@ package mint
 
 import (
 	"context"
+	"encoding/hex"
 	// "fmt"
 	"os"
 	"testing"
@@ -14,6 +15,12 @@ import (
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
 
 func TestSetUpMint(t *testing.T) {
+	decodedPrivKey, err := hex.DecodeString(MintPrivateKey)
+	if err != nil {
+		t.Errorf("hex.DecodeString(masterKey) %+v", err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
 
 	seedInfo := []byte("seed")
 
@@ -26,7 +33,7 @@ func TestSetUpMint(t *testing.T) {
 	}
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 
-	seed.EncryptSeed(MintPrivateKey)
+	seed.EncryptSeed(parsedPrivateKey)
 
 	t.Setenv(NETWORK_ENV, "regtest")
 
@@ -40,15 +47,13 @@ func TestSetUpMint(t *testing.T) {
 	ctx = context.WithValue(ctx, MINT_LIGHTNING_BACKEND_ENV, os.Getenv(MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, NETWORK_ENV, os.Getenv(NETWORK_ENV))
 
-	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
-
 	config, err := SetUpConfigFile()
 
 	if err != nil {
 		t.Errorf("could not setup config file: %+v", err)
 	}
 
-	mint, err := SetUpMint(ctx, mint_privkey, seeds, config)
+	mint, err := SetUpMint(ctx, parsedPrivateKey, seeds, config)
 
 	if err != nil {
 		t.Errorf("could not setup mint: %+v", err)

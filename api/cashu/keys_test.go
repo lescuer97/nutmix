@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/tyler-smith/go-bip32"
 )
 
@@ -53,7 +54,15 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 
 	masterKey := "0000000000000000000000000000000000000000000000000000000000000001"
 
-	generatedSeeds, err := DeriveSeedsFromKey(masterKey, 1, AvailableSeeds)
+
+	decodedPrivKey, err := hex.DecodeString(masterKey)
+	if err != nil {
+		t.Errorf("hex.DecodeString(masterKey) %+v", err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
+
+	generatedSeeds, err := DeriveSeedsFromKey(parsedPrivateKey, 1, AvailableSeeds)
 
 	if err != nil {
 		t.Errorf("could not derive seeds from key %+v", err)
@@ -63,7 +72,7 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 		t.Errorf("seed length is not 2")
 	}
 
-	err = generatedSeeds[0].DecryptSeed(masterKey)
+	err = generatedSeeds[0].DecryptSeed(parsedPrivateKey)
 
 	if err != nil {
 		t.Errorf("could not decrypt seed %+v", err)
@@ -87,12 +96,19 @@ func TestDeriveIndividualSeedFromKey(t *testing.T) {
 
 	masterKey := "0000000000000000000000000000000000000000000000000000000000000001"
 
-	generatedSeeds, err := DeriveIndividualSeedFromKey(masterKey, 1, Sat)
+	decodedPrivKey, err := hex.DecodeString(masterKey)
+	if err != nil {
+		t.Errorf("hex.DecodeString(masterKey) %+v", err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
+
+	generatedSeeds, err := DeriveIndividualSeedFromKey(parsedPrivateKey, 1, Sat)
 
 	if err != nil {
 		t.Errorf("could not derive seeds from key %+v", err)
 	}
-	err = generatedSeeds.DecryptSeed(masterKey)
+	err = generatedSeeds.DecryptSeed(parsedPrivateKey)
 
 	if err != nil {
 		t.Errorf("could not decrypt seed %+v", err)

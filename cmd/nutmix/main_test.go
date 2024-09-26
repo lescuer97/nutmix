@@ -670,6 +670,12 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 	}
 
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+	decodedPrivKey, err := hex.DecodeString(mint_privkey)
+	if err != nil {
+		log.Fatalf("hex.DecodeString(mint_privkey): %+v ", err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
 
@@ -677,7 +683,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 			log.Fatalf("No mint private key found in env")
 		}
 
-		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
+		generatedSeeds, err := cashu.DeriveSeedsFromKey(parsedPrivateKey, 1, cashu.AvailableSeeds)
 
 		err = database.SaveNewSeeds(pool, generatedSeeds)
 
@@ -705,7 +711,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
 
-	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds, config)
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
