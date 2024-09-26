@@ -1,6 +1,8 @@
 package admin
 
-import "testing"
+import (
+	"testing"
+)
 
 
 func TestCheckIntegerFromStringSuccess(t *testing.T) {
@@ -12,7 +14,7 @@ func TestCheckIntegerFromStringSuccess(t *testing.T) {
     }
 
     success := 2
-    if int != &success {
+    if *int != success {
         t.Error("Convertion should have occured")
     }
 }
