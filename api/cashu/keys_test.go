@@ -54,7 +54,6 @@ func TestDeriveSeedsFromKey(t *testing.T) {
 
 	masterKey := "0000000000000000000000000000000000000000000000000000000000000001"
 
-
 	decodedPrivKey, err := hex.DecodeString(masterKey)
 	if err != nil {
 		t.Errorf("hex.DecodeString(masterKey) %+v", err)
