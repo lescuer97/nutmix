@@ -83,7 +83,7 @@ func AuthMiddleware(logger *slog.Logger) gin.HandlerFunc {
 
 func Login(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
+		// parse data for login
 		logger.Debug("Attempting log in")
 		var nostrEvent nostr.Event
 		err := c.BindJSON(&nostrEvent)
@@ -178,10 +178,15 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Handler
 		verified := sig.Verify(eventHash[:], pubkey)
 
 		if !verified {
-			logger.Warn("Private key used is not correct")
-			c.Header("HX-RETARGET", "error-message")
-			c.HTML(400, "incorrect-key-error", nil)
-			return
+			if c.ContentType() == gin.MIMEJSON {
+				c.JSON(400, "Private key used is not correct")
+				return
+			} else {
+				logger.Warn("Private key used is not correct")
+				c.Header("HX-RETARGET", "error-message")
+				c.HTML(400, "incorrect-key-error", nil)
+				return
+			}
 		}
 
 		nostrLogin.Activated = verified

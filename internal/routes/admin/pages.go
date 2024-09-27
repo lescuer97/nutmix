@@ -10,13 +10,22 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 )
 
+type LoginParams struct {
+	Nonce     string
+	ADMINNPUB string
+}
+
 func LoginPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		// generate nonce for login nostr
 		nonce, err := cashu.GenerateNonceHex()
 		if err != nil {
-			c.HTML(200, "error.html", nil)
+			if c.ContentType() == gin.MIMEJSON {
+				c.JSON(500, "there was a problem generating a nonce")
+			} else {
+				c.HTML(200, "error.html", nil)
+			}
 		}
 
 		nostrLogin := cashu.NostrLoginAuth{
@@ -29,15 +38,17 @@ func LoginPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 
 		adminNPUB := os.Getenv("ADMIN_NOSTR_NPUB")
 
-		loginValues := struct {
-			Nonce     string
-			ADMINNPUB string
-		}{
+		loginValues := LoginParams{
 			Nonce:     nostrLogin.Nonce,
 			ADMINNPUB: adminNPUB,
 		}
 
-		c.HTML(200, "login.html", loginValues)
+		if c.ContentType() == gin.MIMEJSON {
+			c.JSON(200, loginValues)
+		} else {
+			c.HTML(200, "login.html", loginValues)
+		}
+
 	}
 }
 

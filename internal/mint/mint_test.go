@@ -3,11 +3,11 @@ package mint
 import (
 	"context"
 	"encoding/hex"
-	"os"
-	"testing"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/tyler-smith/go-bip32"
+	"os"
+	"testing"
 )
 
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"

@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+	// "log"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/mint"
@@ -20,8 +21,16 @@ type ErrorNotif struct {
 }
 
 func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
-	r.Static("static", "internal/routes/admin/static")
-	r.LoadHTMLGlob("internal/routes/admin/templates/**")
+	testPath := os.Getenv("TEST_PATH")
+	if testPath != "" {
+		r.Static("static", testPath+"static")
+		r.LoadHTMLGlob(testPath + "templates/**")
+
+	} else {
+		r.Static("static", "internal/routes/admin/static")
+		r.LoadHTMLGlob("internal/routes/admin/templates/**")
+
+	}
 	adminRoute := r.Group("/admin")
 
 	adminRoute.Use(AuthMiddleware(logger))
