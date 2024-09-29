@@ -64,7 +64,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	t.Setenv("MINT_LIGHTNING_BACKEND", string(mint.FAKE_WALLET))
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// MINTING TESTING STARTS
 
@@ -651,7 +651,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 }
 
-func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
+func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
 
 	pool, err := database.DatabaseSetup(ctx, "../../migrations/")
 
@@ -718,7 +718,10 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	routes.V1Routes(r, pool, mint, logger)
-	admin.AdminRoutes(ctx, r, pool, mint, logger)
+
+	if adminRoute {
+		admin.AdminRoutes(ctx, r, pool, mint, logger)
+	}
 
 	return r, mint
 }
@@ -915,7 +918,7 @@ func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]cashu.
 }
 
 func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainers.Container) {
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// MINTING TESTING STARTS
 
@@ -1579,7 +1582,7 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, _ := SetupRoutingForTesting(ctx)
+	router, _ := SetupRoutingForTesting(ctx, false)
 
 	// Mint check incorrect unit
 	w := httptest.NewRecorder()
@@ -1676,7 +1679,7 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// MINTING TESTING STARTS
 
@@ -1754,7 +1757,7 @@ func TestFeeReturnAmount(t *testing.T) {
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// Mint check incorrect unit
 	w := httptest.NewRecorder()

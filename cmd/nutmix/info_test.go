@@ -53,7 +53,7 @@ func TestMintInfo(t *testing.T) {
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, _ := SetupRoutingForTesting(ctx)
+	router, _ := SetupRoutingForTesting(ctx, false)
 
 	req := httptest.NewRequest("GET", "/v1/info", nil)
 

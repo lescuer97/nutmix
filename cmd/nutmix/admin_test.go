@@ -63,7 +63,7 @@ func TestSetupMintAdminLoginSuccess(t *testing.T) {
 	t.Setenv("ADMIN_NOSTR_NPUB", nip19pubkey)
 	t.Setenv("TEST_PATH", "../../internal/routes/admin/")
 
-	router, _ := SetupRoutingForTesting(ctx)
+	router, _ := SetupRoutingForTesting(ctx, true)
 
 	// get login nonce
 	w := httptest.NewRecorder()
@@ -157,7 +157,7 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 	t.Setenv("ADMIN_NOSTR_NPUB", nip19pubkey)
 	t.Setenv("TEST_PATH", "../../internal/routes/admin/")
 
-	router, _ := SetupRoutingForTesting(ctx)
+	router, _ := SetupRoutingForTesting(ctx, true)
 
 	// get login nonce
 	w := httptest.NewRecorder()

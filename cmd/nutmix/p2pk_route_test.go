@@ -56,7 +56,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	lockingPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x04})
 
@@ -355,7 +355,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	lockingPrivKeyOne := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x04})
 
