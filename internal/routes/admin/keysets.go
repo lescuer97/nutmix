@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
@@ -60,14 +61,113 @@ func KeysetsLayoutPage(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gi
 	}
 }
 
+type RotateRequest struct {
+	Fee int
+}
+
+func rotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, rotateRequest RotateRequest) error {
+	seeds, err := database.GetSeedsByUnit(pool, cashu.Sat)
+	if err != nil {
+
+		return fmt.Errorf("database.GetSeedsByUnit(pool, cashu.Sat). %w", err)
+	}
+	// get current highest seed version
+	var highestSeed cashu.Seed
+	for i, seed := range seeds {
+		if highestSeed.Version < seed.Version {
+			highestSeed = seed
+		}
+		seeds[i].Active = false
+	}
+
+	// get mint private_key
+	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+	if mint_privkey == "" {
+		return fmt.Errorf(`os.Getenv("MINT_PRIVATE_KEY"). %w`, err)
+	}
+	decodedPrivKey, err := hex.DecodeString(mint_privkey)
+	if err != nil {
+		return fmt.Errorf(`hex.DecodeString(mint_privkey). %w`, err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
+
+	// rotate one level up
+	generatedSeed, err := cashu.DeriveIndividualSeedFromKey(parsedPrivateKey, highestSeed.Version+1, cashu.Sat)
+	generatedSeed.Active = true
+
+	if err != nil {
+		return fmt.Errorf(`cashu.DeriveIndividualSeedFromKey(parsedPrivateKey, highestSeed.Version+1, cashu.Sat). %w`, err)
+	}
+
+	generatedSeed.InputFeePpk = rotateRequest.Fee
+
+	// add new key to db
+	err = database.SaveNewSeed(pool, &generatedSeed)
+	if err != nil {
+		return fmt.Errorf(`database.SaveNewSeed(pool, &generatedSeed). %w`, err)
+	}
+	err = database.UpdateActiveStatusSeeds(pool, seeds)
+	if err != nil {
+		return fmt.Errorf(`database.UpdateActiveStatusSeeds(pool, seeds). %w`, err)
+	}
+
+	seeds = append(seeds, generatedSeed)
+
+	keysets, activeKeysets, err := m.DeriveKeysetFromSeeds(seeds, parsedPrivateKey)
+	if err != nil {
+		return fmt.Errorf(`m.DeriveKeysetFromSeeds(seeds, parsedPrivateKey). %w`, err)
+	}
+
+	fmt.Printf("mint.ActiveKeysets: %+v", mint.ActiveKeysets)
+	mint.Keysets = keysets
+	mint.ActiveKeysets = activeKeysets
+	fmt.Printf("ActiveKeysets: %+v", activeKeysets)
+
+	mint_privkey = ""
+	parsedPrivateKey = nil
+	return nil
+}
+
 func RotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var rotateRequest RotateRequest
 
-		seeds, err := database.GetSeedsByUnit(pool, cashu.Sat)
+		fmt.Printf("ROTATE FUNCTION")
+		if c.ContentType() == gin.MIMEJSON {
+			err := c.BindJSON(rotateRequest)
+			if err != nil {
+				c.JSON(400, nil)
+				return
+			}
+		} else {
+			// get Inputed fee
+			feeString := c.Request.PostFormValue("FEE")
+
+			newSeedFee, err := strconv.Atoi(feeString)
+			if err != nil {
+				logger.Error(
+					"Err: There was a problem rotating the key",
+					slog.String(utils.LogExtraInfo, err.Error()))
+
+				errorMessage := ErrorNotif{
+					Error: "Fee was not an integer",
+				}
+
+				c.HTML(200, "settings-error", errorMessage)
+				return
+			}
+			rotateRequest.Fee = newSeedFee
+		}
+
+		fmt.Printf("ROTATE FUNCTION")
+		err := rotateSatsSeed(pool, mint, rotateRequest)
+
 		if err != nil {
 			logger.Error(
-				"database.GetSeedsByUnit(pool, cashu.Sat)",
+				"otateSatsSeed(pool,mint, logger, rotateRequest)",
 				slog.String(utils.LogExtraInfo, err.Error()))
+
 			errorMessage := ErrorNotif{
 				Error: "There was an error getting the seeds",
 			}
@@ -75,137 +175,18 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.H
 			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
-		// get Inputed fee
-		feeString := c.Request.PostFormValue("FEE")
 
-		newSeedFee, err := strconv.Atoi(feeString)
+		if c.ContentType() == gin.MIMEJSON {
+			c.JSON(200, nil)
+		} else {
 
-		if err != nil {
-			logger.Error(
-				"Err: There was a problem rotating the key",
-				slog.String(utils.LogExtraInfo, err.Error()))
-
-			errorMessage := ErrorNotif{
-				Error: "Fee was not an integer",
+			successMessage := struct {
+				Success string
+			}{
+				Success: "Key succesfully rotated",
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
-			return
+			c.Header("HX-Trigger", "recharge-keyset")
+			c.HTML(200, "settings-success", successMessage)
 		}
-
-		// get current highest seed version
-		var highestSeed cashu.Seed
-		for i, seed := range seeds {
-			if highestSeed.Version < seed.Version {
-				highestSeed = seed
-			}
-			seeds[i].Active = false
-		}
-
-		// get mint private_key
-		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
-		if mint_privkey == "" {
-			logger.Error(
-				"Err: could not get mint private key",
-				slog.String(utils.LogExtraInfo, "private key is not available"))
-
-			errorMessage := ErrorNotif{
-				Error: "There was a problem getting the mint private key",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
-			return
-		}
-		decodedPrivKey, err := hex.DecodeString(mint_privkey)
-		if err != nil {
-			logger.Error(
-				"could not parse mint private key",
-				slog.String(utils.LogExtraInfo, "hex.DecodeString(mint_privkey)"))
-
-			errorMessage := ErrorNotif{
-				Error: "There was a problem getting the mint private key",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
-			return
-		}
-
-		parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-
-		// rotate one level up
-		generatedSeed, err := cashu.DeriveIndividualSeedFromKey(parsedPrivateKey, highestSeed.Version+1, cashu.Sat)
-		generatedSeed.Active = true
-
-		if err != nil {
-			logger.Warn(
-				"There was a problem rotating the key",
-				slog.String(utils.LogExtraInfo, err.Error()))
-
-			errorMessage := ErrorNotif{
-				Error: "There was a problem rotating the key",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
-			return
-		}
-
-		generatedSeed.InputFeePpk = newSeedFee
-
-		// add new key to db
-		err = database.SaveNewSeed(pool, &generatedSeed)
-		if err != nil {
-			logger.Error(
-				"Could not save key",
-				slog.String(utils.LogExtraInfo, err.Error()))
-			errorMessage := ErrorNotif{
-				Error: "There was a problem saving the new seed",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
-			return
-		}
-		err = database.UpdateActiveStatusSeeds(pool, seeds)
-		if err != nil {
-			logger.Error(
-				"database.UpdateActiveStatusSeeds",
-				slog.String(utils.LogExtraInfo, err.Error()))
-
-			errorMessage := ErrorNotif{
-				Error: "there was a problem modifying the seeds",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
-			return
-		}
-
-		seeds = append(seeds, generatedSeed)
-
-		keysets, activeKeysets, err := m.DeriveKeysetFromSeeds(seeds, parsedPrivateKey)
-		if err != nil {
-			logger.Error(
-				"There was a problem deriving the keyset",
-				slog.String(utils.LogExtraInfo, err.Error()))
-			errorMessage := ErrorNotif{
-				Error: "There was a problem deriving the keyset",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
-			return
-		}
-
-		mint.Keysets = keysets
-		mint.ActiveKeysets = activeKeysets
-
-		mint_privkey = ""
-		parsedPrivateKey = nil
-		seeds = []cashu.Seed{}
-
-		successMessage := struct {
-			Success string
-		}{
-			Success: "Key succesfully rotated",
-		}
-		c.Header("HX-Trigger", "recharge-keyset")
-		c.HTML(200, "settings-success", successMessage)
 	}
 }

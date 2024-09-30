@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -8,6 +9,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 type LoginParams struct {
@@ -15,7 +17,7 @@ type LoginParams struct {
 	ADMINNPUB string
 }
 
-func LoginPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
+func LoginPage(pool *pgxpool.Pool, logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		// generate nonce for login nostr
@@ -34,7 +36,19 @@ func LoginPage(pool *pgxpool.Pool, mint *mint.Mint) gin.HandlerFunc {
 			Activated: false,
 		}
 
-		database.SaveNostrLoginAuth(pool, nostrLogin)
+		err = database.SaveNostrLoginAuth(pool, nostrLogin)
+		if err != nil {
+			logger.Error(
+				"database.SaveNostrLoginAuth(pool, nostrLogin)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			if c.ContentType() == gin.MIMEJSON {
+				c.JSON(500, "there was a problem generating a nonce")
+			} else {
+				c.HTML(200, "error.html", nil)
+			}
+			return
+
+		}
 
 		adminNPUB := os.Getenv("ADMIN_NOSTR_NPUB")
 

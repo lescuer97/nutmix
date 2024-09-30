@@ -40,7 +40,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	adminRoute.GET("", InitPage(pool, mint))
 	adminRoute.GET("/keysets", KeysetsPage(pool, mint))
 	adminRoute.GET("/settings", MintSettingsPage(pool, mint))
-	adminRoute.GET("/login", LoginPage(pool, mint))
+	adminRoute.GET("/login", LoginPage(pool, logger, mint))
 	adminRoute.GET("/bolt11", LightningNodePage(pool, mint))
 
 	// change routes
