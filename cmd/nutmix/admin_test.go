@@ -217,7 +217,7 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 	}
 }
 
-func TestRotateKeyUp(t *testing.T) {
+func TestRotateKeyUpCall(t *testing.T) {
 	const posgrespassword = "password"
 	const postgresuser = "user"
 	ctx := context.Background()

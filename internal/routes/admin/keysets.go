@@ -119,10 +119,8 @@ func rotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, rotateRequest RotateReques
 		return fmt.Errorf(`m.DeriveKeysetFromSeeds(seeds, parsedPrivateKey). %w`, err)
 	}
 
-	fmt.Printf("mint.ActiveKeysets: %+v", mint.ActiveKeysets)
 	mint.Keysets = keysets
 	mint.ActiveKeysets = activeKeysets
-	fmt.Printf("ActiveKeysets: %+v", activeKeysets)
 
 	mint_privkey = ""
 	parsedPrivateKey = nil
@@ -132,8 +130,6 @@ func rotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, rotateRequest RotateReques
 func RotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rotateRequest RotateRequest
-
-		fmt.Printf("ROTATE FUNCTION")
 		if c.ContentType() == gin.MIMEJSON {
 			err := c.BindJSON(rotateRequest)
 			if err != nil {
@@ -160,7 +156,6 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.H
 			rotateRequest.Fee = newSeedFee
 		}
 
-		fmt.Printf("ROTATE FUNCTION")
 		err := rotateSatsSeed(pool, mint, rotateRequest)
 
 		if err != nil {
