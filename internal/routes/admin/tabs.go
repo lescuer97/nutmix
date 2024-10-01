@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"fmt"
 	"log/slog"
 	"strconv"
 
@@ -17,6 +18,36 @@ func MintSettingsPage(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(200, "settings.html", mint.Config)
 	}
+}
+
+func checkLimitSat(text string) (*int, error) {
+	var finalInt *int = nil
+	switch text {
+	case "":
+
+		return finalInt, nil
+	default:
+		pegInLimit, err := strconv.Atoi(text)
+		if err != nil {
+			return nil, fmt.Errorf("strconv.Atoi(text). %w", err)
+		}
+		finalInt = &pegInLimit
+	}
+
+	return finalInt, nil
+}
+
+func isNostrKeyValid(nostrKey string) (bool, error) {
+	_, key, err := nip19.Decode(nostrKey)
+
+	if err != nil {
+
+		return false, fmt.Errorf("nip19.Decode(key): %w ", err)
+
+	}
+
+	return nostr.IsValid32ByteHex(key.(string)), nil
+
 }
 
 func MintSettingsForm(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
@@ -37,96 +68,68 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin
 			mint.Config.PEG_OUT_ONLY = false
 		}
 
-		pegInLimitStr := c.Request.PostFormValue("PEG_IN_LIMIT_SATS")
-		switch pegInLimitStr {
-
-		case "":
-
-			mint.Config.PEG_IN_LIMIT_SATS = nil
-		default:
-
-			pegInLimit, err := strconv.Atoi(pegInLimitStr)
-			if err != nil {
-				logger.Debug(
-					"strconv.Atoi(pegInLimitStr)",
-					slog.String(utils.LogExtraInfo, err.Error()))
-				errorMessage := ErrorNotif{
-					Error: "Peg in limit is not an integer",
-				}
-
-				c.HTML(200, "settings-error", errorMessage)
-				return
+		// Check pegin limit.
+		pegInLitmit, err := checkLimitSat(c.Request.PostFormValue("PEG_IN_LIMIT_SATS"))
+		if err != nil {
+			logger.Debug(
+				`checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))`,
+				slog.String(utils.LogExtraInfo, err.Error()))
+			errorMessage := ErrorNotif{
+				Error: "peg out limit has a problem",
 			}
 
-			mint.Config.PEG_IN_LIMIT_SATS = &pegInLimit
-
+			c.HTML(200, "settings-error", errorMessage)
+			return
 		}
+		mint.Config.PEG_IN_LIMIT_SATS = pegInLitmit
 
 		// Check pegout limit.
-		pegOutLimitStr := c.Request.PostFormValue("PEG_OUT_LIMIT_SATS")
-		switch pegOutLimitStr {
-
-		case "":
-			mint.Config.PEG_OUT_LIMIT_SATS = nil
-		default:
-			pegOutLimit, err := strconv.Atoi(pegOutLimitStr)
-			if err != nil {
-				logger.Debug(
-					"strconv.Atoi(pegInLimitStr)",
-					slog.String(utils.LogExtraInfo, err.Error()))
-				errorMessage := ErrorNotif{
-					Error: "Peg out limit is not an integer",
-				}
-				c.HTML(200, "settings-error", errorMessage)
-				return
+		pegOutLitmit, err := checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))
+		if err != nil {
+			logger.Debug(
+				`checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))`,
+				slog.String(utils.LogExtraInfo, err.Error()))
+			errorMessage := ErrorNotif{
+				Error: "peg out limit has a problem",
 			}
 
-			mint.Config.PEG_OUT_LIMIT_SATS = &pegOutLimit
-
+			c.HTML(200, "settings-error", errorMessage)
+			return
 		}
+		mint.Config.PEG_OUT_LIMIT_SATS = pegOutLitmit
 
 		nostrKey := c.Request.PostFormValue("NOSTR")
 
 		if len(nostrKey) > 0 {
 
-			_, key, err := nip19.Decode(nostrKey)
+			isValid, err := isNostrKeyValid(nostrKey)
 
 			if err != nil {
 				logger.Warn(
 					"nip19.Decode(nostrKey)",
 					slog.String(utils.LogExtraInfo, err.Error()))
-
 				errorMessage := ErrorNotif{
 					Error: "Nostr npub is not valid",
 				}
-
 				c.HTML(200, "settings-error", errorMessage)
-
 				return
-
 			}
 
-			switch nostr.IsValid32ByteHex(key.(string)) {
-			case true:
-				mint.Config.NOSTR = nostrKey
-			case false:
+			if !isValid {
 				logger.Warn("Nostr npub is not valid")
 				errorMessage := ErrorNotif{
 					Error: "Nostr npub is not valid",
 				}
-
 				c.HTML(200, "settings-error", errorMessage)
-
 				return
-
 			}
 
+			mint.Config.NOSTR = nostrKey
 		} else {
 			mint.Config.NOSTR = ""
-
 		}
 
-		err := mint.Config.SetTOMLFile()
+		err = mint.Config.SetTOMLFile()
 		if err != nil {
 			logger.Error(
 				"mint.Config.SetTOMLFile()",

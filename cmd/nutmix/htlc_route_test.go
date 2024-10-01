@@ -51,17 +51,17 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	lockingPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x04})
 
@@ -401,17 +401,17 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv(database.DATABASE_URL_ENV, connUri)
-	os.Setenv(MINT_PRIVATE_KEY_ENV, MintPrivateKey)
-	os.Setenv(mint.MINT_LIGHTNING_BACKEND_ENV, "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv(database.DATABASE_URL_ENV, connUri)
+	t.Setenv(MINT_PRIVATE_KEY_ENV, MintPrivateKey)
+	t.Setenv(mint.MINT_LIGHTNING_BACKEND_ENV, "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	lockingPrivKeyOne := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x04})
 

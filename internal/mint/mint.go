@@ -346,7 +346,7 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 
 }
 
-func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, config Config) (*Mint, error) {
+func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config Config) (*Mint, error) {
 	activeProofs := ActiveProofs{
 		Proofs: make(map[cashu.Proof]bool),
 	}
@@ -409,36 +409,16 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed, con
 
 	mint.PendingProofs = make([]cashu.Proof, 0)
 
-	// uses seed to generate the keysets
-	for _, seed := range seeds {
-
-		// decrypt seed
-
-		keysets, err := seed.DeriveKeyset(mint_privkey)
-		if err != nil {
-			return &mint, fmt.Errorf("seed.DeriveKeyset(mint_privkey): %w", err)
-		}
-
-		if seed.Active {
-			mint.ActiveKeysets[seed.Unit] = make(cashu.KeysetMap)
-			for _, keyset := range keysets {
-				mint.ActiveKeysets[seed.Unit][keyset.Amount] = keyset
-			}
-
-		}
-
-		mint.Keysets[seed.Unit] = append(mint.Keysets[seed.Unit], keysets...)
+	allKeysets, activeKeyset, err := DeriveKeysetFromSeeds(seeds, mint_privkey)
+	if err != nil {
+		return &mint, fmt.Errorf("DeriveKeysetFromSeeds(seeds, mint_privkey) %w", err)
 	}
+
+	mint.ActiveKeysets = activeKeyset
+	mint.Keysets = allKeysets
 
 	// parse mint private key and get hex value pubkey
-
-	parsedBytes, err := hex.DecodeString(mint_privkey)
-
-	if err != nil {
-		return &mint, fmt.Errorf("Could not setup mints pubkey %w", err)
-	}
-
-	pubkeyhex := hex.EncodeToString(secp256k1.PrivKeyFromBytes(parsedBytes).PubKey().SerializeCompressed())
+	pubkeyhex := hex.EncodeToString(mint_privkey.PubKey().SerializeCompressed())
 
 	mint.MintPubkey = pubkeyhex
 
@@ -471,4 +451,30 @@ func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quot
 	}
 
 	return cashu.UNPAID, "", nil
+}
+
+func DeriveKeysetFromSeeds(seeds []cashu.Seed, privateKey *secp256k1.PrivateKey) (map[string][]cashu.Keyset, map[string]cashu.KeysetMap, error) {
+	newKeysets := make(map[string][]cashu.Keyset)
+	newActiveKeysets := make(map[string]cashu.KeysetMap)
+	for _, seed := range seeds {
+
+		// decrypt seed
+
+		keysets, err := seed.DeriveKeyset(privateKey)
+		if err != nil {
+			return newKeysets, newActiveKeysets, fmt.Errorf("seed.DeriveKeyset(mint_privkey): %w", err)
+		}
+
+		if seed.Active {
+			newActiveKeysets[seed.Unit] = make(cashu.KeysetMap)
+			for _, keyset := range keysets {
+				newActiveKeysets[seed.Unit][keyset.Amount] = keyset
+			}
+
+		}
+
+		newKeysets[seed.Unit] = append(newKeysets[seed.Unit], keysets...)
+	}
+	return newKeysets, newActiveKeysets, nil
+
 }

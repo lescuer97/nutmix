@@ -104,7 +104,6 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(invoice string,
 	fixedLimit := lnrpc.FeeLimit_Fixed{
 		Fixed: int64(feeReserve),
 	}
-	// zpayInvoice.PaymentHash
 
 	feeLimit := lnrpc.FeeLimit{
 		Limit: &fixedLimit,
@@ -184,14 +183,14 @@ func (l LndGrpcWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, f
 	return invoiceRes, nil
 }
 
-func (l LndGrpcWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, error) {
+func (l LndGrpcWallet) getPaymentStatus(quote string) (*lnrpc.Invoice, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
 	decodedHash, err := hex.DecodeString(quote)
 	if err != nil {
-		return cashu.UNPAID, "", fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
+		return nil, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
 	}
 
 	rhash := lnrpc.PaymentHash{
@@ -201,8 +200,19 @@ func (l LndGrpcWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, err
 	invoice, err := client.LookupInvoice(ctx, &rhash)
 
 	if err != nil {
-		return cashu.UNPAID, "", err
+		return nil, err
 	}
+
+	return invoice, nil
+}
+
+func (l LndGrpcWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, error) {
+	invoice, err := l.getPaymentStatus(quote)
+
+	if err != nil {
+		return cashu.UNPAID, "", fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
+	}
+
 	switch {
 	case invoice.State == lnrpc.Invoice_SETTLED:
 		return cashu.PAID, hex.EncodeToString(invoice.RPreimage), nil

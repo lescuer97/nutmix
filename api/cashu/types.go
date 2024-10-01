@@ -327,13 +327,9 @@ type Seed struct {
 	InputFeePpk int `json:"input_fee_ppk" db:"input_fee_ppk"`
 }
 
-func (seed *Seed) EncryptSeed(mintPrivateKey string) error {
-	key_bytes, err := hex.DecodeString(mintPrivateKey)
-	if err != nil {
-		return fmt.Errorf("Error decoding mint private key: %+v ", err)
-	}
+func (seed *Seed) EncryptSeed(mintPrivateKey *secp256k1.PrivateKey) error {
 
-	cipherBlock, err := aes.NewCipher(key_bytes)
+	cipherBlock, err := aes.NewCipher(mintPrivateKey.Serialize())
 	if err != nil {
 		return fmt.Errorf("aes.NewCipher(key_bytes): %w %w", ErrCouldNotEncryptSeed, err)
 
@@ -356,9 +352,9 @@ func (seed *Seed) EncryptSeed(mintPrivateKey string) error {
 	return nil
 }
 
-func (seed *Seed) DeriveKeyset(mint_privkey string) ([]Keyset, error) {
+func (seed *Seed) DeriveKeyset(mintPrivateKey *secp256k1.PrivateKey) ([]Keyset, error) {
 	var keysets []Keyset
-	err := seed.DecryptSeed(mint_privkey)
+	err := seed.DecryptSeed(mintPrivateKey)
 
 	if err != nil {
 		return keysets, fmt.Errorf("seed.DecryptSeed: %w", err)
@@ -383,13 +379,9 @@ func (seed *Seed) DeriveKeyset(mint_privkey string) ([]Keyset, error) {
 
 }
 
-func (seed *Seed) DecryptSeed(mintPrivateKey string) error {
-	key_bytes, err := hex.DecodeString(mintPrivateKey)
-	if err != nil {
-		return fmt.Errorf("Error decoding mint private key: %+v ", err)
-	}
+func (seed *Seed) DecryptSeed(mintPrivateKey *secp256k1.PrivateKey) error {
 
-	cipherBlock, err := aes.NewCipher(key_bytes)
+	cipherBlock, err := aes.NewCipher(mintPrivateKey.Serialize())
 	if err != nil {
 		return fmt.Errorf("aes.NewCipher(key_bytes): %w %w", ErrCouldNotDecryptSeed, err)
 

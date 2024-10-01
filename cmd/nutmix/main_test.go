@@ -21,6 +21,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
+	"github.com/lescuer97/nutmix/internal/routes/admin"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/testcontainers/testcontainers-go"
@@ -63,12 +64,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	t.Setenv("MINT_LIGHTNING_BACKEND", string(mint.FAKE_WALLET))
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
-	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
-	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
-
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// MINTING TESTING STARTS
 
@@ -655,7 +651,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 }
 
-func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
+func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
 
 	pool, err := database.DatabaseSetup(ctx, "../../migrations/")
 
@@ -670,6 +666,12 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 	}
 
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+	decodedPrivKey, err := hex.DecodeString(mint_privkey)
+	if err != nil {
+		log.Fatalf("hex.DecodeString(mint_privkey): %+v ", err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
 
@@ -677,7 +679,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 			log.Fatalf("No mint private key found in env")
 		}
 
-		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
+		generatedSeeds, err := cashu.DeriveSeedsFromKey(parsedPrivateKey, 1, cashu.AvailableSeeds)
 
 		err = database.SaveNewSeeds(pool, generatedSeeds)
 
@@ -691,10 +693,10 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	config, err := mint.SetUpConfigFile()
 
-	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(ctx.Value(mint.MINT_LIGHTNING_BACKEND_ENV).(string))
+	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 
-	config.DATABASE_URL = ctx.Value(database.DATABASE_URL_ENV).(string)
-	config.NETWORK = ctx.Value(mint.NETWORK_ENV).(string)
+	config.DATABASE_URL = os.Getenv(database.DATABASE_URL_ENV)
+	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
 	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
 	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
 	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
@@ -704,7 +706,8 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 	if err != nil {
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
-	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds, config)
+
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -715,6 +718,10 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	routes.V1Routes(r, pool, mint, logger)
+
+	if adminRoute {
+		admin.AdminRoutes(ctx, r, pool, mint, logger)
+	}
 
 	return r, mint
 }
@@ -791,10 +798,10 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
@@ -848,10 +855,10 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "LNbitsWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "LNbitsWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
@@ -911,7 +918,7 @@ func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]cashu.
 }
 
 func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainers.Container) {
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// MINTING TESTING STARTS
 
@@ -1565,17 +1572,17 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, _ := SetupRoutingForTesting(ctx)
+	router, _ := SetupRoutingForTesting(ctx, false)
 
 	// Mint check incorrect unit
 	w := httptest.NewRecorder()
@@ -1662,17 +1669,17 @@ func TestConfigMeltMintLimit(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// MINTING TESTING STARTS
 
@@ -1740,17 +1747,17 @@ func TestFeeReturnAmount(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// Mint check incorrect unit
 	w := httptest.NewRecorder()
