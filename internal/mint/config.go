@@ -177,7 +177,8 @@ func SetUpConfigFile() (Config, error) {
 	switch {
 	// if env values are set and no config exists on toml file use those.
 	// if MINT_LIGHTNING_BACKEND and NETWORK are empty we can assume the file is empty
-	case (len(networkEnv) > 0 && len(mint_lightning_backendEnv) > 0 && len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0):
+	case (len(networkEnv) > 0 && len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0):
+        fmt.Println("inside env vars")
 		config.UseEnviromentVars()
 		writeToFile = true
 
