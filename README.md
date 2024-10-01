@@ -35,7 +35,8 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [x] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
 - [x] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
 - [ ] [NUT-13](https://github.com/cashubtc/nuts/blob/main/13.md)
-- [ ] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
+- [x] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
+- [x] [NUT-15](https://github.com/cashubtc/nuts/blob/main/15.md)
 
 ## Objective
 Build the fastest and most secure implementation of an ecash mint possible. This would include and admin dashboard to be
@@ -45,15 +46,15 @@ able to monitor and control de behaviour of the mint.
 At this moment NUTS are up to P2PK (NUT-11) are implemented and working. I plan to keep going until all NUTS are done.
 
 1. ~~Finish Milestones for [V1](https://github.com/lescuer97/nutmix/milestone/1).~~
-2. Finish NUTS until NUT-15. 
+2. ~~Finish NUTS until NUT-15.~~ 
 3. Add dashboard for controlling aspects of the mint.
     - ~~Nostr Login~~
     - ~~Rotate keysets.~~
-    - Monitor Mint activity.
+    - ~~Monitor Mint activity~~.
     - Emmit blind signatures for certain users.
     - Activate Nostr only mode.
     - ~~Change mint messages~~
-5. Add support for other lightning nodes. Ex: core-lighting, Strike, Greenlight.
+5. Add support for other lightning nodes. Ex: ~~core-lighting~~, Strike, Greenlight.
 4. Add Monero Support this would probably include a way to exchange in between Bitcoin and Monero.
 5. Tor only mode
 6. Nostr only Mode.

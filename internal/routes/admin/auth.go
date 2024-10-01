@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -21,10 +22,9 @@ import (
 
 const AdminAuthKey = "admin-cookie"
 
-func AuthMiddleware(logger *slog.Logger) gin.HandlerFunc {
+func AuthMiddleware(logger *slog.Logger, secret []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
-			key := []byte(os.Getenv(JWT_SECRET))
 
 			token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
 
@@ -33,7 +33,7 @@ func AuthMiddleware(logger *slog.Logger) gin.HandlerFunc {
 					logger.Warn(fmt.Sprintf("Unexpected signing method: %v", token.Header["alg"]))
 					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 				}
-				return key, nil
+				return secret, nil
 			})
 
 			if err != nil {
@@ -199,9 +199,7 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Handler
 			return
 		}
 
-		jwtsecret := []byte(os.Getenv(JWT_SECRET))
-
-		token, err := makeJWTToken(jwtsecret)
+		token, err := makeJWTToken(mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize())
 
 		if err != nil {
 			logger.Warn("Could not makeJWTToken", slog.String(utils.LogExtraInfo, err.Error()))

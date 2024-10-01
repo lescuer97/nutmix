@@ -27,7 +27,7 @@ func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
 		keysetResponse.Id = value[0].Id
 		keysetResponse.Unit = value[0].Unit
 		keysetResponse.Keys = make(map[string]string)
-        keysetResponse.InputFeePpk = value[0].InputFeePpk
+		keysetResponse.InputFeePpk = value[0].InputFeePpk
 
 		for _, keyset := range value {
 

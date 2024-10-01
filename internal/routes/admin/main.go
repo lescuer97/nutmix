@@ -3,18 +3,19 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+
 	// "log"
-	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lescuer97/nutmix/internal/mint"
-	"github.com/lescuer97/nutmix/internal/utils"
 	"log/slog"
 	"os"
 	"slices"
 	"time"
-)
 
-const JWT_SECRET = "JWT_SECRET"
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
+)
 
 type ErrorNotif struct {
 	Error string
@@ -33,7 +34,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 	}
 	adminRoute := r.Group("/admin")
 
-	adminRoute.Use(AuthMiddleware(logger))
+	// I use the first active keyset as secret for jwt token signing
+	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
 
 	// PAGES SETUP
 	// This is /admin
