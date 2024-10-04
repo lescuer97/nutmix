@@ -1,9 +1,7 @@
 package lightning
 
 import (
-	"errors"
 	"fmt"
-
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -20,15 +18,15 @@ func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeR
 
 	return PaymentResponse{
 		Preimage:       mock_preimage,
-		PaymentError:   errors.New(""),
 		PaymentRequest: invoice,
+		PaymentState:   SETTLED,
 		Rhash:          "",
 		PaidFeeSat:     0,
 	}, nil
 }
 
-func (f FakeWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, error) {
-	return cashu.PAID, mock_preimage, nil
+func (f FakeWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
+	return SETTLED, mock_preimage, nil
 }
 
 func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {

@@ -445,6 +445,13 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			return
 		}
 
+		if quote.State == cashu.PENDING {
+			mint.RemoveQuotesAndProofs(meltRequest.Quote, meltRequest.Inputs)
+			logger.Warn("Quote is pending")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
+			return
+		}
+
 		if quote.Melted {
 			mint.RemoveQuotesAndProofs(meltRequest.Quote, meltRequest.Inputs)
 			logger.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
@@ -556,6 +563,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
+			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
 			logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
@@ -566,30 +574,52 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 		payment, err := mint.LightningBackend.PayInvoice(quote.Request, invoice, quote.FeeReserve, quote.Mpp, quote.Amount)
 
-		if err != nil {
-			mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
-			logger.Info(fmt.Sprintf("mint.LightningComs.PayInvoice %+v", err))
-			c.JSON(400, "could not make payment")
-			return
+		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN {
+			// if exception of lightning payment says fail do a payment status recheck.
+			status, _, err := mint.LightningBackend.CheckPayed(quote.Quote)
+
+			// if error on checking payement we will save as pending and returns status
+			if err != nil {
+				quote.State = cashu.PENDING
+
+				response := quote.GetPostMeltQuoteResponse()
+				err = database.ModifyQuoteMeltPayStatusAndMelted(pool, quote.RequestPaid, quote.Melted, quote.State, quote.Quote)
+				if err != nil {
+					mint.ActiveQuotes.RemoveQuote(quote.Quote)
+					logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
+				}
+				c.JSON(200, response)
+				return
+			}
+
+			switch status {
+			// halt transaction and return a pending state
+			case lightning.PENDING, lightning.SETTLED:
+				quote.State = cashu.PENDING
+
+				response := quote.GetPostMeltQuoteResponse()
+				err = database.ModifyQuoteMeltPayStatusAndMelted(pool, quote.RequestPaid, quote.Melted, quote.State, quote.Quote)
+				if err != nil {
+					mint.ActiveQuotes.RemoveQuote(quote.Quote)
+					logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
+				}
+				c.JSON(200, response)
+				return
+
+			// finish failure and release the proofs
+			case lightning.FAILED, lightning.UNKNOWN:
+				mint.RemoveQuotesAndProofs(quote.Quote, meltRequest.Inputs)
+				logger.Info(fmt.Sprintf("mint.LightningComs.PayInvoice %+v", err))
+				c.JSON(400, "could not make payment")
+				return
+			}
 		}
 
-		switch {
-		case payment.PaymentError.Error() == "invoice is already paid":
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
-			return
-		case payment.PaymentError.Error() == "unable to find a path to destination":
-			c.JSON(400, "unable to find a path to destination")
-			return
-		case payment.PaymentError.Error() != "":
-			logger.Info(fmt.Sprintf("unknown lighting error: %+v", payment.PaymentError))
-			detail := "There was an unknown during the lightning payment"
-			c.JSON(500, cashu.ErrorCodeToResponse(cashu.UNKNOWN, &detail))
-			return
-
+		if payment.PaymentState == lightning.SETTLED {
+			quote.RequestPaid = true
+			quote.State = cashu.PAID
+			quote.PaymentPreimage = payment.Preimage
 		}
-		quote.RequestPaid = true
-		quote.State = cashu.PAID
-		quote.PaymentPreimage = payment.Preimage
 
 		// if fees where lower than expected return sats to the user
 		paidLightningFeeSat = uint64(payment.PaidFeeSat)

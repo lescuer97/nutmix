@@ -9,7 +9,6 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/google/uuid"
-	"github.com/lescuer97/nutmix/api/cashu"
 	cln_grpc "github.com/lescuer97/nutmix/internal/lightning/proto"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"google.golang.org/grpc"
@@ -28,7 +27,7 @@ func getTlsConfig(clientCert string, clientKey string, caCert string) (*tls.Conf
 	if clientCert != "" && clientKey != "" {
 		cert, err := tls.X509KeyPair([]byte(clientCert), []byte(clientKey))
 		if err != nil {
-			return tlsConfig, fmt.Errorf("\nerror loading X.509 key pair: %v", err)
+			return tlsConfig, fmt.Errorf("\n error loading X.509 key pair: %v", err)
 		}
 		tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
 	}
@@ -91,6 +90,7 @@ func (l *CLNGRPCWallet) clnGrpcPayInvoice(invoice string, feeReserve uint64, lig
 	max_fee := cln_grpc.Amount{
 		Msat: feeReserve * 1000,
 	}
+
 	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee}
 
 	res, err := client.Pay(ctx, &sendRequest)
@@ -98,21 +98,29 @@ func (l *CLNGRPCWallet) clnGrpcPayInvoice(invoice string, feeReserve uint64, lig
 	if err != nil {
 		return err
 	}
-	// res.
+
 	if res.Status == cln_grpc.PayResponse_FAILED {
 		return fmt.Errorf("Payment failed")
 	}
+	switch res.Status {
+	case cln_grpc.PayResponse_FAILED:
+		lightningResponse.PaymentState = FAILED
+		return fmt.Errorf("Payment failed")
+	case cln_grpc.PayResponse_PENDING:
+		lightningResponse.PaymentState = PENDING
+		return nil
+	}
 
 	lightningResponse.PaymentRequest = invoice
+	lightningResponse.PaymentState = SETTLED
 	lightningResponse.Preimage = hex.EncodeToString(res.PaymentPreimage)
-	lightningResponse.PaymentError = fmt.Errorf("")
 	lightningResponse.PaidFeeSat = int64((res.AmountSentMsat.Msat - res.AmountMsat.Msat)) / 1000
 
 	return nil
 
 }
 func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
-	zpayInvoice *zpay32.Invoice,
+	_ *zpay32.Invoice,
 	feeReserve uint64,
 	amount_sat uint64,
 	lightningResponse *PaymentResponse) error {
@@ -133,13 +141,22 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 	if err != nil {
 		return err
 	}
+
 	if res.Status == cln_grpc.PayResponse_FAILED {
 		return fmt.Errorf("Payment failed")
 	}
+	switch res.Status {
+	case cln_grpc.PayResponse_FAILED:
+		lightningResponse.PaymentState = FAILED
+		return fmt.Errorf("Payment failed")
+	case cln_grpc.PayResponse_PENDING:
+		lightningResponse.PaymentState = PENDING
+		return nil
+	}
 
 	lightningResponse.PaymentRequest = invoice
+	lightningResponse.PaymentState = SETTLED
 	lightningResponse.Preimage = hex.EncodeToString(res.PaymentPreimage)
-	lightningResponse.PaymentError = fmt.Errorf("")
 	lightningResponse.PaidFeeSat = int64((res.AmountSentMsat.Msat - res.AmountMsat.Msat)) / 1000
 
 	return nil
@@ -148,6 +165,18 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 
 func (l CLNGRPCWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
+
+	hexHash := hex.EncodeToString(zpayInvoice.PaymentHash[:])
+
+	// first check if invoice is already paid.
+	status, _, err := l.CheckPayed(hexHash)
+	if err != nil {
+		return invoiceRes, fmt.Errorf(`l.CheckPayed(hexHash) %w`, err)
+	}
+
+	if status == SETTLED {
+		return invoiceRes, ErrAlreadyPaid
+	}
 	if mpp {
 		err := l.clnGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes)
 		if err != nil {
@@ -156,21 +185,21 @@ func (l CLNGRPCWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, f
 	} else {
 		err := l.clnGrpcPayInvoice(invoice, feeReserve, &invoiceRes)
 		if err != nil {
-			return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
+			return invoiceRes, fmt.Errorf(`l.clnGrpcPayInvoice(invoice, feeReserve, &invoiceRes) %w`, err)
 		}
 	}
 
 	return invoiceRes, nil
 }
 
-func (l CLNGRPCWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, error) {
+func (l CLNGRPCWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	decodedHash, err := hex.DecodeString(quote)
 	if err != nil {
-		return cashu.UNPAID, "", fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
+		return FAILED, "", fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
 	}
 
 	rhash := cln_grpc.ListpaysRequest{
@@ -180,7 +209,7 @@ func (l CLNGRPCWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, err
 	pays, err := client.ListPays(ctx, &rhash)
 
 	if err != nil {
-		return cashu.UNPAID, "", err
+		return FAILED, "", err
 	}
 
 	invoiceReq := cln_grpc.ListinvoicesRequest{
@@ -189,16 +218,17 @@ func (l CLNGRPCWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, err
 	invoices, err := client.ListInvoices(ctx, &invoiceReq)
 
 	if err != nil {
-		return cashu.UNPAID, "", err
+		return FAILED, "", err
 	}
 
 	for _, pay := range pays.Pays {
 		switch {
 		case pay.Status == cln_grpc.ListpaysPays_COMPLETE:
-			return cashu.PAID, hex.EncodeToString(pay.PaymentHash), nil
-
+			return SETTLED, hex.EncodeToString(pay.PaymentHash), nil
+		case pay.Status == cln_grpc.ListpaysPays_PENDING:
+			return PENDING, hex.EncodeToString(pay.PaymentHash), nil
 		case pay.Status == cln_grpc.ListpaysPays_FAILED:
-			return cashu.UNPAID, hex.EncodeToString(pay.PaymentHash), nil
+			return SETTLED, hex.EncodeToString(pay.PaymentHash), nil
 
 		}
 
@@ -206,20 +236,25 @@ func (l CLNGRPCWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, err
 	for _, invoice := range invoices.Invoices {
 		switch {
 		case invoice.Status == cln_grpc.ListinvoicesInvoices_PAID:
-			return cashu.PAID, hex.EncodeToString(invoice.PaymentHash), nil
+			return SETTLED, hex.EncodeToString(invoice.PaymentHash), nil
 
 		case invoice.Status == cln_grpc.ListinvoicesInvoices_UNPAID:
-			return cashu.UNPAID, hex.EncodeToString(invoice.PaymentHash), nil
+			return PENDING, hex.EncodeToString(invoice.PaymentHash), nil
 
 		}
 
 	}
-	return cashu.UNPAID, "", nil
+	return PENDING, "", nil
 }
 
 func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
+	_, _, err := l.CheckPayed(hex.EncodeToString(zpayInvoice.PaymentHash[:]))
+
+	if err != nil {
+		return 1, fmt.Errorf(`l.CheckPayed(invoice) %w`, err)
+	}
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	amount := cln_grpc.Amount{

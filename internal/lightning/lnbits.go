@@ -48,6 +48,8 @@ type lnbitsFeeResponse struct {
 	FeeReserve uint64 `json:"fee_reserve"`
 }
 
+var ErrLnbitsFailedPayment = errors.New("failed payment")
+
 func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{}
 	jsonBytes, err := json.Marshal(reqBody)
@@ -82,7 +84,7 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 
 	switch {
 	case detailBody.Status == "failed":
-		return fmt.Errorf("LNBITS payment failed %+v. Request Body %+v", detailBody, reqBody)
+		return fmt.Errorf("LNBITS payment failed %+v. Request Body %+v, %w", detailBody, reqBody, ErrLnbitsFailedPayment)
 
 	case detailBody.Detail == "Payment does not exist.":
 	case len(detailBody.Detail) > 0:
@@ -120,32 +122,36 @@ func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, fe
 	// check invoice payment to get the preimage and fee
 	err = l.LnbitsRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus)
 	if err != nil {
-
+		if errors.Is(err, ErrLnbitsFailedPayment) {
+			invoiceRes.PaymentState = FAILED
+		}
 		return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus): %w`, err)
 	}
 
 	invoiceRes.PaymentRequest = lnbitsInvoice.PaymentRequest
+	invoiceRes.PaymentState = SETTLED
 	invoiceRes.Rhash = lnbitsInvoice.PaymentHash
 	invoiceRes.Preimage = paymentStatus.Preimage
 	invoiceRes.PaidFeeSat = int64(math.Abs(float64(paymentStatus.Details.Fee)))
-	invoiceRes.PaymentError = errors.New("")
 
 	return invoiceRes, nil
 }
 
-func (l LnbitsWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, error) {
+func (l LnbitsWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
 	if err != nil {
-		return cashu.UNPAID, "", fmt.Errorf("json.Marshal: %w", err)
+		return FAILED, "", fmt.Errorf("json.Marshal: %w", err)
 	}
 
 	switch {
 	case paymentStatus.Paid:
-		return cashu.PAID, paymentStatus.Preimage, nil
+		return SETTLED, paymentStatus.Preimage, nil
+	default:
+		return PENDING, paymentStatus.Preimage, nil
+
 	}
-	return cashu.UNPAID, "", nil
 }
 
 func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {

@@ -434,14 +434,14 @@ func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quot
 	}
 
 	switch {
-	case state == cashu.PAID:
+	case state == lightning.SETTLED:
 		err := dbCall(pool, true, cashu.PAID, quote)
 		if err != nil {
 			return cashu.PAID, preimage, fmt.Errorf("dbCall: %w", err)
 		}
 		return cashu.PAID, preimage, nil
 
-	case state == cashu.UNPAID:
+	case state == lightning.PENDING:
 		err := dbCall(pool, true, cashu.UNPAID, quote)
 		if err != nil {
 			return cashu.UNPAID, preimage, fmt.Errorf("dbCall: %w", err)

@@ -3,13 +3,11 @@ package lightning
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"crypto/x509"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/routerrpc"
 	"github.com/lightningnetwork/lnd/lnwire"
@@ -81,12 +79,22 @@ func (l *LndGrpcWallet) lndGrpcPayInvoice(invoice string, feeReserve uint64, lig
 	res, err := client.SendPaymentSync(ctx, &sendRequest)
 
 	if err != nil {
+		lightningResponse.PaymentState = FAILED
 		return err
 	}
 
 	lightningResponse.PaymentRequest = invoice
+	lightningResponse.PaymentState = SETTLED
+	switch {
+	case res.GetPaymentError() == "invoice is already paid":
+		lightningResponse.PaymentState = FAILED
+		return fmt.Errorf("%w, %w", ErrAlreadyPaid, err)
+	case res.GetPaymentError() != "":
+		lightningResponse.PaymentState = FAILED
+		return err
+
+	}
 	lightningResponse.Preimage = hex.EncodeToString(res.PaymentPreimage)
-	lightningResponse.PaymentError = fmt.Errorf(res.PaymentError)
 	lightningResponse.PaidFeeSat = res.PaymentRoute.TotalFeesMsat / 1000
 
 	return nil
@@ -150,13 +158,17 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(invoice string,
 
 	for {
 		switch res.Status {
+		case lnrpc.HTLCAttempt_IN_FLIGHT:
+			lightningResponse.PaymentState = PENDING
 		case lnrpc.HTLCAttempt_FAILED:
+			lightningResponse.PaymentState = FAILED
 			return fmt.Errorf("PaymentFailed  %+v", res.GetFailure())
 		case lnrpc.HTLCAttempt_SUCCEEDED:
 			lightningResponse.PaymentRequest = invoice
+			lightningResponse.PaymentState = SETTLED
 			lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
-			lightningResponse.PaymentError = errors.New("")
 			lightningResponse.PaidFeeSat = res.Route.TotalAmt
+			lightningResponse.PaymentState = SETTLED
 			return nil
 		default:
 			continue
@@ -206,22 +218,24 @@ func (l LndGrpcWallet) getPaymentStatus(quote string) (*lnrpc.Invoice, error) {
 	return invoice, nil
 }
 
-func (l LndGrpcWallet) CheckPayed(quote string) (cashu.ACTION_STATE, string, error) {
+func (l LndGrpcWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
 	invoice, err := l.getPaymentStatus(quote)
 
 	if err != nil {
-		return cashu.UNPAID, "", fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
+		return FAILED, "", fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
 	}
 
 	switch {
 	case invoice.State == lnrpc.Invoice_SETTLED:
-		return cashu.PAID, hex.EncodeToString(invoice.RPreimage), nil
+		return SETTLED, hex.EncodeToString(invoice.RPreimage), nil
+	case invoice.State == lnrpc.Invoice_CANCELED:
+		return FAILED, hex.EncodeToString(invoice.RPreimage), nil
 
 	case invoice.State == lnrpc.Invoice_OPEN:
-		return cashu.UNPAID, hex.EncodeToString(invoice.RPreimage), nil
+		return PENDING, hex.EncodeToString(invoice.RPreimage), nil
 
 	}
-	return cashu.UNPAID, "", nil
+	return PENDING, "", nil
 }
 
 func convert_route_hints(routes [][]zpay32.HopHint) []*lnrpc.RouteHint {
