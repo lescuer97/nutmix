@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -17,10 +18,11 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/comms"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
+	"github.com/lescuer97/nutmix/internal/routes/admin"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -57,17 +59,12 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", string(mint.FAKE_WALLET))
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
-	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
-	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
-
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// MINTING TESTING STARTS
 
@@ -88,7 +85,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -115,7 +112,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	var postMintQuoteResponseTwo cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponseTwo cashu.MintRequestDB
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -218,7 +215,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.PostMintQuoteBolt11Response{}
+	postMintQuoteResponseTwo = cashu.MintRequestDB{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -299,8 +296,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
-		t.Errorf("Expected status code 400, got %d", w.Code)
+	if w.Code != 403 {
+		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
 
 	if w.Body.String() != `"Invalid blind message"` {
@@ -615,7 +612,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if postMeltResponse.State != cashu.PAID {
 		t.Errorf("Expected state to be MINTED, got %v", postMintQuoteResponseTwo.State)
 	}
-	if postMeltResponse.PaymentPreimage != "MockPaymentPreimage" {
+	if postMeltResponse.PaymentPreimage != "fakewalletpreimage" {
 		t.Errorf("Expected payment preimage to be empty, got %s", postMeltResponse.PaymentPreimage)
 	}
 
@@ -654,7 +651,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 }
 
-func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
+func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
 
 	pool, err := database.DatabaseSetup(ctx, "../../migrations/")
 
@@ -669,6 +666,12 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 	}
 
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+	decodedPrivKey, err := hex.DecodeString(mint_privkey)
+	if err != nil {
+		log.Fatalf("hex.DecodeString(mint_privkey): %+v ", err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
 
@@ -676,7 +679,7 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 			log.Fatalf("No mint private key found in env")
 		}
 
-		generatedSeeds, err := cashu.DeriveSeedsFromKey(mint_privkey, 1, cashu.AvailableSeeds)
+		generatedSeeds, err := cashu.DeriveSeedsFromKey(parsedPrivateKey, 1, cashu.AvailableSeeds)
 
 		err = database.SaveNewSeeds(pool, generatedSeeds)
 
@@ -688,7 +691,23 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	}
 
-	mint, err := mint.SetUpMint(ctx, mint_privkey, seeds)
+	config, err := mint.SetUpConfigFile()
+
+	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+
+	config.DATABASE_URL = os.Getenv(database.DATABASE_URL_ENV)
+	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
+	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
+	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
+	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
+	config.MINT_LNBITS_KEY = os.Getenv(utils.MINT_LNBITS_KEY)
+	config.MINT_LNBITS_ENDPOINT = os.Getenv(utils.MINT_LNBITS_ENDPOINT)
+
+	if err != nil {
+		log.Fatalf("could not setup config file: %+v ", err)
+	}
+
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -696,7 +715,13 @@ func SetupRoutingForTesting(ctx context.Context) (*gin.Engine, *mint.Mint) {
 
 	r := gin.Default()
 
-	routes.V1Routes(ctx, r, pool, mint)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	routes.V1Routes(r, pool, mint, logger)
+
+	if adminRoute {
+		admin.AdminRoutes(ctx, r, pool, mint, logger)
+	}
 
 	return r, mint
 }
@@ -773,21 +798,21 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	_, bobLnd, _, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
+	_, bobLnd, _, _, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
 
-	ctx = context.WithValue(ctx, comms.LND_HOST, os.Getenv(comms.LND_HOST))
-	ctx = context.WithValue(ctx, comms.LND_TLS_CERT, os.Getenv(comms.LND_TLS_CERT))
-	ctx = context.WithValue(ctx, comms.LND_MACAROON, os.Getenv(comms.LND_MACAROON))
+	ctx = context.WithValue(ctx, utils.LND_HOST, os.Getenv(utils.LND_HOST))
+	ctx = context.WithValue(ctx, utils.LND_TLS_CERT, os.Getenv(utils.LND_TLS_CERT))
+	ctx = context.WithValue(ctx, utils.LND_MACAROON, os.Getenv(utils.LND_MACAROON))
 
 	if err != nil {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
@@ -830,20 +855,20 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "LNbitsWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "LNbitsWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	_, bobLnd, _, _, err := comms.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-bolt11-tests")
+	_, bobLnd, _, _, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-bolt11-tests")
 
-	ctx = context.WithValue(ctx, comms.MINT_LNBITS_ENDPOINT, os.Getenv(comms.MINT_LNBITS_ENDPOINT))
-	ctx = context.WithValue(ctx, comms.MINT_LNBITS_KEY, os.Getenv(comms.MINT_LNBITS_KEY))
+	ctx = context.WithValue(ctx, utils.MINT_LNBITS_ENDPOINT, os.Getenv(utils.MINT_LNBITS_ENDPOINT))
+	ctx = context.WithValue(ctx, utils.MINT_LNBITS_KEY, os.Getenv(utils.MINT_LNBITS_KEY))
 
 	if err != nil {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
@@ -861,7 +886,7 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 
 }
 
-func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]cashu.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 
 	// try to swap tokens
 	var proofs []cashu.Proof
@@ -893,7 +918,7 @@ func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]mint.K
 }
 
 func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainers.Container) {
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// MINTING TESTING STARTS
 
@@ -914,7 +939,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err := json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -940,7 +965,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	var postMintQuoteResponseTwo cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponseTwo cashu.MintRequestDB
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -1118,7 +1143,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.PostMintQuoteBolt11Response{}
+	postMintQuoteResponseTwo = cashu.MintRequestDB{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -1547,17 +1572,17 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, _ := SetupRoutingForTesting(ctx)
+	router, _ := SetupRoutingForTesting(ctx, false)
 
 	// Mint check incorrect unit
 	w := httptest.NewRecorder()
@@ -1616,6 +1641,85 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
 
 	}
+}
+
+func TestConfigMeltMintLimit(t *testing.T) {
+
+	const posgrespassword = "password"
+	const postgresuser = "user"
+	ctx := context.Background()
+
+	postgresContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:16.2"),
+		postgres.WithDatabase("postgres"),
+		postgres.WithUsername(postgresuser),
+		postgres.WithPassword(posgrespassword),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	connUri, err := postgresContainer.ConnectionString(ctx)
+
+	if err != nil {
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
+	}
+
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
+
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+
+	router, mint := SetupRoutingForTesting(ctx, false)
+
+	// MINTING TESTING STARTS
+
+	// TEST MINT CONFIG LIMIT
+	w := httptest.NewRecorder()
+
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+		Amount: 1000,
+		Unit:   cashu.Sat.String(),
+	}
+	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
+
+	req := httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	limit := 999
+	mint.Config.PEG_IN_LIMIT_SATS = &limit
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Errorf("Expected status code 200, got %d", w.Code)
+	}
+	if w.Body.String() != `"Mint amount over the limit"` {
+		t.Errorf(`Expected body message to be: "Mint amount over the limit". Got:  %s`, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+
+	// Test mint ONLY PEGOUT check
+
+	mint.Config.PEG_OUT_ONLY = true
+	req = httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
+	router.ServeHTTP(w, req)
+
+	if w.Code != 400 {
+		t.Errorf("Expected status code 200, got %d", w.Code)
+	}
+	if w.Body.String() != `"Peg out only enabled"` {
+		t.Errorf(`Expected body message to be: "Peg out only enabled". Got:  %s`, w.Body.String())
+	}
 
 }
 func TestFeeReturnAmount(t *testing.T) {
@@ -1643,17 +1747,17 @@ func TestFeeReturnAmount(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	// Mint check incorrect unit
 	w := httptest.NewRecorder()

@@ -1,4 +1,4 @@
-package comms
+package utils
 
 import (
 	"bytes"
@@ -6,15 +6,26 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/network"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+)
 
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/network"
-	"github.com/testcontainers/testcontainers-go/wait"
+const (
+	LND_HOST             = "LND_GRPC_HOST"
+	LND_TLS_CERT         = "LND_TLS_CERT"
+	LND_MACAROON         = "LND_MACAROON"
+	MINT_LNBITS_ENDPOINT = "MINT_LNBITS_ENDPOINT"
+	MINT_LNBITS_KEY      = "MINT_LNBITS_KEY"
+
+	CLN_HOST     = "CLN_GRPC_HOST"
+	CLN_TLS_CERT = "CLN_TLS_CERT"
+	CLN_MACAROON = "CLN_MACAROON"
 )
 
 // This is used for testing purpose
@@ -32,8 +43,8 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	)
 
 	if err != nil {
-		log.Fatalln("Error: ", err)
-		return nil, nil, nil, nil, err
+		// log.Fatalln("Error: ", err)
+		return nil, nil, nil, nil, fmt.Errorf("Could not setup network: %w", err)
 	}
 
 	// Create bitcoind regtest node
@@ -79,9 +90,8 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		WaitingFor:   wait.ForLog("Server listening on"),
 		ExposedPorts: []string{"18445/tcp", "10009/tcp", "8080/tcp", "9735/tcp"},
 		Name:         "lndAlice" + names,
-
-		Networks: []string{net.Name},
-		Cmd:      []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=alice" /* "--externalip=alice", */, "--tlsextradomain=alice", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9735", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8080", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
+		Networks:     []string{net.Name},
+		Cmd:          []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=alice" /* "--externalip=alice", */, "--tlsextradomain=alice", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9735", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8080", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
 	}
 
 	lndAliceC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

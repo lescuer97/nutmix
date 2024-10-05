@@ -16,9 +16,9 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-// mppPaymentHashAndPreimage returns the payment hash and preimage to use for an
+// mockMppPaymentHashAndPreimage returns the payment hash and preimage to use for an
 // MPP invoice.
-func mppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Preimage,
+func mockMppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Preimage,
 	lntypes.Hash, error) {
 
 	var (
@@ -71,7 +71,7 @@ func CreateMockInvoice(amountSats int64, description string, network chaincfg.Pa
 		Hash:     nil,
 	}
 
-	_, paymentHash, err := mppPaymentHashAndPreimage(&invoiceData)
+	_, paymentHash, err := mockMppPaymentHashAndPreimage(&invoiceData)
 
 	var options []func(*zpay32.Invoice)
 

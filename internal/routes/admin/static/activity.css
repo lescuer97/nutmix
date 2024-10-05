@@ -1,0 +1,100 @@
+.activity {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    padding: 0% 10%
+}
+.balance {
+  display: flex;
+  gap: 35px;
+  border-radius: 15px;
+}
+
+.data-list {
+    display: flex;
+    flex-direction: row;
+    margin-top: 25px;
+    gap: 15px;
+    /* width: 100; */
+}
+
+.time-select {
+    margin-bottom: 15px;
+}
+
+button.time-button {
+    border-radius: 0px;
+    background-color: transparent;
+    color: var(--white);
+    border: 1px solid var(--white);
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+button.time-button.selected {
+    background-color: transparent;
+    color: var(--darkreader-inline-color);
+}
+
+.data-table {
+      width: 50%;
+}
+.data-table h2 {
+    padding-left: 10px;
+}
+
+.data-table div {
+      display: flex;
+      flex-direction: column;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      overflow-wrap: break-word;
+      max-height: 500px;
+}
+
+.data-table caption {
+    text-align: left;
+    padding-left: 15px;
+}
+
+
+tr.DEBUG {
+    background-color: #94ed74;
+    color: black;
+}
+
+tr.WARN {
+    background-color: #f1fc74;
+    color: black;
+}
+
+tr.ERROR {
+    background-color: #ed6565;
+    color: black;
+}
+
+.request-row {
+    max-width: 300px;
+    text-overflow: ellipsis;
+}
+
+th,
+td {
+  border: 1px solid rgb(160 160 160);
+  padding: 8px 10px;
+  text-align: center;
+}
+
+td.unit {
+    text-transform: uppercase;
+}
+
+tr.Mint {
+    background-color: #94ed74;
+    color: black;
+}
+
+tr.Melt {
+    background-color: #ed6565;
+    color: black;
+}

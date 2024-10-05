@@ -1,0 +1,130 @@
+{{ template "base" }} 
+
+{{template "navigation" "activity"}}
+
+<div hx-ext="remove-me" id="notifications"></div>
+<main class="activity">
+    <div class="time-select">
+        <button class="time-button selected" value="24h"  hx-target="#mint-summary" hx-trigger="click"  type="button">24h</button>
+        <button class="time-button" value="48h"     type="button">48h</button>
+        <button class="time-button" value="72h"  type="button">72h</button>
+        <button class="time-button" value="7d"   type="button">7d</button>
+        <button class="time-button" value="all"  type="button">All</button>
+    </div>
+  <div class="balance">
+    <div
+      hx-get="/admin/mint-balance"
+      hx-trigger="load"
+      hx-target="this"
+      hx-swap="innerHTML"
+      class=""
+    ></div>
+
+    <div
+      hx-get="/admin/mint-melt-summary"
+      hx-target="this"
+      hx-swap="innerHTML"
+      hx-trigger="load, reload"
+      hx-headers='javascript:{time: event?.detail?.time}'
+      id="mint-summary"
+      class="summary-table"
+    ></div>
+  </div>
+  <div class="data-list">
+    <div
+      hx-get="/admin/logs"
+      hx-target="this"
+      hx-swap="innerHTML"
+      hx-trigger="load, reload"
+      hx-headers='javascript:{time: event?.detail?.time}'
+      class="data-table log-table"
+    ></div>
+    <div
+      hx-get="/admin/mint-melt-list"
+      hx-target="this"
+      hx-swap="innerHTML"
+      hx-trigger="load, reload"
+      hx-headers='javascript:{time: event?.detail?.time}'
+      class="data-table mint-melt-table"
+    ></div>
+    
+  </div>
+</main>
+
+{{ define "node-balance"}}
+<div class="card">
+  <h2>Node Balance:</h2>
+  {{.}} Sats
+</div>
+{{ end }} 
+
+{{ define "fake-wallet-balance"}}
+<div class="card">
+  <h2>Fake Wallet doesn't have a balance</h2>
+</div>
+{{ end }} 
+
+{{ define "mint-melt-activity"}}
+<div class="card activity">
+    <div class=""><b>Inflows:</b> {{printf "%d" .Mint }}  Sats</div>
+
+  <div class=""><b>Outflows:</b> {{.Melt}} Sats</div>
+
+  <div class=""><b>Net flows:</b> {{.Net}} Sats</div>
+</div>
+{{ end }} 
+
+{{ define "logs" }} 
+<h2>Logs</h2>
+<div class="">
+    <table class="">
+        <thead>
+            <tr>
+              <th class="level" scope="col">Level</th>
+              <th scope="col">Message</th>
+              <th scope="col">Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .}}
+            <tr class="{{.Level}}">
+                    <th scope="row">{{.Level}}</th>
+                    <td class="request-row">{{.Msg}} {{.ExtraInfo}} </td>
+                    <td class="time">{{.Time}}</td>
+                </tr>
+            {{end}} 
+        </tbody>
+    </table>
+</div>
+
+{{ end }}
+
+{{ define "mint-melt-list" }} 
+
+        <h2>Mint & Melt</h2>
+<div>
+    <table class="">
+        <thead>
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col">Request</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Status</th>
+              <th scope="col">Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .}}
+            <tr class="{{.Type}}">
+                    <th scope="row">{{.Type}}</th>
+                    <td class="request-row">{{.Request}}</td>
+                    <td class="unit">{{.Unit}}</td>
+                    <td>{{.Status}}</td>
+                    <td>{{.SeenAt}}</td>
+                </tr>
+            {{end}} 
+        </tbody>
+    </table>
+</div>
+
+{{ end }}

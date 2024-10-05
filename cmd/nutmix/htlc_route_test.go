@@ -51,17 +51,17 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv("DATABASE_URL", connUri)
-	os.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	os.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv("DATABASE_URL", connUri)
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	lockingPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x04})
 
@@ -88,7 +88,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {
@@ -329,7 +329,7 @@ func makeHTLCSpendCondition(preimage string, nSigs int, pubkeys []*secp256k1.Pub
 	return spendCondition, nil
 }
 
-func GenerateProofsHTLC(signatures []cashu.BlindSignature, preimage string, keysets map[string]mint.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofsHTLC(signatures []cashu.BlindSignature, preimage string, keysets map[string]cashu.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 	// try to swap tokens
 	var proofs []cashu.Proof
 	// unblid the signatures and make proofs
@@ -401,17 +401,17 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
-	os.Setenv(database.DATABASE_URL_ENV, connUri)
-	os.Setenv(MINT_PRIVATE_KEY_ENV, MintPrivateKey)
-	os.Setenv(mint.MINT_LIGHTNING_BACKEND_ENV, "FakeWallet")
-	os.Setenv(mint.NETWORK_ENV, "regtest")
+	t.Setenv(database.DATABASE_URL_ENV, connUri)
+	t.Setenv(MINT_PRIVATE_KEY_ENV, MintPrivateKey)
+	t.Setenv(mint.MINT_LIGHTNING_BACKEND_ENV, "FakeWallet")
+	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	router, mint := SetupRoutingForTesting(ctx)
+	router, mint := SetupRoutingForTesting(ctx, false)
 
 	lockingPrivKeyOne := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x04})
 
@@ -440,7 +440,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-	var postMintQuoteResponse cashu.PostMintQuoteBolt11Response
+	var postMintQuoteResponse cashu.MintRequestDB
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
 	if err != nil {

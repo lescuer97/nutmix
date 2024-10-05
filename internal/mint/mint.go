@@ -5,135 +5,105 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
+	"sync"
+	"time"
+
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/comms"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/pkg/crypto"
-	"github.com/tyler-smith/go-bip32"
-	"log"
-	"slices"
-	"sync"
-	"time"
 )
 
-type KeysetMap map[uint64]cashu.Keyset
-
 type Mint struct {
-	ActiveKeysets map[string]KeysetMap
-	Keysets       map[string][]cashu.Keyset
-	LightningComs comms.LightingComms
-	Network       chaincfg.Params
-	PendingProofs []cashu.Proof
-	ActiveProofs  ActiveProofs
-	ActiveQuotes  ActiveQuote
-	MintPubkey    string
-	// ActiveMeltQuote ActiveMeltQuote
+	ActiveKeysets    map[string]cashu.KeysetMap
+	Keysets          map[string][]cashu.Keyset
+	LightningBackend lightning.LightningBackend
+	PendingProofs    []cashu.Proof
+	ActiveProofs     *ActiveProofs
+	ActiveQuotes     *ActiveQuote
+	Config           Config
+	MintPubkey       string
 }
 
 var (
-	AlreadyActiveProof = errors.New("Proof already being spent")
-	AlreadyActiveQuote = errors.New("Quote already being spent")
+	AlreadyActiveProof  = errors.New("Proof already being spent")
+	AlreadyActiveQuote  = errors.New("Quote already being spent")
+	UsingInactiveKeyset = errors.New("Trying to use an inactive keyset")
 )
 
 type ActiveProofs struct {
-	Proofs []cashu.Proof
+	Proofs map[cashu.Proof]bool
 	sync.Mutex
 }
 
-func (a *Mint) AddProofs(proofs []cashu.Proof) error {
-	a.ActiveProofs.Lock()
+func (a *ActiveProofs) AddProofs(proofs []cashu.Proof) error {
+	a.Lock()
+	defer a.Unlock()
 	// check if proof already exists
-	for _, activeProof := range a.ActiveProofs.Proofs {
-		alreadyActiveProof := slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
-			if p == activeProof {
-				return true
-			}
-			return false
+	for _, p := range proofs {
 
-		})
-		if alreadyActiveProof {
-			a.ActiveProofs.Unlock()
+		if a.Proofs[p] {
 			return AlreadyActiveProof
 		}
-	}
 
-	a.ActiveProofs.Proofs = append(a.ActiveProofs.Proofs, proofs...)
-	a.ActiveProofs.Unlock()
+		a.Proofs[p] = true
+	}
 	return nil
 }
 
-func (a *Mint) RemoveProofs(proofs []cashu.Proof) {
-	a.ActiveProofs.Lock()
-	for _, proofToDelete := range proofs {
-		activeProofs := slices.DeleteFunc(a.ActiveProofs.Proofs, func(p cashu.Proof) bool {
-			if p == proofToDelete {
-				return true
-			}
-			return false
+func (a *ActiveProofs) RemoveProofs(proofs []cashu.Proof) error {
+	a.Lock()
+	defer a.Unlock()
+	// check if proof already exists
+	for _, p := range proofs {
 
-		})
-		a.ActiveProofs.Proofs = activeProofs
+		delete(a.Proofs, p)
+
 	}
-
-	a.ActiveProofs.Unlock()
+	return nil
 }
 
 type ActiveQuote struct {
-	Quote []string
+	Quote map[string]bool
 	sync.Mutex
 }
 
-func (a *Mint) AddActiveMintQuote(quote string) error {
-	a.ActiveQuotes.Lock()
-	// check if proof already exists
-	for _, activeQuote := range a.ActiveQuotes.Quote {
+func (q *ActiveQuote) AddQuote(quote string) error {
+	q.Lock()
 
-		if activeQuote == quote {
-			a.ActiveQuotes.Unlock()
-			return AlreadyActiveProof
-		}
+	defer q.Unlock()
+
+	if q.Quote[quote] {
+		return AlreadyActiveQuote
 	}
 
-	a.ActiveQuotes.Quote = append(a.ActiveQuotes.Quote, quote)
-	a.ActiveQuotes.Unlock()
+	q.Quote[quote] = true
+
 	return nil
 }
+func (q *ActiveQuote) RemoveQuote(quote string) error {
+	q.Lock()
+	defer q.Unlock()
 
-func (a *Mint) RemoveActiveMintQuote(quote string) error {
-	a.ActiveQuotes.Lock()
-	activeQuote := slices.DeleteFunc(a.ActiveQuotes.Quote, func(p string) bool {
-		if p == quote {
-			return true
-		}
-		return false
+	delete(q.Quote, quote)
 
-	})
-	a.ActiveQuotes.Quote = activeQuote
-
-	a.ActiveQuotes.Unlock()
 	return nil
-
 }
-
-type ActiveMeltQuote struct {
-	Quote []string
-	sync.Mutex
-}
-
 func (m *Mint) AddQuotesAndProofs(quote string, proofs []cashu.Proof) error {
 
 	if quote != "" {
-		err := m.AddActiveMintQuote(quote)
+		err := m.ActiveQuotes.AddQuote(quote)
 		if err != nil {
 			return fmt.Errorf("m.AddActiveMintQuote(quote): %w", err)
 		}
 	}
 
 	if len(proofs) == 0 {
-		err := m.AddProofs(proofs)
+		err := m.ActiveProofs.AddProofs(proofs)
 		if err != nil {
 			return fmt.Errorf("AddProofs: %w", err)
 		}
@@ -144,17 +114,16 @@ func (m *Mint) AddQuotesAndProofs(quote string, proofs []cashu.Proof) error {
 
 func (m *Mint) RemoveQuotesAndProofs(quote string, proofs []cashu.Proof) {
 	if quote != "" {
-		m.RemoveActiveMintQuote(quote)
+		m.ActiveQuotes.RemoveQuote(quote)
 	}
 
 	if len(proofs) == 0 {
-		m.RemoveProofs(proofs)
+		m.ActiveProofs.RemoveProofs(proofs)
 
 	}
 }
 
 // errors types for validation
-
 var (
 	ErrInvalidProof        = errors.New("Invalid proof")
 	ErrQuoteNotPaid        = errors.New("Quote not paid")
@@ -250,7 +219,6 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
 
 	if err != nil {
-		log.Printf("proof.IsProofSpendConditioned(): %+v", err)
 		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", err)
 	}
 
@@ -270,14 +238,12 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	parsedBlinding, err := hex.DecodeString(proof.C)
 
 	if err != nil {
-		log.Printf("hex.DecodeString: %+v", err)
-		return err
+		return fmt.Errorf("hex.DecodeString: %w", err)
 	}
 
 	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
 	if err != nil {
-		log.Printf("secp256k1.ParsePubKey: %+v", err)
-		return err
+		return fmt.Errorf("secp256k1.ParsePubKey: %+v", err)
 	}
 
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
@@ -296,6 +262,10 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 	for _, output := range outputs {
 
 		correctKeyset := m.ActiveKeysets[unit][output.Amount]
+
+		if correctKeyset.PrivKey == nil || correctKeyset.Id != output.Id {
+			return nil, nil, UsingInactiveKeyset
+		}
 
 		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
 
@@ -360,93 +330,95 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 	return orderedKeys
 }
 
-func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*Mint, error) {
-	mint := Mint{
-		ActiveKeysets: make(map[string]KeysetMap),
-		Keysets:       make(map[string][]cashu.Keyset),
-	}
-
-	network := ctx.Value(NETWORK_ENV)
+func CheckChainParams(network string) (chaincfg.Params, error) {
 	switch network {
 	case "testnet":
-		mint.Network = chaincfg.TestNet3Params
+		return chaincfg.TestNet3Params, nil
 	case "mainnet":
-		mint.Network = chaincfg.MainNetParams
+		return chaincfg.MainNetParams, nil
 	case "regtest":
-		mint.Network = chaincfg.RegressionNetParams
+		return chaincfg.RegressionNetParams, nil
 	case "signet":
-		mint.Network = chaincfg.SigNetParams
+		return chaincfg.SigNetParams, nil
 	default:
-		return &mint, fmt.Errorf("Invalid network: %s", network)
+		return chaincfg.MainNetParams, fmt.Errorf("Invalid network: %s", network)
 	}
 
-	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
-	switch lightningBackendType {
+}
 
-	case comms.FAKE_WALLET:
+func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config Config) (*Mint, error) {
+	activeProofs := ActiveProofs{
+		Proofs: make(map[cashu.Proof]bool),
+	}
+	activeQuotes := ActiveQuote{
+		Quote: make(map[string]bool),
+	}
+	mint := Mint{
+		ActiveKeysets: make(map[string]cashu.KeysetMap),
+		Keysets:       make(map[string][]cashu.Keyset),
+		Config:        config,
+		ActiveProofs:  &activeProofs,
+		ActiveQuotes:  &activeQuotes,
+	}
 
-	case comms.LND_WALLET, comms.LNBITS_WALLET:
-		lightningComs, err := comms.SetupLightingComms(ctx)
+	chainparam, err := CheckChainParams(config.NETWORK)
+	if err != nil {
+		return &mint, fmt.Errorf("CheckChainParams(config.NETWORK) %w", err)
+	}
 
-		if err != nil {
-			return &mint, err
+	switch config.MINT_LIGHTNING_BACKEND {
+
+	case FAKE_WALLET:
+		fake_wallet := lightning.FakeWallet{
+			Network: chainparam,
 		}
-		mint.LightningComs = *lightningComs
+
+		mint.LightningBackend = fake_wallet
+
+	case LNDGRPC:
+		lndWallet := lightning.LndGrpcWallet{
+			Network: chainparam,
+		}
+
+		err := lndWallet.SetupGrpc(config.LND_GRPC_HOST, config.LND_MACAROON, config.LND_TLS_CERT)
+		if err != nil {
+			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
+		}
+		mint.LightningBackend = lndWallet
+	case LNBITS:
+		lnbitsWallet := lightning.LnbitsWallet{
+			Network:  chainparam,
+			Endpoint: config.MINT_LNBITS_ENDPOINT,
+			Key:      config.MINT_LNBITS_KEY,
+		}
+		mint.LightningBackend = lnbitsWallet
+	case CLNGRPC:
+		clnWallet := lightning.CLNGRPCWallet{
+			Network: chainparam,
+		}
+
+		err := clnWallet.SetupGrpc(config.CLN_GRPC_HOST, config.CLN_CA_CERT, config.CLN_CLIENT_CERT, config.CLN_CLIENT_KEY, config.CLN_MACAROON)
+		if err != nil {
+			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
+		}
+		mint.LightningBackend = clnWallet
+
 	default:
-		log.Fatalf("Unknown lightning backend: %s", lightningBackendType)
+		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)
 	}
 
 	mint.PendingProofs = make([]cashu.Proof, 0)
 
-	// uses seed to generate the keysets
-	for _, seed := range seeds {
-
-		// decrypt seed
-
-		// decrypt seed first
-		err := seed.DecryptSeed(mint_privkey)
-
-		if err != nil {
-			log.Println(fmt.Errorf("seed.DecryptSeed: %w", err))
-		}
-		masterKey, err := bip32.NewMasterKey(seed.Seed)
-		if err != nil {
-			log.Println(fmt.Errorf("NewMasterKey: %w", err))
-			return &mint, err
-		}
-
-		unit, err := cashu.UnitFromString(seed.Unit)
-		if err != nil {
-			log.Println(fmt.Errorf("cashu.UnitFromString: %w", err))
-			return &mint, err
-		}
-
-		keysets, err := cashu.GenerateKeysets(masterKey, cashu.GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk)
-
-		if err != nil {
-			return &mint, fmt.Errorf("GenerateKeysets: %w", err)
-		}
-
-		if seed.Active {
-			mint.ActiveKeysets[seed.Unit] = make(KeysetMap)
-			for _, keyset := range keysets {
-				mint.ActiveKeysets[seed.Unit][keyset.Amount] = keyset
-			}
-
-		}
-
-		mint.Keysets[seed.Unit] = append(mint.Keysets[seed.Unit], keysets...)
+	allKeysets, activeKeyset, err := DeriveKeysetFromSeeds(seeds, mint_privkey)
+	if err != nil {
+		return &mint, fmt.Errorf("DeriveKeysetFromSeeds(seeds, mint_privkey) %w", err)
 	}
+
+	mint.ActiveKeysets = activeKeyset
+	mint.Keysets = allKeysets
 
 	// parse mint private key and get hex value pubkey
-
-	parsedBytes, err := hex.DecodeString(mint_privkey)
-
-	if err != nil {
-		return &mint, fmt.Errorf("Could not setup mints pubkey %w", err)
-	}
-
-	pubkeyhex := hex.EncodeToString(secp256k1.PrivKeyFromBytes(parsedBytes).PubKey().SerializeCompressed())
+	pubkeyhex := hex.EncodeToString(mint_privkey.PubKey().SerializeCompressed())
 
 	mint.MintPubkey = pubkeyhex
 
@@ -455,41 +427,54 @@ func SetUpMint(ctx context.Context, mint_privkey string, seeds []cashu.Seed) (*M
 
 type AddToDBFunc func(*pgxpool.Pool, bool, cashu.ACTION_STATE, string) error
 
-func (m *Mint) VerifyLightingPaymentHappened(ctx context.Context, pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
-	lightningBackendType := ctx.Value(MINT_LIGHTNING_BACKEND_ENV)
-	switch lightningBackendType {
+func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
+	state, preimage, err := m.LightningBackend.CheckPayed(quote)
+	if err != nil {
+		return cashu.UNPAID, "", fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
+	}
 
-	case comms.FAKE_WALLET:
+	switch {
+	case state == lightning.SETTLED:
 		err := dbCall(pool, true, cashu.PAID, quote)
 		if err != nil {
-			return cashu.UNPAID, "", fmt.Errorf("dbCall: %w", err)
+			return cashu.PAID, preimage, fmt.Errorf("dbCall: %w", err)
 		}
+		return cashu.PAID, preimage, nil
 
-		return cashu.PAID, "", nil
-
-	case comms.LND_WALLET, comms.LNBITS_WALLET:
-		state, preimage, err := m.LightningComs.CheckIfInvoicePayed(quote)
+	case state == lightning.PENDING:
+		err := dbCall(pool, true, cashu.UNPAID, quote)
 		if err != nil {
-			return cashu.UNPAID, "", fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
+			return cashu.UNPAID, preimage, fmt.Errorf("dbCall: %w", err)
 		}
-
-		switch {
-		case state == cashu.PAID:
-			err := dbCall(pool, true, cashu.PAID, quote)
-			if err != nil {
-				return cashu.PAID, preimage, fmt.Errorf("dbCall: %w", err)
-			}
-			return cashu.PAID, preimage, nil
-
-		case state == cashu.UNPAID:
-			err := dbCall(pool, true, cashu.UNPAID, quote)
-			if err != nil {
-				return cashu.UNPAID, preimage, fmt.Errorf("dbCall: %w", err)
-			}
-			return cashu.UNPAID, preimage, nil
-
-		}
+		return cashu.UNPAID, preimage, nil
 
 	}
+
 	return cashu.UNPAID, "", nil
+}
+
+func DeriveKeysetFromSeeds(seeds []cashu.Seed, privateKey *secp256k1.PrivateKey) (map[string][]cashu.Keyset, map[string]cashu.KeysetMap, error) {
+	newKeysets := make(map[string][]cashu.Keyset)
+	newActiveKeysets := make(map[string]cashu.KeysetMap)
+	for _, seed := range seeds {
+
+		// decrypt seed
+
+		keysets, err := seed.DeriveKeyset(privateKey)
+		if err != nil {
+			return newKeysets, newActiveKeysets, fmt.Errorf("seed.DeriveKeyset(mint_privkey): %w", err)
+		}
+
+		if seed.Active {
+			newActiveKeysets[seed.Unit] = make(cashu.KeysetMap)
+			for _, keyset := range keysets {
+				newActiveKeysets[seed.Unit][keyset.Amount] = keyset
+			}
+
+		}
+
+		newKeysets[seed.Unit] = append(newKeysets[seed.Unit], keysets...)
+	}
+	return newKeysets, newActiveKeysets, nil
+
 }

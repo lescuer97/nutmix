@@ -93,7 +93,7 @@ func SetUpSeedAndKeyset(masterKey *bip32.Key, version int, unit Unit) (Seed, err
 	return newSeed, nil
 }
 
-func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) ([]Seed, error) {
+func DeriveSeedsFromKey(keyFromMint *secp256k1.PrivateKey, version int, availableSeeds []Unit) ([]Seed, error) {
 
 	var seeds []Seed
 
@@ -114,14 +114,10 @@ func DeriveSeedsFromKey(keyFromMint string, version int, availableSeeds []Unit) 
 	return seeds, nil
 }
 
-func DeriveIndividualSeedFromKey(keyFromMint string, version int, unit Unit) (Seed, error) {
+func DeriveIndividualSeedFromKey(keyFromMint *secp256k1.PrivateKey, version int, unit Unit) (Seed, error) {
 	var seed Seed
-	key_bytes, err := hex.DecodeString(keyFromMint)
-	if err != nil {
-		return seed, fmt.Errorf("Error decoding mint private key: %+v ", err)
-	}
 
-	masterKey, err := bip32.NewMasterKey(key_bytes)
+	masterKey, err := bip32.NewMasterKey(keyFromMint.Serialize())
 
 	if err != nil {
 		return seed, fmt.Errorf("Error creating master key: %w ", err)

@@ -1,0 +1,30 @@
+{{define "navigation"}}
+<header>
+    <h2>Nutmix Dashboard</h2>
+    
+<nav >
+    <a {{if eq . "activity" }} class="selected" {{end}}  href="/admin">Mint Activity</a>
+	<a {{if eq . "keysets" }} class="selected" {{end}} href="/admin/keysets">Keysets</a>
+	<a {{if eq . "settings" }} class="selected" {{end}} href="/admin/settings">Mint settings</a>
+	<a {{if eq . "bolt11" }} class="selected" {{end}} href="/admin/bolt11">Lightning Backend</a>
+</nav>
+
+</header> 
+
+{{end}}
+
+{{ define "settings-error" }}
+    
+<div remove-me="3s" class="error">
+    <span>{{.Error}}</span>
+</div>
+
+{{end}}
+
+{{ define "settings-success" }}
+    
+<div remove-me="3s" class="success">
+    <span>{{.Success}}</span>
+</div>
+
+{{end}}
