@@ -29,8 +29,11 @@ func ParseVerifyProofError(proofError error) (cashu.ErrorCode, *string) {
 	return cashu.TOKEN_NOT_VERIFIED, nil
 
 }
+
 func GetChangeOutput(overpaidFees uint64, outputs []cashu.BlindedMessage) []cashu.BlindedMessage {
 	amounts := cashu.AmountSplit(overpaidFees)
+	// if there are more outputs then amount to change.
+	// we size down the total amount of blind messages
 	switch {
 	case len(amounts) > len(outputs):
 		for i := range outputs {
@@ -48,7 +51,7 @@ func GetChangeOutput(overpaidFees uint64, outputs []cashu.BlindedMessage) []cash
 	return outputs
 }
 
-func GetProofsValues(proofs *[]cashu.Proof) (uint64, []string, error) {
+func GetAndCalculateProofsValues(proofs *[]cashu.Proof) (uint64, []string, error) {
 	now := time.Now().Unix()
 	var totalAmount uint64
 	var SecretsList []string

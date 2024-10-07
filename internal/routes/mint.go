@@ -204,7 +204,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 			return
 		}
 
-		AmountProofs, SecretsList, err := utils.GetProofsValues(&swapRequest.Inputs)
+		AmountProofs, SecretsList, err := utils.GetAndCalculateProofsValues(&swapRequest.Inputs)
 		if err != nil {
 			logger.Warn("utils.GetProofsValues(&swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "Problem processing proofs")

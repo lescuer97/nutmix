@@ -485,7 +485,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 			return
 		}
 
-		AmountProofs, SecretsList, err := utils.GetProofsValues(&meltRequest.Inputs)
+		AmountProofs, SecretsList, err := utils.GetAndCalculateProofsValues(&meltRequest.Inputs)
 		if err != nil {
 			logger.Warn("utils.GetProofsValues(&meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "Problem processing proofs")
@@ -598,6 +598,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 
 			overpaidFees := AmountProofs - totalExpent
 			change := utils.GetChangeOutput(overpaidFees, meltRequest.Outputs)
+
 			blindSignatures, recoverySigsDb, err := mint.SignBlindedMessages(change, quote.Unit)
 
 			if err != nil {
