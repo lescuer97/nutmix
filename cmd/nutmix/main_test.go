@@ -577,8 +577,13 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if w.Code != 403 {
 		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
+	var errorRes cashu.ErrorResponse
+	err = json.Unmarshal(w.Body.Bytes(), &errorRes)
+	if err != nil {
+		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
+	}
 
-	if w.Body.String() != `"Invalid Proof"` {
+	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
@@ -1485,7 +1490,13 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
 
-	if w.Body.String() != `"Invalid Proof"` {
+	var errorRes cashu.ErrorResponse
+	err = json.Unmarshal(w.Body.Bytes(), &errorRes)
+	if err != nil {
+		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
+	}
+
+	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 

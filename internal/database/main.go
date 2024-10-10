@@ -323,12 +323,12 @@ func GetMeltQuoteById(pool *pgxpool.Pool, id string) (cashu.MeltRequestDB, error
 	return quote, nil
 }
 
-func CheckListOfProofs(pool *pgxpool.Pool, CList []string, SecretList []string) ([]cashu.Proof, error) {
+func CheckListOfProofs(pool *pgxpool.Pool, SecretList []string) ([]cashu.Proof, error) {
 
 	var proofList []cashu.Proof
 
 	ctx := context.Background()
-	rows, err := pool.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at  FROM proofs WHERE C = ANY($1) OR secret = ANY($2)", CList, SecretList)
+	rows, err := pool.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at  FROM proofs WHERE secret = ANY($1)", SecretList)
 
 	defer rows.Close()
 

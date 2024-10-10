@@ -228,7 +228,7 @@ func (l CLNGRPCWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
 		case pay.Status == cln_grpc.ListpaysPays_PENDING:
 			return PENDING, hex.EncodeToString(pay.PaymentHash), nil
 		case pay.Status == cln_grpc.ListpaysPays_FAILED:
-			return SETTLED, hex.EncodeToString(pay.PaymentHash), nil
+			return FAILED, hex.EncodeToString(pay.PaymentHash), nil
 
 		}
 
@@ -288,7 +288,7 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	return fee, nil
 }
 
-func (l CLNGRPCWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
+func (l CLNGRPCWallet) ReqSETTLEDuestInvoice(amount int64) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 

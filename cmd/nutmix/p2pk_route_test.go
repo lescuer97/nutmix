@@ -501,8 +501,14 @@ func TestP2PKMultisigSigning(t *testing.T) {
 		t.Fatalf("Expected status code 403, got %d", w.Code)
 	}
 
-	if w.Body.String() != `"Locktime has passed and no refund key was found"` {
-		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	var errorRes cashu.ErrorResponse
+	err = json.Unmarshal(w.Body.Bytes(), &errorRes)
+	if err != nil {
+		t.Fatalf("Error generating proofs: %v", err)
+	}
+
+	if *errorRes.Detail != `Locktime has passed and no refund key was found` {
+		t.Fatalf("Expected response No valid signatures, got %s", *errorRes.Detail)
 	}
 
 	// TRY SWAPPING with refund key
