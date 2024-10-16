@@ -248,7 +248,17 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatalf("Expected status code 403, got %d", w.Code)
 	}
 
-	if w.Body.String() != `"Invalid preimage"` {
+	var errorRes cashu.ErrorResponse
+	err = json.Unmarshal(w.Body.Bytes(), &errorRes)
+	if err != nil {
+		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
+	}
+
+	if errorRes.Code != cashu.UNKNOWN {
+		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	}
+
+	if *errorRes.Detail != `Invalid preimage` {
 		t.Fatalf("Expected response Invalid preimage, got %s", w.Body.String())
 	}
 
@@ -557,7 +567,17 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("Expected status code 403, got %d", w.Code)
 	}
 
-	if w.Body.String() != `"Locktime has passed and no refund key was found"` {
+	var errorRes cashu.ErrorResponse
+	err = json.Unmarshal(w.Body.Bytes(), &errorRes)
+	if err != nil {
+		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
+	}
+
+	if errorRes.Code != cashu.UNKNOWN {
+		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	}
+
+	if *errorRes.Detail != `Locktime has passed and no refund key was found` {
 		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
 	}
 
@@ -710,8 +730,17 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("Expected status code 403, got %d", w.Code)
 	}
 
-	if w.Body.String() != `"Invalid preimage"` {
-		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	err = json.Unmarshal(w.Body.Bytes(), &errorRes)
+	if err != nil {
+		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
+	}
+
+	if errorRes.Code != cashu.UNKNOWN {
+		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	}
+
+	if *errorRes.Detail != `Invalid preimage` {
+		t.Fatalf("Expected response Invalid preimage, got %s", w.Body.String())
 	}
 
 	// Try swapping with correct signatures and correct preimage

@@ -1,28 +1,59 @@
-package database
+package postgresql
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
-	// "github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 )
 
-type MintMeltBalance struct {
-	Mint []cashu.MintRequestDB
-	Melt []cashu.MeltRequestDB
+func (pql Postgresql) SaveNostrAuth(auth database.NostrLoginAuth) error {
+	_, err := pql.pool.Exec(context.Background(), "INSERT INTO nostr_login (nonce, expiry , activated) VALUES ($1, $2, $3)", auth.Nonce, auth.Expiry, auth.Activated)
+
+	if err != nil {
+		return databaseError(fmt.Errorf("Inserting to nostr_login: %w", err))
+
+	}
+	return nil
 }
 
-func GetMintMeltBalanceByTime(pool *pgxpool.Pool, time int64) (MintMeltBalance, error) {
-	var mintMeltBalance MintMeltBalance
+func (pql Postgresql) UpdateNostrAuthActivation(nonce string, activated bool) error {
+	// change the paid status of the quote
+	_, err := pql.pool.Exec(context.Background(), "UPDATE nostr_login SET activated = $1 WHERE nonce = $2", activated, nonce)
+	if err != nil {
+		return databaseError(fmt.Errorf("Update to seeds: %w", err))
+
+	}
+	return nil
+}
+
+func (pql Postgresql) GetNostrAuth(nonce string) (database.NostrLoginAuth, error) {
+	rows, err := pql.pool.Query(context.Background(), "SELECT nonce, activated, expiry FROM nostr_login WHERE nonce = $1", nonce)
+	defer rows.Close()
+	if err != nil {
+		return database.NostrLoginAuth{}, fmt.Errorf("Error checking for Active seeds: %w", err)
+	}
+
+	nostrLogin, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[database.NostrLoginAuth])
+
+	if err != nil {
+		return nostrLogin, fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.NostrLoginAuth]): %w", err)
+	}
+
+	return nostrLogin, nil
+
+}
+
+func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBalance, error) {
+	var mintMeltBalance database.MintMeltBalance
 	// change the paid status of the quote
 	batch := pgx.Batch{}
 	batch.Queue("SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID') ", time)
 	batch.Queue("SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp FROM melt_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID')", time)
 
-	results := pool.SendBatch(context.Background(), &batch)
+	results := pql.pool.SendBatch(context.Background(), &batch)
 
 	defer results.Close()
 

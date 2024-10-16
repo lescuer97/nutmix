@@ -3,11 +3,13 @@ package mint
 import (
 	"context"
 	"encoding/hex"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/tyler-smith/go-bip32"
 	"os"
 	"testing"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lescuer97/nutmix/api/cashu"
+	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
+	"github.com/tyler-smith/go-bip32"
 )
 
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
@@ -51,7 +53,9 @@ func TestSetUpMint(t *testing.T) {
 		t.Errorf("could not setup config file: %+v", err)
 	}
 
-	mint, err := SetUpMint(ctx, parsedPrivateKey, seeds, config)
+	db := mockdb.MockDB{}
+
+	mint, err := SetUpMint(ctx, parsedPrivateKey, seeds, config, db)
 
 	if err != nil {
 		t.Errorf("could not setup mint: %+v", err)

@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -14,7 +13,7 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
-func MintSettingsPage(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
+func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(200, "settings.html", mint.Config)
 	}
@@ -50,7 +49,7 @@ func isNostrKeyValid(nostrKey string) (bool, error) {
 
 }
 
-func MintSettingsForm(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		// check the different variables that could change
@@ -154,13 +153,13 @@ func MintSettingsForm(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin
 	}
 }
 
-func LightningNodePage(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
+func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(200, "bolt11.html", mint.Config)
 	}
 }
 
-func Bolt11Post(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 

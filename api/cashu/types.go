@@ -807,9 +807,3 @@ func (b *BlindSignature) VerifyDLEQ(
 	return hashed_keys_priv.Key.Negate().String() == e.Key.String(), nil
 
 }
-
-type NostrLoginAuth struct {
-	Nonce     string
-	Activated bool
-	Expiry    int
-}
