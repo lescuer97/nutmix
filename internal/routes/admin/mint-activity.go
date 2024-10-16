@@ -1,20 +1,17 @@
 package admin
 
 import (
-	"log/slog"
-	"sort"
-	"time"
-
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lescuer97/nutmix/internal/database"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
+	"log/slog"
+	"sort"
+	"time"
 )
 
-func MintBalance(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -43,14 +40,14 @@ func MintBalance(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.Hand
 	}
 }
 
-func MintMeltSummary(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintMeltSummary(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
 
 		timeRequestDuration := ParseToTimeRequest(timeHeader)
 
-		mintMeltBalance, err := database.GetMintMeltBalanceByTime(pool, timeRequestDuration.RollBackFromNow().Unix())
+		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
 			logger.Error(
@@ -101,12 +98,12 @@ func MintMeltSummary(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.
 		c.HTML(200, "mint-melt-activity", mintMeltTotal)
 	}
 }
-func MintMeltList(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
 		timeRequestDuration := ParseToTimeRequest(timeHeader)
 
-		mintMeltBalance, err := database.GetMintMeltBalanceByTime(pool, timeRequestDuration.RollBackFromNow().Unix())
+		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
 			logger.Error(

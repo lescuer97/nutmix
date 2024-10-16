@@ -11,9 +11,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
@@ -81,7 +79,7 @@ func AuthMiddleware(logger *slog.Logger, secret []byte) gin.HandlerFunc {
 	}
 }
 
-func Login(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// parse data for login
 		logger.Debug("Attempting log in")
@@ -97,7 +95,7 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Handler
 			return
 		}
 
-		nostrLogin, err := database.GetNostrLogin(pool, nostrEvent.Content)
+		nostrLogin, err := mint.MintDB.GetNostrAuth(nostrEvent.Content)
 
 		if err != nil {
 			logger.Error(
@@ -191,7 +189,7 @@ func Login(pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) gin.Handler
 
 		nostrLogin.Activated = verified
 
-		err = database.UpdateNostrLoginActivation(pool, nostrLogin)
+		err = mint.MintDB.UpdateNostrAuthActivation(nostrLogin.Nonce, nostrLogin.Activated)
 
 		if err != nil {
 			logger.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.String(utils.LogExtraInfo, err.Error()))

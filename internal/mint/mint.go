@@ -12,8 +12,8 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 )
@@ -27,6 +27,7 @@ type Mint struct {
 	ActiveQuotes     *ActiveQuote
 	Config           Config
 	MintPubkey       string
+	MintDB           database.MintDB
 }
 
 var (
@@ -346,7 +347,7 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 
 }
 
-func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config Config) (*Mint, error) {
+func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config Config, db database.MintDB) (*Mint, error) {
 	activeProofs := ActiveProofs{
 		Proofs: make(map[cashu.Proof]bool),
 	}
@@ -359,6 +360,7 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 		Config:        config,
 		ActiveProofs:  &activeProofs,
 		ActiveQuotes:  &activeQuotes,
+		MintDB:        db,
 	}
 
 	chainparam, err := CheckChainParams(config.NETWORK)
@@ -425,9 +427,9 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 	return &mint, nil
 }
 
-type AddToDBFunc func(*pgxpool.Pool, bool, cashu.ACTION_STATE, string) error
+type AddToDBFunc func(string, bool, cashu.ACTION_STATE, bool) error
 
-func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
+func (m *Mint) VerifyLightingPaymentHappened(paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
 	state, preimage, err := m.LightningBackend.CheckPayed(quote)
 	if err != nil {
 		return cashu.UNPAID, "", fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
@@ -435,14 +437,14 @@ func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quot
 
 	switch {
 	case state == lightning.SETTLED:
-		err := dbCall(pool, true, cashu.PAID, quote)
+		err := dbCall(quote, true, cashu.PAID, false)
 		if err != nil {
 			return cashu.PAID, preimage, fmt.Errorf("dbCall: %w", err)
 		}
 		return cashu.PAID, preimage, nil
 
 	case state == lightning.PENDING:
-		err := dbCall(pool, true, cashu.UNPAID, quote)
+		err := dbCall(quote, false, cashu.UNPAID, false)
 		if err != nil {
 			return cashu.UNPAID, preimage, fmt.Errorf("dbCall: %w", err)
 		}

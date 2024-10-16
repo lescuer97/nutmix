@@ -19,6 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	pq "github.com/lescuer97/nutmix/internal/database/postgresql"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
@@ -658,13 +659,13 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
 
-	pool, err := database.DatabaseSetup(ctx, "../../migrations/")
+	db, err := pq.DatabaseSetup(ctx, "../../migrations/")
 
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
 	}
 
-	seeds, err := database.GetAllSeeds(pool)
+	seeds, err := db.GetAllSeeds()
 
 	if err != nil {
 		log.Fatalf("Could not keysets: %v", err)
@@ -686,7 +687,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 
 		generatedSeeds, err := cashu.DeriveSeedsFromKey(parsedPrivateKey, 1, cashu.AvailableSeeds)
 
-		err = database.SaveNewSeeds(pool, generatedSeeds)
+		err = db.SaveNewSeeds(generatedSeeds)
 
 		seeds = append(seeds, generatedSeeds...)
 
@@ -712,7 +713,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
 
-	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config)
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config, db)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -722,10 +723,10 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	routes.V1Routes(r, pool, mint, logger)
+	routes.V1Routes(r, mint, logger)
 
 	if adminRoute {
-		admin.AdminRoutes(ctx, r, pool, mint, logger)
+		admin.AdminRoutes(ctx, r, mint, logger)
 	}
 
 	return r, mint

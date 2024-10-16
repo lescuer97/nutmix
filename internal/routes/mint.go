@@ -3,16 +3,14 @@ package routes
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/database"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"log/slog"
 	"slices"
 )
 
-func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) {
+func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
@@ -42,7 +40,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 	})
 	v1.GET("/keysets", func(c *gin.Context) {
 
-		seeds, err := database.GetAllSeeds(pool)
+		seeds, err := mint.MintDB.GetAllSeeds()
 		if err != nil {
 			logger.Error(fmt.Errorf("could not get keysets, database.GetAllSeeds(pool) %w", err).Error())
 			c.JSON(500, "Server side error")
@@ -249,7 +247,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 		}
 
 		// check if we know any of the proofs
-		knownProofs, err := database.CheckListOfProofs(pool, SecretsList)
+		knownProofs, err := mint.MintDB.GetProofsFromSecret(SecretsList)
 
 		if err != nil {
 			logger.Error("database.CheckListOfProofs(pool, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
@@ -288,7 +286,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 		}
 
 		// send proofs to database
-		err = database.SaveProofs(pool, swapRequest.Inputs)
+		err = mint.MintDB.SaveProof(swapRequest.Inputs)
 
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
@@ -298,7 +296,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 			return
 		}
 
-		err = database.SetRestoreSigs(pool, recoverySigsDb)
+		err = mint.MintDB.SaveRestoreSigs(recoverySigsDb)
 		if err != nil {
 			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
@@ -324,7 +322,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 			States: make([]cashu.CheckState, 0),
 		}
 		// set as unspent
-		proofs, err := database.CheckListOfProofsBySecretCurve(pool, checkStateRequest.Ys)
+		proofs, err := mint.MintDB.GetProofsFromSecretCurve(checkStateRequest.Ys)
 
 		proofsForRemoval := make([]cashu.Proof, 0)
 
@@ -391,7 +389,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 			blindingFactors = append(blindingFactors, output.B_)
 		}
 
-		blindRecoverySigs, err := database.GetRestoreSigsFromBlindedMessages(pool, blindingFactors)
+		blindRecoverySigs, err := mint.MintDB.GetRestoreSigsFromBlindedMessages(blindingFactors)
 		if err != nil {
 			logger.Error("database.GetRestoreSigsFromBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Opps!, something went wrong")
