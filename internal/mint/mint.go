@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"sync"
 	"time"
 
@@ -71,6 +72,7 @@ type ActiveQuote struct {
 	Quote map[string]bool
 	sync.Mutex
 }
+
 
 func (q *ActiveQuote) AddQuote(quote string) error {
 	q.Lock()
@@ -323,6 +325,11 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 			keys = append(keys, key)
 		}
 	}
+
+    sort.Slice(keys, func(i, j int) bool {
+		return keys[i].Amount < keys[j].Amount
+	})
+
 
 	orderedKeys := cashu.OrderKeysetByUnit(keys)
 
