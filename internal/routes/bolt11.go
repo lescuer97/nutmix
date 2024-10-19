@@ -448,7 +448,7 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		if quote.State == cashu.PENDING {
 			mint.RemoveQuotesAndProofs(meltRequest.Quote, meltRequest.Inputs)
 			logger.Warn("Quote is pending")
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.QUOTE_PENDING, nil))
 			return
 		}
 
