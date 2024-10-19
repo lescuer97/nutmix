@@ -413,7 +413,7 @@ func GetRestoreSigsFromBlindedMessages(pool *pgxpool.Pool, B_ []string) ([]cashu
 
 	var signaturesList []cashu.RecoverSigDB
 
-	rows, err := pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, witness  FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
+	rows, err := pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at  FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
 	defer rows.Close()
 
 	if err != nil {
@@ -439,12 +439,12 @@ func GetRestoreSigsFromBlindedMessages(pool *pgxpool.Pool, B_ []string) ([]cashu
 
 func SetRestoreSigs(pool *pgxpool.Pool, recover_sigs []cashu.RecoverSigDB) error {
 	entries := [][]any{}
-	columns := []string{"id", "amount", "B_", "C_", "created_at", "witness"}
+	columns := []string{"id", "amount", "B_", "C_", "created_at"}
 	tableName := "recovery_signature"
 	tries := 0
 
 	for _, sig := range recover_sigs {
-		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, sig.Witness})
+		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt})
 	}
 
 	for {

@@ -69,7 +69,7 @@ type BlindedMessage struct {
 	Amount  uint64 `json:"amount"`
 	Id      string `json:"id"`
 	B_      string `json:"B_"`
-	Witness string `json:"witness" db:"witness"`
+	Witness string `json:"witness,omitempty" db:"witness"`
 }
 
 func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey]bool) error {
@@ -604,7 +604,7 @@ type RecoverSigDB struct {
 	B_        string `json:"B_" db:"B_"`
 	C_        string `json:"C_" db:"C_"`
 	CreatedAt int64  `json:"created_at" db:"created_at"`
-	Witness   string `json:"witness"`
+	// Dleq   *BlindSignatureDLEQ `json:"dleq"`
 }
 
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
