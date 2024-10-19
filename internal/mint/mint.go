@@ -275,7 +275,6 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 			C_:        blindSignature.C_,
 			B_:        output.B_,
 			CreatedAt: time.Now().Unix(),
-			Witness:   output.Witness,
 		}
 
 		if err != nil {
