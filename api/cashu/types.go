@@ -591,7 +591,7 @@ type PostCheckStateRequest struct {
 type CheckState struct {
 	Y       string     `json:"Y"`
 	State   ProofState `json:"state"`
-	Witness *string    `json:"witness"`
+	Witness *string    `json:"witness,omitempty"`
 }
 
 type PostCheckStateResponse struct {
