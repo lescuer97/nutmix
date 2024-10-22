@@ -380,9 +380,9 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 			// Check if is in list of spents and if its also pending add it for removal of pending list
 			case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
 				compare := p.Y == state
-                if p.Witness != "" {
-				    checkState.Witness = &p.Witness
-                }
+				if p.Witness != "" {
+					checkState.Witness = &p.Witness
+				}
 				if compare && pendingAndSpent {
 
 					proofsForRemoval = append(proofsForRemoval, p)

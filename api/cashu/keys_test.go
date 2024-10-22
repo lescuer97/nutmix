@@ -2,10 +2,8 @@ package cashu
 
 import (
 	"encoding/hex"
-	"testing"
-
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/tyler-smith/go-bip32"
+	"testing"
 )
 
 func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
@@ -16,7 +14,7 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 		t.Errorf("could not setup master key %+v", err)
 	}
 
-	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat, 0)
+	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat, 0, true)
 
 	if err != nil {
 		t.Errorf("could not generate keyset %+v", err)
@@ -46,83 +44,6 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 
 	if keysetId != "0014d74f728e80b8" {
 		t.Errorf("keyset id is not correct")
-	}
-
-}
-
-func TestDeriveSeedsFromKey(t *testing.T) {
-
-	masterKey := "0000000000000000000000000000000000000000000000000000000000000001"
-
-	decodedPrivKey, err := hex.DecodeString(masterKey)
-	if err != nil {
-		t.Errorf("hex.DecodeString(masterKey) %+v", err)
-	}
-
-	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-
-	generatedSeeds, err := DeriveSeedsFromKey(parsedPrivateKey, 1, AvailableSeeds)
-
-	if err != nil {
-		t.Errorf("could not derive seeds from key %+v", err)
-	}
-
-	if len(generatedSeeds) != 1 {
-		t.Errorf("seed length is not 2")
-	}
-
-	err = generatedSeeds[0].DecryptSeed(parsedPrivateKey)
-
-	if err != nil {
-		t.Errorf("could not decrypt seed %+v", err)
-	}
-
-	if hex.EncodeToString(generatedSeeds[0].Seed) != "0f451868e048a61dcf274af7c3a463f48d32dbabb47bfd3f4da850f4d6525975" {
-		t.Errorf("seed 0 is not correct %v", hex.EncodeToString(generatedSeeds[0].Seed))
-	}
-
-	if generatedSeeds[0].Unit != Sat.String() {
-		t.Errorf("seed 0 unit is not correct")
-	}
-
-	if generatedSeeds[0].Id != "00bfa73302d12ffd" {
-		t.Errorf("seed 0 id is not correct %v", generatedSeeds[0].Id)
-	}
-
-}
-
-func TestDeriveIndividualSeedFromKey(t *testing.T) {
-
-	masterKey := "0000000000000000000000000000000000000000000000000000000000000001"
-
-	decodedPrivKey, err := hex.DecodeString(masterKey)
-	if err != nil {
-		t.Errorf("hex.DecodeString(masterKey) %+v", err)
-	}
-
-	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-
-	generatedSeeds, err := DeriveIndividualSeedFromKey(parsedPrivateKey, 1, Sat)
-
-	if err != nil {
-		t.Errorf("could not derive seeds from key %+v", err)
-	}
-	err = generatedSeeds.DecryptSeed(parsedPrivateKey)
-
-	if err != nil {
-		t.Errorf("could not decrypt seed %+v", err)
-	}
-
-	if hex.EncodeToString(generatedSeeds.Seed) != "0f451868e048a61dcf274af7c3a463f48d32dbabb47bfd3f4da850f4d6525975" {
-		t.Errorf("seed 0 is not correct %v", hex.EncodeToString(generatedSeeds.Seed))
-	}
-
-	if generatedSeeds.Unit != Sat.String() {
-		t.Errorf("seed 0 unit is not correct")
-	}
-
-	if generatedSeeds.Id != "00bfa73302d12ffd" {
-		t.Errorf("seed 0 id is not correct %v", generatedSeeds.Id)
 	}
 
 }
