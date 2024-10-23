@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -21,7 +20,7 @@ type ErrorNotif struct {
 	Error string
 }
 
-func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
+func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 	testPath := os.Getenv("TEST_PATH")
 	if testPath != "" {
 		r.Static("static", testPath+"static")
@@ -39,24 +38,24 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, pool *pgxpool.Pool, mint *m
 
 	// PAGES SETUP
 	// This is /admin
-	adminRoute.GET("", InitPage(pool, mint))
-	adminRoute.GET("/keysets", KeysetsPage(pool, mint))
-	adminRoute.GET("/settings", MintSettingsPage(pool, mint))
-	adminRoute.GET("/login", LoginPage(pool, logger, mint))
-	adminRoute.GET("/bolt11", LightningNodePage(pool, mint))
+	adminRoute.GET("", InitPage(mint))
+	adminRoute.GET("/keysets", KeysetsPage(mint))
+	adminRoute.GET("/settings", MintSettingsPage(mint))
+	adminRoute.GET("/login", LoginPage(logger, mint))
+	adminRoute.GET("/bolt11", LightningNodePage(mint))
 
 	// change routes
-	adminRoute.POST("/login", Login(pool, mint, logger))
-	adminRoute.POST("/mintsettings", MintSettingsForm(pool, mint, logger))
-	adminRoute.POST("/bolt11", Bolt11Post(pool, mint, logger))
-	adminRoute.POST("/rotate/sats", RotateSatsSeed(pool, mint, logger))
+	adminRoute.POST("/login", Login(mint, logger))
+	adminRoute.POST("/mintsettings", MintSettingsForm(mint, logger))
+	adminRoute.POST("/bolt11", Bolt11Post(mint, logger))
+	adminRoute.POST("/rotate/sats", RotateSatsSeed(mint, logger))
 
 	// fractional html components
-	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(pool, mint, logger))
-	adminRoute.GET("/lightningdata", LightningDataFormFields(pool, mint))
-	adminRoute.GET("/mint-balance", MintBalance(pool, mint, logger))
-	adminRoute.GET("/mint-melt-summary", MintMeltSummary(pool, mint, logger))
-	adminRoute.GET("/mint-melt-list", MintMeltList(pool, mint, logger))
+	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint, logger))
+	adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
+	adminRoute.GET("/mint-balance", MintBalance(mint, logger))
+	adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint, logger))
+	adminRoute.GET("/mint-melt-list", MintMeltList(mint, logger))
 	adminRoute.GET("/logs", LogsTab(logger))
 
 }

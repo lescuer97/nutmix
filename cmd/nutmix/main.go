@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/database/postgresql"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
@@ -84,15 +84,15 @@ func main() {
 		logger.Info("Running in Release mode")
 	}
 
-	pool, err := database.DatabaseSetup(ctx, "migrations")
-	defer pool.Close()
+	db, err := postgresql.DatabaseSetup(ctx, "migrations")
+	defer db.Close()
 
 	if err != nil {
 		logger.Error(fmt.Sprintf("Error conecting to db %+v", err))
 		log.Panic()
 	}
 
-	seeds, err := database.GetAllSeeds(pool)
+	seeds, err := db.GetAllSeeds()
 
 	if err != nil {
 		logger.Error(fmt.Sprintf("Could not GetAllSeeds: %v", err))
@@ -127,7 +127,7 @@ func main() {
 			log.Panic()
 		}
 
-		err = database.SaveNewSeeds(pool, []cashu.Seed{newSeed})
+		err = db.SaveNewSeeds([]cashu.Seed{newSeed})
 
 		seeds = append(seeds, newSeed)
 
@@ -143,7 +143,7 @@ func main() {
 	}
 
 	// remove mint private key from variable
-	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config)
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config, db)
 
 	// clear mint seeds and privatekey
 	seeds = []cashu.Seed{}
@@ -164,9 +164,9 @@ func main() {
 
 	r.Use(cors.Default())
 
-	routes.V1Routes(r, pool, mint, logger)
+	routes.V1Routes(r, mint, logger)
 
-	admin.AdminRoutes(ctx, r, pool, mint, logger)
+	admin.AdminRoutes(ctx, r, mint, logger)
 
 	logger.Info("Nutmix started in port 8080")
 
