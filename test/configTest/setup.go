@@ -11,18 +11,11 @@ type ConfigFiles struct {
 	TomlFile []byte
 }
 
-func CopyConfigFiles() (ConfigFiles, error) {
-	dir, err := os.UserConfigDir()
+func CopyConfigFiles(filepath string) (ConfigFiles, error) {
 
 	var config ConfigFiles
 
-	if err != nil {
-		return config, fmt.Errorf("os.UserHomeDir(), %w", err)
-	}
-	var pathToProjectDir string = dir + "/" + mint.ConfigDirName
-	var pathToProjectConfigFile string = pathToProjectDir + "/" + mint.ConfigFileName
-
-	file, err := os.ReadFile(pathToProjectConfigFile)
+	file, err := os.ReadFile(filepath)
 
 	if err != nil {
 
@@ -35,16 +28,9 @@ func CopyConfigFiles() (ConfigFiles, error) {
 	return config, nil
 }
 
-func RemoveConfigFile() error {
-	dir, err := os.UserConfigDir()
+func RemoveConfigFile(filepath string) error {
 
-	if err != nil {
-		return fmt.Errorf("os.UserHomeDir(), %w", err)
-	}
-	var pathToProjectDir string = dir + "/" + mint.ConfigDirName
-	var pathToProjectConfigFile string = pathToProjectDir + "/" + mint.ConfigFileName
-
-	err = os.Remove(pathToProjectConfigFile)
+	err := os.Remove(filepath)
 	if err != nil {
 		return fmt.Errorf("os.Remove(), %w", err)
 	}

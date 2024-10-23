@@ -63,7 +63,7 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error)
 func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT seed, created_at, active, version, unit, id, encrypted, "input_fee_ppk" FROM seeds ORDER BY version DESC`)
+	rows, err := pql.pool.Query(context.Background(), `SELECT  created_at, active, version, unit, id,  "input_fee_ppk" FROM seeds ORDER BY version DESC`)
 	defer rows.Close()
 
 	if err != nil {
@@ -84,7 +84,7 @@ func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 }
 
 func (pql Postgresql) GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error) {
-	rows, err := pql.pool.Query(context.Background(), "SELECT seed, created_at, active, version, unit, id, encrypted, input_fee_ppk FROM seeds WHERE unit = $1", unit.String())
+	rows, err := pql.pool.Query(context.Background(), "SELECT  created_at, active, version, unit, id, input_fee_ppk FROM seeds WHERE unit = $1", unit.String())
 	defer rows.Close()
 	if err != nil {
 		return []cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
@@ -105,7 +105,7 @@ func (pql Postgresql) SaveNewSeed(seed cashu.Seed) error {
 
 	for {
 		tries += 1
-		_, err := pql.pool.Exec(context.Background(), "INSERT INTO seeds (seed, active, created_at, unit, id, version, encrypted, input_fee_ppk) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.Encrypted, seed.InputFeePpk)
+		_, err := pql.pool.Exec(context.Background(), "INSERT INTO seeds ( active, created_at, unit, id, version, input_fee_ppk) VALUES ($1, $2, $3, $4, $5, $6)", seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk)
 
 		switch {
 		case err != nil && tries < 3:
@@ -123,11 +123,11 @@ func (pql Postgresql) SaveNewSeeds(seeds []cashu.Seed) error {
 	tries := 0
 
 	entries := [][]any{}
-	columns := []string{"seed", "active", "created_at", "unit", "id", "version", "encrypted", "input_fee_ppk"}
+	columns := []string{"active", "created_at", "unit", "id", "version", "input_fee_ppk"}
 	tableName := "seeds"
 
 	for _, seed := range seeds {
-		entries = append(entries, []any{seed.Seed, seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.Encrypted, seed.InputFeePpk})
+		entries = append(entries, []any{seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk})
 	}
 
 	for {
@@ -169,16 +169,6 @@ func (pql Postgresql) UpdateSeedsActiveStatus(seeds []cashu.Seed) error {
 
 	return nil
 
-}
-
-func (pql Postgresql) UpdateSeedEncryption(seed cashu.Seed) error {
-	// change the paid status of the quote
-	_, err := pql.pool.Exec(context.Background(), "UPDATE seeds SET encrypted = $1, seed = $2  WHERE id = $3", seed.Encrypted, seed.Seed, seed.Id)
-	if err != nil {
-		return databaseError(fmt.Errorf("Update to seeds: %w", err))
-
-	}
-	return nil
 }
 
 func (pql Postgresql) SaveMintRequest(request cashu.MintRequestDB) error {
@@ -393,7 +383,7 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.Re
 
 	var signaturesList []cashu.RecoverSigDB
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, witness  FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
+	rows, err := pql.pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at  FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
 	defer rows.Close()
 
 	if err != nil {
@@ -419,12 +409,12 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.Re
 
 func (pql Postgresql) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
 	entries := [][]any{}
-	columns := []string{"id", "amount", "B_", "C_", "created_at", "witness"}
+	columns := []string{"id", "amount", "B_", "C_", "created_at"}
 	tableName := "recovery_signature"
 	tries := 0
 
 	for _, sig := range recover_sigs {
-		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, sig.Witness})
+		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt})
 	}
 
 	for {

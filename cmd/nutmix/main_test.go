@@ -678,18 +678,24 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 	}
 
 	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
+	masterKey, err := mint.MintPrivateKeyToBip32(parsedPrivateKey)
+	if err != nil {
+		log.Fatalf("mint.MintPrivateKeyToBip32(parsedPrivateKey): %+v ", err)
+	}
 	// incase there are no seeds in the db we create a new one
 	if len(seeds) == 0 {
 
 		if mint_privkey == "" {
 			log.Fatalf("No mint private key found in env")
 		}
+		seed, err := mint.CreateNewSeed(masterKey, 1, 0)
+		if err != nil {
+			log.Fatalf("mint.CreateNewSeed(masterKey, 1, 0) %+v ", err)
+		}
 
-		generatedSeeds, err := cashu.DeriveSeedsFromKey(parsedPrivateKey, 1, cashu.AvailableSeeds)
+		err = db.SaveNewSeeds([]cashu.Seed{seed})
 
-		err = db.SaveNewSeeds(generatedSeeds)
-
-		seeds = append(seeds, generatedSeeds...)
+		seeds = append(seeds, seed)
 
 		if err != nil {
 			log.Fatalf("SaveNewSeed: %+v ", err)

@@ -172,7 +172,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		response := cashu.GetInfoResponse{
 			Name:            mint.Config.NAME,
-			Version:         "NutMix/0.1.1",
+			Version:         "NutMix/0.2.0",
 			Pubkey:          mint.MintPubkey,
 			Description:     mint.Config.DESCRIPTION,
 			DescriptionLong: mint.Config.DESCRIPTION_LONG,
@@ -347,7 +347,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			// Check if is in list of spents and if its also pending add it for removal of pending list
 			case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
 				compare := p.Y == state
-				checkState.Witness = &p.Witness
+				if p.Witness != "" {
+					checkState.Witness = &p.Witness
+				}
 				if compare && pendingAndSpent {
 
 					proofsForRemoval = append(proofsForRemoval, p)

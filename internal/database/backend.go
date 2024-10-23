@@ -35,8 +35,6 @@ type MintDB interface {
 	SaveNewSeeds(seeds []cashu.Seed) error
 	// This should be used to only update the Active Status of seed on the db
 	UpdateSeedsActiveStatus(seeds []cashu.Seed) error
-	// This is for updating if a mint is encrypted or not
-	UpdateSeedEncryption(seeds cashu.Seed) error
 
 	SaveMintRequest(request cashu.MintRequestDB) error
 	ChangeMintRequestState(quote string, paid bool, state cashu.ACTION_STATE, minted bool) error
