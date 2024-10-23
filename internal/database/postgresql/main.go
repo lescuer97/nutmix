@@ -237,25 +237,6 @@ func (pql Postgresql) GetMeltRequestById(id string) (cashu.MeltRequestDB, error)
 	return quote, nil
 }
 
-func (pql Postgresql) ModifyQuoteMintMintedStatus(minted bool, state cashu.ACTION_STATE, quote string) error {
-
-	args := pgx.NamedArgs{
-		"state":  state,
-		"minted": minted,
-		"quote":  quote,
-	}
-
-	query := `UPDATE mint_request SET minted = @minted, state = @state WHERE quote = @quote`
-
-	// change the paid status of the quote
-	_, err := pql.pool.Exec(context.Background(), query, args)
-
-	if err != nil {
-		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
-
-	}
-	return nil
-}
 func (pql Postgresql) SaveMeltRequest(request cashu.MeltRequestDB) error {
 
 	_, err := pql.pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp)
@@ -277,15 +258,6 @@ func (pql Postgresql) AddPreimageMeltRequest(preimage string, quote string) erro
 func (pql Postgresql) ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool) error {
 	// change the paid status of the quote
 	_, err := pql.pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, state = $3, melted = $4 WHERE quote = $2", paid, quote, state, melted)
-	if err != nil {
-		return databaseError(fmt.Errorf("updating mint_request: %w", err))
-
-	}
-	return nil
-}
-func (pql Postgresql) ModifyQuoteMeltMeltedStatus(melted bool, quote string) error {
-	// change the paid status of the quote
-	_, err := pql.pool.Exec(context.Background(), "UPDATE melt_request SET melted = $1 WHERE quote = $2", melted, quote)
 	if err != nil {
 		return databaseError(fmt.Errorf("updating mint_request: %w", err))
 
