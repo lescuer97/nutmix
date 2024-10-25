@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/pkg/crypto"
+	"github.com/tyler-smith/go-bip32"
 )
 
 type Mint struct {
@@ -275,7 +277,6 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 			C_:        blindSignature.C_,
 			B_:        output.B_,
 			CreatedAt: time.Now().Unix(),
-			Witness:   output.Witness,
 		}
 
 		if err != nil {
@@ -324,6 +325,10 @@ func (m *Mint) OrderActiveKeysByUnit() cashu.KeysResponse {
 			keys = append(keys, key)
 		}
 	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].Amount < keys[j].Amount
+	})
 
 	orderedKeys := cashu.OrderKeysetByUnit(keys)
 
@@ -409,7 +414,12 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 
 	mint.PendingProofs = make([]cashu.Proof, 0)
 
-	allKeysets, activeKeyset, err := DeriveKeysetFromSeeds(seeds, mint_privkey)
+	mintKey, err := MintPrivateKeyToBip32(mint_privkey)
+	if err != nil {
+		return &mint, fmt.Errorf("MintPrivateKeyToBip32(mint_privkey) %w", err)
+	}
+
+	allKeysets, activeKeyset, err := GetKeysetsFromSeeds(seeds, mintKey)
 	if err != nil {
 		return &mint, fmt.Errorf("DeriveKeysetFromSeeds(seeds, mint_privkey) %w", err)
 	}
@@ -453,18 +463,16 @@ func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quot
 	return cashu.UNPAID, "", nil
 }
 
-func DeriveKeysetFromSeeds(seeds []cashu.Seed, privateKey *secp256k1.PrivateKey) (map[string][]cashu.Keyset, map[string]cashu.KeysetMap, error) {
+func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *bip32.Key) (map[string][]cashu.Keyset, map[string]cashu.KeysetMap, error) {
 	newKeysets := make(map[string][]cashu.Keyset)
 	newActiveKeysets := make(map[string]cashu.KeysetMap)
+
 	for _, seed := range seeds {
 
-		// decrypt seed
-
-		keysets, err := seed.DeriveKeyset(privateKey)
+		keysets, err := DeriveKeyset(mintKey, seed)
 		if err != nil {
-			return newKeysets, newActiveKeysets, fmt.Errorf("seed.DeriveKeyset(mint_privkey): %w", err)
+			return newKeysets, newActiveKeysets, fmt.Errorf("DeriveKeyset(mintKey, seed) %w", err)
 		}
-
 		if seed.Active {
 			newActiveKeysets[seed.Unit] = make(cashu.KeysetMap)
 			for _, keyset := range keysets {
@@ -476,5 +484,68 @@ func DeriveKeysetFromSeeds(seeds []cashu.Seed, privateKey *secp256k1.PrivateKey)
 		newKeysets[seed.Unit] = append(newKeysets[seed.Unit], keysets...)
 	}
 	return newKeysets, newActiveKeysets, nil
+
+}
+
+func MintPrivateKeyToBip32(mintKey *secp256k1.PrivateKey) (*bip32.Key, error) {
+	masterKey, err := bip32.NewMasterKey(mintKey.Serialize())
+	if err != nil {
+
+		return nil, fmt.Errorf(" bip32.NewMasterKey(mintKey.Serialize()). %w", err)
+	}
+
+	return masterKey, nil
+}
+
+func DeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.Keyset, error) {
+	unit, err := cashu.UnitFromString(seed.Unit)
+	if err != nil {
+
+		return nil, fmt.Errorf("UnitFromString(seed.Unit) %w", err)
+	}
+
+	unitKey, err := mintKey.NewChildKey(uint32(unit.EnumIndex()))
+
+	if err != nil {
+
+		return nil, fmt.Errorf("mintKey.NewChildKey(uint32(unit.EnumIndex())). %w", err)
+	}
+
+	versionKey, err := unitKey.NewChildKey(uint32(seed.Version))
+	if err != nil {
+		return nil, fmt.Errorf("mintKey.NewChildKey(uint32(seed.Version)) %w", err)
+	}
+
+	keyset, err := cashu.GenerateKeysets(versionKey, cashu.GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk, seed.Active)
+	if err != nil {
+		return nil, fmt.Errorf(`GenerateKeysets(versionKey,GetAmountsForKeysets(), "", unit, 0) %w`, err)
+	}
+
+	return keyset, nil
+}
+
+func CreateNewSeed(mintPrivateKey *bip32.Key, version int, fee int) (cashu.Seed, error) {
+	// rotate one level up
+	newSeed := cashu.Seed{
+		CreatedAt:   time.Now().Unix(),
+		Active:      true,
+		Version:     version,
+		Unit:        cashu.Sat.String(),
+		InputFeePpk: fee,
+	}
+
+	keyset, err := DeriveKeyset(mintPrivateKey, newSeed)
+
+	if err != nil {
+		return newSeed, fmt.Errorf("DeriveKeyset(mintPrivateKey, newSeed) %w", err)
+	}
+
+	newSeedId, err := cashu.DeriveKeysetId(keyset)
+	if err != nil {
+		return newSeed, fmt.Errorf("cashu.DeriveKeysetId(keyset) %w", err)
+	}
+
+	newSeed.Id = newSeedId
+	return newSeed, nil
 
 }

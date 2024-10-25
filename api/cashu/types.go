@@ -1,8 +1,6 @@
 package cashu
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,8 +11,6 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
-	"github.com/tyler-smith/go-bip32"
-	"io"
 	"time"
 )
 
@@ -69,7 +65,7 @@ type BlindedMessage struct {
 	Amount  uint64 `json:"amount"`
 	Id      string `json:"id"`
 	B_      string `json:"B_"`
-	Witness string `json:"witness" db:"witness"`
+	Witness string `json:"witness,omitempty" db:"witness"`
 }
 
 func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey]bool) error {
@@ -317,94 +313,12 @@ func (keyset *Keyset) GetPubKey() *secp256k1.PublicKey {
 }
 
 type Seed struct {
-	Seed        []byte
 	Active      bool
 	CreatedAt   int64
 	Version     int
 	Unit        string
 	Id          string
-	Encrypted   bool
 	InputFeePpk int `json:"input_fee_ppk" db:"input_fee_ppk"`
-}
-
-func (seed *Seed) EncryptSeed(mintPrivateKey *secp256k1.PrivateKey) error {
-
-	cipherBlock, err := aes.NewCipher(mintPrivateKey.Serialize())
-	if err != nil {
-		return fmt.Errorf("aes.NewCipher(key_bytes): %w %w", ErrCouldNotEncryptSeed, err)
-
-	}
-	aesGCM, err := cipher.NewGCM(cipherBlock)
-	if err != nil {
-		return fmt.Errorf("cipher.NewGCM(: %w %w", ErrCouldNotEncryptSeed, err)
-	}
-
-	//Create a nonce. Nonce should be from GCM
-	nonce := make([]byte, aesGCM.NonceSize())
-	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return fmt.Errorf("io.ReadFull(rand.Reader, nonce): %w %w", ErrCouldNotEncryptSeed, err)
-	}
-
-	ciphertext := aesGCM.Seal(nonce, nonce, seed.Seed, nil)
-
-	seed.Seed = ciphertext
-
-	return nil
-}
-
-func (seed *Seed) DeriveKeyset(mintPrivateKey *secp256k1.PrivateKey) ([]Keyset, error) {
-	var keysets []Keyset
-	err := seed.DecryptSeed(mintPrivateKey)
-
-	if err != nil {
-		return keysets, fmt.Errorf("seed.DecryptSeed: %w", err)
-	}
-	masterKey, err := bip32.NewMasterKey(seed.Seed)
-	if err != nil {
-		return keysets, fmt.Errorf("NewMasterKey: %w", err)
-	}
-
-	unit, err := UnitFromString(seed.Unit)
-	if err != nil {
-		return keysets, fmt.Errorf("cashu.UnitFromString: %w", err)
-	}
-
-	keysets, err = GenerateKeysets(masterKey, GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk)
-
-	if err != nil {
-		return keysets, fmt.Errorf("GenerateKeysets(masterKey, GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk): %w", err)
-	}
-
-	return keysets, nil
-
-}
-
-func (seed *Seed) DecryptSeed(mintPrivateKey *secp256k1.PrivateKey) error {
-
-	cipherBlock, err := aes.NewCipher(mintPrivateKey.Serialize())
-	if err != nil {
-		return fmt.Errorf("aes.NewCipher(key_bytes): %w %w", ErrCouldNotDecryptSeed, err)
-
-	}
-	aesGCM, err := cipher.NewGCM(cipherBlock)
-	if err != nil {
-		return fmt.Errorf("cipher.NewGCM(: %w %w", ErrCouldNotDecryptSeed, err)
-	}
-
-	nonceSize := aesGCM.NonceSize()
-
-	//Extract the nonce from the encrypted data
-	nonce, ciphertext := seed.Seed[:nonceSize], seed.Seed[nonceSize:]
-
-	//Decrypt the data
-	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return fmt.Errorf("aesGCM.Open(: %w %w", ErrCouldNotDecryptSeed, err)
-	}
-
-	seed.Seed = plaintext
-
-	return nil
 }
 
 type SwapMintMethod struct {
@@ -592,7 +506,7 @@ type PostCheckStateRequest struct {
 type CheckState struct {
 	Y       string     `json:"Y"`
 	State   ProofState `json:"state"`
-	Witness *string    `json:"witness"`
+	Witness *string    `json:"witness,omitempty"`
 }
 
 type PostCheckStateResponse struct {
@@ -605,7 +519,7 @@ type RecoverSigDB struct {
 	B_        string `json:"B_" db:"B_"`
 	C_        string `json:"C_" db:"C_"`
 	CreatedAt int64  `json:"created_at" db:"created_at"`
-	Witness   string `json:"witness"`
+	// Dleq   *BlindSignatureDLEQ `json:"dleq"`
 }
 
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {

@@ -91,19 +91,20 @@ func rotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, rotateRequest RotateReques
 	}
 
 	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-
-	// rotate one level up
-	generatedSeed, err := cashu.DeriveIndividualSeedFromKey(parsedPrivateKey, highestSeed.Version+1, cashu.Sat)
-	generatedSeed.Active = true
-
+	masterKey, err := m.MintPrivateKeyToBip32(parsedPrivateKey)
 	if err != nil {
-		return fmt.Errorf(`cashu.DeriveIndividualSeedFromKey(parsedPrivateKey, highestSeed.Version+1, cashu.Sat). %w`, err)
+		return fmt.Errorf(`m.MintPrivateKeyToBip32(parsedPrivateKey) %w`, err)
 	}
 
-	generatedSeed.InputFeePpk = rotateRequest.Fee
+	// Create New seed with one higher version
+	newSeed, err := m.CreateNewSeed(masterKey, highestSeed.Version+1, rotateRequest.Fee)
+
+	if err != nil {
+		return fmt.Errorf(`m.CreateNewSeed(masterKey,1,0 ) %w`, err)
+	}
 
 	// add new key to db
-	err = database.SaveNewSeed(pool, &generatedSeed)
+	err = database.SaveNewSeed(pool, &newSeed)
 	if err != nil {
 		return fmt.Errorf(`database.SaveNewSeed(pool, &generatedSeed). %w`, err)
 	}
@@ -112,9 +113,9 @@ func rotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, rotateRequest RotateReques
 		return fmt.Errorf(`database.UpdateActiveStatusSeeds(pool, seeds). %w`, err)
 	}
 
-	seeds = append(seeds, generatedSeed)
+	seeds = append(seeds, newSeed)
 
-	keysets, activeKeysets, err := m.DeriveKeysetFromSeeds(seeds, parsedPrivateKey)
+	keysets, activeKeysets, err := m.GetKeysetsFromSeeds(seeds, masterKey)
 	if err != nil {
 		return fmt.Errorf(`m.DeriveKeysetFromSeeds(seeds, parsedPrivateKey). %w`, err)
 	}
@@ -124,6 +125,7 @@ func rotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, rotateRequest RotateReques
 
 	mint_privkey = ""
 	parsedPrivateKey = nil
+	masterKey = nil
 	return nil
 }
 

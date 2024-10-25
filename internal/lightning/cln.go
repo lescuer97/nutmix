@@ -343,15 +343,15 @@ func (l CLNGRPCWallet) WalletBalance() (uint64, error) {
 		return 0, err
 	}
 
-	fundsSat := uint64(0)
+	fundsMSat := uint64(0)
 
 	for _, channel := range balance.Channels {
 
-		fundsSat += channel.OurAmountMsat.Msat / 1000
+		fundsMSat += channel.OurAmountMsat.Msat
 
 	}
 
-	return fundsSat, nil
+	return fundsMSat, nil
 }
 
 func (f CLNGRPCWallet) LightningType() Backend {
