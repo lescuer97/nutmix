@@ -154,7 +154,6 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 		}
 
 		quote, err := database.GetMintQuoteById(pool, mintRequest.Quote)
-
 		if err != nil {
 			mint.ActiveQuotes.RemoveQuote(quote.Quote)
 			logger.Error(fmt.Errorf("Incorrect body: %w", err).Error())

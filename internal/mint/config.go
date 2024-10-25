@@ -143,7 +143,7 @@ func (c *Config) SetTOMLFile() error {
 }
 
 func SetUpConfigFile() (Config, error) {
-	dir, err := os.UserConfigDir()
+	dir, err := os.UserHomeDir()
 
 	var config Config
 

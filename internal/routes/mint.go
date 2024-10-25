@@ -87,7 +87,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 		nuts := make(map[string]any)
 		var baseNuts []string = []string{"1", "2", "3", "4", "5", "6"}
 
-		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12"}
+		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12", "17"}
 
 		if mint.LightningBackend.ActiveMPP() {
 			optionalNuts = append(optionalNuts, "15")
@@ -166,6 +166,23 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 				}
 
 				nuts[nut] = info
+			case "17":
+
+                wsMethod := make(map[string][]cashu.SwapMintMethod)
+
+				bolt11Method := cashu.SwapMintMethod{
+					Method:    cashu.MethodBolt11,
+					Unit:      cashu.Sat.String(),
+					Commands:  []cashu.SubscriptionKind{
+                        cashu.Bolt11MeltQuote,
+                        cashu.Bolt11MintQuote,
+                        cashu.ProofStateWs,
+                    },
+				}
+                wsMethod["supported"] = []cashu.SwapMintMethod{ bolt11Method}
+
+
+				nuts[nut] = wsMethod
 
 			default:
 				nuts[nut] = cashu.SwapMintInfo{
@@ -209,6 +226,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 		}
 
 		now := time.Now().Unix()
+
 		// check proof have the same amount as blindedSignatures
 		for i, proof := range swapRequest.Inputs {
 			AmountProofs += proof.Amount
@@ -229,6 +247,7 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 		for _, output := range swapRequest.Outputs {
 			AmountSignature += output.Amount
 		}
+
 		unit, err := mint.CheckProofsAreSameUnit(swapRequest.Inputs)
 
 		if err != nil {

@@ -413,6 +413,7 @@ type SwapMintMethod struct {
 	MinAmount int    `json:"min_amount"`
 	MaxAmount int    `json:"max_amount"`
 	Mpp       bool   `json:"mpp,omitempty"`
+    Commands []SubscriptionKind `json:"commands,omitempty"`
 }
 
 type SwapMintInfo struct {
