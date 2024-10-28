@@ -3,16 +3,14 @@ package routes
 import (
 	"errors"
 	"fmt"
-	"log/slog"
-	"slices"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"log/slog"
+	"time"
 )
 
 func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) {
@@ -168,19 +166,18 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 				nuts[nut] = info
 			case "17":
 
-                wsMethod := make(map[string][]cashu.SwapMintMethod)
+				wsMethod := make(map[string][]cashu.SwapMintMethod)
 
 				bolt11Method := cashu.SwapMintMethod{
-					Method:    cashu.MethodBolt11,
-					Unit:      cashu.Sat.String(),
-					Commands:  []cashu.SubscriptionKind{
-                        cashu.Bolt11MeltQuote,
-                        cashu.Bolt11MintQuote,
-                        cashu.ProofStateWs,
-                    },
+					Method: cashu.MethodBolt11,
+					Unit:   cashu.Sat.String(),
+					Commands: []cashu.SubscriptionKind{
+						cashu.Bolt11MeltQuote,
+						cashu.Bolt11MintQuote,
+						cashu.ProofStateWs,
+					},
 				}
-                wsMethod["supported"] = []cashu.SwapMintMethod{ bolt11Method}
-
+				wsMethod["supported"] = []cashu.SwapMintMethod{bolt11Method}
 
 				nuts[nut] = wsMethod
 
@@ -373,56 +370,9 @@ func v1MintRoutes(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.
 		checkStateResponse := cashu.PostCheckStateResponse{
 			States: make([]cashu.CheckState, 0),
 		}
-		// set as unspent
-		proofs, err := database.CheckListOfProofsBySecretCurve(pool, checkStateRequest.Ys)
 
-		proofsForRemoval := make([]cashu.Proof, 0)
-
-		for _, state := range checkStateRequest.Ys {
-
-			pendingAndSpent := false
-
-			checkState := cashu.CheckState{
-				Y:       state,
-				State:   cashu.PROOF_UNSPENT,
-				Witness: nil,
-			}
-
-			switch {
-			// check if is in list of pending proofs
-			case slices.ContainsFunc(mint.PendingProofs, func(p cashu.Proof) bool {
-				checkState.Witness = &p.Witness
-				return p.Y == state
-			}):
-				pendingAndSpent = true
-				checkState.State = cashu.PROOF_PENDING
-			// Check if is in list of spents and if its also pending add it for removal of pending list
-			case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
-				compare := p.Y == state
-				if p.Witness != "" {
-					checkState.Witness = &p.Witness
-				}
-				if compare && pendingAndSpent {
-
-					proofsForRemoval = append(proofsForRemoval, p)
-				}
-				return compare
-			}):
-				checkState.State = cashu.PROOF_SPENT
-			}
-
-			checkStateResponse.States = append(checkStateResponse.States, checkState)
-		}
-
-		// remove proofs from pending proofs
-		if len(proofsForRemoval) != 0 {
-			newPendingProofs := []cashu.Proof{}
-			for _, proof := range mint.PendingProofs {
-				if !slices.Contains(proofsForRemoval, proof) {
-					newPendingProofs = append(newPendingProofs, proof)
-				}
-			}
-		}
+		states, err := m.CheckProofState(pool, mint, checkStateRequest.Ys)
+		checkStateResponse.States = states
 
 		c.JSON(200, checkStateResponse)
 

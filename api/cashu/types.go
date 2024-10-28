@@ -322,12 +322,12 @@ type Seed struct {
 }
 
 type SwapMintMethod struct {
-	Method    string `json:"method"`
-	Unit      string `json:"unit"`
-	MinAmount int    `json:"min_amount"`
-	MaxAmount int    `json:"max_amount"`
-	Mpp       bool   `json:"mpp,omitempty"`
-    Commands []SubscriptionKind `json:"commands,omitempty"`
+	Method    string             `json:"method"`
+	Unit      string             `json:"unit"`
+	MinAmount int                `json:"min_amount"`
+	MaxAmount int                `json:"max_amount"`
+	Mpp       bool               `json:"mpp,omitempty"`
+	Commands  []SubscriptionKind `json:"commands,omitempty"`
 }
 
 type SwapMintInfo struct {

@@ -11,5 +11,6 @@ import (
 func V1Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *slog.Logger) {
 	v1MintRoutes(r, pool, mint, logger)
 	v1bolt11Routes(r, pool, mint, logger)
+	v1WebSocketRoute(r, pool, mint, logger)
 
 }

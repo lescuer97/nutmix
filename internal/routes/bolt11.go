@@ -106,30 +106,11 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
 		quoteId := c.Param("quote")
 
-		quote, err := database.GetMintQuoteById(pool, quoteId)
-
-		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
-			c.JSON(200, quote)
-			return
-		}
+		quote, err := m.CheckMintRequest(pool, mint, quoteId)
 		if err != nil {
-			logger.Error(fmt.Errorf("GetMintQuoteById: %w", err).Error())
+			logger.Error(fmt.Errorf("m.CheckMintRequest(pool, mint,quoteId ): %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
-		}
-
-		state, _, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
-
-		if err != nil {
-			logger.Warn(fmt.Errorf("VerifyLightingPaymentHappened: %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-
-		quote.State = state
-
-		if state == cashu.PAID {
-			quote.RequestPaid = true
 		}
 
 		c.JSON(200, quote)
@@ -375,42 +356,14 @@ func v1bolt11Routes(r *gin.Engine, pool *pgxpool.Pool, mint *mint.Mint, logger *
 	v1.GET("/melt/quote/bolt11/:quote", func(c *gin.Context) {
 		quoteId := c.Param("quote")
 
-		quote, err := database.GetMeltQuoteById(pool, quoteId)
+		quote, err := m.CheckMeltRequest(pool, mint, quoteId)
 		if err != nil {
-			logger.Warn(fmt.Errorf("database.GetMeltQuoteById: %w", err).Error())
+			logger.Error(fmt.Errorf("m.CheckMeltRequest(pool, mint, quoteId): %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
-		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
-			c.JSON(200, quote.GetPostMeltQuoteResponse())
-			return
-		}
-
-		state, preimage, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMeltPayStatus)
-		if err != nil {
-			if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
-				c.JSON(200, quote.GetPostMeltQuoteResponse())
-				return
-			}
-			logger.Warn(fmt.Errorf("VerifyLightingPaymentHappened: %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-		quote.PaymentPreimage = preimage
-		quote.State = state
-		if state == cashu.PAID {
-			quote.RequestPaid = true
-		}
-
-		err = database.AddPaymentPreimageToMeltRequest(pool, preimage, quote.Quote)
-		if err != nil {
-			logger.Error(fmt.Errorf("database.AddPaymentPreimageToMeltRequest(pool, : %w", err).Error())
-			c.JSON(200, quote.GetPostMeltQuoteResponse())
-			return
-		}
-
-		c.JSON(200, quote.GetPostMeltQuoteResponse())
+		c.JSON(200, quote)
 	})
 
 	v1.POST("/melt/bolt11", func(c *gin.Context) {
