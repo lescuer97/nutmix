@@ -42,3 +42,14 @@ type WsNotification struct {
 	Params  WebRequestParams `json:"params"`
 	Id      int              `json:"id"`
 }
+
+type ErrorMsg struct {
+    Code int64 `json:"code"`
+    Message string `json:"message"`
+
+}
+type WsError struct {
+	JsonRpc string           `json:"jsonrpc"`
+    Error ErrorMsg `json:"error"`
+	Id      int              `json:"id"`
+}

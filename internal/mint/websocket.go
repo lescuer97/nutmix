@@ -63,19 +63,25 @@ func (m MintStatusChecker) checkState(pool *pgxpool.Pool, mint *Mint) ([]cashu.P
 
 }
 func (m MintStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsConn *websocket.Conn) error {
-	statuses, err := m.checkState(pool, mint)
+	initialMintStatus, err := m.checkState(pool, mint)
 	if err != nil {
 		return fmt.Errorf("m.checkState(pool, mint) %w", err)
 	}
+	// check if the statues are different if the are send a message back
 
-	for i := 0; i < len(statuses); i++ {
+	// store mint request statuses to check for changes later
+	var storedRequests = make(map[string]cashu.PostMintQuoteBolt11Response)
+
+	for i := 0; i < len(initialMintStatus); i++ {
+		storedRequests[initialMintStatus[i].Quote] = initialMintStatus[i]
+
 		statusNotif := cashu.WsNotification{
 			JsonRpc: "2.0",
 			Method:  cashu.Subcribe,
 			Id:      m.id,
 			Params: cashu.WebRequestParams{
 				SubId:   m.subId,
-				Payload: statuses[i],
+				Payload: initialMintStatus[i],
 			},
 		}
 		err = SendJson(wsConn, statusNotif)
@@ -87,30 +93,32 @@ func (m MintStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsCon
 
 	for {
 
-		statuses, err := m.checkState(pool, mint)
+		mintRequestStatus, err := m.checkState(pool, mint)
 		if err != nil {
 			return fmt.Errorf("m.checkState(pool, mint) %w", err)
 		}
 
-		for i := 0; i < len(statuses); i++ {
-			statusNotif := cashu.WsNotification{
-				JsonRpc: "2.0",
-				Method:  cashu.Subcribe,
-				Id:      m.id,
-				Params: cashu.WebRequestParams{
-					SubId:   m.subId,
-					Payload: statuses[i],
-				},
-			}
-			err = SendJson(wsConn, statusNotif)
-			if err != nil {
-				return fmt.Errorf("sendJson(wsConn, statusNotif). %w", err)
+		for i := 0; i < len(mintRequestStatus); i++ {
+			if mintRequestStatus[i].State != storedRequests[mintRequestStatus[i].Quote].State {
+				storedRequests[mintRequestStatus[i].Quote] = mintRequestStatus[i]
+				statusNotif := cashu.WsNotification{
+					JsonRpc: "2.0",
+					Method:  cashu.Subcribe,
+					Id:      m.id,
+					Params: cashu.WebRequestParams{
+						SubId:   m.subId,
+						Payload: mintRequestStatus[i],
+					},
+				}
+				err = SendJson(wsConn, statusNotif)
+				if err != nil {
+					return fmt.Errorf("sendJson(wsConn, statusNotif). %w", err)
+				}
 			}
 
 		}
 
-		time.Sleep(15 * time.Second)
-
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -134,19 +142,22 @@ func (m MeltStatusChecker) checkState(pool *pgxpool.Pool, mint *Mint) ([]cashu.P
 
 }
 func (m MeltStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsConn *websocket.Conn) error {
-	statuses, err := m.checkState(pool, mint)
+	meltRequestsStatus, err := m.checkState(pool, mint)
 	if err != nil {
 		return fmt.Errorf("m.checkState(pool, mint) %w", err)
 	}
+	var storedRequest = make(map[string]cashu.PostMeltQuoteBolt11Response)
 
-	for i := 0; i < len(statuses); i++ {
+	for i := 0; i < len(meltRequestsStatus); i++ {
+		// if status changed send info back to the websocket
+		storedRequest[meltRequestsStatus[i].Quote] = meltRequestsStatus[i]
 		statusNotif := cashu.WsNotification{
 			JsonRpc: "2.0",
 			Method:  cashu.Subcribe,
 			Id:      m.id,
 			Params: cashu.WebRequestParams{
 				SubId:   m.subId,
-				Payload: statuses[i],
+				Payload: meltRequestsStatus[i],
 			},
 		}
 		err = SendJson(wsConn, statusNotif)
@@ -164,24 +175,26 @@ func (m MeltStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsCon
 		}
 
 		for i := 0; i < len(statuses); i++ {
-			statusNotif := cashu.WsNotification{
-				JsonRpc: "2.0",
-				Method:  cashu.Subcribe,
-				Id:      m.id,
-				Params: cashu.WebRequestParams{
-					SubId:   m.subId,
-					Payload: statuses[i],
-				},
-			}
-			err = SendJson(wsConn, statusNotif)
-			if err != nil {
-				return fmt.Errorf("sendJson(wsConn, statusNotif). %w", err)
+			if statuses[i].State != storedRequest[statuses[i].Quote].State {
+				storedRequest[meltRequestsStatus[i].Quote] = statuses[i]
+				statusNotif := cashu.WsNotification{
+					JsonRpc: "2.0",
+					Method:  cashu.Subcribe,
+					Id:      m.id,
+					Params: cashu.WebRequestParams{
+						SubId:   m.subId,
+						Payload: statuses[i],
+					},
+				}
+				err = SendJson(wsConn, statusNotif)
+				if err != nil {
+					return fmt.Errorf("sendJson(wsConn, statusNotif). %w", err)
+				}
 			}
 
 		}
 
-		time.Sleep(15 * time.Second)
-
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -203,19 +216,21 @@ func (p ProofStatusChecker) checkState(pool *pgxpool.Pool, mint *Mint) ([]cashu.
 
 }
 func (m ProofStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsConn *websocket.Conn) error {
-	statuses, err := m.checkState(pool, mint)
+	proofsStateStatus, err := m.checkState(pool, mint)
 	if err != nil {
 		return fmt.Errorf("m.checkState(pool, mint) %w", err)
 	}
+	var storedProofState = make(map[string]cashu.CheckState)
 
-	for i := 0; i < len(statuses); i++ {
+	for i := 0; i < len(proofsStateStatus); i++ {
+		storedProofState[proofsStateStatus[i].Y] = proofsStateStatus[i]
 		statusNotif := cashu.WsNotification{
 			JsonRpc: "2.0",
 			Method:  cashu.Subcribe,
 			Id:      m.id,
 			Params: cashu.WebRequestParams{
 				SubId:   m.subId,
-				Payload: statuses[i],
+				Payload: proofsStateStatus[i],
 			},
 		}
 		err = SendJson(wsConn, statusNotif)
@@ -233,23 +248,26 @@ func (m ProofStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsCo
 		}
 
 		for i := 0; i < len(statuses); i++ {
-			statusNotif := cashu.WsNotification{
-				JsonRpc: "2.0",
-				Method:  cashu.Subcribe,
-				Id:      m.id,
-				Params: cashu.WebRequestParams{
-					SubId:   m.subId,
-					Payload: statuses[i],
-				},
-			}
-			err = SendJson(wsConn, statusNotif)
-			if err != nil {
-				return fmt.Errorf("sendJson(wsConn, statusNotif). %w", err)
+			if statuses[i].State != storedProofState[statuses[i].Y].State {
+				storedProofState[statuses[i].Y] = statuses[i]
+				statusNotif := cashu.WsNotification{
+					JsonRpc: "2.0",
+					Method:  cashu.Subcribe,
+					Id:      m.id,
+					Params: cashu.WebRequestParams{
+						SubId:   m.subId,
+						Payload: statuses[i],
+					},
+				}
+				err = SendJson(wsConn, statusNotif)
+				if err != nil {
+					return fmt.Errorf("sendJson(wsConn, statusNotif). %w", err)
+				}
 			}
 
 		}
 
-		time.Sleep(15 * time.Second)
+		time.Sleep(5 * time.Second)
 
 	}
 }
