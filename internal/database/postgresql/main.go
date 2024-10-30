@@ -270,7 +270,7 @@ func (pql Postgresql) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, e
 	var proofList []cashu.Proof
 
 	ctx := context.Background()
-	rows, err := pql.pool.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at  FROM proofs WHERE secret = ANY($1)", SecretList)
+	rows, err := pql.pool.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at, state  FROM proofs WHERE secret = ANY($1)", SecretList)
 
 	defer rows.Close()
 
@@ -297,13 +297,13 @@ func (pql Postgresql) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, e
 
 func (pql Postgresql) SaveProof(proofs []cashu.Proof) error {
 	entries := [][]any{}
-	columns := []string{"c", "secret", "amount", "id", "y", "witness", "seen_at"}
+	columns := []string{"c", "secret", "amount", "id", "y", "witness", "seen_at", "state"}
 	tableName := "proofs"
 
 	tries := 0
 
 	for _, proof := range proofs {
-		entries = append(entries, []any{proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness, proof.SeenAt})
+		entries = append(entries, []any{proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness, proof.SeenAt, proof.State})
 	}
 
 	for {
@@ -327,7 +327,7 @@ func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, erro
 
 	var proofList []cashu.Proof
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at FROM proofs WHERE y = ANY($1)`, Ys)
+	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state FROM proofs WHERE y = ANY($1)`, Ys)
 	defer rows.Close()
 
 	if err != nil {

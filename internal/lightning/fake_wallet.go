@@ -2,19 +2,63 @@ package lightning
 
 import (
 	"fmt"
+	"slices"
+
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
+type FakeWalletError int
+
+const (
+	NONE = 0
+
+	FailPaymentPending = iota + 1
+	FailPaymentFailed  = iota + 2
+	FailPaymentUnknown = iota + 3
+
+	FailQueryPending = iota + 4
+	FailQueryFailed  = iota + 5
+	FailQueryUnknown = iota + 6
+)
+
 type FakeWallet struct {
-	Network chaincfg.Params
+	Network         chaincfg.Params
+	UnpurposeErrors []FakeWalletError
 }
 
 const mock_preimage = "fakewalletpreimage"
 
 func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
+	switch {
+	case slices.Contains(f.UnpurposeErrors, FailPaymentUnknown):
+		return PaymentResponse{
+			Preimage:       "",
+			PaymentRequest: "",
+			PaymentState:   UNKNOWN,
+			Rhash:          "",
+			PaidFeeSat:     0,
+		}, nil
+
+	case slices.Contains(f.UnpurposeErrors, FailPaymentFailed):
+		return PaymentResponse{
+			Preimage:       "",
+			PaymentRequest: "",
+			PaymentState:   FAILED,
+			Rhash:          "",
+			PaidFeeSat:     0,
+		}, nil
+	case slices.Contains(f.UnpurposeErrors, FailPaymentPending):
+		return PaymentResponse{
+			Preimage:       "",
+			PaymentRequest: "",
+			PaymentState:   PENDING,
+			Rhash:          "",
+			PaidFeeSat:     0,
+		}, nil
+	}
 
 	return PaymentResponse{
 		Preimage:       mock_preimage,
@@ -26,6 +70,16 @@ func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeR
 }
 
 func (f FakeWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
+	switch {
+	case slices.Contains(f.UnpurposeErrors, FailPaymentUnknown):
+		return UNKNOWN, "", nil
+	case slices.Contains(f.UnpurposeErrors, FailPaymentFailed):
+		return FAILED, "", nil
+	case slices.Contains(f.UnpurposeErrors, FailPaymentPending):
+		return PENDING, "", nil
+
+	}
+
 	return SETTLED, mock_preimage, nil
 }
 

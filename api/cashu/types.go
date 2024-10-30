@@ -145,13 +145,14 @@ const PROOF_SPENT ProofState = "SPENT"
 const PROOF_PENDING ProofState = "PENDING"
 
 type Proof struct {
-	Amount  uint64 `json:"amount"`
-	Id      string `json:"id"`
-	Secret  string `json:"secret"`
-	C       string `json:"C" db:"c"`
-	Y       string `json:"Y" db:"y"`
-	Witness string `json:"witness" db:"witness"`
-	SeenAt  int64  `json:"seen_at"`
+	Amount  uint64     `json:"amount"`
+	Id      string     `json:"id"`
+	Secret  string     `json:"secret"`
+	C       string     `json:"C" db:"c"`
+	Y       string     `json:"Y" db:"y"`
+	Witness string     `json:"witness" db:"witness"`
+	SeenAt  int64      `json:"seen_at"`
+	State   ProofState `json:"state"`
 }
 
 func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {

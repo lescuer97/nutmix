@@ -216,7 +216,6 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		unit, err := mint.CheckProofsAreSameUnit(swapRequest.Inputs)
 
 		if err != nil {
-			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			logger.Warn("CheckProofsAreSameUnit", slog.String(utils.LogExtraInfo, err.Error()))
 			detail := "Proofs are not the same unit"
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, &detail))
@@ -226,7 +225,6 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		// check for needed amount of fees
 		fee, err := cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])
 		if err != nil {
-			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			logger.Warn("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
@@ -245,6 +243,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, "There was a problem during swapping")
 			return
 		}
+		defer mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 
 		// check if we know any of the proofs
 		knownProofs, err := mint.MintDB.GetProofsFromSecret(SecretsList)
@@ -263,7 +262,6 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err = mint.VerifyListOfProofs(swapRequest.Inputs, swapRequest.Outputs, unit)
 
 		if err != nil {
-			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			logger.Warn("mint.VerifyListOfProofs", slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorCode, details := utils.ParseVerifyProofError(err)
@@ -275,7 +273,6 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		blindedSignatures, recoverySigsDb, err := mint.SignBlindedMessages(swapRequest.Outputs, cashu.Sat.String())
 
 		if err != nil {
-			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			logger.Error("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Opps!, something went wrong")
 			return
@@ -289,7 +286,6 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err = mint.MintDB.SaveProof(swapRequest.Inputs)
 
 		if err != nil {
-			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			logger.Error("database.SaveProofs", slog.String(utils.LogExtraInfo, err.Error()))
 			logger.Error("Proofs", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", swapRequest.Inputs)))
 			c.JSON(200, response)
@@ -298,13 +294,11 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		err = mint.MintDB.SaveRestoreSigs(recoverySigsDb)
 		if err != nil {
-			mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 			logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
 			logger.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
 			c.JSON(200, response)
 			return
 		}
-		mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 
 		c.JSON(200, response)
 	})
