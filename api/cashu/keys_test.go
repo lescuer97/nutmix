@@ -71,3 +71,32 @@ func TestChangeProofsStateToPending(t *testing.T) {
 	}
 
 }
+func TestChangeProofsStateToPendingAndQuoteSet(t *testing.T) {
+
+	proofs := Proofs{
+		Proof{
+			Amount: 1,
+			State:  PROOF_UNSPENT,
+		},
+		Proof{
+			Amount: 2,
+			State:  PROOF_UNSPENT,
+		},
+	}
+	proofs.SetPendingAndQuoteRef("123")
+
+	if proofs[0].State != PROOF_PENDING {
+		t.Errorf("proof transformation not working, should be: %v ", proofs[1].State)
+	}
+	if proofs[0].Quote != "123" {
+		t.Errorf("proof transformation not working, should be: %v ", "123")
+	}
+	if proofs[1].State != PROOF_PENDING {
+		t.Errorf("proof transformation not working, should be: %v ", proofs[1].State)
+
+	}
+	if proofs[1].Quote != "123" {
+		t.Errorf("proof transformation not working, should be: %v ", "123")
+	}
+
+}
