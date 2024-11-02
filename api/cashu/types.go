@@ -144,6 +144,14 @@ const PROOF_UNSPENT ProofState = "UNSPENT"
 const PROOF_SPENT ProofState = "SPENT"
 const PROOF_PENDING ProofState = "PENDING"
 
+type Proofs []Proof
+
+func (p *Proofs) SetProofsState(state ProofState) {
+	for i := 0; i < len(*p); i++ {
+		(*p)[i].State = state
+	}
+}
+
 type Proof struct {
 	Amount  uint64     `json:"amount"`
 	Id      string     `json:"id"`
@@ -153,6 +161,7 @@ type Proof struct {
 	Witness string     `json:"witness" db:"witness"`
 	SeenAt  int64      `json:"seen_at"`
 	State   ProofState `json:"state"`
+	Quote   string     `json:"quote" db:"quote"`
 }
 
 func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
@@ -485,7 +494,7 @@ type PostMeltQuoteBolt11Response struct {
 }
 
 type PostSwapRequest struct {
-	Inputs  []Proof          `json:"inputs"`
+	Inputs  Proofs           `json:"inputs"`
 	Outputs []BlindedMessage `json:"outputs"`
 }
 
@@ -495,7 +504,7 @@ type PostSwapResponse struct {
 
 type PostMeltBolt11Request struct {
 	Quote   string           `json:"quote"`
-	Inputs  []Proof          `json:"inputs"`
+	Inputs  Proofs           `json:"inputs"`
 	Outputs []BlindedMessage `json:"outputs"`
 }
 

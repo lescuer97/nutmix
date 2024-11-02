@@ -52,7 +52,7 @@ func GetChangeOutput(overpaidFees uint64, outputs []cashu.BlindedMessage) []cash
 }
 
 // Sets some values being used by the mint like seen, secretY, seen, and pending state
-func GetAndCalculateProofsValues(proofs *[]cashu.Proof) (uint64, []string, error) {
+func GetAndCalculateProofsValues(proofs *cashu.Proofs) (uint64, []string, error) {
 	now := time.Now().Unix()
 	var totalAmount uint64
 	var SecretsList []string
@@ -67,7 +67,6 @@ func GetAndCalculateProofsValues(proofs *[]cashu.Proof) (uint64, []string, error
 		}
 		(*proofs)[i] = p
 		(*proofs)[i].SeenAt = now
-		(*proofs)[i].State = cashu.PROOF_PENDING
 	}
 
 	return totalAmount, SecretsList, nil

@@ -246,7 +246,7 @@ func (pql Postgresql) SaveMeltRequest(request cashu.MeltRequestDB) error {
 	return nil
 }
 
-func (pql Postgresql) AddPreimageMeltRequest(preimage string, quote string) error {
+func (pql Postgresql) AddPreimageMeltRequest(quote string, preimage string) error {
 	// change the paid status of the quote
 	_, err := pql.pool.Exec(context.Background(), "UPDATE melt_request SET payment_preimage = $1 WHERE quote = $2", preimage, quote)
 	if err != nil {
@@ -270,7 +270,7 @@ func (pql Postgresql) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, e
 	var proofList []cashu.Proof
 
 	ctx := context.Background()
-	rows, err := pql.pool.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at, state  FROM proofs WHERE secret = ANY($1)", SecretList)
+	rows, err := pql.pool.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE secret = ANY($1)", SecretList)
 
 	defer rows.Close()
 
@@ -297,13 +297,13 @@ func (pql Postgresql) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, e
 
 func (pql Postgresql) SaveProof(proofs []cashu.Proof) error {
 	entries := [][]any{}
-	columns := []string{"c", "secret", "amount", "id", "y", "witness", "seen_at", "state"}
+	columns := []string{"c", "secret", "amount", "id", "y", "witness", "seen_at", "state", "quote"}
 	tableName := "proofs"
 
 	tries := 0
 
 	for _, proof := range proofs {
-		entries = append(entries, []any{proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness, proof.SeenAt, proof.State})
+		entries = append(entries, []any{proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness, proof.SeenAt, proof.State, proof.Quote})
 	}
 
 	for {
@@ -327,7 +327,7 @@ func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, erro
 
 	var proofList []cashu.Proof
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state FROM proofs WHERE y = ANY($1)`, Ys)
+	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE y = ANY($1)`, Ys)
 	defer rows.Close()
 
 	if err != nil {

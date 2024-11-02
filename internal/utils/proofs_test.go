@@ -77,7 +77,7 @@ func MakeListofMockProofs(amounts int) []cashu.Proof {
 
 func TestGetValuesFromProofs(t *testing.T) {
 
-	listOfProofs := []cashu.Proof{
+	listOfProofs := cashu.Proofs{
 		{
 			Id:     "mockid",
 			Amount: 2,

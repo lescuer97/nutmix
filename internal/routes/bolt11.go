@@ -475,6 +475,10 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
+		// change state to pending
+		meltRequest.Inputs.SetProofsState(cashu.PROOF_PENDING)
+		quote.State = cashu.PENDING
+
 		if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
 			logger.Info(fmt.Sprintf("Not enought proofs to expend. Needs: %v", quote.Amount))
 			c.JSON(403, "Not enought proofs to expend. Needs: %v")
@@ -523,7 +527,6 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 
 			// if error on checking payement we will save as pending and returns status
 			if err != nil {
-				quote.State = cashu.PENDING
 
 				response := quote.GetPostMeltQuoteResponse()
 				err = mint.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted)
@@ -622,10 +625,15 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
-		// change proofs to spent
-		for i := 0; i < len(meltRequest.Inputs); i++ {
-			meltRequest.Inputs[i].State = cashu.PROOF_SPENT
+		err = mint.MintDB.AddPreimageMeltRequest(quote.Quote, quote.PaymentPreimage)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.MintDB.AddPreimageMeltRequest(quote.Quote, quote.PaymentPreimage) %+v", err).Error())
+			c.JSON(200, response)
+			return
 		}
+
+		// change proofs to spent
+		meltRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
 
 		// send proofs to database
 		err = mint.MintDB.SaveProof(meltRequest.Inputs)

@@ -282,6 +282,8 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			Signatures: blindedSignatures,
 		}
 
+		swapRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
+
 		// send proofs to database
 		err = mint.MintDB.SaveProof(swapRequest.Inputs)
 

@@ -130,7 +130,6 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var postMeltResponse cashu.PostMeltQuoteBolt11Response
-	fmt.Printf("\n response: %v", w.Body.String())
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 
@@ -284,7 +283,6 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var postMeltResponse cashu.PostMeltQuoteBolt11Response
-	fmt.Printf("\n response: %v", w.Body.String())
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 
@@ -415,7 +413,6 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var postMeltResponse cashu.PostMeltQuoteBolt11Response
-	fmt.Printf("\n response: %v", w.Body.String())
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 
