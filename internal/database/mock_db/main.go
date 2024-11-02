@@ -101,7 +101,7 @@ func (m *MockDB) GetMeltRequestById(id string) (cashu.MeltRequestDB, error) {
 	var meltRequests []cashu.MeltRequestDB
 	for i := 0; i < len(m.MeltRequest); i++ {
 
-		if m.MintRequest[i].Quote == id {
+		if m.MeltRequest[i].Quote == id {
 			meltRequests = append(meltRequests, m.MeltRequest[i])
 
 		}

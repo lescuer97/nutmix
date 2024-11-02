@@ -19,6 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
 	pq "github.com/lescuer97/nutmix/internal/database/postgresql"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
@@ -660,7 +661,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
 
 	db, err := pq.DatabaseSetup(ctx, "../../migrations/")
-
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
 	}
@@ -720,6 +720,80 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 	}
 
 	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config, db)
+
+	if err != nil {
+		log.Fatalf("SetUpMint: %+v ", err)
+	}
+
+	r := gin.Default()
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	routes.V1Routes(r, mint, logger)
+
+	if adminRoute {
+		admin.AdminRoutes(ctx, r, mint, logger)
+	}
+
+	return r, mint
+}
+func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
+	db := mockdb.MockDB{}
+	seeds, err := db.GetAllSeeds()
+
+	if err != nil {
+		log.Fatalf("Could not keysets: %v", err)
+	}
+
+	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+	decodedPrivKey, err := hex.DecodeString(mint_privkey)
+	if err != nil {
+		log.Fatalf("hex.DecodeString(mint_privkey): %+v ", err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
+	masterKey, err := mint.MintPrivateKeyToBip32(parsedPrivateKey)
+	if err != nil {
+		log.Fatalf("mint.MintPrivateKeyToBip32(parsedPrivateKey): %+v ", err)
+	}
+	// incase there are no seeds in the db we create a new one
+	if len(seeds) == 0 {
+
+		if mint_privkey == "" {
+			log.Fatalf("No mint private key found in env")
+		}
+		seed, err := mint.CreateNewSeed(masterKey, 1, 0)
+		if err != nil {
+			log.Fatalf("mint.CreateNewSeed(masterKey, 1, 0) %+v ", err)
+		}
+
+		err = db.SaveNewSeeds([]cashu.Seed{seed})
+
+		seeds = append(seeds, seed)
+
+		if err != nil {
+			log.Fatalf("SaveNewSeed: %+v ", err)
+		}
+
+	}
+
+	config, err := mint.SetUpConfigFile()
+
+	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+
+	config.DATABASE_URL = os.Getenv(database.DATABASE_URL_ENV)
+	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
+	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
+	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
+	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
+	config.MINT_LNBITS_KEY = os.Getenv(utils.MINT_LNBITS_KEY)
+	config.MINT_LNBITS_ENDPOINT = os.Getenv(utils.MINT_LNBITS_ENDPOINT)
+
+	if err != nil {
+		log.Fatalf("could not setup config file: %+v ", err)
+	}
+
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config, &db)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)

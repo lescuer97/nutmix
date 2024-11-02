@@ -71,11 +71,11 @@ func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeR
 
 func (f FakeWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
 	switch {
-	case slices.Contains(f.UnpurposeErrors, FailPaymentUnknown):
+	case slices.Contains(f.UnpurposeErrors, FailQueryUnknown):
 		return UNKNOWN, "", nil
-	case slices.Contains(f.UnpurposeErrors, FailPaymentFailed):
+	case slices.Contains(f.UnpurposeErrors, FailQueryFailed):
 		return FAILED, "", nil
-	case slices.Contains(f.UnpurposeErrors, FailPaymentPending):
+	case slices.Contains(f.UnpurposeErrors, FailQueryPending):
 		return PENDING, "", nil
 
 	}
