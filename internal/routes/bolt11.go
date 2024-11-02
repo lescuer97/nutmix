@@ -476,7 +476,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		}
 
 		// change state to pending
-		meltRequest.Inputs.SetProofsState(cashu.PROOF_PENDING)
+		meltRequest.Inputs.SetPendingAndQuoteRef(quote.Quote)
 		quote.State = cashu.PENDING
 
 		if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {

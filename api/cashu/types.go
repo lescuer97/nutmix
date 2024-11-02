@@ -146,9 +146,22 @@ const PROOF_PENDING ProofState = "PENDING"
 
 type Proofs []Proof
 
+func (p *Proofs) SetPendingAndQuoteRef(quote string) {
+	for i := 0; i < len(*p); i++ {
+		(*p)[i].State = PROOF_PENDING
+		(*p)[i].Quote = quote
+	}
+}
+
 func (p *Proofs) SetProofsState(state ProofState) {
 	for i := 0; i < len(*p); i++ {
 		(*p)[i].State = state
+	}
+}
+
+func (p *Proofs) SetQuoteReference(quote string) {
+	for i := 0; i < len(*p); i++ {
+		(*p)[i].Quote = quote
 	}
 }
 
