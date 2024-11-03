@@ -8,7 +8,6 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/mint"
-	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
@@ -47,7 +46,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		var mintRequestDB cashu.MintRequestDB
 		if mint.Config.PEG_OUT_ONLY {
 			logger.Info("Peg out only enables")
-			c.JSON(400, "Peg out only enabled")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.MINTING_DISABLED, nil))
 			return
 		}
 
@@ -222,12 +221,8 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.SignBlindedMessages: %w", err).Error())
-			if errors.Is(err, m.ErrInvalidBlindMessage) {
-				c.JSON(403, m.ErrInvalidBlindMessage.Error())
-				return
-			}
-
-			c.JSON(500, "Opps!, something went wrong")
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -504,7 +499,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 
 		if err != nil {
 			logger.Debug("Could not verify Proofs", slog.String(utils.LogExtraInfo, err.Error()))
-			errorCode, details := utils.ParseVerifyProofError(err)
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
@@ -604,7 +599,8 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 
 			if err != nil {
 				logger.Info("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
-				c.JSON(500, "Opps!, something went wrong")
+				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 				return
 			}
 

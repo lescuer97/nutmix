@@ -264,7 +264,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		if err != nil {
 			logger.Warn("mint.VerifyListOfProofs", slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorCode, details := utils.ParseVerifyProofError(err)
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
@@ -274,7 +274,8 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		if err != nil {
 			logger.Error("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
-			c.JSON(500, "Opps!, something went wrong")
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 

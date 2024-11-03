@@ -8,7 +8,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
-func ParseVerifyProofError(proofError error) (cashu.ErrorCode, *string) {
+func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	switch {
 	case errors.Is(proofError, cashu.ErrEmptyWitness):
 
@@ -21,6 +21,8 @@ func ParseVerifyProofError(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrLocktimePassed):
 		message := cashu.ErrLocktimePassed.Error()
 		return cashu.UNKNOWN, &message
+	case errors.Is(proofError, cashu.UsingInactiveKeyset):
+		return cashu.INACTIVE_KEYSET, nil
 	case errors.Is(proofError, cashu.ErrInvalidPreimage):
 		message := cashu.ErrInvalidPreimage.Error()
 		return cashu.UNKNOWN, &message

@@ -20,6 +20,10 @@ var (
 	ErrCouldNotDecryptSeed     = errors.New("Could not decrypt seed")
 	ErrKeysetNotFound          = errors.New("Keyset not found")
 	ErrKeysetForProofNotFound  = errors.New("Keyset for proof not found")
+
+	AlreadyActiveProof  = errors.New("Proof already being spent")
+	AlreadyActiveQuote  = errors.New("Quote already being spent")
+	UsingInactiveKeyset = errors.New("Trying to use an inactive keyset")
 )
 
 const (
