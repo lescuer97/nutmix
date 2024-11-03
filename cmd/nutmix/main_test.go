@@ -298,12 +298,18 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
-	}
+	errorResponse = cashu.ErrorResponse{}
 
-	if w.Body.String() != `"Invalid blind message"` {
-		t.Errorf("Expected Invalid blind message, got %s", w.Body.String())
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if w.Code != 400 {
+		t.Errorf("Expected status code 400, got %d", w.Code)
+	}
+	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
+	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Error)
 	}
 
 	// MINTING TESTING ENDS
@@ -1142,13 +1148,15 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
+	errorResponse = cashu.ErrorResponse{}
 
-	if w.Code != 403 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
 	}
-
-	if w.Body.String() != `"Invalid blind message"` {
-		t.Errorf("Expected Invalid blind message, got %s", w.Body.String())
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Error)
 	}
 
 	// ASK FOR MINTING WITH TOO MANY BLINDED MESSAGES
@@ -1809,8 +1817,15 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-	if w.Body.String() != `"Peg out only enabled"` {
-		t.Errorf(`Expected body message to be: "Peg out only enabled". Got:  %s`, w.Body.String())
+	errorResponse := cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if errorResponse.Code != cashu.MINTING_DISABLED {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
+	}
+	if errorResponse.Error != "Minting is disabled" {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Error)
 	}
 
 }
