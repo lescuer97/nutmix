@@ -3,27 +3,24 @@ package admin
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/gin-gonic/gin"
+	"github.com/lescuer97/nutmix/api/cashu"
+	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"log/slog"
 	"os"
 	"strconv"
-
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/database"
-	m "github.com/lescuer97/nutmix/internal/mint"
-	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-func KeysetsPage(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
+func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
 		c.HTML(200, "keysets.html", nil)
 	}
 }
-func KeysetsLayoutPage(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		type KeysetData struct {
@@ -39,7 +36,7 @@ func KeysetsLayoutPage(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gi
 			Keysets []KeysetData
 		}{}
 
-		seeds, err := database.GetAllSeeds(pool)
+		seeds, err := mint.MintDB.GetAllSeeds()
 		if err != nil {
 			logger.Error("database.GetAllSeeds(pool) %+v", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Server side error")
@@ -65,8 +62,8 @@ type RotateRequest struct {
 	Fee int
 }
 
-func rotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, rotateRequest RotateRequest) error {
-	seeds, err := database.GetSeedsByUnit(pool, cashu.Sat)
+func rotateSatsSeed(mint *m.Mint, rotateRequest RotateRequest) error {
+	seeds, err := mint.MintDB.GetSeedsByUnit(cashu.Sat)
 	if err != nil {
 
 		return fmt.Errorf("database.GetSeedsByUnit(pool, cashu.Sat). %w", err)
@@ -104,11 +101,11 @@ func rotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, rotateRequest RotateReques
 	}
 
 	// add new key to db
-	err = database.SaveNewSeed(pool, &newSeed)
+	err = mint.MintDB.SaveNewSeed(newSeed)
 	if err != nil {
 		return fmt.Errorf(`database.SaveNewSeed(pool, &generatedSeed). %w`, err)
 	}
-	err = database.UpdateActiveStatusSeeds(pool, seeds)
+	err = mint.MintDB.UpdateSeedsActiveStatus(seeds)
 	if err != nil {
 		return fmt.Errorf(`database.UpdateActiveStatusSeeds(pool, seeds). %w`, err)
 	}
@@ -129,7 +126,7 @@ func rotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, rotateRequest RotateReques
 	return nil
 }
 
-func RotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rotateRequest RotateRequest
 		if c.ContentType() == gin.MIMEJSON {
@@ -158,7 +155,7 @@ func RotateSatsSeed(pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) gin.H
 			rotateRequest.Fee = newSeedFee
 		}
 
-		err := rotateSatsSeed(pool, mint, rotateRequest)
+		err := rotateSatsSeed(mint, rotateRequest)
 
 		if err != nil {
 			logger.Error(

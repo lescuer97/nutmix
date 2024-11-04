@@ -228,7 +228,7 @@ func (l CLNGRPCWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
 		case pay.Status == cln_grpc.ListpaysPays_PENDING:
 			return PENDING, hex.EncodeToString(pay.PaymentHash), nil
 		case pay.Status == cln_grpc.ListpaysPays_FAILED:
-			return SETTLED, hex.EncodeToString(pay.PaymentHash), nil
+			return FAILED, hex.EncodeToString(pay.PaymentHash), nil
 
 		}
 

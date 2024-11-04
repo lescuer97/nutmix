@@ -3,11 +3,10 @@ package cashu
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"math"
-	"time"
-
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/tyler-smith/go-bip32"
+	"math"
+	"time"
 )
 
 func DeriveKeysetId(keysets []Keyset) (string, error) {

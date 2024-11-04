@@ -1,16 +1,10 @@
 package mint
 
 import (
-	// "context"
 	"encoding/hex"
-	// "os"
-	"testing"
-	// "time"
-
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
-	// "github.com/lescuer97/nutmix/api/cashu"
-	// "github.com/tyler-smith/go-bip32"
+	"testing"
 )
 
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
@@ -26,6 +20,7 @@ func TestCreateNewSeed(t *testing.T) {
 	if err != nil {
 		t.Fatal("mint.MintPrivateKeyToBip32(parsedPrivateKey)")
 	}
+
 	seed1, err := CreateNewSeed(masterKey, 1, 0)
 	if err != nil {
 		t.Fatal("CreateNewSeed(masterKey, 1, 0)")

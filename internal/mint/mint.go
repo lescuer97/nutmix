@@ -13,8 +13,8 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/tyler-smith/go-bip32"
@@ -29,13 +29,8 @@ type Mint struct {
 	ActiveQuotes     *ActiveQuote
 	Config           Config
 	MintPubkey       string
+	MintDB           database.MintDB
 }
-
-var (
-	AlreadyActiveProof  = errors.New("Proof already being spent")
-	AlreadyActiveQuote  = errors.New("Quote already being spent")
-	UsingInactiveKeyset = errors.New("Trying to use an inactive keyset")
-)
 
 type ActiveProofs struct {
 	Proofs map[cashu.Proof]bool
@@ -49,7 +44,7 @@ func (a *ActiveProofs) AddProofs(proofs []cashu.Proof) error {
 	for _, p := range proofs {
 
 		if a.Proofs[p] {
-			return AlreadyActiveProof
+			return cashu.AlreadyActiveProof
 		}
 
 		a.Proofs[p] = true
@@ -80,7 +75,7 @@ func (q *ActiveQuote) AddQuote(quote string) error {
 	defer q.Unlock()
 
 	if q.Quote[quote] {
-		return AlreadyActiveQuote
+		return cashu.AlreadyActiveQuote
 	}
 
 	q.Quote[quote] = true
@@ -266,7 +261,7 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 		correctKeyset := m.ActiveKeysets[unit][output.Amount]
 
 		if correctKeyset.PrivKey == nil || correctKeyset.Id != output.Id {
-			return nil, nil, UsingInactiveKeyset
+			return nil, nil, cashu.UsingInactiveKeyset
 		}
 
 		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
@@ -351,7 +346,7 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 
 }
 
-func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config Config) (*Mint, error) {
+func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config Config, db database.MintDB) (*Mint, error) {
 	activeProofs := ActiveProofs{
 		Proofs: make(map[cashu.Proof]bool),
 	}
@@ -364,6 +359,7 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 		Config:        config,
 		ActiveProofs:  &activeProofs,
 		ActiveQuotes:  &activeQuotes,
+		MintDB:        db,
 	}
 
 	chainparam, err := CheckChainParams(config.NETWORK)
@@ -435,9 +431,9 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 	return &mint, nil
 }
 
-type AddToDBFunc func(*pgxpool.Pool, bool, cashu.ACTION_STATE, string) error
+type AddToDBFunc func(string, bool, cashu.ACTION_STATE, bool) error
 
-func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
+func (m *Mint) VerifyLightingPaymentHappened(paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
 	state, preimage, err := m.LightningBackend.CheckPayed(quote)
 	if err != nil {
 		return cashu.UNPAID, "", fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
@@ -445,14 +441,14 @@ func (m *Mint) VerifyLightingPaymentHappened(pool *pgxpool.Pool, paid bool, quot
 
 	switch {
 	case state == lightning.SETTLED:
-		err := dbCall(pool, true, cashu.PAID, quote)
+		err := dbCall(quote, true, cashu.PAID, false)
 		if err != nil {
 			return cashu.PAID, preimage, fmt.Errorf("dbCall: %w", err)
 		}
 		return cashu.PAID, preimage, nil
 
 	case state == lightning.PENDING:
-		err := dbCall(pool, true, cashu.UNPAID, quote)
+		err := dbCall(quote, false, cashu.UNPAID, false)
 		if err != nil {
 			return cashu.UNPAID, preimage, fmt.Errorf("dbCall: %w", err)
 		}
