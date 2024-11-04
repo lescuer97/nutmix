@@ -146,6 +146,23 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)
 	}
+
+	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	var errorResponse cashu.ErrorResponse
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
+	}
+
+	if errorResponse.Code != cashu.QUOTE_PENDING {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
+	}
+
 }
 
 func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
@@ -298,6 +315,22 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)
+	}
+
+	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	var errorResponse cashu.ErrorResponse
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
+	}
+
+	if errorResponse.Code != cashu.QUOTE_PENDING {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+
 	}
 }
 
