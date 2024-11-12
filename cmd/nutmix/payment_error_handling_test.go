@@ -160,7 +160,21 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 
 	if errorResponse.Code != cashu.QUOTE_PENDING {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+	}
 
+	secreList := []string{}
+	for _, p := range meltProofs {
+		secreList = append(secreList, p.Secret)
+	}
+
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(secreList)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
+	}
+	for _, p := range proofsDB {
+		if p.State != cashu.PROOF_PENDING {
+			t.Errorf("Proof is not pending %+v", p)
+		}
 	}
 
 }
@@ -330,8 +344,23 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 
 	if errorResponse.Code != cashu.QUOTE_PENDING {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
+
+	secreList := []string{}
+	for _, p := range meltProofs {
+		secreList = append(secreList, p.Secret)
+	}
+
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(secreList)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
+	}
+	for _, p := range proofsDB {
+		if p.State != cashu.PROOF_PENDING {
+			t.Errorf("Proof is not pending %+v", p)
+		}
+	}
+
 }
 
 func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
@@ -457,9 +486,18 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
 
-	proofs, _ := mint.MintDB.GetProofsFromSecret([]string{meltProofs[0].Secret})
+	secreList := []string{}
+	for _, p := range meltProofs {
+		secreList = append(secreList, p.Secret)
+	}
 
-	if proofs[0].State != cashu.PROOF_PENDING {
-		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(secreList)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
+	}
+	for _, p := range proofsDB {
+		if p.State != cashu.PROOF_PENDING {
+			t.Errorf("Proof is not pending %+v", p)
+		}
 	}
 }
