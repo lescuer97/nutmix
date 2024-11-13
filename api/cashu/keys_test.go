@@ -88,14 +88,15 @@ func TestChangeProofsStateToPendingAndQuoteSet(t *testing.T) {
 	if proofs[0].State != PROOF_PENDING {
 		t.Errorf("proof transformation not working, should be: %v ", proofs[1].State)
 	}
-	if proofs[0].Quote != "123" {
-		t.Errorf("proof transformation not working, should be: %v ", "123")
+    res := "123"
+	if *proofs[0].Quote != res {
+        t.Errorf("proof transformation not working, should be: %v. is:  ", "123")
 	}
 	if proofs[1].State != PROOF_PENDING {
 		t.Errorf("proof transformation not working, should be: %v ", proofs[1].State)
 
 	}
-	if proofs[1].Quote != "123" {
+	if *proofs[1].Quote != res {
 		t.Errorf("proof transformation not working, should be: %v ", "123")
 	}
 

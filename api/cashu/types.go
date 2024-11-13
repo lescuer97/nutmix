@@ -153,7 +153,7 @@ type Proofs []Proof
 func (p *Proofs) SetPendingAndQuoteRef(quote string) {
 	for i := 0; i < len(*p); i++ {
 		(*p)[i].State = PROOF_PENDING
-		(*p)[i].Quote = quote
+		(*p)[i].Quote = &quote
 	}
 }
 
@@ -165,7 +165,7 @@ func (p *Proofs) SetProofsState(state ProofState) {
 
 func (p *Proofs) SetQuoteReference(quote string) {
 	for i := 0; i < len(*p); i++ {
-		(*p)[i].Quote = quote
+		(*p)[i].Quote = &quote
 	}
 }
 
@@ -178,7 +178,7 @@ type Proof struct {
 	Witness string     `json:"witness" db:"witness"`
 	SeenAt  int64      `json:"seen_at"`
 	State   ProofState `json:"state"`
-	Quote   string     `json:"quote" db:"quote"`
+	Quote   *string    `json:"quote" db:"quote"`
 }
 
 func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
