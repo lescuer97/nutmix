@@ -3,15 +3,13 @@ package mint
 import (
 	"encoding/json"
 	"fmt"
-	"time"
-
 	"github.com/gorilla/websocket"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"time"
 )
 
 type WSStateChecker interface {
-	WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsConn *websocket.Conn) error
+	WatchForChanges(mint *Mint, wsConn *websocket.Conn) error
 }
 
 func GetCorrectStatusChecker(req cashu.WsRequest) WSStateChecker {
@@ -49,10 +47,10 @@ type MintStatusChecker struct {
 	id       int
 }
 
-func (m MintStatusChecker) checkState(pool *pgxpool.Pool, mint *Mint) ([]cashu.PostMintQuoteBolt11Response, error) {
+func (m MintStatusChecker) checkState(mint *Mint) ([]cashu.PostMintQuoteBolt11Response, error) {
 	var mintQuotes []cashu.PostMintQuoteBolt11Response
 	for _, v := range m.statuses {
-		quote, err := CheckMintRequest(pool, mint, v)
+		quote, err := CheckMintRequest(mint, v)
 		if err != nil {
 			return mintQuotes, fmt.Errorf("m.CheckMintRequest(pool, mint,v ) %w", err)
 		}
@@ -62,8 +60,8 @@ func (m MintStatusChecker) checkState(pool *pgxpool.Pool, mint *Mint) ([]cashu.P
 	return mintQuotes, nil
 
 }
-func (m MintStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsConn *websocket.Conn) error {
-	initialMintStatus, err := m.checkState(pool, mint)
+func (m MintStatusChecker) WatchForChanges(mint *Mint, wsConn *websocket.Conn) error {
+	initialMintStatus, err := m.checkState(mint)
 	if err != nil {
 		return fmt.Errorf("m.checkState(pool, mint) %w", err)
 	}
@@ -93,7 +91,7 @@ func (m MintStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsCon
 
 	for {
 
-		mintRequestStatus, err := m.checkState(pool, mint)
+		mintRequestStatus, err := m.checkState(mint)
 		if err != nil {
 			return fmt.Errorf("m.checkState(pool, mint) %w", err)
 		}
@@ -128,10 +126,10 @@ type MeltStatusChecker struct {
 	id       int
 }
 
-func (m MeltStatusChecker) checkState(pool *pgxpool.Pool, mint *Mint) ([]cashu.PostMeltQuoteBolt11Response, error) {
+func (m MeltStatusChecker) checkState(mint *Mint) ([]cashu.PostMeltQuoteBolt11Response, error) {
 	var meltQuotes []cashu.PostMeltQuoteBolt11Response
 	for _, v := range m.statuses {
-		quote, err := CheckMeltRequest(pool, mint, v)
+		quote, err := CheckMeltRequest(mint, v)
 		if err != nil {
 			return meltQuotes, fmt.Errorf("m.CheckMintRequest(pool, mint,v ) %w", err)
 		}
@@ -141,8 +139,8 @@ func (m MeltStatusChecker) checkState(pool *pgxpool.Pool, mint *Mint) ([]cashu.P
 	return meltQuotes, nil
 
 }
-func (m MeltStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsConn *websocket.Conn) error {
-	meltRequestsStatus, err := m.checkState(pool, mint)
+func (m MeltStatusChecker) WatchForChanges(mint *Mint, wsConn *websocket.Conn) error {
+	meltRequestsStatus, err := m.checkState(mint)
 	if err != nil {
 		return fmt.Errorf("m.checkState(pool, mint) %w", err)
 	}
@@ -169,7 +167,7 @@ func (m MeltStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsCon
 
 	for {
 
-		statuses, err := m.checkState(pool, mint)
+		statuses, err := m.checkState(mint)
 		if err != nil {
 			return fmt.Errorf("m.checkState(pool, mint) %w", err)
 		}
@@ -204,9 +202,9 @@ type ProofStatusChecker struct {
 	id     int
 }
 
-func (p ProofStatusChecker) checkState(pool *pgxpool.Pool, mint *Mint) ([]cashu.CheckState, error) {
+func (p ProofStatusChecker) checkState(mint *Mint) ([]cashu.CheckState, error) {
 	var proofsState []cashu.CheckState
-	proofsState, err := CheckProofState(pool, mint, p.proofs)
+	proofsState, err := CheckProofState(mint, p.proofs)
 
 	if err != nil {
 		return proofsState, fmt.Errorf("m.CheckMintRequest(pool, mint, p.proofs ) %w", err)
@@ -215,8 +213,8 @@ func (p ProofStatusChecker) checkState(pool *pgxpool.Pool, mint *Mint) ([]cashu.
 	return proofsState, nil
 
 }
-func (m ProofStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsConn *websocket.Conn) error {
-	proofsStateStatus, err := m.checkState(pool, mint)
+func (m ProofStatusChecker) WatchForChanges(mint *Mint, wsConn *websocket.Conn) error {
+	proofsStateStatus, err := m.checkState(mint)
 	if err != nil {
 		return fmt.Errorf("m.checkState(pool, mint) %w", err)
 	}
@@ -242,7 +240,7 @@ func (m ProofStatusChecker) WatchForChanges(pool *pgxpool.Pool, mint *Mint, wsCo
 
 	for {
 
-		statuses, err := m.checkState(pool, mint)
+		statuses, err := m.checkState(mint)
 		if err != nil {
 			return fmt.Errorf("m.checkState(pool, mint) %w", err)
 		}

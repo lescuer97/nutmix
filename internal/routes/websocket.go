@@ -12,7 +12,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-func v1WebSocketRoute(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *slog.Logger) {
+func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -51,7 +51,7 @@ func v1WebSocketRoute(r *gin.Engine, pool *pgxpool.Pool, mint *m.Mint, logger *s
 
 		statusChecker := m.GetCorrectStatusChecker(request)
 
-		err = statusChecker.WatchForChanges(pool, mint, conn)
+		err = statusChecker.WatchForChanges(mint, conn)
 		if err != nil {
 			logger.Error("statusChecker.WatchForChanges(pool, mint, conn)", slog.String(utils.LogExtraInfo, err.Error()))
 			return
@@ -66,14 +66,14 @@ func CheckStatusesOfSubscription(subKind cashu.SubscriptionKind, filters []strin
 	switch subKind {
 	case cashu.Bolt11MintQuote:
 		for _, v := range filters {
-			quote, err := m.CheckMintRequest(pool, mint, v)
+			quote, err := m.CheckMintRequest(mint, v)
 			if err != nil {
 				return mintQuote, proofsState, fmt.Errorf("m.CheckMintRequest(pool, mint,v ) %w", err)
 			}
 			mintQuote = append(mintQuote, quote)
 		}
 	case cashu.ProofStateWs:
-		proofsState, err := m.CheckProofState(pool, mint, filters)
+		proofsState, err := m.CheckProofState(mint, filters)
 		if err != nil {
 			return mintQuote, proofsState, fmt.Errorf("m.CheckMintRequest(pool, mint,v ) %w", err)
 		}

@@ -2,17 +2,14 @@ package mint
 
 import (
 	"fmt"
-	"slices"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/database"
+	"slices"
 )
 
-func CheckProofState(pool *pgxpool.Pool, mint *Mint, Ys []string) ([]cashu.CheckState, error) {
+func CheckProofState(mint *Mint, Ys []string) ([]cashu.CheckState, error) {
 	var states []cashu.CheckState
 	// set as unspent
-	proofs, err := database.CheckListOfProofsBySecretCurve(pool, Ys)
+	proofs, err := mint.MintDB.GetProofsFromSecretCurve(Ys)
 	if err != nil {
 		return states, fmt.Errorf("database.CheckListOfProofsBySecretCurve(pool, Ys). %w", err)
 	}

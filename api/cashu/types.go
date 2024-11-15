@@ -20,6 +20,10 @@ var (
 	ErrCouldNotDecryptSeed     = errors.New("Could not decrypt seed")
 	ErrKeysetNotFound          = errors.New("Keyset not found")
 	ErrKeysetForProofNotFound  = errors.New("Keyset for proof not found")
+
+	AlreadyActiveProof  = errors.New("Proof already being spent")
+	AlreadyActiveQuote  = errors.New("Quote already being spent")
+	UsingInactiveKeyset = errors.New("Trying to use an inactive keyset")
 )
 
 const (
@@ -144,14 +148,37 @@ const PROOF_UNSPENT ProofState = "UNSPENT"
 const PROOF_SPENT ProofState = "SPENT"
 const PROOF_PENDING ProofState = "PENDING"
 
+type Proofs []Proof
+
+func (p *Proofs) SetPendingAndQuoteRef(quote string) {
+	for i := 0; i < len(*p); i++ {
+		(*p)[i].State = PROOF_PENDING
+		(*p)[i].Quote = &quote
+	}
+}
+
+func (p *Proofs) SetProofsState(state ProofState) {
+	for i := 0; i < len(*p); i++ {
+		(*p)[i].State = state
+	}
+}
+
+func (p *Proofs) SetQuoteReference(quote string) {
+	for i := 0; i < len(*p); i++ {
+		(*p)[i].Quote = &quote
+	}
+}
+
 type Proof struct {
-	Amount  uint64 `json:"amount"`
-	Id      string `json:"id"`
-	Secret  string `json:"secret"`
-	C       string `json:"C" db:"c"`
-	Y       string `json:"Y" db:"y"`
-	Witness string `json:"witness" db:"witness"`
-	SeenAt  int64  `json:"seen_at"`
+	Amount  uint64     `json:"amount"`
+	Id      string     `json:"id"`
+	Secret  string     `json:"secret"`
+	C       string     `json:"C" db:"c"`
+	Y       string     `json:"Y" db:"y"`
+	Witness string     `json:"witness" db:"witness"`
+	SeenAt  int64      `json:"seen_at"`
+	State   ProofState `json:"state"`
+	Quote   *string    `json:"quote" db:"quote"`
 }
 
 func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, pubkeysFromProofs *map[*btcec.PublicKey]bool) (bool, error) {
@@ -485,7 +512,7 @@ type PostMeltQuoteBolt11Response struct {
 }
 
 type PostSwapRequest struct {
-	Inputs  []Proof          `json:"inputs"`
+	Inputs  Proofs           `json:"inputs"`
 	Outputs []BlindedMessage `json:"outputs"`
 }
 
@@ -495,7 +522,7 @@ type PostSwapResponse struct {
 
 type PostMeltBolt11Request struct {
 	Quote   string           `json:"quote"`
-	Inputs  []Proof          `json:"inputs"`
+	Inputs  Proofs           `json:"inputs"`
 	Outputs []BlindedMessage `json:"outputs"`
 }
 
@@ -721,10 +748,4 @@ func (b *BlindSignature) VerifyDLEQ(
 	// I negate the hashed_keys_priv because the original key got altered when multiplying for A
 	return hashed_keys_priv.Key.Negate().String() == e.Key.String(), nil
 
-}
-
-type NostrLoginAuth struct {
-	Nonce     string
-	Activated bool
-	Expiry    int
 }

@@ -3,25 +3,22 @@ package mint
 import (
 	"errors"
 	"fmt"
-	"strings"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lightningnetwork/lnd/invoices"
+	"strings"
 )
 
-func CheckMintRequest(pool *pgxpool.Pool, mint *Mint, quoteId string) (cashu.PostMintQuoteBolt11Response, error) {
-	quote, err := database.GetMintQuoteById(pool, quoteId)
-
+func CheckMintRequest(mint *Mint, quoteId string) (cashu.PostMintQuoteBolt11Response, error) {
+	quote, err := mint.MintDB.GetMintRequestById(quoteId)
 	if err != nil {
 		return quote.PostMintQuoteBolt11Response(), fmt.Errorf("database.GetMintQuoteById(pool, quoteId). %w", err)
 	}
+
 	if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
 		return quote.PostMintQuoteBolt11Response(), nil
 	}
 
-	state, _, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMintPayStatus)
+	state, _, err := mint.VerifyLightingPaymentHappened(quote.RequestPaid, quote.Quote, mint.MintDB.ChangeMintRequestState)
 
 	if err != nil {
 		return quote.PostMintQuoteBolt11Response(), fmt.Errorf("mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid. %w", err)
@@ -36,8 +33,9 @@ func CheckMintRequest(pool *pgxpool.Pool, mint *Mint, quoteId string) (cashu.Pos
 
 }
 
-func CheckMeltRequest(pool *pgxpool.Pool, mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Response, error) {
-	quote, err := database.GetMeltQuoteById(pool, quoteId)
+func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Response, error) {
+
+	quote, err := mint.MintDB.GetMeltRequestById(quoteId)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("database.GetMintQuoteById(pool, quoteId). %w", err)
 	}
@@ -46,7 +44,7 @@ func CheckMeltRequest(pool *pgxpool.Pool, mint *Mint, quoteId string) (cashu.Pos
 		return quote.GetPostMeltQuoteResponse(), nil
 	}
 
-	state, preimage, err := mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMeltPayStatus)
+	state, preimage, err := mint.VerifyLightingPaymentHappened(quote.RequestPaid, quote.Quote, mint.MintDB.ChangeMeltRequestState)
 	if err != nil {
 		if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 			return quote.GetPostMeltQuoteResponse(), nil
@@ -60,7 +58,7 @@ func CheckMeltRequest(pool *pgxpool.Pool, mint *Mint, quoteId string) (cashu.Pos
 		quote.RequestPaid = true
 	}
 
-	err = database.AddPaymentPreimageToMeltRequest(pool, preimage, quote.Quote)
+	err = mint.MintDB.AddPreimageMeltRequest(quote.Quote, preimage)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("database.AddPaymentPreimageToMeltRequest(pool, preimage, quote.Quote) %w", err)
 	}

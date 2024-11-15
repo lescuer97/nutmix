@@ -19,6 +19,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
+	pq "github.com/lescuer97/nutmix/internal/database/postgresql"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
@@ -296,12 +298,18 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
-	}
+	errorResponse = cashu.ErrorResponse{}
 
-	if w.Body.String() != `"Invalid blind message"` {
-		t.Errorf("Expected Invalid blind message, got %s", w.Body.String())
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if w.Code != 400 {
+		t.Errorf("Expected status code 400, got %d", w.Code)
+	}
+	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
+	}
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Error)
 	}
 
 	// MINTING TESTING ENDS
@@ -577,8 +585,13 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if w.Code != 403 {
 		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
+	var errorRes cashu.ErrorResponse
+	err = json.Unmarshal(w.Body.Bytes(), &errorRes)
+	if err != nil {
+		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
+	}
 
-	if w.Body.String() != `"Invalid Proof"` {
+	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
@@ -653,13 +666,12 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
 
-	pool, err := database.DatabaseSetup(ctx, "../../migrations/")
-
+	db, err := pq.DatabaseSetup(ctx, "../../migrations/")
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
 	}
 
-	seeds, err := database.GetAllSeeds(pool)
+	seeds, err := db.GetAllSeeds()
 
 	if err != nil {
 		log.Fatalf("Could not keysets: %v", err)
@@ -687,7 +699,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 			log.Fatalf("mint.CreateNewSeed(masterKey, 1, 0) %+v ", err)
 		}
 
-		err = database.SaveNewSeeds(pool, []cashu.Seed{seed})
+		err = db.SaveNewSeeds([]cashu.Seed{seed})
 
 		seeds = append(seeds, seed)
 
@@ -713,7 +725,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
 
-	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config)
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config, db)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -723,10 +735,84 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	routes.V1Routes(r, pool, mint, logger)
+	routes.V1Routes(r, mint, logger)
 
 	if adminRoute {
-		admin.AdminRoutes(ctx, r, pool, mint, logger)
+		admin.AdminRoutes(ctx, r, mint, logger)
+	}
+
+	return r, mint
+}
+func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
+	db := mockdb.MockDB{}
+	seeds, err := db.GetAllSeeds()
+
+	if err != nil {
+		log.Fatalf("Could not keysets: %v", err)
+	}
+
+	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+	decodedPrivKey, err := hex.DecodeString(mint_privkey)
+	if err != nil {
+		log.Fatalf("hex.DecodeString(mint_privkey): %+v ", err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
+	masterKey, err := mint.MintPrivateKeyToBip32(parsedPrivateKey)
+	if err != nil {
+		log.Fatalf("mint.MintPrivateKeyToBip32(parsedPrivateKey): %+v ", err)
+	}
+	// incase there are no seeds in the db we create a new one
+	if len(seeds) == 0 {
+
+		if mint_privkey == "" {
+			log.Fatalf("No mint private key found in env")
+		}
+		seed, err := mint.CreateNewSeed(masterKey, 1, 0)
+		if err != nil {
+			log.Fatalf("mint.CreateNewSeed(masterKey, 1, 0) %+v ", err)
+		}
+
+		err = db.SaveNewSeeds([]cashu.Seed{seed})
+
+		seeds = append(seeds, seed)
+
+		if err != nil {
+			log.Fatalf("SaveNewSeed: %+v ", err)
+		}
+
+	}
+
+	config, err := mint.SetUpConfigFile()
+
+	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+
+	config.DATABASE_URL = os.Getenv(database.DATABASE_URL_ENV)
+	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
+	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
+	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
+	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
+	config.MINT_LNBITS_KEY = os.Getenv(utils.MINT_LNBITS_KEY)
+	config.MINT_LNBITS_ENDPOINT = os.Getenv(utils.MINT_LNBITS_ENDPOINT)
+
+	if err != nil {
+		log.Fatalf("could not setup config file: %+v ", err)
+	}
+
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config, &db)
+
+	if err != nil {
+		log.Fatalf("SetUpMint: %+v ", err)
+	}
+
+	r := gin.Default()
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	routes.V1Routes(r, mint, logger)
+
+	if adminRoute {
+		admin.AdminRoutes(ctx, r, mint, logger)
 	}
 
 	return r, mint
@@ -1062,13 +1148,15 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
+	errorResponse = cashu.ErrorResponse{}
 
-	if w.Code != 403 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
 	}
-
-	if w.Body.String() != `"Invalid blind message"` {
-		t.Errorf("Expected Invalid blind message, got %s", w.Body.String())
+	if errorResponse.Error != "Proof could not be verified" {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Error)
 	}
 
 	// ASK FOR MINTING WITH TOO MANY BLINDED MESSAGES
@@ -1491,7 +1579,13 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
 
-	if w.Body.String() != `"Invalid Proof"` {
+	var errorRes cashu.ErrorResponse
+	err = json.Unmarshal(w.Body.Bytes(), &errorRes)
+	if err != nil {
+		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
+	}
+
+	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
@@ -1723,8 +1817,15 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-	if w.Body.String() != `"Peg out only enabled"` {
-		t.Errorf(`Expected body message to be: "Peg out only enabled". Got:  %s`, w.Body.String())
+	errorResponse := cashu.ErrorResponse{}
+
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	if errorResponse.Code != cashu.MINTING_DISABLED {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
+	}
+	if errorResponse.Error != "Minting is disabled" {
+		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Error)
 	}
 
 }

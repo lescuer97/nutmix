@@ -44,12 +44,11 @@ type WsNotification struct {
 }
 
 type ErrorMsg struct {
-    Code int64 `json:"code"`
-    Message string `json:"message"`
-
+	Code    int64  `json:"code"`
+	Message string `json:"message"`
 }
 type WsError struct {
-	JsonRpc string           `json:"jsonrpc"`
-    Error ErrorMsg `json:"error"`
-	Id      int              `json:"id"`
+	JsonRpc string   `json:"jsonrpc"`
+	Error   ErrorMsg `json:"error"`
+	Id      int      `json:"id"`
 }

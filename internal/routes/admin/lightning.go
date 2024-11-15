@@ -2,11 +2,10 @@ package admin
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 	m "github.com/lescuer97/nutmix/internal/mint"
 )
 
-func LightningDataFormFields(pool *pgxpool.Pool, mint *m.Mint) gin.HandlerFunc {
+func LightningDataFormFields(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		backend := c.Query(m.MINT_LIGHTNING_BACKEND_ENV)

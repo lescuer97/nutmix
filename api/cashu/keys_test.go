@@ -47,3 +47,57 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 	}
 
 }
+
+func TestChangeProofsStateToPending(t *testing.T) {
+
+	proofs := Proofs{
+		Proof{
+			Amount: 1,
+			State:  PROOF_UNSPENT,
+		},
+		Proof{
+			Amount: 2,
+			State:  PROOF_UNSPENT,
+		},
+	}
+	proofs.SetProofsState(PROOF_PENDING)
+
+	if proofs[0].State != PROOF_PENDING {
+		t.Errorf("proof transformation not working, should be: %v ", proofs[1].State)
+	}
+	if proofs[1].State != PROOF_PENDING {
+		t.Errorf("proof transformation not working, should be: %v ", proofs[1].State)
+
+	}
+
+}
+func TestChangeProofsStateToPendingAndQuoteSet(t *testing.T) {
+
+	proofs := Proofs{
+		Proof{
+			Amount: 1,
+			State:  PROOF_UNSPENT,
+		},
+		Proof{
+			Amount: 2,
+			State:  PROOF_UNSPENT,
+		},
+	}
+	proofs.SetPendingAndQuoteRef("123")
+
+	if proofs[0].State != PROOF_PENDING {
+		t.Errorf("proof transformation not working, should be: %v ", proofs[1].State)
+	}
+	res := "123"
+	if *proofs[0].Quote != res {
+		t.Errorf("proof transformation not working, should be: %v. is:  ", "123")
+	}
+	if proofs[1].State != PROOF_PENDING {
+		t.Errorf("proof transformation not working, should be: %v ", proofs[1].State)
+
+	}
+	if *proofs[1].Quote != res {
+		t.Errorf("proof transformation not working, should be: %v ", "123")
+	}
+
+}
