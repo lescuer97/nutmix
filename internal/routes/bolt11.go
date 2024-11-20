@@ -128,7 +128,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			quote.RequestPaid = true
 		}
 
-		c.JSON(200, quote)
+		c.JSON(200, quote.PostMintQuoteBolt11Response())
 	})
 
 	v1.POST("/mint/bolt11", func(c *gin.Context) {
