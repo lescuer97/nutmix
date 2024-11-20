@@ -3,17 +3,15 @@ package routes
 import (
 	"errors"
 	"fmt"
-	"log"
-	"log/slog"
-	"sync"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"log/slog"
+	"sync"
+	"time"
 )
 
 var ErrAlreadySubscribed = errors.New("Filter already subscribed")
@@ -94,7 +92,10 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				errMsg := cashu.WsError{
 					JsonRpc: "2.0",
 					Id:      request.Id,
-					Error:   cashu.ErrorMsg{},
+					Error: cashu.ErrorMsg{
+						Code:    cashu.UNKNOWN,
+						Message: "Already subscribed to filter",
+					},
 				}
 				err = m.SendJson(conn, errMsg)
 			}
@@ -119,7 +120,19 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		go ListenToIncommingMessage(&activeSubs, conn)
 
-		CheckingForSubsUpdates(&activeSubs, mint, conn)
+		err = CheckingForSubsUpdates(&activeSubs, mint, conn)
+		if err != nil {
+			logger.Warn("CheckingForSubsUpdates(&activeSubs, mint, conn).", slog.String(utils.LogExtraInfo, err.Error()))
+			errMsg := cashu.WsError{
+				JsonRpc: "2.0",
+				Id:      request.Id,
+				Error: cashu.ErrorMsg{
+					Code:    cashu.UNKNOWN,
+					Message: "There was an error while checking state",
+				},
+			}
+			err = m.SendJson(conn, errMsg)
+		}
 
 	})
 }
@@ -153,12 +166,11 @@ func ListenToIncommingMessage(subs *WalletSubscription, conn *websocket.Conn) {
 	}
 }
 
-func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websocket.Conn) {
+func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websocket.Conn) error {
 
 	alreadyCheckedFilter := make(map[string]any)
 	for {
 		for kind, filters := range subs.Subscriptions {
-			// statusChecker := m.GetCorrectStatusChecker(kind)
 			for filter, subId := range filters {
 				// check if a new stored notif has already been seen and if no send a status update and store state
 				value, exists := alreadyCheckedFilter[filter]
@@ -175,7 +187,7 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 				case cashu.Bolt11MintQuote:
 					mintState, err := m.CheckMintRequest(mint, filter)
 					if err != nil {
-						return
+						return fmt.Errorf("m.CheckMintRequest(mint, filter). %w", err)
 					}
 					statusNotif.Params.Payload = mintState
 					if exists {
@@ -183,22 +195,20 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 							alreadyCheckedFilter[filter] = mintState
 							err := m.SendJson(conn, statusNotif)
 							if err != nil {
-								log.Printf("Error %v", err)
-								return
+								return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 							}
 						}
 					} else {
 						alreadyCheckedFilter[filter] = mintState
 						err := m.SendJson(conn, statusNotif)
 						if err != nil {
-							log.Printf("Error %v", err)
-							return
+							return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 						}
 					}
 				case cashu.Bolt11MeltQuote:
 					meltState, err := m.CheckMeltRequest(mint, filter)
 					if err != nil {
-						return
+						return fmt.Errorf("m.CheckMeltRequest(mint, filter). %w", err)
 					}
 
 					statusNotif.Params.Payload = meltState
@@ -208,23 +218,21 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 							alreadyCheckedFilter[filter] = meltState
 							err := m.SendJson(conn, statusNotif)
 							if err != nil {
-								log.Printf("Error %v", err)
-								return
+								return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 							}
 						}
 					} else {
 						alreadyCheckedFilter[filter] = meltState
 						err := m.SendJson(conn, statusNotif)
 						if err != nil {
-							log.Printf("Error %v", err)
-							return
+							return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 						}
 					}
 
 				case cashu.ProofStateWs:
 					proofsState, err := m.CheckProofState(mint, []string{filter})
 					if err != nil {
-						return
+						return fmt.Errorf("m.CheckProofState(mint, []string{filter}). %w", err)
 					}
 					// check for subscription and if the state changed
 					if exists && len(proofsState) > 0 {
@@ -234,8 +242,7 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 							alreadyCheckedFilter[filter] = proofsState[0]
 							err := m.SendJson(conn, statusNotif)
 							if err != nil {
-								log.Printf("Error %v", err)
-								return
+								return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 							}
 						}
 					} else {
@@ -243,8 +250,7 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 						alreadyCheckedFilter[filter] = proofsState[0]
 						err := m.SendJson(conn, statusNotif)
 						if err != nil {
-							log.Printf("Error %v", err)
-							return
+							return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 						}
 					}
 				}
