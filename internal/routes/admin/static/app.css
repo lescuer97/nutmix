@@ -2,6 +2,7 @@
 @import url("bolt11.css");
 @import url("keysets.css");
 @import url("activity.css");
+@import url("dialog.css");
 
 :root {
   /** CSS DARK THEME PRIMARY COLORS */
@@ -101,7 +102,7 @@ main {
   flex-direction: column;
 }
 
-form {
+.form {
   display: flex;
   flex-direction: column;
   background-color: var(--color-surface-200);

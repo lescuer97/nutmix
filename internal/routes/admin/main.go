@@ -58,6 +58,10 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.GET("/mint-melt-list", MintMeltList(mint, logger))
 	adminRoute.GET("/logs", LogsTab(logger))
 
+    // liquidity manager
+	adminRoute.GET("/liquidity-button", LiquidityButton(logger))
+	adminRoute.GET("/liquidity-form", LiquidityForm(logger))
+
 }
 
 type TIME_REQUEST string

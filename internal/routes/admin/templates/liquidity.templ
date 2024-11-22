@@ -1,0 +1,36 @@
+package templates 
+
+templ LiquidityButton() {
+    <button hx-get="/admin/liquidity-form"
+      hx-target="main"
+      hx-swap="beforeend"
+      hx-trigger="click"
+      id="mint-summary"
+      >
+        Move to liquid
+    </button>
+}
+
+
+templ BoltzPostForm() {
+    <dialog open class={"dialog"}>
+    <form  
+      hx-get="/admin/liquidity-form"
+      hx-target="this"
+      hx-trigger="click"
+      >
+
+    <label for="address">
+        Liquid Address
+        <input name="address" type="text" />
+    </label>
+
+    <label for="amount">
+        Amount
+        <input name="amount" type="number" />
+    </label>
+
+    <button type="submit" >Move to Liquid</button>
+    </form>
+    </dialog>
+}
