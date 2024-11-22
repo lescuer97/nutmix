@@ -1,14 +1,17 @@
 package admin
 
 import (
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/gin-gonic/gin"
-	m "github.com/lescuer97/nutmix/internal/mint"
-	"github.com/lescuer97/nutmix/internal/utils"
-	"github.com/lightningnetwork/lnd/zpay32"
+	"context"
 	"log/slog"
 	"sort"
 	"time"
+
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/gin-gonic/gin"
+	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
+	"github.com/lescuer97/nutmix/internal/utils"
+	"github.com/lightningnetwork/lnd/zpay32"
 )
 
 func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
@@ -119,13 +122,13 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		mintMeltRequestVisual := ListMintMeltVisual{}
+		mintMeltRequestVisual := templates.ListMintMeltVisual{}
 
 		// sum up mint
 		for _, mintRequest := range mintMeltBalance.Mint {
 			utc := time.Unix(mintRequest.SeenAt, 0).UTC().Format("2006-Jan-2  15:04:05 MST")
 
-			mintMeltRequestVisual = append(mintMeltRequestVisual, MintMeltRequestVisual{
+			mintMeltRequestVisual = append(mintMeltRequestVisual, templates.MintMeltRequestVisual{
 				Type:    "Mint",
 				Unit:    mintRequest.Unit,
 				Request: mintRequest.Request,
@@ -139,7 +142,7 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		for _, meltRequest := range mintMeltBalance.Melt {
 			utc := time.Unix(meltRequest.SeenAt, 0).UTC().Format("2006-Jan-2  15:04:05 MST")
 
-			mintMeltRequestVisual = append(mintMeltRequestVisual, MintMeltRequestVisual{
+			mintMeltRequestVisual = append(mintMeltRequestVisual, templates.MintMeltRequestVisual{
 				Type:    "Melt",
 				Unit:    meltRequest.Unit,
 				Request: meltRequest.Request,
@@ -150,28 +153,13 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		sort.Sort(mintMeltRequestVisual)
 
-		c.HTML(200, "mint-melt-list", mintMeltRequestVisual)
+		ctx := context.Background()
+
+		err = templates.MintMeltEventList(mintMeltRequestVisual).Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(err)
+			c.Status(400)
+			return
+		}
 	}
-}
-
-type MintMeltRequestVisual struct {
-	Type    string
-	Unit    string
-	Request string
-	Status  string
-	SeenAt  string
-}
-
-type ListMintMeltVisual []MintMeltRequestVisual
-
-func (ms ListMintMeltVisual) Len() int {
-	return len(ms)
-}
-
-func (ms ListMintMeltVisual) Less(i, j int) bool {
-	return ms[i].SeenAt < ms[j].SeenAt
-}
-
-func (ms ListMintMeltVisual) Swap(i, j int) {
-	ms[i], ms[j] = ms[j], ms[i]
 }

@@ -4,3 +4,4 @@ mint/tmp/
 mint/main
 env/
 tmp/
+*_templ.go

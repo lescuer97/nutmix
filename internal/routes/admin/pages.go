@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"log/slog"
 	"os"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -67,6 +69,16 @@ func LoginPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 
 func InitPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.HTML(200, "mint_activity.html", nil)
+		ctx := context.Background()
+
+		templates.Layout()
+
+		err := templates.MintActivityLayout().Render(ctx, c.Writer)
+
+		if err != nil {
+			c.Error(err)
+			// c.HTML(400,"", nil)
+			return
+		}
 	}
 }

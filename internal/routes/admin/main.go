@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -28,7 +29,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 
 	} else {
 		r.Static("static", "internal/routes/admin/static")
-		r.LoadHTMLGlob("internal/routes/admin/templates/**")
+		r.LoadHTMLGlob("internal/routes/admin/templates/*.html")
 
 	}
 	adminRoute := r.Group("/admin")
@@ -58,7 +59,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.GET("/mint-melt-list", MintMeltList(mint, logger))
 	adminRoute.GET("/logs", LogsTab(logger))
 
-    // liquidity manager
+	// liquidity manager
 	adminRoute.GET("/liquidity-button", LiquidityButton(logger))
 	adminRoute.GET("/liquidity-form", LiquidityForm(logger))
 
@@ -95,7 +96,6 @@ func ParseToTimeRequest(str string) TIME_REQUEST {
 
 // return 24 hours by default
 func (t TIME_REQUEST) RollBackFromNow() time.Time {
-
 	rollBackHour := time.Now()
 
 	switch t {
@@ -154,8 +154,14 @@ func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo}, timeRequestDuration.RollBackFromNow())
 
 		slices.Reverse(logs)
+		ctx := context.Background()
 
-		c.HTML(200, "logs", logs)
+		err = templates.Logs(logs).Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(err)
+			// c.HTML(400,"", nil)
+			return
+		}
 	}
 }
 

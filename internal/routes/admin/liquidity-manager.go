@@ -11,30 +11,30 @@ import (
 
 func LiquidityButton(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-        ctx := context.Background()
-        component := templates.LiquidityButton()
+		ctx := context.Background()
+		component := templates.LiquidityButton()
 
-        err := component.Render(ctx, c.Writer)
-        if err != nil {
-			 c.Error(errors.New("component.Render(ctx, c.Writer)"))
-             return
-        }
+		err := component.Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(errors.New("component.Render(ctx, c.Writer)"))
+			return
+		}
 
-        return
+		return
 	}
 }
 
 func LiquidityForm(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-        ctx := context.Background()
-        component := templates.BoltzPostForm()
+		ctx := context.Background()
+		component := templates.BoltzPostForm()
 
-        err := component.Render(ctx, c.Writer)
-        if err != nil {
-			 c.Error(errors.New("component.Render(ctx, c.Writer)"))
-             return
-        }
+		err := component.Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(errors.New("component.Render(ctx, c.Writer)"))
+			return
+		}
 
-        return
+		return
 	}
 }
