@@ -67,11 +67,11 @@ func (e ErrorCode) String() string {
 
 type ErrorResponse struct {
 	// integer code
-	Code ErrorCode
+    Code ErrorCode `json:"code"`
 	// Human readable error
-	Error string
+	Error string `json:"error"`
 	// Extended explanation of error
-	Detail *string
+	Detail *string `json:"detail"`
 }
 
 func ErrorCodeToResponse(code ErrorCode, detail *string) ErrorResponse {
