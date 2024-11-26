@@ -255,6 +255,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		if len(knownProofs) != 0 {
+            logger.Warn("Proofs already spent", slog.String(utils.LogExtraInfo, fmt.Sprintf("know proofs: %+v", knownProofs)))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}
