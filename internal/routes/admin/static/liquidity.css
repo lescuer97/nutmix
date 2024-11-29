@@ -2,24 +2,36 @@
     display: flex;
     justify-content: center;
     align-content: center;
-    padding: 0% 10%;
-    background-color: var(--color-surface-200);
-    border: 1px solid var(--white);
+    flex-direction: row;
+}
+
+.liquidity-dashboard .actions-container {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  max-width: 50%;
+  background-color: var(--color-surface-200);
+  border: 1px solid var(--white);
+  }
+
+.liquidity-actions {
+    display: flex;
+    gap: 15px;
 
 }
-/* .liquidity-actions { */
-/*     display: flex; */
-/*     justify-content: center; */
-/*     align-content: center; */
-/**/
-/**/
-/* } */
 
 .swap-form {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  padding: 0px 30px 30px 30px;
+  /* border-radius: 15px; */
+  /* border: 2px solid #020000; */
+}
+
+.active-swaps{
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
   /* border-radius: 15px; */
   /* border: 2px solid #020000; */
 }

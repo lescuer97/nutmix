@@ -44,7 +44,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.GET("/settings", MintSettingsPage(mint))
 	adminRoute.GET("/login", LoginPage(logger, mint))
 	adminRoute.GET("/bolt11", LightningNodePage(mint))
-	adminRoute.GET("/liquidity", LigthningLiquidityPage(mint))
+	adminRoute.GET("/liquidity", LigthningLiquidityPage(logger, mint))
 
 	// change routes
 	adminRoute.POST("/login", Login(mint, logger))
@@ -62,8 +62,11 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 
 	// liquidity manager
 	adminRoute.GET("/liquidity-button", LiquidityButton(logger))
-	adminRoute.GET("/liquid-swap-form", LiquidSwapForm(logger))
+	adminRoute.GET("/liquid-swap-form", LiquidSwapForm(logger, mint))
 	adminRoute.GET("/lightning-swap-form", LightningSwapForm(logger))
+
+	adminRoute.POST("/liquid-swap-req", LiquidSwapRequest(logger, mint))
+	adminRoute.POST("/lightning-swap-req", LightningSwapRequest(logger, mint))
 
 }
 

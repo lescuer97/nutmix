@@ -8,10 +8,12 @@ templ LiquidityButton() {
 	</a>
 }
 
-templ LiquidityDashboard(swapForm string) {
+templ LiquidityDashboard(swapForm string, nodeBalance string) {
+	<script type="text/javascript">
+  </script>
 	@Layout() {
 		<main class="liquidity-dashboard">
-			<div>
+			<div class="actions-container">
 				<div class="liquidity-actions">
 					<button
 						hx-get="/admin/liquid-swap-form"
@@ -33,7 +35,7 @@ templ LiquidityDashboard(swapForm string) {
 				<div class="active-swaps">
 					switch  swapForm {
 						case "liquid":
-							@LiquidSwapBoltzPostForm()
+							@LiquidSwapBoltzPostForm(nodeBalance)
 						case "lightning":
 							@LightningSwapBoltz()
 						default:
@@ -46,20 +48,23 @@ templ LiquidityDashboard(swapForm string) {
 	}
 }
 
-templ LiquidSwapBoltzPostForm() {
+templ LiquidSwapBoltzPostForm(nodeBalance string) {
 	<form
 		class="swap-form"
 		hx-post="/admin/liquid-swap-req"
-		hx-target="this"
+		hx-target=".active-swaps"
+		hx-swap="innerHTML"
 	>
-		<h3>Change to Liquid</h3>
+		<h3>Swap to Liquid</h3>
+		<h4>Node Balance: {nodeBalance}</h4>
+
 		<label for="address">
 			Liquid Address
-			<input name="address" type="text"/>
+			<input required name="address" type="text"/>
 		</label>
 		<label for="amount">
 			Amount
-			<input name="amount" type="number"/>
+			<input required name="amount" max={nodeBalance} type="number"/>
 		</label>
 		<button hx-disabled-elt="this" type="submit">Move to Liquid</button>
 	</form>
@@ -69,46 +74,50 @@ templ LightningSwapBoltz() {
 	<form
 		class="swap-form"
 		hx-post="/admin/lightning-swap-req"
-		hx-target="this"
+		hx-target=".active-swaps"
+		hx-swap="innerHTML"
 	>
-		<h3>Change to Lightning</h3>
+		<h3>Swap to Lightning</h3>
 		<label for="address">
 			Lightning Invoice 
-			<input name="address" type="text"/>
+			<input required name="address" type="text"/>
 		</label>
-		<label for="amount">
-			Amount
-			<input name="amount" type="number"/>
-		</label>
-		<button hx-disabled-elt="this" type="submit">Quote Move to Liquid</button>
+		<button hx-disabled-elt="this" type="submit">Move to Mint's node</button>
 	</form>
 }
 
-templ LightningSwapSummary(send string, receive string) {
-	<form
-		hx-post="/admin/lightning-swap"
-		hx-target="this"
-		hx-trigger="click"
-	>
-		<h3>Change to Mint's lighting node</h3>
-		<div>
-			Fees of the Swap
-			<p>
-				You send:  { send } Sats
-			</p>
-			<p>
-				You Receive: { receive } Sats
-			</p>
-		</div>
-		Pay this address: 
-		<label for="address">
-			Liquid Address
-			<div name="address" type="text"></div>
-		</label>
-		<label for="amount">
-			Amount
-			<input name="amount" type="number"/>
-		</label>
-		<button type="submit">Move to Liquid</button>
-	</form>
+templ LightningSwapSummary(send string, receive string, address string) {
+	<h3>Change to Mint's lighting node</h3>
+	<div>
+		Fees of the Swap
+		<p>
+			You send:  { send } Sats
+		</p>
+		<p>
+			You Receive: { receive } Sats
+		</p>
+	</div>
+	Pay this address: 
+	<label for="address">
+		Lightning invoice:
+		<div name="address" type="text" aria-readonly="true">{ address }</div>
+	</label>
+}
+
+templ LiquidSwapSummary(send string, receive string, address string) {
+	<h3>Change to Mint's lighting node</h3>
+	<div>
+		Fees of the Swap
+		<p>
+			You send:  { send } Sats
+		</p>
+		<p>
+			You Receive: { receive } Sats
+		</p>
+	</div>
+	Pay this address: 
+	<label for="address">
+		Liquid Address:
+		<div name="address" type="text" aria-readonly="true">{ address }</div>
+	</label>
 }

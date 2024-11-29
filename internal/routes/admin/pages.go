@@ -81,11 +81,22 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 	}
 }
 
-func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
+func LigthningLiquidityPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
+		milillisatBalance, err := mint.LightningBackend.WalletBalance()
+		if err != nil {
 
-		err := templates.LiquidityDashboard(c.Query("swapForm")).Render(ctx, c.Writer)
+			logger.Warn(
+				"mint.LightningComs.WalletBalance()",
+				slog.String(utils.LogExtraInfo, err.Error()))
+
+			c.Error(err)
+			// c.HTML(400,"", nil)
+			return
+		}
+
+		err = templates.LiquidityDashboard(c.Query("swapForm"), string(milillisatBalance / 1000)).Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(err)
