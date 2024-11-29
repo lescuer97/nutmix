@@ -38,12 +38,13 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
 
 	// PAGES SETUP
-	// This is /admin
+	// This is /admin pages
 	adminRoute.GET("", InitPage(mint))
 	adminRoute.GET("/keysets", KeysetsPage(mint))
 	adminRoute.GET("/settings", MintSettingsPage(mint))
 	adminRoute.GET("/login", LoginPage(logger, mint))
 	adminRoute.GET("/bolt11", LightningNodePage(mint))
+	adminRoute.GET("/liquidity", LigthningLiquidityPage(mint))
 
 	// change routes
 	adminRoute.POST("/login", Login(mint, logger))
@@ -61,7 +62,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 
 	// liquidity manager
 	adminRoute.GET("/liquidity-button", LiquidityButton(logger))
-	adminRoute.GET("/liquidity-form", LiquidityForm(logger))
+	adminRoute.GET("/liquid-swap-form", LiquidSwapForm(logger))
+	adminRoute.GET("/lightning-swap-form", LightningSwapForm(logger))
 
 }
 

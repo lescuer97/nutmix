@@ -71,9 +71,21 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
-		templates.Layout()
-
 		err := templates.MintActivityLayout().Render(ctx, c.Writer)
+
+		if err != nil {
+			c.Error(err)
+			// c.HTML(400,"", nil)
+			return
+		}
+	}
+}
+
+func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+
+		err := templates.LiquidityDashboard(c.Query("swapForm")).Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(err)
