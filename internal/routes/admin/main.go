@@ -68,6 +68,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.POST("/liquid-swap-req", LiquidSwapRequest(logger, mint))
 	adminRoute.POST("/lightning-swap-req", LightningSwapRequest(logger, mint))
 
+    adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
+
 }
 
 type TIME_REQUEST string

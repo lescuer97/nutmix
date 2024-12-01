@@ -1,0 +1,6 @@
+package: boltz
+output: ../api/boltz/boltz-api.gen.go
+generate:
+  models: true
+  client: true
+

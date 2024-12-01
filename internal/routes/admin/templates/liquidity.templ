@@ -55,16 +55,15 @@ templ LiquidSwapBoltzPostForm(nodeBalance string) {
 		hx-target=".active-swaps"
 		hx-swap="innerHTML"
 	>
-		<h3>Swap to Liquid</h3>
-		<h4>Node Balance: {nodeBalance}</h4>
-
+		<h3>Swap Lightning to Liquid</h3>
+		<h4>Node Balance: { nodeBalance }</h4>
 		<label for="address">
 			Liquid Address
 			<input required name="address" type="text"/>
 		</label>
 		<label for="amount">
-			Amount
-			<input required name="amount" max={nodeBalance} type="number"/>
+			Amount (Sats)
+			<input required name="amount" max={ nodeBalance } type="number"/>
 		</label>
 		<button hx-disabled-elt="this" type="submit">Move to Liquid</button>
 	</form>
@@ -77,47 +76,63 @@ templ LightningSwapBoltz() {
 		hx-target=".active-swaps"
 		hx-swap="innerHTML"
 	>
-		<h3>Swap to Lightning</h3>
-		<label for="address">
-			Lightning Invoice 
-			<input required name="address" type="text"/>
+		<h3>Swap Liquid to Lightning</h3>
+		<label for="amount">
+			Amount (SATS)
+			<input required name="amount" min="1" type="number"/>
 		</label>
 		<button hx-disabled-elt="this" type="submit">Move to Mint's node</button>
 	</form>
 }
 
-templ LightningSwapSummary(send string, receive string, address string) {
+templ LightningSwapSummary(send string, address string, swapId string) {
+	<h3>Send To Liquid Address</h3>
+	<div>
+		Fees of the Swap
+		<p>
+			You send:  { send } Sats
+		</p>
+		Pay Liquid Address: 
+		<label for="address">
+			<div name="address" type="text" aria-readonly="true">{ address }</div>
+		</label>
+	        <div
+	        	hx-get={"/admin/swap/" + swapId}
+	        	hx-trigger="load, every 2s"
+	        	hx-swap="innerHTML"
+	        	hx-target="this"
+	        	class="swap-state"
+	        ></div>
+	</div>
+}
+
+templ LiquidSwapSummary(send string, address string, swapId string) {
 	<h3>Change to Mint's lighting node</h3>
 	<div>
 		Fees of the Swap
 		<p>
 			You send:  { send } Sats
 		</p>
-		<p>
-			You Receive: { receive } Sats
-		</p>
 	</div>
-	Pay this address: 
+	Pay this Invoice: 
 	<label for="address">
 		Lightning invoice:
 		<div name="address" type="text" aria-readonly="true">{ address }</div>
 	</label>
+	<div
+		hx-get="/admin/swap/{swapId}"
+		hx-trigger="load, delay: 1s"
+		hx-swap="innerHTML"
+		hx-target="this"
+		class="swap-state"
+	></div>
 }
 
-templ LiquidSwapSummary(send string, receive string, address string) {
-	<h3>Change to Mint's lighting node</h3>
+templ SwapState(state string ) {
+	<h3>Swap State</h3>
 	<div>
-		Fees of the Swap
-		<p>
-			You send:  { send } Sats
-		</p>
-		<p>
-			You Receive: { receive } Sats
-		</p>
+        Current state: {state}
+
+        
 	</div>
-	Pay this address: 
-	<label for="address">
-		Liquid Address:
-		<div name="address" type="text" aria-readonly="true">{ address }</div>
-	</label>
 }

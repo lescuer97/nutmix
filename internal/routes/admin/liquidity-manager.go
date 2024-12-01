@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
 
@@ -72,11 +73,23 @@ func LightningSwapForm(logger *slog.Logger) gin.HandlerFunc {
 func LiquidSwapRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
-		component := templates.LiquidSwapSummary("10001", "10000", "test address")
+        // need amount and liquid address 
+        amountStr := c.PostForm("amount")
 
-		err := component.Render(ctx, c.Writer)
+        _ ,err := strconv.ParseUint(amountStr, 10, 64 )
 		if err != nil {
-			c.Error(errors.New("component.Render(ctx, c.Writer)"))
+			c.Error(errors.New("strconv.ParseUint(amountStr, 10, 64 )"))
+			return
+		}
+
+        _ = c.PostForm("address")
+
+        c.Header("HX-Replace-URL", "/admin/liquidity?swapForm=liquid&id=" + "4567")
+		component := templates.LiquidSwapSummary("10001",  "test address", "4567")
+
+		err = component.Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(errors.New(`templates.LiquidSwapSummary("10001",  "test address")`))
 			return
 		}
 
@@ -87,9 +100,46 @@ func LiquidSwapRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 func LightningSwapRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
-		component := templates.LightningSwapSummary("10001", "10000", "test address")
 
-		err := component.Render(ctx, c.Writer)
+        // only needs the amount and we generate an invoice from the mint directly
+        amountStr := c.PostForm("amount")
+
+        amount ,err := strconv.ParseUint(amountStr, 10, 64 )
+		if err != nil {
+			c.Error(fmt.Errorf("strconv.ParseUint(amountStr, 10, 64 ). %w", err))
+			return
+		}
+
+        resp, err := mint.LightningBackend.RequestInvoice(int64(amount))
+		if err != nil {
+			c.Error(fmt.Errorf("mint.LightningBackend.RequestInvoice(int64(amount)). %w", err))
+			return
+		}
+
+        c.Header("HX-Replace-URL", "/admin/liquidity?swapForm=lightning&id=" + "4567")
+		component := templates.LightningSwapSummary("10001",  resp.PaymentRequest, "12345")
+
+		err = component.Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(errors.New("component.Render(ctx, c.Writer)"))
+			return
+		}
+
+		return
+	}
+}
+
+func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+
+        // only needs the amount and we generate an invoice from the mint directly
+        _ = c.Param("swapId")
+
+
+		component := templates.SwapState("Not Paid")
+
+        err := component.Render(ctx, c.Writer)
 		if err != nil {
 			c.Error(errors.New("component.Render(ctx, c.Writer)"))
 			return

@@ -5,3 +5,4 @@ mint/main
 env/
 tmp/
 *_templ.go
+*_gen.go
