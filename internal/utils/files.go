@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-const ConfigFileName string = "config.toml"
-const ConfigDirName string = "nutmix"
 const logFileName string = "nutmix.log"
 const LogExtraInfo string = "extra-info"
 

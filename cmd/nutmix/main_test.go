@@ -63,7 +63,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	t.Setenv("DATABASE_URL", connUri)
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	t.Setenv("MINT_LIGHTNING_BACKEND", string(mint.FAKE_WALLET))
+	t.Setenv("MINT_LIGHTNING_BACKEND", string(utils.FAKE_WALLET))
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	router, mint := SetupRoutingForTesting(ctx, false)
@@ -711,9 +711,8 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 
 	config, err := mint.SetUpConfigFile()
 
-	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 
-	config.DATABASE_URL = os.Getenv(database.DATABASE_URL_ENV)
 	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
 	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
 	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
@@ -785,9 +784,8 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 
 	config, err := mint.SetUpConfigFile()
 
-	config.MINT_LIGHTNING_BACKEND = mint.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 
-	config.DATABASE_URL = os.Getenv(database.DATABASE_URL_ENV)
 	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
 	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
 	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)

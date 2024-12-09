@@ -15,7 +15,7 @@ func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
-		if mint.Config.MINT_LIGHTNING_BACKEND == m.FAKE_WALLET {
+		if mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET {
 			c.HTML(200, "fake-wallet-balance", nil)
 			return
 
