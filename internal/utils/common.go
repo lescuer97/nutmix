@@ -2,10 +2,8 @@ package utils
 
 import (
 	"fmt"
-	"os"
-
-	"github.com/BurntSushi/toml"
 	"github.com/lescuer97/nutmix/internal/lightning"
+	"os"
 )
 
 const ConfigFileName string = "config.toml"
@@ -106,30 +104,6 @@ func (c *Config) UseEnviromentVars() {
 	c.MINT_LNBITS_ENDPOINT = os.Getenv("MINT_LNBITS_ENDPOINT")
 	c.MINT_LNBITS_KEY = os.Getenv("MINT_LNBITS_KEY")
 
-}
-
-func (c *Config) SetTOMLFile() error {
-	dir, err := os.UserConfigDir()
-
-	if err != nil {
-		return fmt.Errorf("os.UserHomeDir(), %w", err)
-	}
-
-	var pathToProjectDir string = dir + "/" + ConfigDirName
-	var pathToProjectConfigFile string = pathToProjectDir + "/" + ConfigFileName
-
-	bytes, err := toml.Marshal(c)
-	if err != nil {
-		return fmt.Errorf("toml.Marshal(c), %w", err)
-	}
-
-	err = os.WriteFile(pathToProjectConfigFile, bytes, 0764)
-
-	if err != nil {
-		return fmt.Errorf("os.WriteFile(pathToProjectConfigFile, bytes,0764), %w", err)
-	}
-
-	return nil
 }
 
 func getConfigFile() ([]byte, error) {

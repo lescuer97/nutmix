@@ -34,59 +34,6 @@ func getConfigFile() ([]byte, error) {
 	return os.ReadFile(pathToProjectConfigFile)
 }
 
-func SetUpConfigFile() (utils.Config, error) {
-
-	var config utils.Config
-	file, err := getConfigFile()
-
-	if err != nil {
-		return config, fmt.Errorf("getConfigFile(), %w", err)
-	}
-
-	err = toml.Unmarshal(file, &config)
-	if err != nil {
-		return config, fmt.Errorf("toml.Unmarshal(buf,&config ), %w", err)
-	}
-
-	// check if some legacy env variables are set to check if there is a need to migrate
-	networkEnv := os.Getenv(NETWORK_ENV)
-	mint_lightning_backendEnv := os.Getenv(MINT_LIGHTNING_BACKEND_ENV)
-
-	writeToFile := false
-
-	switch {
-	// if env values are set and no config exists on toml file use those.
-	// if MINT_LIGHTNING_BACKEND and NETWORK are empty we can assume the file is empty
-	case (len(networkEnv) > 0 && len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0):
-		fmt.Println("inside env vars")
-		config.UseEnviromentVars()
-		writeToFile = true
-
-	// if no config and no env set default to toml
-	case (len(networkEnv) == 0 && len(mint_lightning_backendEnv) == 0 && len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0):
-		config.Default()
-		writeToFile = true
-
-	default:
-		fmt.Println("running default")
-
-		// if valid config value exists use those
-	}
-
-	if writeToFile {
-		err := config.SetTOMLFile()
-
-		if err != nil {
-			return config, fmt.Errorf("config.SetTOMLFile() %w", err)
-		}
-
-	}
-
-	// if not transfer from env file if they exists if not
-
-	return config, nil
-}
-
 // will not look for os.variable config only file config
 func SetUpConfigDB(db database.MintDB) (utils.Config, error) {
 
