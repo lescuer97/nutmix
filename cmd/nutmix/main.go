@@ -26,9 +26,6 @@ var (
 	MINT_PRIVATE_KEY_ENV = "MINT_PRIVATE_KEY"
 )
 
-const ConfigFileName string = "config.toml"
-const ConfigDirName string = "nutmix"
-
 func main() {
 
 	logsdir, err := utils.GetLogsDirectory()
@@ -137,7 +134,7 @@ func main() {
 		}
 	}
 
-	config, err := mint.SetUpConfigFile()
+	config, err := mint.SetUpConfigDB(db)
 	if err != nil {
 		log.Fatalf("mint.SetUpConfigFile(): %+v ", err)
 	}

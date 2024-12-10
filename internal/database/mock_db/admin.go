@@ -5,16 +5,16 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 )
 
-func (m MockDB) SaveNostrAuth(auth database.NostrLoginAuth) error {
+func (m *MockDB) SaveNostrAuth(auth database.NostrLoginAuth) error {
 	return nil
 
 }
 
-func (m MockDB) UpdateNostrAuthActivation(nonce string, activated bool) error {
+func (m *MockDB) UpdateNostrAuthActivation(nonce string, activated bool) error {
 	return nil
 }
 
-func (m MockDB) GetNostrAuth(nonce string) (database.NostrLoginAuth, error) {
+func (m *MockDB) GetNostrAuth(nonce string) (database.NostrLoginAuth, error) {
 	var seeds []database.NostrLoginAuth
 	for i := 0; i < len(m.NostrAuth); i++ {
 
@@ -28,7 +28,7 @@ func (m MockDB) GetNostrAuth(nonce string) (database.NostrLoginAuth, error) {
 
 }
 
-func (m MockDB) GetMintMeltBalanceByTime(time int64) (database.MintMeltBalance, error) {
+func (m *MockDB) GetMintMeltBalanceByTime(time int64) (database.MintMeltBalance, error) {
 	var mintmeltbalance database.MintMeltBalance
 
 	for i := 0; i < len(m.MeltRequest); i++ {

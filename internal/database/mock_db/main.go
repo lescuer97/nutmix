@@ -6,6 +6,7 @@ import (
 
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 var DBError = errors.New("ERROR DATABASE")
@@ -19,6 +20,7 @@ type MockDB struct {
 	RecoverSigDB  []cashu.RecoverSigDB
 	NostrAuth     []database.NostrLoginAuth
 	Seeds         []cashu.Seed
+	Config        utils.Config
 	ErrorToReturn error
 }
 

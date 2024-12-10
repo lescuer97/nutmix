@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 type MintMeltBalance struct {
@@ -51,6 +52,10 @@ type MintDB interface {
 
 	GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error
+
+	GetConfig() (utils.Config, error)
+	SetConfig(config utils.Config) error
+	UpdateConfig(config utils.Config) error
 
 	/// Calls for the admin dashboard
 

@@ -128,10 +128,11 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			mint.Config.NOSTR = ""
 		}
 
-		err = mint.Config.SetTOMLFile()
+		err = mint.MintDB.UpdateConfig(mint.Config)
+
 		if err != nil {
 			logger.Error(
-				"mint.Config.SetTOMLFile()",
+				"mint.MintDB.SetConfig(mint.Config)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
 				Error: "there was a problem in the server",
@@ -189,16 +190,16 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
 
-		case string(m.FAKE_WALLET):
+		case string(utils.FAKE_WALLET):
 
-			mint.Config.MINT_LIGHTNING_BACKEND = m.FAKE_WALLET
+			mint.Config.MINT_LIGHTNING_BACKEND = utils.FAKE_WALLET
 
 			fakeWalletBackend := lightning.FakeWallet{
 				Network: chainparam,
 			}
 
 			mint.LightningBackend = fakeWalletBackend
-		case string(m.LNDGRPC):
+		case string(utils.LNDGRPC):
 			lndHost := c.Request.PostFormValue("LND_GRPC_HOST")
 			tlsCert := c.Request.PostFormValue("LND_TLS_CERT")
 			macaroon := c.Request.PostFormValue("LND_MACAROON")
@@ -236,12 +237,12 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 			}
 			mint.LightningBackend = lndWallet
-			mint.Config.MINT_LIGHTNING_BACKEND = m.LNDGRPC
+			mint.Config.MINT_LIGHTNING_BACKEND = utils.LNDGRPC
 			mint.Config.LND_GRPC_HOST = lndHost
 			mint.Config.LND_MACAROON = macaroon
 			mint.Config.LND_TLS_CERT = tlsCert
 
-		case string(m.LNBITS):
+		case string(utils.LNBITS):
 			lnbitsKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
 			lnbitsEndpoint := c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
 
@@ -251,10 +252,10 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 				Endpoint: lnbitsEndpoint,
 			}
 			mint.LightningBackend = lnbitsWallet
-			mint.Config.MINT_LIGHTNING_BACKEND = m.LNBITS
+			mint.Config.MINT_LIGHTNING_BACKEND = utils.LNBITS
 			mint.Config.MINT_LNBITS_KEY = lnbitsKey
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
-		case string(m.CLNGRPC):
+		case string(utils.CLNGRPC):
 			clnHost := c.Request.PostFormValue("CLN_GRPC_HOST")
 			clnCaCert := c.Request.PostFormValue("CLN_CA_CERT")
 			clnClientCert := c.Request.PostFormValue("CLN_CLIENT_CERT")
@@ -294,7 +295,7 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 			}
 			mint.LightningBackend = clnWallet
-			mint.Config.MINT_LIGHTNING_BACKEND = m.CLNGRPC
+			mint.Config.MINT_LIGHTNING_BACKEND = utils.CLNGRPC
 			mint.Config.CLN_GRPC_HOST = clnHost
 			mint.Config.CLN_MACAROON = macaroon
 			mint.Config.CLN_CA_CERT = clnCaCert
@@ -302,16 +303,18 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			mint.Config.CLN_CLIENT_CERT = clnClientCert
 		}
 
-		err = mint.Config.SetTOMLFile()
+		err = mint.MintDB.UpdateConfig(mint.Config)
+
 		if err != nil {
 			logger.Error(
-				"mint.Config.SetTOMLFile()",
+				"mint.MintDB.UpdateConfig(mint.Config)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
-				Error: "There was a problem setting your config",
+				Error: "there was a problem in the server",
 			}
 
 			c.HTML(200, "settings-error", errorMessage)
+
 			return
 
 		}

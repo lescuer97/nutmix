@@ -12,6 +12,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -21,7 +22,7 @@ import (
 func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	ctx := context.Background()
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	t.Setenv("MINT_LIGHTNING_BACKEND", string(mint.FAKE_WALLET))
+	t.Setenv("MINT_LIGHTNING_BACKEND", string(utils.FAKE_WALLET))
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	router, mint := SetupRoutingForTestingMockDb(ctx, false)
@@ -204,7 +205,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	t.Setenv("MINT_LIGHTNING_BACKEND", string(mint.FAKE_WALLET))
+	t.Setenv("MINT_LIGHTNING_BACKEND", string(utils.FAKE_WALLET))
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 	t.Setenv("DATABASE_URL", connUri)
 
@@ -366,7 +367,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	ctx := context.Background()
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	t.Setenv("MINT_LIGHTNING_BACKEND", string(mint.FAKE_WALLET))
+	t.Setenv("MINT_LIGHTNING_BACKEND", string(utils.FAKE_WALLET))
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 
 	router, mint := SetupRoutingForTestingMockDb(ctx, false)

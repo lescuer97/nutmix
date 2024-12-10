@@ -1,12 +1,12 @@
-package lightning
+package setuptest
 
 import (
 	"context"
 	"os"
 	"testing"
 
-	// "github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -23,7 +23,7 @@ func TestSetupLightingCommsLND(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
 	}
-	lndWallet := LndGrpcWallet{
+	lndWallet := lightning.LndGrpcWallet{
 		Network: chaincfg.RegressionNetParams,
 	}
 
@@ -52,7 +52,7 @@ func TestSetupLightingCommsLnBits(t *testing.T) {
 	endpoint := os.Getenv(utils.MINT_LNBITS_ENDPOINT)
 	key := os.Getenv(utils.MINT_LNBITS_KEY)
 
-	lnbitsWallet := LnbitsWallet{
+	lnbitsWallet := lightning.LnbitsWallet{
 		Network:  chaincfg.RegressionNetParams,
 		Key:      key,
 		Endpoint: endpoint,

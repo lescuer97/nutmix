@@ -16,6 +16,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/tyler-smith/go-bip32"
 )
@@ -27,7 +28,7 @@ type Mint struct {
 	PendingProofs    []cashu.Proof
 	ActiveProofs     *ActiveProofs
 	ActiveQuotes     *ActiveQuote
-	Config           Config
+	Config           utils.Config
 	MintPubkey       string
 	MintDB           database.MintDB
 }
@@ -346,7 +347,7 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 
 }
 
-func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config Config, db database.MintDB) (*Mint, error) {
+func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config utils.Config, db database.MintDB) (*Mint, error) {
 	activeProofs := ActiveProofs{
 		Proofs: make(map[cashu.Proof]bool),
 	}
@@ -369,14 +370,14 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 
 	switch config.MINT_LIGHTNING_BACKEND {
 
-	case FAKE_WALLET:
+	case utils.FAKE_WALLET:
 		fake_wallet := lightning.FakeWallet{
 			Network: chainparam,
 		}
 
 		mint.LightningBackend = fake_wallet
 
-	case LNDGRPC:
+	case utils.LNDGRPC:
 		lndWallet := lightning.LndGrpcWallet{
 			Network: chainparam,
 		}
@@ -386,14 +387,14 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
 		}
 		mint.LightningBackend = lndWallet
-	case LNBITS:
+	case utils.LNBITS:
 		lnbitsWallet := lightning.LnbitsWallet{
 			Network:  chainparam,
 			Endpoint: config.MINT_LNBITS_ENDPOINT,
 			Key:      config.MINT_LNBITS_KEY,
 		}
 		mint.LightningBackend = lnbitsWallet
-	case CLNGRPC:
+	case utils.CLNGRPC:
 		clnWallet := lightning.CLNGRPCWallet{
 			Network: chainparam,
 		}
