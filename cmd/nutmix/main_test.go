@@ -709,7 +709,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 
 	}
 
-	config, err := mint.SetUpConfigFile()
+	config, err := mint.SetUpConfigDB(db)
 
 	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 
@@ -782,7 +782,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 
 	}
 
-	config, err := mint.SetUpConfigFile()
+	config, err := mint.SetUpConfigDB(&db)
 
 	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 
