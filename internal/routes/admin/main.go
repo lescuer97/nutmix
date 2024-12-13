@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 
-	// "log"
 	"log/slog"
 	"os"
 	"slices"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/mint"
@@ -33,9 +33,27 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 
 	}
 	adminRoute := r.Group("/admin")
+    LightningToLiquidSwap(&chaincfg.MainNetParams)
 
 	// I use the first active keyset as secret for jwt token signing
 	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
+
+    // apiKey := os.Getenv("BOLTZ_SDK_KEY")
+    // // setup liquid sdk
+    // config, err := breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkMainnet, &apiKey )
+    // if err != nil {
+    //     log.Panicf("breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkMainnet). %+v", err)
+    // }
+    // 
+    // connectRequest := breez_sdk_liquid.ConnectRequest{
+    //     Config:   config,
+    // }
+    // 
+    // sdk, err := breez_sdk_liquid.Connect(connectRequest)
+    // if err != nil {
+    //     log.Panicf("breez_sdk_liquid.Connect(connectRequest). %+v", err)
+    // }
+    // defer sdk.Disconnect()
 
 	// PAGES SETUP
 	// This is /admin pages
@@ -65,10 +83,10 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.GET("/liquid-swap-form", LiquidSwapForm(logger, mint))
 	adminRoute.GET("/lightning-swap-form", LightningSwapForm(logger))
 
-	adminRoute.POST("/liquid-swap-req", LiquidSwapRequest(logger, mint))
-	adminRoute.POST("/lightning-swap-req", LightningSwapRequest(logger, mint))
+	adminRoute.POST("/liquid-swap-req", SwapToLiquidRequest(logger, mint))
+	adminRoute.POST("/lightning-swap-req", SwapToLightningRequest(logger, mint))
 
-    adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
+	adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
 
 }
 
