@@ -67,7 +67,7 @@ func (e ErrorCode) String() string {
 
 type ErrorResponse struct {
 	// integer code
-    Code ErrorCode `json:"code"`
+	Code ErrorCode `json:"code"`
 	// Human readable error
 	Error string `json:"error"`
 	// Extended explanation of error

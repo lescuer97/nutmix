@@ -102,6 +102,8 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			logger.Error("Error on creating websocket %+v", slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
+
+		logger.Debug(fmt.Sprintf("New request %+v", request))
 		// confirm subscription or unsubscribe
 		response := cashu.WsResponse{
 			JsonRpc: "2.0",
@@ -118,20 +120,31 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		go ListenToIncommingMessage(&activeSubs, conn)
+		listining := make(chan string)
+		writing := make(chan string)
 
-		err = CheckingForSubsUpdates(&activeSubs, mint, conn)
-		if err != nil {
-			logger.Warn("CheckingForSubsUpdates(&activeSubs, mint, conn).", slog.String(utils.LogExtraInfo, err.Error()))
-			errMsg := cashu.WsError{
-				JsonRpc: "2.0",
-				Id:      request.Id,
-				Error: cashu.ErrorMsg{
-					Code:    cashu.UNKNOWN,
-					Message: "There was an error while checking state",
-				},
-			}
-			err = m.SendJson(conn, errMsg)
+		go ListenToIncommingMessage(&activeSubs, conn, listining)
+
+		go CheckingForSubsUpdates(&activeSubs, mint, conn, writing)
+		// if err != nil {
+		// 	logger.Warn("CheckingForSubsUpdates(&activeSubs, mint, conn).", slog.String(utils.LogExtraInfo, err.Error()))
+		// 	errMsg := cashu.WsError{
+		// 		JsonRpc: "2.0",
+		// 		Id:      request.Id,
+		// 		Error: cashu.ErrorMsg{
+		// 			Code:    cashu.UNKNOWN,
+		// 			Message: "There was an error while checking state",
+		// 		},
+		// 	}
+		// 	err = m.SendJson(conn, errMsg)
+		// }
+		select {
+		case listenInfo := <-listining:
+			logger.Warn("go ListenToIncommingMessage(&activeSubs, conn, listining).", slog.String(utils.LogExtraInfo, listenInfo))
+
+		case writeInfo := <-writing:
+			logger.Warn("go CheckingForSubsUpdates(&activeSubs, mint, conn, writing).", slog.String(utils.LogExtraInfo, writeInfo))
+
 		}
 
 	})
@@ -151,22 +164,24 @@ func handleWSRequest(request cashu.WsRequest, subs *WalletSubscription) error {
 	return nil
 }
 
-func ListenToIncommingMessage(subs *WalletSubscription, conn *websocket.Conn) {
+func ListenToIncommingMessage(subs *WalletSubscription, conn *websocket.Conn, ch chan string) {
 	for {
 		var request cashu.WsRequest
 		err := conn.ReadJSON(&request)
 		if err != nil {
+			ch <- fmt.Errorf("conn.ReadJSON(&request).%w", err).Error()
 			return
 		}
 
 		err = handleWSRequest(request, subs)
 		if err != nil {
+			ch <- fmt.Errorf("handleWSRequest(request, subs) %w", err).Error()
 			return
 		}
 	}
 }
 
-func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websocket.Conn) error {
+func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websocket.Conn, ch chan string) error {
 
 	alreadyCheckedFilter := make(map[string]any)
 	for {
@@ -261,7 +276,7 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 	}
 }
 
-func CheckStatusesOfSubscription(subKind cashu.SubscriptionKind, filters []string, pool *pgxpool.Pool, mint *m.Mint) ([]cashu.PostMintQuoteBolt11Response, []cashu.CheckState, error) {
+func CheckStatusesOfSubscription(subKind cashu.SubscriptionKind, filters []string, pool *pgxpool.Pool, mint *m.Mint, ch chan string) ([]cashu.PostMintQuoteBolt11Response, []cashu.CheckState, error) {
 	var mintQuote []cashu.PostMintQuoteBolt11Response
 	var proofsState []cashu.CheckState
 	switch subKind {
