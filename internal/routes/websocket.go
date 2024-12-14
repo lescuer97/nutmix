@@ -133,18 +133,6 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		go ListenToIncommingMessage(&activeSubs, conn, listining)
 
 		go CheckingForSubsUpdates(&activeSubs, mint, conn, writing)
-		// if err != nil {
-		// 	logger.Warn("CheckingForSubsUpdates(&activeSubs, mint, conn).", slog.String(utils.LogExtraInfo, err.Error()))
-		// 	errMsg := cashu.WsError{
-		// 		JsonRpc: "2.0",
-		// 		Id:      request.Id,
-		// 		Error: cashu.ErrorMsg{
-		// 			Code:    cashu.UNKNOWN,
-		// 			Message: "There was an error while checking state",
-		// 		},
-		// 	}
-		// 	err = m.SendJson(conn, errMsg)
-		// }
 		select {
 		case listenInfo := <-listining:
 			logger.Warn("go ListenToIncommingMessage(&activeSubs, conn, listining).", slog.String(utils.LogExtraInfo, listenInfo))
@@ -183,6 +171,20 @@ func ListenToIncommingMessage(subs *WalletSubscription, conn *websocket.Conn, ch
 		err = handleWSRequest(request, subs)
 		if err != nil {
 			ch <- fmt.Errorf("handleWSRequest(request, subs) %w", err).Error()
+			return
+		}
+		response := cashu.WsResponse{
+			JsonRpc: "2.0",
+			Id:      request.Id,
+			Result: cashu.WsResponseResult{
+				Status: "OK",
+				SubId:  request.Params.SubId,
+			},
+		}
+
+		err = m.SendJson(conn, response)
+		if err != nil {
+			ch <- fmt.Errorf("m.SendJson(conn, response) %w", err).Error()
 			return
 		}
 	}
