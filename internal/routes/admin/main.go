@@ -3,25 +3,30 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
+	"log"
 
 	"log/slog"
 	"os"
 	"slices"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/breez/breez-sdk-liquid-go/breez_sdk_liquid"
+	"github.com/btcsuite/btcd/btcutil/hdkeychain"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/mint"
+	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"github.com/tyler-smith/go-bip39"
 )
 
 type ErrorNotif struct {
 	Error string
 }
 
-func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
+func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	testPath := os.Getenv("TEST_PATH")
 	if testPath != "" {
 		r.Static("static", testPath+"static")
@@ -33,27 +38,56 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 
 	}
 	adminRoute := r.Group("/admin")
-    LightningToLiquidSwap(&chaincfg.MainNetParams)
-
 	// I use the first active keyset as secret for jwt token signing
 	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
 
-    // apiKey := os.Getenv("BOLTZ_SDK_KEY")
-    // // setup liquid sdk
-    // config, err := breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkMainnet, &apiKey )
-    // if err != nil {
-    //     log.Panicf("breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkMainnet). %+v", err)
-    // }
-    // 
-    // connectRequest := breez_sdk_liquid.ConnectRequest{
-    //     Config:   config,
-    // }
-    // 
-    // sdk, err := breez_sdk_liquid.Connect(connectRequest)
-    // if err != nil {
-    //     log.Panicf("breez_sdk_liquid.Connect(connectRequest). %+v", err)
-    // }
-    // defer sdk.Disconnect()
+	apiKey := os.Getenv("BOLTZ_SDK_KEY")
+
+	// // setup liquid sdk
+	config, err := breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkTestnet, &apiKey)
+	if err != nil {
+		log.Panicf("breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkMainnet). %+v", err)
+	}
+
+	// get nmonic from private key
+	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+	if mint_privkey == "" {
+		log.Panicf("Mint private key not available")
+	}
+	decodedPrivKey, err := hex.DecodeString(mint_privkey)
+	if err != nil {
+		log.Panicf("hex.DecodeString(mint_privkey). %+v", err)
+	}
+
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
+
+	masterKey, err := m.MintPrivateKeyToBip32(parsedPrivateKey)
+	if err != nil {
+		log.Panicf("m.MintPrivateKeyToBip32(parsedPrivateKey). %+v", err)
+	}
+
+	// path for liquid
+	liquidKey, err := masterKey.NewChildKey(hdkeychain.HardenedKeyStart + LiquidCoinType)
+	if err != nil {
+		log.Panicf("masterKey.NewChildKey(hdkeychain.HardenedKeyStart + LiquidCoinType). %+v", err)
+	}
+
+	mnemonic, err := bip39.NewMnemonic(liquidKey.Key)
+
+	if err != nil {
+		log.Panicf("bip39.NewMnemonic(liquidKey.Key). %+v", err)
+	}
+
+	connectRequest := breez_sdk_liquid.ConnectRequest{
+		Config:   config,
+		Mnemonic: mnemonic,
+	}
+
+	sdk, err := breez_sdk_liquid.Connect(connectRequest)
+	if err != nil {
+		log.Panicf("breez_sdk_liquid.Connect(connectRequest). %+v", err)
+	}
+	// defer sdk.Disconnect()
 
 	// PAGES SETUP
 	// This is /admin pages
@@ -83,10 +117,12 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.GET("/liquid-swap-form", LiquidSwapForm(logger, mint))
 	adminRoute.GET("/lightning-swap-form", LightningSwapForm(logger))
 
-	adminRoute.POST("/liquid-swap-req", SwapToLiquidRequest(logger, mint))
+	adminRoute.POST("/liquid-swap-req", SwapToLiquidRequest(logger, mint, sdk))
 	adminRoute.POST("/lightning-swap-req", SwapToLightningRequest(logger, mint))
 
 	adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
+
+	adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapTransaction(logger, mint))
 
 }
 
@@ -161,7 +197,7 @@ func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 
 		}
 
-		file, err := os.Open(logsdir + "/" + mint.LogFileName)
+		file, err := os.Open(logsdir + "/" + m.LogFileName)
 		defer file.Close()
 		if err != nil {
 			logger.Warn(

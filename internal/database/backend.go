@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"errors"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -29,7 +30,6 @@ const (
 type MintDB interface {
 
 	/// Calls for the Functioning of the mint
-
 	GetAllSeeds() ([]cashu.Seed, error)
 	GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error)
 	SaveNewSeed(seed cashu.Seed) error
@@ -64,4 +64,10 @@ type MintDB interface {
 	SaveNostrAuth(auth NostrLoginAuth) error
 	UpdateNostrAuthActivation(nonce string, activated bool) error
 	GetNostrAuth(nonce string) (NostrLoginAuth, error)
+
+	// start transaction
+	// BeginTx() (*sql.Tx, error)
+	// AddSwapRequest(tx *sql.Tx) (error)
+
+	// liquidity provider state
 }

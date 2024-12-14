@@ -405,6 +405,16 @@ func (pql Postgresql) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
 	}
 }
 
+// func (pql Postgresql) BeginTx() (*sql.Tx, error){
+//     tx, err := pql.pool.Begin(context.Background())
+// 	if err != nil {
+// 		return nil, databaseError(fmt.Errorf("pql.pool.Acquire(): %w", err))
+// 	}
+//
+//
+//     return &tx, nil
+// }
+
 func (pql Postgresql) Close() {
 	pql.pool.Close()
 }
