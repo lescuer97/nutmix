@@ -3,15 +3,17 @@ package routes
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"log/slog"
-	"sync"
-	"time"
 )
 
 var ErrAlreadySubscribed = errors.New("Filter already subscribed")
@@ -58,17 +60,22 @@ func (w *WalletSubscription) Unsubcribe(subId string) {
 	}
 	w.Unlock()
 }
+func checkOrigin(r *http.Request) bool {
+	return true
+}
 
 func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
 	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
+		ReadBufferSize:  4096,
+		WriteBufferSize: 4096,
+		CheckOrigin:     checkOrigin,
 	}
 
 	v1.GET("/ws", func(c *gin.Context) {
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
+			logger.Warn("upgrader.Upgrade(c.Writer, c.Request, nil)", slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
 		defer conn.Close()

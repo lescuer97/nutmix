@@ -40,7 +40,7 @@ type WsNotification struct {
 	JsonRpc string           `json:"jsonrpc"`
 	Method  WebRequestMethod `json:"method"`
 	Params  WebRequestParams `json:"params"`
-	Id      int              `json:"id"`
+	Id      int              `json:"id,omitempty"`
 }
 
 type ErrorMsg struct {
