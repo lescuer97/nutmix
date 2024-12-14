@@ -490,7 +490,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		}
 
 		if len(knownProofs) != 0 {
-			logger.Info("Proofs already used", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", knownProofs)))
+			logger.Info("Proofs already used", slog.String(utils.LogExtraInfo, fmt.Sprintf("knownproofs:  %+v", knownProofs)))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}
@@ -517,6 +517,8 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN {
+			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
+
 			// if exception of lightning payment says fail do a payment status recheck.
 			status, _, err := mint.LightningBackend.CheckPayed(quote.Quote)
 

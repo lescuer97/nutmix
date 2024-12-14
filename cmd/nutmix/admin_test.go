@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/testcontainers/testcontainers-go"
@@ -57,7 +58,7 @@ func TestSetupMintAdminLoginSuccess(t *testing.T) {
 
 	t.Setenv("DATABASE_URL", connUri)
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	t.Setenv("MINT_LIGHTNING_BACKEND", string(m.FAKE_WALLET))
+	t.Setenv("MINT_LIGHTNING_BACKEND", string(utils.FAKE_WALLET))
 	t.Setenv(m.NETWORK_ENV, "regtest")
 	t.Setenv("ADMIN_NOSTR_NPUB", nip19pubkey)
 	t.Setenv("TEST_PATH", "../../internal/routes/admin/")
@@ -149,7 +150,7 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 
 	t.Setenv("DATABASE_URL", connUri)
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	t.Setenv("MINT_LIGHTNING_BACKEND", string(m.FAKE_WALLET))
+	t.Setenv("MINT_LIGHTNING_BACKEND", string(utils.FAKE_WALLET))
 	t.Setenv(m.NETWORK_ENV, "regtest")
 	t.Setenv("ADMIN_NOSTR_NPUB", nip19pubkey)
 	t.Setenv("TEST_PATH", "../../internal/routes/admin/")
@@ -254,7 +255,7 @@ func TestRotateKeyUpCall(t *testing.T) {
 
 	t.Setenv("DATABASE_URL", connUri)
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	t.Setenv("MINT_LIGHTNING_BACKEND", string(m.FAKE_WALLET))
+	t.Setenv("MINT_LIGHTNING_BACKEND", string(utils.FAKE_WALLET))
 	t.Setenv(m.NETWORK_ENV, "regtest")
 	t.Setenv("ADMIN_NOSTR_NPUB", nip19pubkey)
 	t.Setenv("TEST_PATH", "../../internal/routes/admin/")
