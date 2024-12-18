@@ -80,14 +80,18 @@ You'll need  the correct variables in an `.env` file first. Use the env.example 
 
 The mint will fail and Print out what you are missing if you don't have this 4 Items setup.
 
-You can now login and setup your Lightning node and Mint information.
-It's important to set up the variables under `LIGHTNING CONNECTION` for connecting to a node. 
 
 if you want to run with docker traefik and you also need to fill variables below `HOSTING` for your domains.
 
 If you have this correctly setup it should be as easy as running a simple docker command on linux:
 
 ``` docker compose up -d ```
+
+[![Video on .evn setup](https://cdn.hzrd149.com/0930b6e46cfe03a70345930d55b2eff51b0eb39d6e6eb4305b42b7736398f49c.png)](https://cdn.hzrd149.com/0ef3cb33401dbdd002039d01c0f749491c26720a80b23b885ae0f569ebd9f7b3.mp4)
+
+[![Setup Lightning node](https://cdn.hzrd149.com/c2175c7a310026f0450f98146f9dd180979909aaa464aa4376a75eb25b013b10.png)](https://cdn.hzrd149.com/905025ea49d48e36890f87ab05a7be75b141331e25ec8a326a29adfc9cb4cd0a.mp4)
+
+[![Walkthrough of dashboard](https://cdn.hzrd149.com/9f967999398e74ffb5ae079bb7e06b58ef8470204b05a21647c5b4e18c71c8d9.png)](https://cdn.hzrd149.com/72a5a65e027370084d45586084098f97ae3631f86bad932656b5c9532be7ba93.mp4)
 
 #### How to rotate a keyset up
 
