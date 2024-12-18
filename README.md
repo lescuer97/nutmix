@@ -18,49 +18,11 @@ I saw the work made by calle on the Cashu protocol and was fascinated by the awe
 
 I'm also attempting to make all NUTs available as well as some other ideas such as: Monero and FIAT ecash.
 
-## Supported NUTs
-
-Implemented [NUTs](https://github.com/cashubtc/nuts/):
-
-- [x] [NUT-00](https://github.com/cashubtc/nuts/blob/main/00.md)
-- [x] [NUT-01](https://github.com/cashubtc/nuts/blob/main/01.md)
-- [x] [NUT-02](https://github.com/cashubtc/nuts/blob/main/02.md)
-- [x] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md)
-- [x] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md)
-- [x] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
-- [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md)
-- [x] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md)
-- [x] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
-- [x] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md)
-- [x] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
-- [x] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
-- [ ] [NUT-13](https://github.com/cashubtc/nuts/blob/main/13.md)
-- [x] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
-- [x] [NUT-15](https://github.com/cashubtc/nuts/blob/main/15.md)
 
 ## Objective
 Build the fastest and most secure implementation of an ecash mint possible. This would include and admin dashboard to be
 able to monitor and control de behaviour of the mint.
 
-## Roadmap
-At this moment NUTS are up to P2PK (NUT-11) are implemented and working. I plan to keep going until all NUTS are done.
-
-1. ~~Finish Milestones for [V1](https://github.com/lescuer97/nutmix/milestone/1).~~
-2. ~~Finish NUTS until NUT-15.~~ 
-3. Add dashboard for controlling aspects of the mint.
-    - ~~Nostr Login~~
-    - ~~Rotate keysets.~~
-    - ~~Monitor Mint activity~~.
-    - Emmit blind signatures for certain users.
-    - Activate Nostr only mode.
-    - ~~Change mint messages~~
-5. Add support for other lightning nodes. Ex: ~~core-lighting~~, Strike, Greenlight.
-4. Add Monero Support this would probably include a way to exchange in between Bitcoin and Monero.
-5. Tor only mode
-6. Nostr only Mode.
-7. Remote signing. This would leave the mint in a highly available server but the lightning transactions and tokens
-   would be signed and verified on a secure enclave. This could be something like a hardware device or AWS Nitro. I
-   would probably take inspiration or directly use something like [VLS](https://vls.tech/)
 
 ### Run the Mint
 
@@ -113,6 +75,46 @@ I have a special development docker compose called: `docker-compose-dev.yml`. Th
 2. Run the mint locally. 
 
 ``` # build the project go run cmd/nutmix/*.go ```
+
+## Supported NUTs
+
+Implemented [NUTs](https://github.com/cashubtc/nuts/):
+
+- [x] [NUT-00](https://github.com/cashubtc/nuts/blob/main/00.md)
+- [x] [NUT-01](https://github.com/cashubtc/nuts/blob/main/01.md)
+- [x] [NUT-02](https://github.com/cashubtc/nuts/blob/main/02.md)
+- [x] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md)
+- [x] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md)
+- [x] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
+- [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md)
+- [x] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md)
+- [x] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
+- [x] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md)
+- [x] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
+- [x] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
+- [ ] [NUT-13](https://github.com/cashubtc/nuts/blob/main/13.md)
+- [x] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
+- [x] [NUT-15](https://github.com/cashubtc/nuts/blob/main/15.md)
+
+## Roadmap
+At this moment NUTS are up to P2PK (NUT-11) are implemented and working. I plan to keep going until all NUTS are done.
+
+1. ~~Finish Milestones for [V1](https://github.com/lescuer97/nutmix/milestone/1).~~
+2. ~~Finish NUTS until NUT-15.~~ 
+3. Add dashboard for controlling aspects of the mint.
+    - ~~Nostr Login~~
+    - ~~Rotate keysets.~~
+    - ~~Monitor Mint activity~~.
+    - Emmit blind signatures for certain users.
+    - Activate Nostr only mode.
+    - ~~Change mint messages~~
+5. Add support for other lightning nodes. Ex: ~~core-lighting~~, Strike, Greenlight.
+4. Add Monero Support this would probably include a way to exchange in between Bitcoin and Monero.
+5. Tor only mode
+6. Nostr only Mode.
+7. Remote signing. This would leave the mint in a highly available server but the lightning transactions and tokens
+   would be signed and verified on a secure enclave. This could be something like a hardware device or AWS Nitro. I
+   would probably take inspiration or directly use something like [VLS](https://vls.tech/)
 
 ### Support 
 
