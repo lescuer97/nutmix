@@ -108,7 +108,7 @@ templ MintMeltEventList(eventList []MintMeltRequestVisual) {
 	</div>
 }
 
-templ MintActivityLayout() {
+templ MintActivityLayout(liquidityManagerAvailable bool) {
 	@Layout() {
 		<div hx-ext="remove-me" id="notifications"></div>
 		<main class="activity">
@@ -136,12 +136,14 @@ templ MintActivityLayout() {
 					id="mint-summary"
 					class="summary-table"
 				></div>
-				<div
-					hx-get="/admin/liquidity-button"
-					hx-target="this"
-					hx-swap="outerHTML"
-					hx-trigger="load, reload"
-				></div>
+				if liquidityManagerAvailable {
+					<div
+						hx-get="/admin/liquidity-button"
+						hx-target="this"
+						hx-swap="outerHTML"
+						hx-trigger="load, reload"
+					></div>
+				}
 			</div>
 			<div class="data-list">
 				<div

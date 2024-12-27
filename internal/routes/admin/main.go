@@ -41,10 +41,37 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 	// I use the first active keyset as secret for jwt token signing
 	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
 
+
+	// PAGES SETUP
+	// This is /admin pages
+	adminRoute.GET("", InitPage(mint))
+	adminRoute.GET("/keysets", KeysetsPage(mint))
+	adminRoute.GET("/settings", MintSettingsPage(mint))
+	adminRoute.GET("/login", LoginPage(logger, mint))
+	adminRoute.GET("/bolt11", LightningNodePage(mint))
+	adminRoute.GET("/liquidity", LigthningLiquidityPage(logger, mint))
+
+	// change routes
+	adminRoute.POST("/login", Login(mint, logger))
+	adminRoute.POST("/mintsettings", MintSettingsForm(mint, logger))
+	adminRoute.POST("/bolt11", Bolt11Post(mint, logger))
+	adminRoute.POST("/rotate/sats", RotateSatsSeed(mint, logger))
+
+	// fractional html components
+	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint, logger))
+	adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
+	adminRoute.GET("/mint-balance", MintBalance(mint, logger))
+	adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint, logger))
+	adminRoute.GET("/mint-melt-list", MintMeltList(mint, logger))
+	adminRoute.GET("/logs", LogsTab(logger))
+
+
+    // only have swap routes if liquidity manager is possible
+    if utils.CanUseLiquidityManager(mint.LightningBackend.GetNetwork()) {
 	apiKey := os.Getenv("BOLTZ_SDK_KEY")
 
 	// // setup liquid sdk
-	config, err := breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkTestnet, &apiKey)
+	config, err := breez_sdk_liquid.DefaultConfig(utils.GetBreezLiquid(mint.LightningBackend.GetNetwork()), &apiKey)
 	if err != nil {
 		log.Panicf("breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkMainnet). %+v", err)
 	}
@@ -88,30 +115,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 		log.Panicf("breez_sdk_liquid.Connect(connectRequest). %+v", err)
 	}
 	// defer sdk.Disconnect()
-
-	// PAGES SETUP
-	// This is /admin pages
-	adminRoute.GET("", InitPage(mint))
-	adminRoute.GET("/keysets", KeysetsPage(mint))
-	adminRoute.GET("/settings", MintSettingsPage(mint))
-	adminRoute.GET("/login", LoginPage(logger, mint))
-	adminRoute.GET("/bolt11", LightningNodePage(mint))
-	adminRoute.GET("/liquidity", LigthningLiquidityPage(logger, mint))
-
-	// change routes
-	adminRoute.POST("/login", Login(mint, logger))
-	adminRoute.POST("/mintsettings", MintSettingsForm(mint, logger))
-	adminRoute.POST("/bolt11", Bolt11Post(mint, logger))
-	adminRoute.POST("/rotate/sats", RotateSatsSeed(mint, logger))
-
-	// fractional html components
-	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint, logger))
-	adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
-	adminRoute.GET("/mint-balance", MintBalance(mint, logger))
-	adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint, logger))
-	adminRoute.GET("/mint-melt-list", MintMeltList(mint, logger))
-	adminRoute.GET("/logs", LogsTab(logger))
-
 	// liquidity manager
 	adminRoute.GET("/liquidity-button", LiquidityButton(logger))
 	adminRoute.GET("/liquid-swap-form", LiquidSwapForm(logger, mint))
@@ -123,6 +126,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 	adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
 
 	adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapTransaction(logger, mint))
+}
 
 }
 

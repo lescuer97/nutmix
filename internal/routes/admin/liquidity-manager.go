@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/breez/breez-sdk-liquid-go/breez_sdk_liquid"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/internal/lightning"
@@ -109,7 +108,7 @@ func SwapToLiquidRequest(logger *slog.Logger, mint *m.Mint, sdk *breez_sdk_liqui
 			Type:        utils.LiquidityOut,
 		}
 
-		decodedInvoice, err := zpay32.Decode(res.Destination, &chaincfg.TestNet3Params)
+		decodedInvoice, err := zpay32.Decode(res.Destination, mint.LightningBackend.GetNetwork())
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			log.Printf("\n zpay32.Decode(res.Destination) %+v \n", err)
@@ -227,7 +226,7 @@ func ConfirmSwapTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		decodedInvoice, err := zpay32.Decode(swapRequest.Destination, &chaincfg.TestNet3Params)
+		decodedInvoice, err := zpay32.Decode(swapRequest.Destination, mint.LightningBackend.GetNetwork())
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			c.Error(fmt.Errorf("zpay32.Decode(res.Destination) %w", err))
