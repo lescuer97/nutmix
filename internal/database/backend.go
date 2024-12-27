@@ -1,7 +1,6 @@
 package database
 
 import (
-	"database/sql"
 	"errors"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -66,8 +65,9 @@ type MintDB interface {
 	GetNostrAuth(nonce string) (NostrLoginAuth, error)
 
 	// start transaction
-	// BeginTx() (*sql.Tx, error)
-	// AddSwapRequest(tx *sql.Tx) (error)
+	AddSwapRequest(utils.SwapRequest) error
+	GetSwapRequestById(id string) (utils.SwapRequest, error)
+	ChangeSwapRequestState(id string, state utils.SwapState) error
 
 	// liquidity provider state
 }

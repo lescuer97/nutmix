@@ -85,13 +85,10 @@ templ LightningSwapBoltz() {
 	</form>
 }
 
-templ LightningSwapSummary(sendSats string, recieveSats string, address string, swapId string) {
+templ LightningSwapSummary( recieveSats string, address string, swapId string) {
 	<h3>Send To Liquid Address</h3>
 	<div>
 		Fees of the Swap
-		<p>
-			send:  { sendSats } Sats
-		</p>
 		<p>
 			Receive:  { recieveSats } Sats
 		</p>

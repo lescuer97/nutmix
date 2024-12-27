@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 func (pql Postgresql) SaveNostrAuth(auth database.NostrLoginAuth) error {
@@ -97,4 +98,76 @@ func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBal
 
 	return mintMeltBalance, nil
 
+}
+
+func (pql Postgresql) AddSwapRequest(swap utils.SwapRequest) error {
+	_, err := pql.pool.Exec(context.Background(), "INSERT INTO swap_request (amount, id , destination, state, type) VALUES ($1, $2, $3, $4, $5)", swap.Amount, swap.Id, swap.Destination, swap.State, swap.Type)
+
+	if err != nil {
+		return databaseError(fmt.Errorf("INSERT INTO swap_request: %w", err))
+
+	}
+	return nil
+}
+func (pql Postgresql) ChangeSwapRequestState(id string, state utils.SwapState) error {
+	_, err := pql.pool.Exec(context.Background(), "UPDATE swap_request SET state = $1 WHERE id = $2", state, id)
+
+	if err != nil {
+		return databaseError(fmt.Errorf("INSERT INTO swap_request: %w", err))
+
+	}
+	return nil
+}
+
+func (pql Postgresql) GetSwapRequests(swap utils.SwapRequest) ([]utils.SwapRequest, error) {
+
+	var swaps []utils.SwapRequest
+	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, destination, state,type FROM swap_request ")
+	defer rows.Close()
+	if err != nil {
+		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
+	}
+
+	swaps, err = pgx.CollectRows(rows, pgx.RowToStructByName[utils.SwapRequest])
+
+	if err != nil {
+		return swaps, fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.NostrLoginAuth]): %w", err)
+	}
+
+	return swaps, nil
+}
+func (pql Postgresql) GetSwapRequestById(id string) (utils.SwapRequest, error) {
+
+	var swaps utils.SwapRequest
+	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, destination, state,type FROM swap_request WHERE id = $1 ", id)
+	defer rows.Close()
+	if err != nil {
+		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
+	}
+
+	swaps, err = pgx.CollectOneRow(rows, pgx.RowToStructByName[utils.SwapRequest])
+
+	if err != nil {
+		return swaps, fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.NostrLoginAuth]): %w", err)
+	}
+
+	return swaps, nil
+}
+
+func (pql Postgresql) GetSwapRequestByState(swap utils.SwapRequest, state utils.SwapState) ([]utils.SwapRequest, error) {
+
+	var swaps []utils.SwapRequest
+	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, destination, state,type FROM swap_request WHERE state = $1 ", state)
+	defer rows.Close()
+	if err != nil {
+		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
+	}
+
+	swaps, err = pgx.CollectRows(rows, pgx.RowToStructByName[utils.SwapRequest])
+
+	if err != nil {
+		return swaps, fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.NostrLoginAuth]): %w", err)
+	}
+
+	return swaps, nil
 }

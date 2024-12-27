@@ -6,3 +6,8 @@ env/
 tmp/
 *_templ.go
 *_gen.go
+
+#breez sdk info
+testnet/ 
+#breez sdk info
+mainnet/
