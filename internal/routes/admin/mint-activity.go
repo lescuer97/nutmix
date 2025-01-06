@@ -163,3 +163,33 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		}
 	}
 }
+
+func SwapsList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		swaps, err := mint.MintDB.GetAllLiquiditySwaps()
+
+		if err != nil {
+			logger.Error(
+				"database.GetMintMeltBalanceByTime(pool",
+				slog.String(utils.LogExtraInfo, err.Error()))
+
+			errorMessage := ErrorNotif{
+
+				Error: "There was an error getting mint activity",
+			}
+
+			c.HTML(200, "settings-error", errorMessage)
+			return
+		}
+
+		ctx := context.Background()
+
+		err = templates.ListOfSwaps(swaps).Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(err)
+			c.Status(400)
+			return
+		}
+	}
+}

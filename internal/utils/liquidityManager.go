@@ -1,8 +1,8 @@
 package utils
 
 import (
-    "github.com/btcsuite/btcd/chaincfg"
 	"github.com/breez/breez-sdk-liquid-go/breez_sdk_liquid"
+	"github.com/btcsuite/btcd/chaincfg"
 )
 
 type SwapState string
@@ -29,7 +29,7 @@ func CanUseLiquidityManager(chain *chaincfg.Params) bool {
 		return true
 	case &chaincfg.TestNet3Params:
 	default:
-		return false
+		return true
 	}
 	return false
 }
@@ -46,10 +46,11 @@ func GetBreezLiquid(chain *chaincfg.Params) breez_sdk_liquid.LiquidNetwork {
 	return breez_sdk_liquid.LiquidNetworkTestnet
 }
 
-type SwapRequest struct {
-	Amount      uint      `json"amount"`
+type LiquiditySwap struct {
+	Amount      uint64    `json"amount"`
 	Id          string    `json"id"`
 	Destination string    `json"destination"`
 	State       SwapState `json"state"`
 	Type        SwapType  `json"type"`
+	Expiration  uint64    `json"expiration"`
 }

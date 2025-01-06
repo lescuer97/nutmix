@@ -65,9 +65,11 @@ type MintDB interface {
 	GetNostrAuth(nonce string) (NostrLoginAuth, error)
 
 	// start transaction
-	AddSwapRequest(utils.SwapRequest) error
-	GetSwapRequestById(id string) (utils.SwapRequest, error)
-	ChangeSwapRequestState(id string, state utils.SwapState) error
+	AddLiquiditySwap(utils.LiquiditySwap) error
+	GetLiquiditySwapById(id string) (utils.LiquiditySwap, error)
+	ChangeLiquiditySwapState(id string, state utils.SwapState) error
+	GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error)
+	GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error)
 
 	// liquidity provider state
 }

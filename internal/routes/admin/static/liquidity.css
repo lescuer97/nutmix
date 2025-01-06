@@ -1,8 +1,9 @@
 .liquidity-dashboard {
     display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
     justify-content: center;
     align-content: center;
-    flex-direction: row;
 }
 
 .liquidity-dashboard .actions-container {
@@ -12,6 +13,15 @@
   max-width: 50%;
   background-color: var(--color-surface-200);
   border: 1px solid var(--white);
+  align-self: center;
+  }
+.liquidity-dashboard .swap-list {
+  display: flex;
+  flex-direction: column;
+  max-width: 50%;
+  background-color: var(--color-surface-200);
+  border: 1px solid var(--white);
+  align-self: center;
   }
 
 .liquidity-actions {

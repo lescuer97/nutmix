@@ -1,5 +1,11 @@
 package templates 
 
+import ("github.com/lescuer97/nutmix/internal/utils"
+"time"
+"strconv"
+
+)
+
 templ LiquidityButton() {
 	<a
 		href="/admin/liquidity"
@@ -44,9 +50,45 @@ templ LiquidityDashboard(swapForm string, nodeBalance string) {
 					}
 				</div>
 			</div>
+					<div
+						hx-get="/admin/swaps-list"
+                        hx-trigger="load"
+                        class="swap-list"
+						hx-swap="innerHTML"
+					>
+					</div>
 		</main>
 	}
 }
+
+
+templ ListOfSwaps(swaps []utils.LiquiditySwap) {
+		<table class="">
+			<thead>
+				<tr>
+					<th class="level" scope="col">Amount</th>
+					<th scope="col">Type</th>
+					<th scope="col">Expiration</th>
+					<th scope="col">State</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, item := range swaps {
+                    {{ unixTime := time.Unix(int64(item.Expiration), 0) }}
+                    {{ amount := strconv.FormatUint(item.Amount, 10) }}
+                    {{ liquidityType := string(item.Type)}}
+                    {{ state := string(item.State)}}
+					<tr>
+						<th scope="row">{ amount }</th>
+						<td class="request-row">{ liquidityType }</td>
+						<td class="time">{ unixTime.Format(time.UnixDate) }</td>
+						<td class="request-row">{ state }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+}
+
 
 templ LiquidSwapBoltzPostForm(nodeBalance string) {
 	<form
@@ -92,9 +134,12 @@ templ LightningSwapSummary(recieveSats string, address string, swapId string) {
 		<p>
 			Receive:  { recieveSats } Sats
 		</p>
+		<p>
+			Please pay this address:  { address }
+		</p>
 		<div
 			hx-get={ "/admin/swap/" + swapId }
-			hx-trigger="load, every 2s"
+			hx-trigger="every 2s"
 			hx-swap="innerHTML"
 			hx-target="this"
 			class="swap-state"

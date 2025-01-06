@@ -41,7 +41,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 	// I use the first active keyset as secret for jwt token signing
 	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
 
-
 	// PAGES SETUP
 	// This is /admin pages
 	adminRoute.GET("", InitPage(mint))
@@ -64,69 +63,69 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 	adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint, logger))
 	adminRoute.GET("/mint-melt-list", MintMeltList(mint, logger))
 	adminRoute.GET("/logs", LogsTab(logger))
+	adminRoute.GET("/swaps-list", SwapsList(mint, logger))
 
+	// only have swap routes if liquidity manager is possible
+	if utils.CanUseLiquidityManager(mint.LightningBackend.GetNetwork()) {
+		apiKey := os.Getenv("BOLTZ_SDK_KEY")
 
-    // only have swap routes if liquidity manager is possible
-    if utils.CanUseLiquidityManager(mint.LightningBackend.GetNetwork()) {
-	apiKey := os.Getenv("BOLTZ_SDK_KEY")
+		// // setup liquid sdk
+		config, err := breez_sdk_liquid.DefaultConfig(utils.GetBreezLiquid(mint.LightningBackend.GetNetwork()), &apiKey)
+		if err != nil {
+			log.Panicf("breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkMainnet). %+v", err)
+		}
 
-	// // setup liquid sdk
-	config, err := breez_sdk_liquid.DefaultConfig(utils.GetBreezLiquid(mint.LightningBackend.GetNetwork()), &apiKey)
-	if err != nil {
-		log.Panicf("breez_sdk_liquid.DefaultConfig(breez_sdk_liquid.LiquidNetworkMainnet). %+v", err)
+		// get nmonic from private key
+		mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
+		if mint_privkey == "" {
+			log.Panicf("Mint private key not available")
+		}
+		decodedPrivKey, err := hex.DecodeString(mint_privkey)
+		if err != nil {
+			log.Panicf("hex.DecodeString(mint_privkey). %+v", err)
+		}
+
+		parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
+
+		masterKey, err := m.MintPrivateKeyToBip32(parsedPrivateKey)
+		if err != nil {
+			log.Panicf("m.MintPrivateKeyToBip32(parsedPrivateKey). %+v", err)
+		}
+
+		// path for liquid
+		liquidKey, err := masterKey.NewChildKey(hdkeychain.HardenedKeyStart + LiquidCoinType)
+		if err != nil {
+			log.Panicf("masterKey.NewChildKey(hdkeychain.HardenedKeyStart + LiquidCoinType). %+v", err)
+		}
+
+		mnemonic, err := bip39.NewMnemonic(liquidKey.Key)
+
+		if err != nil {
+			log.Panicf("bip39.NewMnemonic(liquidKey.Key). %+v", err)
+		}
+
+		connectRequest := breez_sdk_liquid.ConnectRequest{
+			Config:   config,
+			Mnemonic: mnemonic,
+		}
+
+		sdk, err := breez_sdk_liquid.Connect(connectRequest)
+		if err != nil {
+			log.Panicf("breez_sdk_liquid.Connect(connectRequest). %+v", err)
+		}
+		// defer sdk.Disconnect()
+		// liquidity manager
+		adminRoute.GET("/liquidity-button", LiquidityButton(logger))
+		adminRoute.GET("/liquid-swap-form", LiquidSwapForm(logger, mint))
+		adminRoute.GET("/lightning-swap-form", LightningSwapForm(logger))
+
+		adminRoute.POST("/liquid-swap-req", SwapToLiquidRequest(logger, mint, sdk))
+		adminRoute.POST("/lightning-swap-req", SwapToLightningRequest(logger, mint))
+
+		adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
+
+		adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(logger, mint))
 	}
-
-	// get nmonic from private key
-	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
-	if mint_privkey == "" {
-		log.Panicf("Mint private key not available")
-	}
-	decodedPrivKey, err := hex.DecodeString(mint_privkey)
-	if err != nil {
-		log.Panicf("hex.DecodeString(mint_privkey). %+v", err)
-	}
-
-	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-
-	masterKey, err := m.MintPrivateKeyToBip32(parsedPrivateKey)
-	if err != nil {
-		log.Panicf("m.MintPrivateKeyToBip32(parsedPrivateKey). %+v", err)
-	}
-
-	// path for liquid
-	liquidKey, err := masterKey.NewChildKey(hdkeychain.HardenedKeyStart + LiquidCoinType)
-	if err != nil {
-		log.Panicf("masterKey.NewChildKey(hdkeychain.HardenedKeyStart + LiquidCoinType). %+v", err)
-	}
-
-	mnemonic, err := bip39.NewMnemonic(liquidKey.Key)
-
-	if err != nil {
-		log.Panicf("bip39.NewMnemonic(liquidKey.Key). %+v", err)
-	}
-
-	connectRequest := breez_sdk_liquid.ConnectRequest{
-		Config:   config,
-		Mnemonic: mnemonic,
-	}
-
-	sdk, err := breez_sdk_liquid.Connect(connectRequest)
-	if err != nil {
-		log.Panicf("breez_sdk_liquid.Connect(connectRequest). %+v", err)
-	}
-	// defer sdk.Disconnect()
-	// liquidity manager
-	adminRoute.GET("/liquidity-button", LiquidityButton(logger))
-	adminRoute.GET("/liquid-swap-form", LiquidSwapForm(logger, mint))
-	adminRoute.GET("/lightning-swap-form", LightningSwapForm(logger))
-
-	adminRoute.POST("/liquid-swap-req", SwapToLiquidRequest(logger, mint, sdk))
-	adminRoute.POST("/lightning-swap-req", SwapToLightningRequest(logger, mint))
-
-	adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
-
-	adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapTransaction(logger, mint))
-}
 
 }
 
