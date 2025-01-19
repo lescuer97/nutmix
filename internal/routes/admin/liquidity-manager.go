@@ -102,12 +102,12 @@ func SwapToLiquidRequest(logger *slog.Logger, mint *m.Mint, sdk *breez_sdk_liqui
 
 		uuid := uuid.New().String()
 		swap := utils.LiquiditySwap{
-			Amount:      amount,
-            LiquidAddress: &liquidAddress,
+			Amount:           amount,
+			LiquidAddress:    &liquidAddress,
 			LightningInvoice: res.Destination,
-			State:       utils.WaitingUserConfirmation,
-			Id:          uuid,
-			Type:        utils.LiquidityOut,
+			State:            utils.WaitingUserConfirmation,
+			Id:               uuid,
+			Type:             utils.LiquidityOut,
 		}
 
 		decodedInvoice, err := zpay32.Decode(res.Destination, mint.LightningBackend.GetNetwork())
@@ -159,11 +159,11 @@ func SwapToLightningRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		}
 		uuid := uuid.New().String()
 		swap := utils.LiquiditySwap{
-			Amount:      amount,
+			Amount:           amount,
 			LightningInvoice: resp.PaymentRequest,
-			State:       utils.MintWaitingPaymentRecv,
-			Id:          uuid,
-			Type:        utils.LiquidityIn,
+			State:            utils.MintWaitingPaymentRecv,
+			Id:               uuid,
+			Type:             utils.LiquidityIn,
 		}
 
 		decodedInvoice, err := zpay32.Decode(resp.PaymentRequest, mint.LightningBackend.GetNetwork())
@@ -233,9 +233,6 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			}
 		case utils.LiquidityOut:
 
-
-
-
 		}
 		err = mint.MintDB.ChangeLiquiditySwapState(swapId, swapRequest.State)
 		if err != nil {
@@ -284,7 +281,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 
 		fee := uint64(float64(swapRequest.Amount) * 0.10)
 
-        logger.Info(fmt.Sprintf("making payment to breez for exchange. %+v", swapRequest.LightningInvoice))
+		logger.Info(fmt.Sprintf("making payment to breez for exchange. %+v", swapRequest.LightningInvoice))
 		payment, err := mint.LightningBackend.PayInvoice(swapRequest.LightningInvoice, decodedInvoice, fee, false, 0)
 
 		// Hardened error handling
