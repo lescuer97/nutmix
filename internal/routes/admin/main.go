@@ -125,6 +125,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 		adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
 
 		adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(logger, mint))
+		go CheckStatusOfLiquiditySwaps(mint, logger)
 	}
 
 }

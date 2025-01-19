@@ -91,7 +91,7 @@ func SwapToLiquidRequest(logger *slog.Logger, mint *m.Mint, sdk *breez_sdk_liqui
 			return
 		}
 
-		address := c.PostForm("address")
+		liquidAddress := c.PostForm("address")
 
 		res, err := LightningToLiquidSwap(amount, sdk)
 		if err != nil {
@@ -103,7 +103,8 @@ func SwapToLiquidRequest(logger *slog.Logger, mint *m.Mint, sdk *breez_sdk_liqui
 		uuid := uuid.New().String()
 		swap := utils.LiquiditySwap{
 			Amount:      amount,
-			Destination: address,
+            LiquidAddress: &liquidAddress,
+			LightningInvoice: res.Destination,
 			State:       utils.WaitingUserConfirmation,
 			Id:          uuid,
 			Type:        utils.LiquidityOut,
@@ -126,7 +127,7 @@ func SwapToLiquidRequest(logger *slog.Logger, mint *m.Mint, sdk *breez_sdk_liqui
 		}
 
 		c.Header("HX-Replace-URL", "/admin/liquidity?swapForm=liquid&id="+uuid)
-		component := templates.LiquidSwapSummary(decodedInvoice.MilliSat.ToSatoshis().String(), string(amount), swap.Destination, uuid)
+		component := templates.LiquidSwapSummary(decodedInvoice.MilliSat.ToSatoshis().String(), string(amount), swap.LightningInvoice, uuid)
 
 		err = component.Render(ctx, c.Writer)
 		if err != nil {
@@ -159,7 +160,7 @@ func SwapToLightningRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		uuid := uuid.New().String()
 		swap := utils.LiquiditySwap{
 			Amount:      amount,
-			Destination: resp.PaymentRequest,
+			LightningInvoice: resp.PaymentRequest,
 			State:       utils.MintWaitingPaymentRecv,
 			Id:          uuid,
 			Type:        utils.LiquidityIn,
@@ -212,7 +213,7 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 
 		switch swapRequest.Type {
 		case utils.LiquidityIn:
-			decodedInvoice, err := zpay32.Decode(swapRequest.Destination, mint.LightningBackend.GetNetwork())
+			decodedInvoice, err := zpay32.Decode(swapRequest.LightningInvoice, mint.LightningBackend.GetNetwork())
 			if err != nil {
 				// If the fees are acceptable, continue to create the Receive Payment
 				c.Error(fmt.Errorf("zpay32.Decode(res.Destination, mint.LightningBackend.GetNetwork()). %w", err))
@@ -230,6 +231,11 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			case lightning.SETTLED:
 				swapRequest.State = utils.Finished
 			}
+		case utils.LiquidityOut:
+
+
+
+
 		}
 		err = mint.MintDB.ChangeLiquiditySwapState(swapId, swapRequest.State)
 		if err != nil {
@@ -269,7 +275,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 			return
 		}
 
-		decodedInvoice, err := zpay32.Decode(swapRequest.Destination, mint.LightningBackend.GetNetwork())
+		decodedInvoice, err := zpay32.Decode(swapRequest.LightningInvoice, mint.LightningBackend.GetNetwork())
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			c.Error(fmt.Errorf("zpay32.Decode(res.Destination) %w", err))
@@ -278,14 +284,15 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 
 		fee := uint64(float64(swapRequest.Amount) * 0.10)
 
-		payment, err := mint.LightningBackend.PayInvoice(swapRequest.Destination, decodedInvoice, fee, false, 0)
+        logger.Info(fmt.Sprintf("making payment to breez for exchange. %+v", swapRequest.LightningInvoice))
+		payment, err := mint.LightningBackend.PayInvoice(swapRequest.LightningInvoice, decodedInvoice, fee, false, 0)
 
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN {
 			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
 
 			// if exception of lightning payment says fail do a payment status recheck.
-			status, _, err := mint.LightningBackend.CheckPayed(swapRequest.Destination)
+			status, _, err := mint.LightningBackend.CheckPayed(swapRequest.LightningInvoice)
 
 			// if error on checking payement we will save as pending and returns status
 			if err != nil {
@@ -325,7 +332,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 		}
 
 		// change swap to waiting for chain confirmations
-		component := templates.SwapState(string(utils.WaitingBoltzTXConfirmations), swapId)
+		component := templates.SwapState(string(swapRequest.State), swapId)
 
 		err = component.Render(ctx, c.Writer)
 		if err != nil {

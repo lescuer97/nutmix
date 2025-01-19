@@ -6,7 +6,6 @@ import (
 )
 
 type SwapState string
-
 const WaitingBoltzTXConfirmations SwapState = "WaitingBoltzTXConfirmations"
 const BoltzWaitingPayment SwapState = "BoltzWaitingPayment"
 const WaitingUserConfirmation SwapState = "WaitingUserConfirmation"
@@ -17,6 +16,12 @@ const Finished SwapState = "Finished"
 const Expired SwapState = "Expired"
 const LightnigPaymentFail SwapState = "LightnigPaymentFail"
 const UnknownProblem SwapState = "UnknownProblem"
+
+
+func SwapStateToString() string {
+
+
+}
 
 type SwapType string
 
@@ -49,8 +54,9 @@ func GetBreezLiquid(chain *chaincfg.Params) breez_sdk_liquid.LiquidNetwork {
 type LiquiditySwap struct {
 	Amount      uint64    `json"amount"`
 	Id          string    `json"id"`
-	Destination string    `json"destination"`
 	State       SwapState `json"state"`
 	Type        SwapType  `json"type"`
 	Expiration  uint64    `json"expiration"`
+    LightningInvoice string    `db:"lightning_invoice"`
+    LiquidAddress *string    `db:"liquid_address,omitempty"`
 }

@@ -1,11 +1,12 @@
 -- +goose Up
 CREATE TABLE liquidity_swaps(
-    Amount INTEGER,
-    Id TEXT,
-    Destination TEXT,
-    State TEXT,
-    Type TEXT,
-	Expiration int4 NOT NULL
+    amount INTEGER,
+    id TEXT,
+    state TEXT,
+    type TEXT,
+	expiration int4 NOT NULL,
+    lightning_invoice TEXT NOT NULL,
+    liquid_address TEXT
 );
 
 
