@@ -9,25 +9,41 @@
 .liquidity-dashboard .actions-container {
   display: flex;
   flex-direction: column;
-  padding: 20px;
   max-width: 50%;
   background-color: var(--color-surface-200);
   border: 1px solid var(--white);
   align-self: center;
+  word-wrap: break-word;
   }
+
 .liquidity-dashboard .swap-list {
   display: flex;
   flex-direction: column;
-  max-width: 50%;
   background-color: var(--color-surface-200);
-  border: 1px solid var(--white);
   align-self: center;
+  max-height: 600px;
+  overflow-y: auto;
   }
 
 .liquidity-actions {
     display: flex;
     gap: 15px;
+    padding: 20px;
 
+}
+
+.invoice-input {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+
+    min-width: 400px;
+    min-height: 120px;
+}
+.invoice-input textarea {
+    width: 100%;
+    height: 100%;
 }
 
 .swap-form {

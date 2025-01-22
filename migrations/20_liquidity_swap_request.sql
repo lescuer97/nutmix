@@ -5,8 +5,7 @@ CREATE TABLE liquidity_swaps(
     state TEXT,
     type TEXT,
 	expiration int4 NOT NULL,
-    lightning_invoice TEXT NOT NULL,
-    liquid_address TEXT
+    lightning_invoice TEXT NOT NULL
 );
 
 

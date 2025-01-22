@@ -15,10 +15,10 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 	for {
 
-		swaps, err := mint.MintDB.GetLiquiditySwapsByStates([]utils.SwapState{utils.WaitingBoltzTXConfirmations,
-			utils.BoltzWaitingPayment,
+		swaps, err := mint.MintDB.GetLiquiditySwapsByStates([]utils.SwapState{
 			utils.MintWaitingPaymentRecv,
 			utils.LightnigPaymentFail,
+			utils.LightnigPaymentPending,
 			utils.UnknownProblem,
 		})
 		if err != nil {
@@ -73,6 +73,8 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 				switch status {
 				case lightning.SETTLED:
 					swap.State = utils.Finished
+				case lightning.PENDING:
+					swap.State = utils.LightnigPaymentPending
 				case lightning.FAILED:
 					swap.State = utils.LightnigPaymentFail
 				}

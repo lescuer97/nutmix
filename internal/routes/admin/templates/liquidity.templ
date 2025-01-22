@@ -1,9 +1,9 @@
 package templates 
 
-import ("github.com/lescuer97/nutmix/internal/utils"
-"time"
-"strconv"
-
+import (
+	"github.com/lescuer97/nutmix/internal/utils"
+	"strconv"
+	"time"
 )
 
 templ LiquidityButton() {
@@ -25,121 +25,117 @@ templ LiquidityDashboard(swapForm string, nodeBalance string) {
 						hx-get="/admin/liquid-swap-form"
 						hx-target=".active-swaps"
 						hx-swap="innerHTML"
-						hx-push-url="/admin/liquidity?swapForm=liquid"
+						hx-push-url="/admin/liquidity?swapForm=out"
 						type="button"
 					>
-						Swap To Liquid
+						Send funds out
 					</button>
 					<button
 						hx-get="/admin/lightning-swap-form"
 						hx-target=".active-swaps"
 						hx-swap="innerHTML"
-						hx-push-url="/admin/liquidity?swapForm=lightning"
+						hx-push-url="/admin/liquidity?swapForm=in"
 						type="button"
-					>Swap To Mint's ligthning node</button>
+					>Send funds to mint</button>
 				</div>
 				<div class="active-swaps">
 					switch  swapForm {
-						case "liquid":
-							@LiquidSwapBoltzPostForm(nodeBalance)
-						case "lightning":
-							@LightningSwapBoltz()
+						case "out":
+							@SwapOutPostForm(nodeBalance)
+						case "in":
+							@SwapInPostForm()
 						default:
-							<h3>Swaps</h3>
-							<div></div>
+							<h3 style="padding-left: 15px;">List of Liquidity Movements</h3>
+							<div
+								hx-get="/admin/swaps-list"
+								hx-trigger="load"
+								class="swap-list"
+								hx-swap="innerHTML"
+							></div>
 					}
 				</div>
 			</div>
-					<div
-						hx-get="/admin/swaps-list"
-                        hx-trigger="load"
-                        class="swap-list"
-						hx-swap="innerHTML"
-					>
-					</div>
 		</main>
 	}
 }
 
-
 templ ListOfSwaps(swaps []utils.LiquiditySwap) {
-		<table class="">
-			<thead>
+	<table class="">
+		<thead>
+			<tr>
+				<th class="level" scope="col">Amount (sats)</th>
+				<th scope="col">Type</th>
+				<th scope="col">Expiration</th>
+				<th scope="col">State</th>
+			</tr>
+		</thead>
+		<tbody>
+			for _, item := range swaps {
+				{{ unixTime := time.Unix(int64(item.Expiration), 0) }}
+				{{ amount := strconv.FormatUint(item.Amount, 10) }}
+				{{ liquidityType := string(item.Type) }}
+				{{ state := string(item.State) }}
+				{{ url := "liquidity/" + item.Id }}
 				<tr>
-					<th class="level" scope="col">Amount (sats)</th>
-					<th scope="col">Type</th>
-					<th scope="col">Expiration</th>
-					<th scope="col">State</th>
+					<th scope="row">{ amount }</th>
+					<td class="request-row">{ liquidityType }</td>
+					<td class="time">{ unixTime.Format(time.UnixDate) }</td>
+					<td class="request-row">{ state }</td>
+					<td class="request-row"><a href={ templ.URL(url) }>INFO</a></td>
 				</tr>
-			</thead>
-			<tbody>
-				for _, item := range swaps {
-                    {{ unixTime := time.Unix(int64(item.Expiration), 0) }}
-                    {{ amount := strconv.FormatUint(item.Amount, 10) }}
-                    {{ liquidityType := string(item.Type)}}
-                    {{ state := string(item.State)}}
-					<tr>
-						<th scope="row">{ amount }</th>
-						<td class="request-row">{ liquidityType }</td>
-						<td class="time">{ unixTime.Format(time.UnixDate) }</td>
-						<td class="request-row">{ state }</td>
-					</tr>
-				}
-			</tbody>
-		</table>
+			}
+		</tbody>
+	</table>
 }
 
-
-templ LiquidSwapBoltzPostForm(nodeBalance string) {
+templ SwapOutPostForm(nodeBalance string) {
 	<form
 		class="swap-form"
-		hx-post="/admin/liquid-swap-req"
-		hx-target=".active-swaps"
+		hx-post="/admin/out-swap-req"
+		hx-target=".actions-container"
 		hx-swap="innerHTML"
 	>
-		<h3>Swap Lightning to Liquid</h3>
+		<h3>Move funds out</h3>
 		<h4>Node Balance: { nodeBalance }</h4>
-		<label for="address">
-			Liquid Address
-			<input required name="address" type="text"/>
+		<label class="invoice-input" for="invoice">
+			Lightning Invoice to pay
+			<textarea required name="invoice" type="text"></textarea>
 		</label>
-		<label for="amount">
-			Amount (Sats)
-			<input required name="amount" type="number"/>
-		</label>
-		<button hx-disabled-elt="this" type="submit">Move to Liquid</button>
+		<button hx-disabled-elt="this" type="submit">Move funds out of mint</button>
 	</form>
 }
 
-templ LightningSwapBoltz() {
+templ SwapInPostForm() {
 	<form
 		class="swap-form"
-		hx-post="/admin/lightning-swap-req"
-		hx-target=".active-swaps"
+		hx-post="/admin/in-swap-req"
+		hx-target=".actions-container"
 		hx-swap="innerHTML"
 	>
-		<h3>Swap Liquid to Lightning</h3>
+		<h3>Move fund into Mint</h3>
 		<label for="amount">
 			Amount (SATS)
 			<input required name="amount" min="1" type="number"/>
 		</label>
-		<button hx-disabled-elt="this" type="submit">Move to Mint's node</button>
+		<button hx-disabled-elt="this" type="submit">Move funds into mint</button>
 	</form>
 }
 
-templ LightningSwapSummary(recieveSats string, address string, swapId string) {
-	<h3>Send To Liquid Address</h3>
+templ LightningReceiveSummary(recieveSats string, address string, swapId string) {
+	<h3>Liquidity In</h3>
 	<div>
-		Fees of the Swap
 		<p>
-			Receive:  { recieveSats } Sats
+			Please pay this invoice: 
 		</p>
 		<p>
-			Please pay this address:  { address }
+			{ address }
+		</p>
+		<p>
+			For receiving:  { recieveSats }
 		</p>
 		<div
 			hx-get={ "/admin/swap/" + swapId }
-			hx-trigger="every 2s"
+			hx-trigger="load, every 2s"
 			hx-swap="innerHTML"
 			hx-target="this"
 			class="swap-state"
@@ -147,22 +143,18 @@ templ LightningSwapSummary(recieveSats string, address string, swapId string) {
 	</div>
 }
 
-templ LiquidSwapSummary(sendSats string, recieveSats string, address string, swapId string) {
-	<h3>Sending To Liquid Address</h3>
+templ LightningSendSummary(recieveSats string, address string, swapId string) {
 	<div>
-		Swap Numbers
+		<h3>Liquidity Out</h3>
 		<p>
-			SwapId:  { swapId }
+			Please confirm you want to send:  { recieveSats } Sats. To this invoice:
 		</p>
 		<p>
-			sends:  { sendSats } Sats
-		</p>
-		<p>
-			Receives:  { recieveSats } Sats
+			{ address }
 		</p>
 		<div
 			hx-get={ "/admin/swap/" + swapId }
-			hx-trigger="every 2s"
+			hx-trigger="load, every 2s"
 			hx-swap="innerHTML"
 			hx-target="this"
 			class="swap-state"
@@ -172,18 +164,28 @@ templ LiquidSwapSummary(sendSats string, recieveSats string, address string, swa
 
 templ SwapState(state string, swapId string) {
 	<div class="state">
-		if state == "WaitingUserConfirmation" {
-			<form
-				hx-post={ "/admin/swap/" + swapId + "/confirm" }
-				hx-swap="innerHTML"
-				hx-target=".swap-state"
-			>
-				<button hx-disabled-elt="this" type="submit">Confirm Swap</button>
-			</form>
-		}
 		<h3>Swap State</h3>
 		<div>
 			Current state: { state }
 		</div>
+		if state == "WaitingUserConfirmation" {
+			<form
+				hx-post={ "/admin/swap/" + swapId + "/confirm" }
+				hx-swap="outerHTML"
+				hx-target=".state"
+			>
+				<button hx-disabled-elt="this" type="submit">Confirm Swap</button>
+			</form>
+		}
 	</div>
+}
+
+templ SwapStatusPage(summary templ.Component) {
+	@Layout() {
+		<main class="liquidity-dashboard">
+			<div class="actions-container">
+				@summary
+			</div>
+		</main>
+	}
 }

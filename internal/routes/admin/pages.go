@@ -4,7 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strconv"
 
+	"github.com/a-h/templ"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
@@ -97,6 +99,36 @@ func LigthningLiquidityPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFun
 		}
 
 		err = templates.LiquidityDashboard(c.Query("swapForm"), string(milillisatBalance/1000)).Render(ctx, c.Writer)
+
+		if err != nil {
+			c.Error(err)
+			// c.HTML(400,"", nil)
+			return
+		}
+	}
+}
+
+func SwapStatusPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+
+		swapId := c.Param("swapId")
+		swap, err := mint.MintDB.GetLiquiditySwapById(swapId)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		amount := strconv.FormatUint(swap.Amount, 10)
+		var component templ.Component
+		switch swap.Type {
+		case utils.LiquidityIn:
+			component = templates.LightningReceiveSummary(amount, swap.LightningInvoice, swap.Id)
+		case utils.LiquidityOut:
+			component = templates.LightningSendSummary(amount, swap.LightningInvoice, swap.Id)
+
+		}
+
+		err = templates.SwapStatusPage(component).Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(err)

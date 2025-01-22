@@ -7,20 +7,15 @@ import (
 
 type SwapState string
 
-const WaitingBoltzTXConfirmations SwapState = "WaitingBoltzTXConfirmations"
-const BoltzWaitingPayment SwapState = "BoltzWaitingPayment"
 const WaitingUserConfirmation SwapState = "WaitingUserConfirmation"
-
 const MintWaitingPaymentRecv SwapState = "MintWaitingPaymentRecv"
 
 const Finished SwapState = "Finished"
 const Expired SwapState = "Expired"
 const LightnigPaymentFail SwapState = "LightnigPaymentFail"
+const LightnigPaymentPending SwapState = "LightnigPaymentPending"
+const LightnigPaymentExpired SwapState = "LightnigPaymentExpired"
 const UnknownProblem SwapState = "UnknownProblem"
-
-func SwapStateToString() string {
-
-}
 
 type SwapType string
 
@@ -57,5 +52,4 @@ type LiquiditySwap struct {
 	Type             SwapType  `json"type"`
 	Expiration       uint64    `json"expiration"`
 	LightningInvoice string    `db:"lightning_invoice"`
-	LiquidAddress    *string   `db:"liquid_address,omitempty"`
 }
