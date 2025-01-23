@@ -9,8 +9,9 @@ import (
 templ LiquidityButton() {
 	<a
 		href="/admin/liquidity"
+        class="action-button"
 	>
-		Manage liquidity
+		Manage node's liquidity
 	</a>
 }
 
@@ -45,7 +46,7 @@ templ LiquidityDashboard(swapForm string, nodeBalance string) {
 						case "in":
 							@SwapInPostForm()
 						default:
-							<h3 style="padding-left: 15px;">List of Liquidity Movements</h3>
+							<h3 style="margin-left: 15px;">List of Liquidity Movements</h3>
 							<div
 								hx-get="/admin/swaps-list"
 								hx-trigger="load"
@@ -67,14 +68,15 @@ templ ListOfSwaps(swaps []utils.LiquiditySwap) {
 				<th scope="col">Type</th>
 				<th scope="col">Expiration</th>
 				<th scope="col">State</th>
+				<th scope="col"></th>
 			</tr>
 		</thead>
 		<tbody>
 			for _, item := range swaps {
 				{{ unixTime := time.Unix(int64(item.Expiration), 0) }}
 				{{ amount := strconv.FormatUint(item.Amount, 10) }}
-				{{ liquidityType := string(item.Type) }}
-				{{ state := string(item.State) }}
+				{{ liquidityType := item.Type.ToString() }}
+				{{ state := item.State.ToString() }}
 				{{ url := "liquidity/" + item.Id }}
 				<tr>
 					<th scope="row">{ amount }</th>
@@ -122,8 +124,8 @@ templ SwapInPostForm() {
 }
 
 templ LightningReceiveSummary(recieveSats string, address string, swapId string) {
-	<h3>Liquidity In</h3>
-	<div>
+	<h3 style="margin-left: 15px;">Liquidity In</h3>
+	<div class="summary">
 		<p>
 			Please pay this invoice: 
 		</p>
@@ -145,7 +147,9 @@ templ LightningReceiveSummary(recieveSats string, address string, swapId string)
 
 templ LightningSendSummary(recieveSats string, address string, swapId string) {
 	<div>
-		<h3>Liquidity Out</h3>
+		<h3 style="margin-left: 15px;">Liquidity Out</h3>
+
+        <div class="summary">
 		<p>
 			Please confirm you want to send:  { recieveSats } Sats. To this invoice:
 		</p>
@@ -159,6 +163,7 @@ templ LightningSendSummary(recieveSats string, address string, swapId string) {
 			hx-target="this"
 			class="swap-state"
 		></div>
+        </div>
 	</div>
 }
 
@@ -166,15 +171,16 @@ templ SwapState(state string, swapId string) {
 	<div class="state">
 		<h3>Swap State</h3>
 		<div>
-			Current state: { state }
+			Current state: <b> { state } </b>
 		</div>
-		if state == "WaitingUserConfirmation" {
+		if state == "Waiting for confirmation" {
 			<form
 				hx-post={ "/admin/swap/" + swapId + "/confirm" }
 				hx-swap="outerHTML"
 				hx-target=".state"
+                hx-disabled-elt="find button"
 			>
-				<button hx-disabled-elt="this" type="submit">Confirm Swap</button>
+				<button style="margin-top: 10px;" hx-disabled-elt="this" type="submit">Confirm Swap</button>
 			</form>
 		}
 	</div>

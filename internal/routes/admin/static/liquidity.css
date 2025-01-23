@@ -14,6 +14,7 @@
   border: 1px solid var(--white);
   align-self: center;
   word-wrap: break-word;
+  padding: 20px;
   }
 
 .liquidity-dashboard .swap-list {
@@ -29,7 +30,7 @@
     display: flex;
     gap: 15px;
     padding: 20px;
-
+    justify-content: center;
 }
 
 .invoice-input {
@@ -61,4 +62,34 @@
   word-wrap: break-word;
   /* border-radius: 15px; */
   /* border: 2px solid #020000; */
+}
+
+.summary {
+    padding: 20px;
+}
+
+.action-button {
+    background-color: var(--darkreader-inline-bgcolor);
+    color: var(--white);
+    padding: 15px 20px;
+    border-radius: 50px;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 1px;
+    border: 0px;
+    height: max-content;
+    align-self: center
+}
+
+.action-button:hover {
+    background-color: #0056b3;
+}
+
+.action-button:active {
+    transform: translateY(1px);
+}
+
+.action-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
 }

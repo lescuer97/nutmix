@@ -5,6 +5,7 @@ mint/main
 env/
 tmp/
 *_templ.go
+*_templ.txt
 *_gen.go
 
 #breez sdk info

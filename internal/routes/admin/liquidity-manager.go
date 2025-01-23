@@ -225,7 +225,7 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		component := templates.SwapState(string(swapRequest.State), swapId)
+		component := templates.SwapState(swapRequest.State.ToString(), swapId)
 
 		err = component.Render(ctx, c.Writer)
 		if err != nil {
@@ -247,6 +247,18 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 		swapRequest, err := mint.MintDB.GetLiquiditySwapById(swapId)
 		if err != nil {
 			c.Error(errors.New("mint.MintDB.GetLiquiditySwapById(swapId)"))
+			return
+		}
+
+		if swapRequest.State != utils.WaitingUserConfirmation {
+			c.Error(fmt.Errorf("Can't pay lightning invoice %w", utils.ErrAlreadyLNPaying))
+			return
+		}
+
+		swapRequest.State = utils.LightningPaymentPending
+		err = mint.MintDB.ChangeLiquiditySwapState(swapId, swapRequest.State)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.ChangeLiquiditySwapState(swapId, swapRequest.State). %w", err))
 			return
 		}
 
@@ -283,7 +295,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 			switch status {
 			// halt transaction and return a pending state
 			case lightning.PENDING, lightning.SETTLED:
-				swapRequest.State = utils.LightnigPaymentPending
+				swapRequest.State = utils.LightningPaymentPending
 				// change melt request state
 				err = mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, swapRequest.State)
 				if err != nil {
@@ -294,7 +306,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 
 			// finish failure and release the proofs
 			case lightning.FAILED, lightning.UNKNOWN:
-				swapRequest.State = utils.LightnigPaymentFail
+				swapRequest.State = utils.LightningPaymentFail
 				err = mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, swapRequest.State)
 				if err != nil {
 					logger.Error(fmt.Errorf("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail): %w", err).Error())
@@ -311,7 +323,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 		}
 
 		// change swap to waiting for chain confirmations
-		component := templates.SwapState(string(swapRequest.State), swapId)
+		component := templates.SwapState(swapRequest.State.ToString(), swapId)
 
 		err = component.Render(ctx, c.Writer)
 		if err != nil {

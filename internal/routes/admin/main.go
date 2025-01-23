@@ -3,15 +3,16 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+	"log/slog"
+	"os"
+	"slices"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"log/slog"
-	"os"
-	"slices"
-	"time"
 )
 
 type ErrorNotif struct {
