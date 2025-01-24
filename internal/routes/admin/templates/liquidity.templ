@@ -123,7 +123,7 @@ templ SwapInPostForm() {
 	</form>
 }
 
-templ LightningReceiveSummary(recieveSats string, address string, swapId string) {
+templ LightningReceiveSummary(recieveSats string, address string, qrCode string, swapId string) {
 	<h3 style="margin-left: 15px;">Liquidity In</h3>
 	<div class="summary">
 		<p>
@@ -135,6 +135,7 @@ templ LightningReceiveSummary(recieveSats string, address string, swapId string)
 		<p>
 			For receiving:  { recieveSats }
 		</p>
+        @QRCode(qrCode)
 		<div
 			hx-get={ "/admin/swap/" + swapId }
 			hx-trigger="load, every 2s"
@@ -194,4 +195,8 @@ templ SwapStatusPage(summary templ.Component) {
 			</div>
 		</main>
 	}
+}
+// QR component
+templ QRCode(qrData string) {
+    <img src={"data:image/png;base64,"+qrData} alt="QR Code"/>
 }

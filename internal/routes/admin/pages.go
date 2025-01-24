@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
@@ -119,10 +120,17 @@ func SwapStatusPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 			return
 		}
 		amount := strconv.FormatUint(swap.Amount, 10)
+		// generate qrCode
+		qrcode, err := generateQR(swap.LightningInvoice)
+		if err != nil {
+			c.Error(fmt.Errorf("generateQR(swap.LightningInvoice). %w", err))
+			return
+		}
+
 		var component templ.Component
 		switch swap.Type {
 		case utils.LiquidityIn:
-			component = templates.LightningReceiveSummary(amount, swap.LightningInvoice, swap.Id)
+			component = templates.LightningReceiveSummary(amount, swap.LightningInvoice, qrcode, swap.Id)
 		case utils.LiquidityOut:
 			component = templates.LightningSendSummary(amount, swap.LightningInvoice, swap.Id)
 

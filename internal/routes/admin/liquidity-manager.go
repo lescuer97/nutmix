@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 func LiquidityButton(logger *slog.Logger) gin.HandlerFunc {
@@ -170,8 +172,15 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 
 		amountConverted := strconv.FormatUint(swap.Amount, 10)
 
+		// generate qrCode
+		qrcode, err := generateQR(swap.LightningInvoice)
+		if err != nil {
+			c.Error(fmt.Errorf("generateQR(swap.LightningInvoice). %w", err))
+			return
+		}
+
 		c.Header("HX-Replace-URL", "/admin/liquidity/"+uuid)
-		component := templates.LightningReceiveSummary(amountConverted, swap.LightningInvoice, swap.Id)
+		component := templates.LightningReceiveSummary(amountConverted, swap.LightningInvoice, qrcode, swap.Id)
 
 		err = component.Render(ctx, c.Writer)
 		if err != nil {
@@ -271,7 +280,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 
 		fee := uint64(float64(swapRequest.Amount) * 0.10)
 
-		logger.Info(fmt.Sprintf("making payment to breez for exchange. %+v", swapRequest.LightningInvoice))
+		logger.Info(fmt.Sprintf("making payment to invoice: %+v", swapRequest.LightningInvoice))
 		payment, err := mint.LightningBackend.PayInvoice(swapRequest.LightningInvoice, decodedInvoice, fee, false, 0)
 
 		// Hardened error handling
@@ -333,4 +342,15 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 
 		return
 	}
+}
+func generateQR(data string) (string, error) {
+	qr, err := qrcode.New(data, qrcode.Medium)
+	if err != nil {
+		return "", err
+	}
+	png, err := qr.PNG(256)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(png), nil
 }
