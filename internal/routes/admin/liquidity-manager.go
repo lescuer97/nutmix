@@ -47,7 +47,7 @@ func SwapOutForm(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 				"mint.LightningComs.WalletBalance()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			c.Error(err)
+			c.Error(fmt.Errorf("mint.LightningComs.WalletBalance(). %w", err))
 			return
 		}
 
@@ -91,6 +91,7 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			log.Printf("\n zpay32.Decode(res.Destination) %+v \n", err)
+			c.Error(fmt.Errorf("\n zpay32.Decode(res.Destination) %+v \n", err))
 			return
 		}
 
@@ -110,6 +111,7 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			log.Printf("\n Could not add swap request %+v \n", err)
+			c.Error(fmt.Errorf("\n Could not add swap request %+v \n", err))
 			return
 		}
 
@@ -157,6 +159,7 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			log.Printf("\n zpay32.Decode(resp.PaymentRequest, %+v \n", err)
+			c.Error(fmt.Errorf("\n zpay32.Decode(resp.PaymentRequest, %+v \n", err))
 			return
 		}
 
@@ -167,6 +170,7 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			log.Printf("\n Could not add swap request %+v \n", err)
+			c.Error(fmt.Errorf("\n Could not add swap request %+v \n", err))
 			return
 		}
 
@@ -195,7 +199,6 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
-
 		// only needs the amount and we generate an invoice from the mint directly
 		swapId := c.Param("swapId")
 
