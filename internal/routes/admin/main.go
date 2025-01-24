@@ -3,6 +3,8 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"slices"
@@ -19,6 +21,36 @@ type ErrorNotif struct {
 	Error string
 }
 
+func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+
+		if len(c.Errors) > 0 {
+			message := "Unknown Problem"
+			for _, e := range c.Errors {
+				switch {
+				case errors.Is(e, utils.ErrAlreadyLNPaying):
+					message = "Error paying invoice"
+					return
+				case errors.Is(e, ErrInvalidNostrKey):
+					message = "Nostr npub is not valid"
+					return
+
+				}
+
+			}
+
+			logger.Error(fmt.Sprintf("Error from calls: %+v", c.Errors.String()))
+			component := templates.ErrorNotif(message)
+			err := component.Render(c.Request.Context(), c.Writer)
+			if err != nil {
+				logger.Error(fmt.Sprintf("could not render error notification: %+v", err))
+				return
+			}
+		}
+
+	}
+}
 func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	testPath := os.Getenv("TEST_PATH")
 	if testPath != "" {
@@ -31,6 +63,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 
 	}
 	adminRoute := r.Group("/admin")
+
+	adminRoute.Use(ErrorHtmlMessageMiddleware(logger))
 	// I use the first active keyset as secret for jwt token signing
 	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
 

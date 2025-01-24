@@ -9,7 +9,7 @@ import (
 templ LiquidityButton() {
 	<a
 		href="/admin/liquidity"
-        class="action-button"
+		class="action-button"
 	>
 		Manage node's liquidity
 	</a>
@@ -135,7 +135,7 @@ templ LightningReceiveSummary(recieveSats string, address string, qrCode string,
 		<p>
 			For receiving:  { recieveSats }
 		</p>
-        @QRCode(qrCode)
+		@QRCode(qrCode)
 		<div
 			hx-get={ "/admin/swap/" + swapId }
 			hx-trigger="load, every 2s"
@@ -149,22 +149,21 @@ templ LightningReceiveSummary(recieveSats string, address string, qrCode string,
 templ LightningSendSummary(recieveSats string, address string, swapId string) {
 	<div>
 		<h3 style="margin-left: 15px;">Liquidity Out</h3>
-
-        <div class="summary">
-		<p>
-			Please confirm you want to send:  { recieveSats } Sats. To this invoice:
-		</p>
-		<p>
-			{ address }
-		</p>
-		<div
-			hx-get={ "/admin/swap/" + swapId }
-			hx-trigger="load, every 2s"
-			hx-swap="innerHTML"
-			hx-target="this"
-			class="swap-state"
-		></div>
-        </div>
+		<div class="summary">
+			<p>
+				Please confirm you want to send:  { recieveSats } Sats. To this invoice:
+			</p>
+			<p>
+				{ address }
+			</p>
+			<div
+				hx-get={ "/admin/swap/" + swapId }
+				hx-trigger="load, every 2s"
+				hx-swap="innerHTML"
+				hx-target="this"
+				class="swap-state"
+			></div>
+		</div>
 	</div>
 }
 
@@ -172,14 +171,14 @@ templ SwapState(state string, swapId string) {
 	<div class="state">
 		<h3>Swap State</h3>
 		<div>
-			Current state: <b> { state } </b>
+			Current state: <b>{ state } </b>
 		</div>
 		if state == "Waiting for confirmation" {
 			<form
 				hx-post={ "/admin/swap/" + swapId + "/confirm" }
 				hx-swap="outerHTML"
 				hx-target=".state"
-                hx-disabled-elt="find button"
+				hx-disabled-elt="find button"
 			>
 				<button style="margin-top: 10px;" hx-disabled-elt="this" type="submit">Confirm Swap</button>
 			</form>
@@ -196,7 +195,8 @@ templ SwapStatusPage(summary templ.Component) {
 		</main>
 	}
 }
+
 // QR component
 templ QRCode(qrData string) {
-    <img src={"data:image/png;base64,"+qrData} alt="QR Code"/>
+	<img src={ "data:image/png;base64," + qrData } alt="QR Code"/>
 }
