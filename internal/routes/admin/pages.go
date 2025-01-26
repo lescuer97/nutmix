@@ -98,8 +98,9 @@ func LigthningLiquidityPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFun
 			// c.HTML(400,"", nil)
 			return
 		}
+		amount := strconv.FormatUint(milillisatBalance/1000, 10)
 
-		err = templates.LiquidityDashboard(c.Query("swapForm"), string(milillisatBalance/1000)).Render(ctx, c.Writer)
+		err = templates.LiquidityDashboard(c.Query("swapForm"), amount).Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(err)

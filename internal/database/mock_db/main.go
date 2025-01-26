@@ -19,6 +19,7 @@ type MockDB struct {
 	MintRequest   []cashu.MintRequestDB
 	RecoverSigDB  []cashu.RecoverSigDB
 	NostrAuth     []database.NostrLoginAuth
+	LiquiditySwap []utils.LiquiditySwap
 	Seeds         []cashu.Seed
 	Config        utils.Config
 	ErrorToReturn error

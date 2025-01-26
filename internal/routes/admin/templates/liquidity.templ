@@ -74,6 +74,7 @@ templ ListOfSwaps(swaps []utils.LiquiditySwap) {
 		<tbody>
 			for _, item := range swaps {
 				{{ unixTime := time.Unix(int64(item.Expiration), 0) }}
+				{{ formattedDate := unixTime.Format(time.UnixDate) }}
 				{{ amount := strconv.FormatUint(item.Amount, 10) }}
 				{{ liquidityType := item.Type.ToString() }}
 				{{ state := item.State.ToString() }}
@@ -81,7 +82,7 @@ templ ListOfSwaps(swaps []utils.LiquiditySwap) {
 				<tr>
 					<th scope="row">{ amount }</th>
 					<td class="request-row">{ liquidityType }</td>
-					<td class="time">{ unixTime.Format(time.UnixDate) }</td>
+					<td class="time">{ formattedDate }</td>
 					<td class="request-row">{ state }</td>
 					<td class="request-row"><a href={ templ.URL(url) }>INFO</a></td>
 				</tr>
