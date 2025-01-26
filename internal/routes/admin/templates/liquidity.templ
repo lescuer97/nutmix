@@ -167,13 +167,15 @@ templ LightningSendSummary(recieveSats string, address string, swapId string) {
 	</div>
 }
 
-templ SwapState(state string, swapId string) {
+templ SwapState(state utils.SwapState, swapId string) {
+	{{ waitingConfirm := state == utils.WaitingUserConfirmation }}
+	{{ stringState := state.ToString() }}
 	<div class="state">
 		<h3>Swap State</h3>
 		<div>
-			Current state: <b>{ state } </b>
+			Current state: <b>{ stringState } </b>
 		</div>
-		if state == "Waiting for confirmation" {
+		if waitingConfirm {
 			<form
 				hx-post={ "/admin/swap/" + swapId + "/confirm" }
 				hx-swap="outerHTML"

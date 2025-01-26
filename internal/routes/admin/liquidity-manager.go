@@ -237,7 +237,7 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		component := templates.SwapState(swapRequest.State.ToString(), swapId)
+		component := templates.SwapState(swapRequest.State, swapId)
 
 		err = component.Render(ctx, c.Writer)
 		if err != nil {
@@ -335,7 +335,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 		}
 
 		// change swap to waiting for chain confirmations
-		component := templates.SwapState(swapRequest.State.ToString(), swapId)
+		component := templates.SwapState(swapRequest.State, swapId)
 
 		err = component.Render(ctx, c.Writer)
 		if err != nil {

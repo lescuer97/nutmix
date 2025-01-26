@@ -5,7 +5,6 @@ go 1.22.1
 require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/a-h/templ v0.2.793
-	github.com/breez/breez-sdk-liquid-go v0.5.1
 	github.com/btcsuite/btcd v0.24.2-beta.rc1
 	github.com/btcsuite/btcd/btcec/v2 v2.3.3
 	github.com/btcsuite/btcd/btcutil v1.1.5
@@ -19,7 +18,6 @@ require (
 	github.com/lightningnetwork/lnd v0.17.4-beta.rc1
 	github.com/nbd-wtf/go-nostr v0.34.4
 	github.com/oapi-codegen/oapi-codegen/v2 v2.4.1
-	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pressly/goose/v3 v3.20.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/testcontainers/testcontainers-go v0.31.0
@@ -38,7 +36,6 @@ require (
 	github.com/Microsoft/hcsshim v0.11.4 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/aead/siphash v1.0.1 // indirect
-	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd/btcutil/psbt v1.1.9 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect

@@ -3,7 +3,6 @@ package utils
 import (
 	"errors"
 
-	"github.com/breez/breez-sdk-liquid-go/breez_sdk_liquid"
 	"github.com/btcsuite/btcd/chaincfg"
 )
 
@@ -69,18 +68,6 @@ func CanUseLiquidityManager(chain *chaincfg.Params) bool {
 		return true
 	}
 	return false
-}
-
-func GetBreezLiquid(chain *chaincfg.Params) breez_sdk_liquid.LiquidNetwork {
-	switch chain {
-	case &chaincfg.MainNetParams:
-		return breez_sdk_liquid.LiquidNetworkMainnet
-	case &chaincfg.TestNet3Params:
-	default:
-		return breez_sdk_liquid.LiquidNetworkTestnet
-	}
-
-	return breez_sdk_liquid.LiquidNetworkTestnet
 }
 
 type LiquiditySwap struct {
