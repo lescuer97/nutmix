@@ -58,12 +58,12 @@ func (m *MockDB) GetMintMeltBalanceByTime(time int64) (database.MintMeltBalance,
 	}
 	return mintmeltbalance, nil
 }
-func (m *MockDB) AddLiquiditySwap(swap utils.LiquiditySwap) error {
+func (m *MockDB) AddLiquiditySwap(tx pgx.Tx, swap utils.LiquiditySwap) error {
 	m.LiquiditySwap = append(m.LiquiditySwap, swap)
 	return nil
 
 }
-func (m *MockDB) ChangeLiquiditySwapState(id string, state utils.SwapState) error {
+func (m *MockDB) ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.SwapState) error {
 	var liquiditySwaps []utils.LiquiditySwap
 	for i := 0; i < len(m.LiquiditySwap); i++ {
 		if m.LiquiditySwap[i].Id == id {
@@ -75,7 +75,7 @@ func (m *MockDB) ChangeLiquiditySwapState(id string, state utils.SwapState) erro
 	return nil
 }
 
-func (m *MockDB) GetLiquiditySwapById(id string) (utils.LiquiditySwap, error) {
+func (m *MockDB) GetLiquiditySwapById(tx pgx.Tx, id string) (utils.LiquiditySwap, error) {
 	var liquiditySwaps []utils.LiquiditySwap
 	for i := 0; i < len(m.LiquiditySwap); i++ {
 

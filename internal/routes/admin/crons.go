@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"context"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -14,6 +16,30 @@ import (
 func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 	for {
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			logger.Debug(
+				"Could not get db transactions",
+				slog.String(utils.LogExtraInfo, err.Error()),
+			)
+			return
+		}
+
+		defer func() {
+			if p := recover(); p != nil {
+				logger.Error("\n Rolling back  because of failure %+v\n", p)
+				tx.Rollback(ctx)
+			} else if err != nil {
+				logger.Error(fmt.Sprintf("\n Rolling back  because of failure %+v\n", err))
+				tx.Rollback(ctx)
+			} else {
+				err = tx.Commit(ctx)
+				if err != nil {
+					logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
+				}
+			}
+		}()
 
 		swaps, err := mint.MintDB.GetLiquiditySwapsByStates([]utils.SwapState{
 			utils.MintWaitingPaymentRecv,
@@ -42,7 +68,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 			now := time.Now().Unix()
 
 			if now > int64(swap.Expiration) {
-				err := mint.MintDB.ChangeLiquiditySwapState(swap.Id, utils.Expired)
+				err := mint.MintDB.ChangeLiquiditySwapState(tx, swap.Id, utils.Expired)
 				if err != nil {
 					logger.Warn(
 						"mint.MintDB.ChangeLiquiditySwapState(swap.Id,utils.Expired)",
@@ -79,7 +105,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 					swap.State = utils.LightningPaymentFail
 				}
 
-				err = mint.MintDB.ChangeLiquiditySwapState(swap.Id, swap.State)
+				err = mint.MintDB.ChangeLiquiditySwapState(tx, swap.Id, swap.State)
 				if err != nil {
 					logger.Warn(
 						"mint.MintDB.ChangeLiquiditySwapState(swap.Id,utils.Expired)",

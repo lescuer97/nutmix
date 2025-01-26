@@ -100,8 +100,8 @@ func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBal
 
 }
 
-func (pql Postgresql) AddLiquiditySwap(swap utils.LiquiditySwap) error {
-	_, err := pql.pool.Exec(context.Background(), "INSERT INTO liquidity_swaps (amount, id , lightning_invoice, state, type, expiration) VALUES ($1, $2, $3, $4, $5, $6)", swap.Amount, swap.Id, swap.LightningInvoice, swap.State, swap.Type, swap.Expiration)
+func (pql Postgresql) AddLiquiditySwap(tx pgx.Tx, swap utils.LiquiditySwap) error {
+	_, err := tx.Exec(context.Background(), "INSERT INTO liquidity_swaps (amount, id , lightning_invoice, state, type, expiration) VALUES ($1, $2, $3, $4, $5, $6)", swap.Amount, swap.Id, swap.LightningInvoice, swap.State, swap.Type, swap.Expiration)
 
 	if err != nil {
 		return databaseError(fmt.Errorf("INSERT INTO swap_request: %w", err))
@@ -109,8 +109,8 @@ func (pql Postgresql) AddLiquiditySwap(swap utils.LiquiditySwap) error {
 	}
 	return nil
 }
-func (pql Postgresql) ChangeLiquiditySwapState(id string, state utils.SwapState) error {
-	_, err := pql.pool.Exec(context.Background(), "UPDATE liquidity_swaps SET state = $1 WHERE id = $2", state, id)
+func (pql Postgresql) ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.SwapState) error {
+	_, err := tx.Exec(context.Background(), "UPDATE liquidity_swaps SET state = $1 WHERE id = $2", state, id)
 
 	if err != nil {
 		return databaseError(fmt.Errorf("INSERT INTO swap_request: %w", err))
@@ -137,10 +137,10 @@ func (pql Postgresql) GetLiquiditySwaps(swap utils.LiquiditySwap) ([]utils.Liqui
 	return swaps, nil
 }
 
-func (pql Postgresql) GetLiquiditySwapById(id string) (utils.LiquiditySwap, error) {
+func (pql Postgresql) GetLiquiditySwapById(tx pgx.Tx, id string) (utils.LiquiditySwap, error) {
 
 	var swaps utils.LiquiditySwap
-	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration FROM liquidity_swaps WHERE id = $1 ", id)
+	rows, err := tx.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration FROM liquidity_swaps WHERE id = $1 FOR UPDATE", id)
 	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)

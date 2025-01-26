@@ -117,7 +117,6 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 				if err != nil {
 					logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
 				}
-				fmt.Println("Key rotation finished successfully")
 			}
 		}()
 

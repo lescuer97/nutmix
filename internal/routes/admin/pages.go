@@ -115,7 +115,32 @@ func SwapStatusPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 		ctx := context.Background()
 
 		swapId := c.Param("swapId")
-		swap, err := mint.MintDB.GetLiquiditySwapById(swapId)
+		tx, err := mint.MintDB.GetTx(c.Request.Context())
+		if err != nil {
+			logger.Debug(
+				"Incorrect body",
+				slog.String(utils.LogExtraInfo, err.Error()),
+			)
+			c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
+			return
+		}
+
+		defer func() {
+			if p := recover(); p != nil {
+				logger.Error("\n Rolling back  because of failure %+v\n", p)
+				tx.Rollback(c.Request.Context())
+			} else if err != nil {
+				logger.Error(fmt.Sprintf("\n Rolling back  because of failure %+v\n", err))
+				tx.Rollback(c.Request.Context())
+			} else {
+				err = tx.Commit(c.Request.Context())
+				if err != nil {
+					logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
+				}
+				fmt.Println("Key rotation finished successfully")
+			}
+		}()
+		swap, err := mint.MintDB.GetLiquiditySwapById(tx, swapId)
 		if err != nil {
 			c.Error(err)
 			return
