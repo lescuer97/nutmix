@@ -22,6 +22,14 @@ jobs:
         run: |
           go version
 
+      - name: install templ
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+
+      - name: run templ build
+        run: |
+          templ generate .
+
       - name: Install dependencies
         run: go get -t ./... 
 
