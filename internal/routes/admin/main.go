@@ -55,7 +55,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 	testPath := os.Getenv("TEST_PATH")
 	if testPath != "" {
 		r.Static("static", testPath+"static")
-		r.LoadHTMLGlob(testPath + "templates/**")
+		r.LoadHTMLGlob(testPath + "templates/**.html")
 
 	} else {
 		r.Static("static", "internal/routes/admin/static")

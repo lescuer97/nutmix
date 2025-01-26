@@ -73,22 +73,26 @@ templ ListOfSwaps(swaps []utils.LiquiditySwap) {
 		</thead>
 		<tbody>
 			for _, item := range swaps {
-				{{ unixTime := time.Unix(int64(item.Expiration), 0) }}
-				{{ formattedDate := unixTime.Format(time.UnixDate) }}
-				{{ amount := strconv.FormatUint(item.Amount, 10) }}
-				{{ liquidityType := item.Type.ToString() }}
-				{{ state := item.State.ToString() }}
-				{{ url := "liquidity/" + item.Id }}
-				<tr>
-					<th scope="row">{ amount }</th>
-					<td class="request-row">{ liquidityType }</td>
-					<td class="time">{ formattedDate }</td>
-					<td class="request-row">{ state }</td>
-					<td class="request-row"><a href={ templ.URL(url) }>INFO</a></td>
-				</tr>
+				@ListItem(item)
 			}
 		</tbody>
 	</table>
+}
+
+templ ListItem(swap utils.LiquiditySwap) {
+	{{ unixTime := time.Unix(int64(swap.Expiration), 0) }}
+	{{ formattedDate := unixTime.Format(time.UnixDate) }}
+	{{ amount := strconv.FormatUint(swap.Amount, 10) }}
+	{{ liquidityType := swap.Type.ToString() }}
+	{{ state := swap.State.ToString() }}
+	{{ url := "liquidity/" + swap.Id }}
+	<tr>
+		<th scope="row">{ amount }</th>
+		<td class="request-row">{ liquidityType }</td>
+		<td class="time">{ formattedDate }</td>
+		<td class="request-row">{ state }</td>
+		<td class="request-row"><a href={ templ.URL(url) }>INFO</a></td>
+	</tr>
 }
 
 templ SwapOutPostForm(nodeBalance string) {
