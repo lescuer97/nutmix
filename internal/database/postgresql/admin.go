@@ -20,9 +20,9 @@ func (pql Postgresql) SaveNostrAuth(auth database.NostrLoginAuth) error {
 	return nil
 }
 
-func (pql Postgresql) UpdateNostrAuthActivation(nonce string, activated bool) error {
+func (pql Postgresql) UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error {
 	// change the paid status of the quote
-	_, err := pql.pool.Exec(context.Background(), "UPDATE nostr_login SET activated = $1 WHERE nonce = $2", activated, nonce)
+	_, err := tx.Exec(context.Background(), "UPDATE nostr_login SET activated = $1 WHERE nonce = $2", activated, nonce)
 	if err != nil {
 		return databaseError(fmt.Errorf("Update to seeds: %w", err))
 
@@ -30,8 +30,8 @@ func (pql Postgresql) UpdateNostrAuthActivation(nonce string, activated bool) er
 	return nil
 }
 
-func (pql Postgresql) GetNostrAuth(nonce string) (database.NostrLoginAuth, error) {
-	rows, err := pql.pool.Query(context.Background(), "SELECT nonce, activated, expiry FROM nostr_login WHERE nonce = $1", nonce)
+func (pql Postgresql) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLoginAuth, error) {
+	rows, err := tx.Query(context.Background(), "SELECT nonce, activated, expiry FROM nostr_login WHERE nonce = $1 FOR UPDATE", nonce)
 	defer rows.Close()
 	if err != nil {
 		return database.NostrLoginAuth{}, fmt.Errorf("Error checking for Active seeds: %w", err)

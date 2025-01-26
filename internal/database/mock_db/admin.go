@@ -1,23 +1,30 @@
 package mockdb
 
 import (
+	"context"
 	"slices"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
+func (m *MockDB) GetTx(ctx context.Context) (pgx.Tx, error) {
+	return &pgxpool.Tx{}, nil
+
+}
 func (m *MockDB) SaveNostrAuth(auth database.NostrLoginAuth) error {
 	return nil
 
 }
 
-func (m *MockDB) UpdateNostrAuthActivation(nonce string, activated bool) error {
+func (m *MockDB) UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error {
 	return nil
 }
 
-func (m *MockDB) GetNostrAuth(nonce string) (database.NostrLoginAuth, error) {
+func (m *MockDB) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLoginAuth, error) {
 	var seeds []database.NostrLoginAuth
 	for i := 0; i < len(m.NostrAuth); i++ {
 

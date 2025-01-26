@@ -1,8 +1,10 @@
 package database
 
 import (
+	"context"
 	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
@@ -27,6 +29,7 @@ const (
 )
 
 type MintDB interface {
+	GetTx(ctx context.Context) (pgx.Tx, error)
 
 	/// Calls for the Functioning of the mint
 	GetAllSeeds() ([]cashu.Seed, error)
@@ -61,10 +64,10 @@ type MintDB interface {
 	GetMintMeltBalanceByTime(time int64) (MintMeltBalance, error)
 
 	SaveNostrAuth(auth NostrLoginAuth) error
-	UpdateNostrAuthActivation(nonce string, activated bool) error
-	GetNostrAuth(nonce string) (NostrLoginAuth, error)
+	UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error
+	GetNostrAuth(tx pgx.Tx, nonce string) (NostrLoginAuth, error)
 
-	// start transaction
+	// liquidity swaps
 	AddLiquiditySwap(utils.LiquiditySwap) error
 	GetLiquiditySwapById(id string) (utils.LiquiditySwap, error)
 	ChangeLiquiditySwapState(id string, state utils.SwapState) error

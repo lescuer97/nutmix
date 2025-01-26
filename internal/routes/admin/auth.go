@@ -95,7 +95,33 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		nostrLogin, err := mint.MintDB.GetNostrAuth(nostrEvent.Content)
+		tx, err := mint.MintDB.GetTx(c.Request.Context())
+		if err != nil {
+			logger.Debug(
+				"Incorrect body",
+				slog.String(utils.LogExtraInfo, err.Error()),
+			)
+			c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
+			return
+		}
+
+		defer func() {
+			if p := recover(); p != nil {
+				logger.Error("\n Rolling back  because of failure %+v\n", p)
+				tx.Rollback(c.Request.Context())
+			} else if err != nil {
+				logger.Error(fmt.Sprintf("\n Rolling back  because of failure %+v\n", err))
+				tx.Rollback(c.Request.Context())
+			} else {
+				err = tx.Commit(c.Request.Context())
+				if err != nil {
+					logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
+				}
+				fmt.Println("Key rotation finished successfully")
+			}
+		}()
+
+		nostrLogin, err := mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)
 
 		if err != nil {
 			logger.Error(
@@ -189,7 +215,7 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		nostrLogin.Activated = verified
 
-		err = mint.MintDB.UpdateNostrAuthActivation(nostrLogin.Nonce, nostrLogin.Activated)
+		err = mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated)
 
 		if err != nil {
 			logger.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.String(utils.LogExtraInfo, err.Error()))

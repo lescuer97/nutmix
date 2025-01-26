@@ -60,6 +60,10 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error)
 	return postgresql, nil
 }
 
+func (pql Postgresql) GetTx(ctx context.Context) (pgx.Tx, error) {
+	return pql.pool.Begin(ctx)
+}
+
 func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 
