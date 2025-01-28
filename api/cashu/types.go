@@ -139,7 +139,7 @@ type BlindSignature struct {
 	Amount uint64              `json:"amount"`
 	Id     string              `json:"id"`
 	C_     string              `json:"C_"`
-	Dleq   *BlindSignatureDLEQ `json:"dleq"`
+	Dleq   *BlindSignatureDLEQ `json:"dleq,omitempty"`
 }
 
 type ProofState string
@@ -541,12 +541,12 @@ type PostCheckStateResponse struct {
 }
 
 type RecoverSigDB struct {
-	Amount    uint64 `json:"amount"`
-	Id        string `json:"id"`
-	B_        string `json:"B_" db:"B_"`
-	C_        string `json:"C_" db:"C_"`
-	CreatedAt int64  `json:"created_at" db:"created_at"`
-	// Dleq   *BlindSignatureDLEQ `json:"dleq"`
+	Amount    uint64              `json:"amount"`
+	Id        string              `json:"id"`
+	B_        string              `json:"B_" db:"B_"`
+	C_        string              `json:"C_" db:"C_"`
+	CreatedAt int64               `json:"created_at" db:"created_at"`
+	Dleq      *BlindSignatureDLEQ `json:"dleq"`
 }
 
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
@@ -575,6 +575,7 @@ type PostRestoreRequest struct {
 type PostRestoreResponse struct {
 	Outputs    []BlindedMessage `json:"outputs"`
 	Signatures []BlindSignature `json:"signatures"`
+	Promises   []BlindSignature `json:"promises"`
 }
 
 type BlindSignatureDLEQ struct {

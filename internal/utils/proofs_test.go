@@ -99,8 +99,8 @@ func TestGetValuesFromProofs(t *testing.T) {
 		t.Errorf("Incorrect total amount %v. Should be 8", TotalAmount)
 	}
 
-	if secretsList[0] != "mockSecret" {
-		t.Errorf("Incorrect total amount %v. Should be 8", TotalAmount)
+	if secretsList[0] != "02aa4a2c024e41bd87e8c2758d5a7c2d81e09afe52f67fc8a69768bd73d515e28f" {
+		t.Errorf("Should be mock secret %v. Should be 8", TotalAmount)
 	}
 	if listOfProofs[0].Y != "02aa4a2c024e41bd87e8c2758d5a7c2d81e09afe52f67fc8a69768bd73d515e28f" {
 		t.Errorf("Incorrect Y: %v. ", listOfProofs[0].Y)
