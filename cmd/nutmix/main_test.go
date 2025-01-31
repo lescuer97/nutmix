@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
+	"github.com/lescuer97/nutmix/internal/signer"
 	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lescuer97/nutmix/pkg/crypto"
@@ -138,10 +140,13 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	w.Flush()
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+	}
 
 	// ASK FOR MINTING WITH TOO MANY BLINDED MESSAGES
-	blindedMessages, _, _, err := CreateBlindedMessages(999999, referenceKeyset)
+	blindedMessages, _, _, err := CreateBlindedMessages(999999, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -168,7 +173,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	}
 
 	// ASK FOR SUCCESSFUL MINTING
-	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, referenceKeyset)
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -208,8 +213,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
 	}
 
-	if postMintResponse.Signatures[0].Id != referenceKeyset.Id {
-		t.Errorf("Expected id to be %s, got %s", referenceKeyset.Id, postMintResponse.Signatures[0].Id)
+	if postMintResponse.Signatures[0].Id != activeKeys.Keysets[0].Id {
+		t.Errorf("Expected id to be %s, got %s", activeKeys.Keysets[0].Id, postMintResponse.Signatures[0].Id)
 	}
 
 	// lookup in the db if quote shows as issued
@@ -231,7 +236,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	}
 
 	// try to remint tokens with other blinded signatures
-	reMintBlindedMessages, _, _, err := CreateBlindedMessages(1000, referenceKeyset)
+	reMintBlindedMessages, _, _, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -276,7 +281,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	excesMintingBlindMessage, _, _, err := CreateBlindedMessages(10000000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	excesMintingBlindMessage, _, _, err := CreateBlindedMessages(10000000, activeKeys)
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
@@ -318,12 +323,12 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	// SWAP TESTING STARTS
 
 	// TRY TO SWAP WITH TOO MANY BLINDED MESSAGES
-	swapProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+	swapProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapBlindedMessages, _, _, err := CreateBlindedMessages(1032843, mint.ActiveKeysets[cashu.Sat.String()][1])
+	swapBlindedMessages, _, _, err := CreateBlindedMessages(1032843, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -359,12 +364,12 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	}
 
 	// TRY TO SWAP SUCCESSFULLY
-	swapProofs, err = GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+	swapProofs, err = GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(1009, mint.ActiveKeysets[cashu.Sat.String()][1])
+	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(1009, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -404,18 +409,18 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
 	}
 
-	if postSwapResponse.Signatures[0].Id != referenceKeyset.Id {
-		t.Errorf("Expected id to be %s, got %s", referenceKeyset.Id, postSwapResponse.Signatures[0].Id)
+	if postSwapResponse.Signatures[0].Id != activeKeys.Keysets[0].Id {
+		t.Errorf("Expected id to be %s, got %s", activeKeys.Keysets[0].Id, postSwapResponse.Signatures[0].Id)
 	}
 
 	w.Flush()
 
 	// SWAP WITH INVALID PROOFS
-	invalidSignatureProofs, err := GenerateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	invalidSignatureProofs, err := GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapInvalidSigBlindedMessages, _, _, err := CreateBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	swapInvalidSigBlindedMessages, _, _, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -456,11 +461,11 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w.Flush()
 
 	// swap with  not enought proofs for compared to signatures
-	proofsForRemoving, err := GenerateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	proofsForRemoving, err := GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	signaturesForRemoving, _, _, err := CreateBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	signaturesForRemoving, _, _, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -563,7 +568,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected amount to be 1000, got %d", postMeltQuoteResponse.Amount)
 	}
 
-	meltProofs, err := GenerateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	meltProofs, err := GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
@@ -598,7 +603,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	w.Flush()
 
-	meltProofs, err = GenerateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	meltProofs, err = GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -720,11 +725,6 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 }
 func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
 	db := mockdb.MockDB{}
-	seeds, err := db.GetAllSeeds()
-
-	if err != nil {
-		log.Fatalf("Could not keysets: %v", err)
-	}
 
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 	decodedPrivKey, err := hex.DecodeString(mint_privkey)
@@ -732,31 +732,11 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 		log.Fatalf("hex.DecodeString(mint_privkey): %+v ", err)
 	}
 
-	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-	masterKey, err := mint.MintPrivateKeyToBip32(parsedPrivateKey)
+	signer, err := localsigner.SetupLocalSigner(&db)
 	if err != nil {
-		log.Fatalf("mint.MintPrivateKeyToBip32(parsedPrivateKey): %+v ", err)
+		log.Fatalf("localsigner.SetupLocalSigner(&db): %+v ", err)
 	}
-	// incase there are no seeds in the db we create a new one
-	if len(seeds) == 0 {
-
-		if mint_privkey == "" {
-			log.Fatalf("No mint private key found in env")
-		}
-		seed, err := mint.CreateNewSeed(masterKey, 1, 0)
-		if err != nil {
-			log.Fatalf("mint.CreateNewSeed(masterKey, 1, 0) %+v ", err)
-		}
-
-		err = db.SaveNewSeeds([]cashu.Seed{seed})
-
-		seeds = append(seeds, seed)
-
-		if err != nil {
-			log.Fatalf("SaveNewSeed: %+v ", err)
-		}
-
-	}
+	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
 
 	config, err := mint.SetUpConfigDB(&db)
 
@@ -773,7 +753,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
 
-	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config, &db)
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, config, &db, &signer)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -798,7 +778,7 @@ func newBlindedMessage(id string, amount uint64, B_ *secp256k1.PublicKey) cashu.
 }
 
 // returns Blinded messages, secrets - [][]byte, and list of r
-func CreateBlindedMessages(amount uint64, keyset cashu.Keyset) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
+func CreateBlindedMessages(amount uint64, keyset signer.GetKeysResponse) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
 	splitAmounts := cashu.AmountSplit(amount)
 	splitLen := len(splitAmounts)
 
@@ -829,7 +809,7 @@ func CreateBlindedMessages(amount uint64, keyset cashu.Keyset) ([]cashu.BlindedM
 			}
 		}
 
-		blindedMessage := newBlindedMessage(keyset.Id, amt, B_)
+		blindedMessage := newBlindedMessage(keyset.Keysets[0].Id, amt, B_)
 		blindedMessages[i] = blindedMessage
 		secrets[i] = secret
 		rs[i] = r
@@ -952,7 +932,7 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 
 }
 
-func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]cashu.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResponse, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 
 	// try to swap tokens
 	var proofs []cashu.Proof
@@ -968,7 +948,13 @@ func GenerateProofs(signatures []cashu.BlindSignature, keysets map[string]cashu.
 			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
-		mintPublicKey, err := secp256k1.ParsePubKey(keysets[cashu.Sat.String()][output.Amount].PrivKey.PubKey().SerializeCompressed())
+		amountStr := strconv.FormatUint(output.Amount, 10)
+		pubkeyStr := keyset.Keysets[0].Keys[amountStr]
+		pubkeyBytes, err := hex.DecodeString(pubkeyStr)
+		if err != nil {
+			return nil, fmt.Errorf("hex.DecodeString(pubkeyStr): %w", err)
+		}
+		mintPublicKey, err := secp256k1.ParsePubKey(pubkeyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
@@ -1053,10 +1039,13 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	w.Flush()
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+	}
 
 	// MINTING WITHOUT PAYING THE INVOICE
-	beforeMintBlindedMessages, _, _, err := CreateBlindedMessages(1000, referenceKeyset)
+	beforeMintBlindedMessages, _, _, err := CreateBlindedMessages(1000, activeKeys)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -1106,7 +1095,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	excesMintingBlindMessage, _, _, err := CreateBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	excesMintingBlindMessage, _, _, err := CreateBlindedMessages(1000, activeKeys)
 
 	excesMintingBlindMessage[0].B_ = "badsig"
 
@@ -1134,7 +1123,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	// ASK FOR MINTING WITH TOO MANY BLINDED MESSAGES
-	blindedMessages, _, _, err := CreateBlindedMessages(999999, referenceKeyset)
+	blindedMessages, _, _, err := CreateBlindedMessages(999999, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -1161,7 +1150,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	// MINT SUCCESSFULY
-	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(1000, referenceKeyset)
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -1201,8 +1190,8 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
 	}
 
-	if postMintResponse.Signatures[0].Id != referenceKeyset.Id {
-		t.Errorf("Expected id to be %s, got %s", referenceKeyset.Id, postMintResponse.Signatures[0].Id)
+	if postMintResponse.Signatures[0].Id != activeKeys.Keysets[0].Id {
+		t.Errorf("Expected id to be %s, got %s", activeKeys.Keysets[0].Id, postMintResponse.Signatures[0].Id)
 	}
 
 	// lookup in the db if quote shows as issued
@@ -1224,7 +1213,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	// try to remint tokens with other blinded signatures
-	reMintBlindedMessages, _, _, err := CreateBlindedMessages(1000, referenceKeyset)
+	reMintBlindedMessages, _, _, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -1262,12 +1251,12 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	// SWAP TESTING STARTS
 
 	// TRY TO SWAP WITH TOO MANY BLINDED MESSAGES
-	swapProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+	swapProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapBlindedMessages, _, _, err := CreateBlindedMessages(1032843, mint.ActiveKeysets[cashu.Sat.String()][1])
+	swapBlindedMessages, _, _, err := CreateBlindedMessages(1032843, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -1303,12 +1292,12 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	// try to swap tokens
-	swapProofs, err = GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+	swapProofs, err = GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -1348,18 +1337,18 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
 	}
 
-	if postSwapResponse.Signatures[0].Id != referenceKeyset.Id {
-		t.Errorf("Expected id to be %s, got %s", referenceKeyset.Id, postSwapResponse.Signatures[0].Id)
+	if postSwapResponse.Signatures[0].Id != activeKeys.Keysets[0].Id {
+		t.Errorf("Expected id to be %s, got %s", activeKeys.Keysets[0].Id, postSwapResponse.Signatures[0].Id)
 	}
 
 	w.Flush()
 
 	// Swap with invalid Proofs
-	invalidSignatureProofs, err := GenerateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	invalidSignatureProofs, err := GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapInvalidSigBlindedMessages, _, _, err := CreateBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	swapInvalidSigBlindedMessages, _, _, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -1400,11 +1389,11 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w.Flush()
 
 	// swap with  not enought proofs for compared to signatures
-	proofsForRemoving, err := GenerateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	proofsForRemoving, err := GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	signaturesForRemoving, _, _, err := CreateBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1])
+	signaturesForRemoving, _, _, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -1530,7 +1519,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	// test melt with invalid proofs
-	meltProofs, err := GenerateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	meltProofs, err := GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
@@ -1565,7 +1554,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	w.Flush()
 
-	meltProofs, err = GenerateProofs(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecrets, swapPrivateKeySecrets)
+	meltProofs, err = GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -1864,10 +1853,13 @@ func TestFeeReturnAmount(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+	}
 
 	// mint cashu tokens
-	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, referenceKeyset)
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -1920,12 +1912,12 @@ func TestFeeReturnAmount(t *testing.T) {
 	w.Flush()
 
 	// test melt tokens
-	meltProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
 
 	// mint cashu tokens
-	changeBlindedMessages, _, _, err := CreateBlindedMessages(10000, referenceKeyset)
+	changeBlindedMessages, _, _, err := CreateBlindedMessages(10000, activeKeys)
 	if err != nil {
-		t.Errorf("Error CreateBlindedMessages(10000, referenceKeyset): %v", err)
+		t.Errorf("Error CreateBlindedMessages(10000, activeKeys): %v", err)
 	}
 
 	meltRequest := cashu.PostMeltBolt11Request{
