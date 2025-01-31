@@ -357,6 +357,10 @@ func privateKeysToDleq(s_key *string, e_key *string, dleq *cashu.BlindSignatureD
 	if s_key == nil || e_key == nil {
 		return nil
 	}
+	if *s_key == "" || *e_key == "" {
+		return nil
+	}
+
 	sBytes, err := hex.DecodeString(*s_key)
 	if err != nil {
 		return errors.New("failed to decode 's' field")
@@ -398,6 +402,7 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.Re
 		if err != nil {
 			return nil, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
 		}
+
 		err = privateKeysToDleq(&dleq_s_str, &dleq_e_str, sig.Dleq)
 		if err != nil {
 			return nil, databaseError(fmt.Errorf("privateKeysToDleq(dleq_s_str, dleq_e_str, sig.Dleq). %w", err))
