@@ -223,8 +223,14 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		for _, output := range swapRequest.Outputs {
 			AmountSignature += output.Amount
 		}
+		keysets, err := mint.Signer.GetKeys()
+		if err != nil {
+			logger.Warn("mint.Signer.GetKeysByUnit(unit)", slog.String(utils.LogExtraInfo, err.Error()))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
+			return
+		}
 
-		unit, err := mint.CheckProofsAreSameUnit(swapRequest.Inputs)
+		_, err = mint.CheckProofsAreSameUnit(swapRequest.Inputs, keysets.Keysets)
 
 		if err != nil {
 			logger.Warn("CheckProofsAreSameUnit", slog.String(utils.LogExtraInfo, err.Error()))
@@ -233,15 +239,8 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		keysets, err := mint.Signer.GetKeysByUnit(unit)
-		if err != nil {
-			logger.Warn("mint.Signer.GetKeysByUnit(unit)", slog.String(utils.LogExtraInfo, err.Error()))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
-			return
-		}
-
 		// check for needed amount of fees
-		fee, err := cashu.Fees(swapRequest.Inputs, keysets)
+		fee, err := cashu.Fees(swapRequest.Inputs, keysets.Keysets)
 		if err != nil {
 			logger.Warn("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
@@ -278,7 +277,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs, unit)
+		err = mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs)
 
 		if err != nil {
 			logger.Warn(" mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs, unit)", slog.String(utils.LogExtraInfo, err.Error()))

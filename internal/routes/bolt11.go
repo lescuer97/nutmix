@@ -440,7 +440,14 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
-		unit, err := mint.CheckProofsAreSameUnit(meltRequest.Inputs)
+		keysets, err := mint.Signer.GetKeys()
+		if err != nil {
+			logger.Warn("mint.Signer.GetKeys()", slog.String(utils.LogExtraInfo, err.Error()))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
+			return
+		}
+
+		unit, err := mint.CheckProofsAreSameUnit(meltRequest.Inputs, keysets.Keysets)
 
 		if err != nil {
 			logger.Info(fmt.Sprintf("CheckProofsAreSameUnit: %+v", err))
@@ -455,14 +462,8 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
-		keysets, err := mint.Signer.GetKeysByUnit(unit)
-		if err != nil {
-			logger.Warn("mint.Signer.GetKeysByUnit(unit)", slog.String(utils.LogExtraInfo, err.Error()))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
-			return
-		}
 		// check for needed amount of fees
-		fee, err := cashu.Fees(meltRequest.Inputs, keysets)
+		fee, err := cashu.Fees(meltRequest.Inputs, keysets.Keysets)
 		if err != nil {
 			logger.Info(fmt.Sprintf("cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()]): %+v", err))
 			c.JSON(400, "Could not find keyset for proof id")
@@ -501,7 +502,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs, unit)
+		err = mint.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs)
 
 		if err != nil {
 			logger.Debug("Could not verify Proofs", slog.String(utils.LogExtraInfo, err.Error()))

@@ -52,10 +52,10 @@ func GenerateNonceHex() (string, error) {
 	return hex.EncodeToString(nonce), nil
 }
 
-func Fees(proofs []Proof, keysets []Keyset) (uint, error) {
+func Fees(proofs []Proof, keysets []BasicKeysetResponse) (uint, error) {
 	totalFees := uint(0)
 
-	var keysetToUse Keyset
+	var keysetToUse BasicKeysetResponse
 	for _, proof := range proofs {
 		// find keyset to compare to fees if keyset id is not found throw error
 		// only check for new keyset if proofs id is different

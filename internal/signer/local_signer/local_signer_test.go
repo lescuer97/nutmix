@@ -1,11 +1,9 @@
 package localsigner
 
 import (
-	"log"
-	"testing"
-
 	"github.com/lescuer97/nutmix/api/cashu"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
+	"testing"
 )
 
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"

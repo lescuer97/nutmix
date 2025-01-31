@@ -3,6 +3,7 @@ package localsigner
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -18,9 +19,11 @@ import (
 )
 
 type LocalSigner struct {
+	// activeKeysets map[id]cashu.MintKeysMap
 	activeKeysets map[string]cashu.MintKeysMap
-	keysets       map[string][]cashu.MintKey
-	db            database.MintDB
+	// keyests map[id]cashu.MintKeysMap
+	keysets map[string]cashu.MintKeysMap
+	db      database.MintDB
 }
 
 func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
@@ -85,13 +88,19 @@ func (l *LocalSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 
 	val, exists := l.keysets[id]
 	if exists {
+		var keys []cashu.MintKey
+		for _, key := range val {
+			keys = append(keys, key)
+		}
 
-		return signer.OrderKeysetByUnit(val), nil
+		return signer.OrderKeysetByUnit(keys), nil
 
 	}
 	return signer.GetKeysResponse{}, signer.ErrNoKeysetFound
 }
 func (l *LocalSigner) GetKeysByUnit(unit cashu.Unit) ([]cashu.Keyset, error) {
+
+	log.Printf("\n unit: %+v\n", unit)
 
 	var keys []cashu.Keyset
 
@@ -105,6 +114,7 @@ func (l *LocalSigner) GetKeysByUnit(unit cashu.Unit) ([]cashu.Keyset, error) {
 					Id:          mintKey[0].Id,
 					Unit:        mintKey[0].Unit,
 					InputFeePpk: mintKey[0].InputFeePpk,
+					Keys:        make(map[string]string),
 				}
 
 				for _, keyset := range mintKey {
@@ -127,7 +137,7 @@ func (l *LocalSigner) GetKeys() (signer.GetKeysetsResponse, error) {
 		return response, fmt.Errorf(" l.db.GetAllSeeds(). %w", err)
 	}
 	for _, seed := range seeds {
-		response.Keysets = append(response.Keysets, signer.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+		response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
 	}
 	return response, nil
 }
@@ -263,7 +273,7 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 	var recoverSigDB []cashu.RecoverSigDB
 
 	for _, output := range messages {
-		correctKeyset := l.keysets[output.Id][output.Amount]
+		correctKeyset := l.activeKeysets[output.Id][output.Amount]
 
 		if correctKeyset.PrivKey == nil || !correctKeyset.Active {
 			return nil, nil, cashu.UsingInactiveKeyset
@@ -293,15 +303,15 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 
 }
 
-func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage, unit cashu.Unit) error {
+func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage) error {
 	checkOutputs := false
 
 	pubkeysFromProofs := make(map[*btcec.PublicKey]bool)
 
 	for _, proof := range proofs {
-		err := l.validateProof(proof, unit, &checkOutputs, &pubkeysFromProofs)
+		err := l.validateProof(proof, &checkOutputs, &pubkeysFromProofs)
 		if err != nil {
-			return fmt.Errorf("ValidateProof: %w", err)
+			return fmt.Errorf("l.validateProof(proof, unit, &checkOutputs, &pubkeysFromProofs): %w", err)
 		}
 	}
 
@@ -320,9 +330,15 @@ func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.B
 	return nil
 }
 
-func (l *LocalSigner) validateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
+func (l *LocalSigner) validateProof(proof cashu.Proof, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
 	var keysetToUse cashu.MintKey
-	for _, keyset := range l.keysets[unit.String()] {
+
+	keysets, exists := l.keysets[proof.Id]
+	if !exists {
+		return cashu.ErrKeysetForProofNotFound
+	}
+
+	for _, keyset := range keysets {
 		if keyset.Amount == proof.Amount && keyset.Id == proof.Id {
 			keysetToUse = keyset
 			break

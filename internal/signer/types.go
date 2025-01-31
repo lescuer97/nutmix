@@ -1,6 +1,10 @@
 package signer
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/lescuer97/nutmix/api/cashu"
+)
 
 var ErrNoKeysetFound = errors.New("No keyset found")
 
@@ -8,7 +12,7 @@ type GetKeysResponse struct {
 	Keysets []KeysetResponse `json:"keysets"`
 }
 type GetKeysetsResponse struct {
-	Keysets []BasicKeysetResponse `json:"keysets"`
+	Keysets []cashu.BasicKeysetResponse `json:"keysets"`
 }
 
 type KeysetResponse struct {

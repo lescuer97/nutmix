@@ -68,8 +68,8 @@ func DeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, error) 
 	return keyset, nil
 }
 
-func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *bip32.Key) (map[string][]cashu.MintKey, map[string]cashu.MintKeysMap, error) {
-	newKeysets := make(map[string][]cashu.MintKey)
+func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *bip32.Key) (map[string]cashu.MintKeysMap, map[string]cashu.MintKeysMap, error) {
+	newKeysets := make(map[string]cashu.MintKeysMap)
 	newActiveKeysets := make(map[string]cashu.MintKeysMap)
 
 	for _, seed := range seeds {
@@ -77,15 +77,17 @@ func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *bip32.Key) (map[string][]c
 		if err != nil {
 			return newKeysets, newActiveKeysets, fmt.Errorf("DeriveKeyset(mintKey, seed) %w", err)
 		}
-		if seed.Active {
-			newActiveKeysets[seed.Unit] = make(cashu.MintKeysMap)
-			for _, keyset := range keysets {
-				newActiveKeysets[seed.Unit][keyset.Amount] = keyset
-			}
 
+		mintkeyMap := make(cashu.MintKeysMap)
+		for _, keyset := range keysets {
+			mintkeyMap[keyset.Amount] = keyset
 		}
 
-		newKeysets[seed.Id] = keysets
+		if seed.Active {
+			newActiveKeysets[seed.Id] = mintkeyMap
+		}
+
+		newKeysets[seed.Id] = mintkeyMap
 	}
 	return newKeysets, newActiveKeysets, nil
 

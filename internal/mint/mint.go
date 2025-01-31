@@ -128,18 +128,13 @@ var (
 	MINT_LIGHTNING_BACKEND_ENV = "MINT_LIGHTNING_BACKEND"
 )
 
-func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof) (cashu.Unit, error) {
+func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
 
 	units := make(map[string]bool)
 
-	seenKeys := make(map[string]signer.BasicKeysetResponse)
+	seenKeys := make(map[string]cashu.BasicKeysetResponse)
 
-	keys, err := m.Signer.GetKeys()
-	if err != nil {
-		return cashu.Sat, fmt.Errorf("m.Signer.GetKeys(): %w", err)
-	}
-
-	for _, v := range keys.Keysets {
+	for _, v := range keys {
 		seenKeys[v.Id] = v
 	}
 	for _, proof := range proofs {
