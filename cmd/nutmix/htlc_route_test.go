@@ -17,6 +17,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/signer"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -95,10 +96,13 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+	}
 
 	// ask for minting
-	htlcBlindedMessages, htlcMintingSecrets, HTLCMintingSecretKeys, err := CreateHTLCBlindedMessages(1000, referenceKeyset, correctPreimage, 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	htlcBlindedMessages, htlcMintingSecrets, HTLCMintingSecretKeys, err := CreateHTLCBlindedMessages(1000, activeKeys, correctPreimage, 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -133,8 +137,10 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 
 	aliceBlindSigs = append(aliceBlindSigs, postMintResponse.Signatures...)
 
+	// activeKeys
+
 	// SWAP HTLC TOKEN with other HTLC TOKENS
-	swapProofs, err := GenerateProofsHTLC(postMintResponse.Signatures, correctPreimage, mint.ActiveKeysets, htlcMintingSecrets, HTLCMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKey})
+	swapProofs, err := GenerateProofsHTLC(postMintResponse.Signatures, correctPreimage, activeKeys.Keysets, htlcMintingSecrets, HTLCMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
@@ -178,7 +184,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesHTLCWrongSigs, _, _, err := CreateHTLCBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], correctPreimage, 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	swapBlindedMessagesHTLCWrongSigs, _, _, err := CreateHTLCBlindedMessages(1000, unitKeys[0], correctPreimage, 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -264,7 +270,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 
 }
 
-func CreateHTLCBlindedMessages(amount uint64, keyset cashu.Keyset, preimage string, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
+func CreateHTLCBlindedMessages(amount uint64, keyset signer.GetKeysResponse, preimage string, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
 	splitAmounts := cashu.AmountSplit(amount)
 	splitLen := len(splitAmounts)
 

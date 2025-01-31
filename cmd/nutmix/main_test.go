@@ -24,6 +24,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
+	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/testcontainers/testcontainers-go"
@@ -671,12 +672,6 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 		log.Fatal("Error conecting to db", err)
 	}
 
-	seeds, err := db.GetAllSeeds()
-
-	if err != nil {
-		log.Fatalf("Could not keysets: %v", err)
-	}
-
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 	decodedPrivKey, err := hex.DecodeString(mint_privkey)
 	if err != nil {
@@ -684,30 +679,6 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 	}
 
 	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-	masterKey, err := mint.MintPrivateKeyToBip32(parsedPrivateKey)
-	if err != nil {
-		log.Fatalf("mint.MintPrivateKeyToBip32(parsedPrivateKey): %+v ", err)
-	}
-	// incase there are no seeds in the db we create a new one
-	if len(seeds) == 0 {
-
-		if mint_privkey == "" {
-			log.Fatalf("No mint private key found in env")
-		}
-		seed, err := mint.CreateNewSeed(masterKey, 1, 0)
-		if err != nil {
-			log.Fatalf("mint.CreateNewSeed(masterKey, 1, 0) %+v ", err)
-		}
-
-		err = db.SaveNewSeeds([]cashu.Seed{seed})
-
-		seeds = append(seeds, seed)
-
-		if err != nil {
-			log.Fatalf("SaveNewSeed: %+v ", err)
-		}
-
-	}
 
 	config, err := mint.SetUpConfigDB(db)
 
@@ -724,7 +695,12 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
 
-	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config, db)
+	signer, err := localsigner.SetupLocalSigner(db)
+	if err != nil {
+		log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
+	}
+
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, config, db, &signer)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)

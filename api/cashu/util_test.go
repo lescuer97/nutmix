@@ -34,7 +34,7 @@ func TestAmountOfFeeProofs(t *testing.T) {
 	var proofs []Proof
 	var keysets []Keyset
 	id := "keysetID"
-	inputFee := 100
+	inputFee := uint(100)
 
 	for i := 0; i < 9; i++ {
 		// add 9 proofs

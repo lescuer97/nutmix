@@ -39,6 +39,7 @@ func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
 	return res
 
 }
+
 func GenerateNonceHex() (string, error) {
 
 	// generate random Nonce
@@ -51,8 +52,8 @@ func GenerateNonceHex() (string, error) {
 	return hex.EncodeToString(nonce), nil
 }
 
-func Fees(proofs []Proof, keysets []Keyset) (int, error) {
-	totalFees := 0
+func Fees(proofs []Proof, keysets []Keyset) (uint, error) {
+	totalFees := uint(0)
 
 	var keysetToUse Keyset
 	for _, proof := range proofs {

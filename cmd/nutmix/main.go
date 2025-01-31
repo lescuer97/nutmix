@@ -4,20 +4,21 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
-	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/database/postgresql"
-	"github.com/lescuer97/nutmix/internal/mint"
-	"github.com/lescuer97/nutmix/internal/routes"
-	"github.com/lescuer97/nutmix/internal/routes/admin"
-	"github.com/lescuer97/nutmix/internal/utils"
 	"io"
 	"log"
 	"log/slog"
 	"os"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"github.com/lescuer97/nutmix/internal/database/postgresql"
+	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes"
+	"github.com/lescuer97/nutmix/internal/routes/admin"
+	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 var (
@@ -89,13 +90,6 @@ func main() {
 		log.Panic()
 	}
 
-	seeds, err := db.GetAllSeeds()
-
-	if err != nil {
-		logger.Error(fmt.Sprintf("Could not GetAllSeeds: %v", err))
-		log.Panic()
-	}
-
 	mint_privkey := os.Getenv(MINT_PRIVATE_KEY_ENV)
 	if mint_privkey == "" {
 		logger.Error("No mint private key found in env")
@@ -109,44 +103,23 @@ func main() {
 	}
 
 	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-	masterKey, err := mint.MintPrivateKeyToBip32(parsedPrivateKey)
-	if err != nil {
-		logger.Error(fmt.Sprintf("mint.MintPrivateKeyToBip32(parsedPrivateKey). %v", err))
-		log.Panic()
-	}
-
-	// incase there are no seeds in the db we create a new one
-	if len(seeds) == 0 {
-		newSeed, err := mint.CreateNewSeed(masterKey, 1, 0)
-
-		if err != nil {
-			logger.Error(fmt.Sprintf("mint.CreateNewSeed(masterKey,1,0 ) %+v ", err))
-			log.Panic()
-		}
-
-		err = db.SaveNewSeeds([]cashu.Seed{newSeed})
-
-		seeds = append(seeds, newSeed)
-
-		if err != nil {
-			logger.Error(fmt.Sprintf("database.SaveNewSeeds(pool, []cashu.Seed{newSeed}): %+v ", err))
-			log.Panic()
-		}
-	}
 
 	config, err := mint.SetUpConfigDB(db)
 	if err != nil {
 		log.Fatalf("mint.SetUpConfigFile(): %+v ", err)
 	}
 
+	signer, err := localsigner.SetupLocalSigner(db)
+	if err != nil {
+		log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
+	}
+
 	// remove mint private key from variable
-	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, seeds, config, db)
+	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, config, db, &signer)
 
 	// clear mint seeds and privatekey
-	seeds = []cashu.Seed{}
 	mint_privkey = ""
 	parsedPrivateKey = nil
-	masterKey = nil
 
 	if err != nil {
 		logger.Warn(fmt.Sprintf("SetUpMint: %+v ", err))

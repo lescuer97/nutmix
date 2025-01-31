@@ -9,9 +9,9 @@ import (
 	"os"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
@@ -79,7 +79,7 @@ func AuthMiddleware(logger *slog.Logger, secret []byte) gin.HandlerFunc {
 	}
 }
 
-func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// parse data for login
 		logger.Debug("Attempting log in")
@@ -197,7 +197,7 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		token, err := makeJWTToken(mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize())
+		token, err := makeJWTToken(loginKey.Serialize())
 
 		if err != nil {
 			logger.Warn("Could not makeJWTToken", slog.String(utils.LogExtraInfo, err.Error()))

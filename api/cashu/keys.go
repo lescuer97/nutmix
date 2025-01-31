@@ -22,7 +22,7 @@ func DeriveKeysetId(keysets []Keyset) (string, error) {
 	return "00" + hex[:14], nil
 }
 
-func GenerateKeysets(versionKey *bip32.Key, values []uint64, id string, unit Unit, inputFee int, active bool) ([]Keyset, error) {
+func GenerateKeysets(versionKey *bip32.Key, values []uint64, id string, unit Unit, inputFee uint, active bool) ([]Keyset, error) {
 	var keysets []Keyset
 
 	// Get the current time

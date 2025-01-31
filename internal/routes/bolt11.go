@@ -217,7 +217,14 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
-		blindedSignatures, recoverySigsDb, err = mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
+		unit, err := cashu.UnitFromString(quote.Unit)
+		if err != nil {
+			logger.Info(fmt.Errorf("cashu.UnitFromString(quote.Unit): %w", err).Error())
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
+		blindedSignatures, recoverySigsDb, err = mint.Signer.SignBlindMessages(mintRequest.Outputs, unit)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.SignBlindedMessages: %w", err).Error())
@@ -455,8 +462,14 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
+		keysets, err := mint.Signer.GetKeysByUnit(unit)
+		if err != nil {
+			logger.Warn("mint.Signer.GetKeysByUnit(unit)", slog.String(utils.LogExtraInfo, err.Error()))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
+			return
+		}
 		// check for needed amount of fees
-		fee, err := cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()])
+		fee, err := cashu.Fees(meltRequest.Inputs, keysets)
 		if err != nil {
 			logger.Info(fmt.Sprintf("cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()]): %+v", err))
 			c.JSON(400, "Could not find keyset for proof id")
@@ -495,7 +508,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.VerifyListOfProofs(meltRequest.Inputs, []cashu.BlindedMessage{}, unit)
+		err = mint.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs, unit)
 
 		if err != nil {
 			logger.Debug("Could not verify Proofs", slog.String(utils.LogExtraInfo, err.Error()))
@@ -596,7 +609,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			overpaidFees := AmountProofs - totalExpent
 			change := utils.GetChangeOutput(overpaidFees, meltRequest.Outputs)
 
-			blindSignatures, recoverySigsDb, err := mint.SignBlindedMessages(change, quote.Unit)
+			blindSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(change, unit)
 
 			if err != nil {
 				logger.Info("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
