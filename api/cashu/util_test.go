@@ -32,7 +32,7 @@ func TestOrderKeysetByUnit(t *testing.T) {
 func TestAmountOfFeeProofs(t *testing.T) {
 
 	var proofs []Proof
-	var keysets []MintKey
+	var keysets []Keyset
 	id := "keysetID"
 	inputFee := uint(100)
 
@@ -42,7 +42,7 @@ func TestAmountOfFeeProofs(t *testing.T) {
 			Id: id,
 		}
 
-		keyset := MintKey{
+		keyset := Keyset{
 			Id:          id,
 			InputFeePpk: inputFee,
 		}
@@ -63,7 +63,7 @@ func TestAmountOfFeeProofs(t *testing.T) {
 			Id: id,
 		}
 
-		keyset := MintKey{
+		keyset := Keyset{
 			Id:          id,
 			InputFeePpk: inputFee,
 		}
