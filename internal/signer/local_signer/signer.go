@@ -1,7 +1,9 @@
 package localsigner
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -9,6 +11,10 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	gonutsC "github.com/elnosh/gonuts/cashu"
+	"github.com/elnosh/gonuts/cashu/nuts/nut10"
+	"github.com/elnosh/gonuts/cashu/nuts/nut11"
+	"github.com/elnosh/gonuts/cashu/nuts/nut14"
 	"github.com/elnosh/gonuts/crypto"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
@@ -240,42 +246,56 @@ func (l *LocalSigner) signBlindMessage(k *secp256k1.PrivateKey, message cashu.Bl
 
 	return blindSig, nil
 }
-func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage, unit cashu.Unit) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
-	var blindedSignatures []cashu.BlindSignature
-	var recoverSigDB []cashu.RecoverSigDB
-
-	for _, output := range messages {
-		correctKeyset := l.activeKeysets[unit.String()][output.Amount]
-
-		if correctKeyset.PrivKey == nil || correctKeyset.Id != output.Id {
-			return nil, nil, cashu.UsingInactiveKeyset
-		}
-
-		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
-
-		recoverySig := cashu.RecoverSigDB{
-			Amount:    output.Amount,
-			Id:        output.Id,
-			C_:        blindSignature.C_,
-			B_:        output.B_,
-			Dleq:      blindSignature.Dleq,
-			CreatedAt: time.Now().Unix(),
-		}
-
-		if err != nil {
-			err = fmt.Errorf("GenerateBlindSignature: %w %w", cashu.ErrInvalidBlindMessage, err)
-			return nil, nil, err
-		}
-
-		blindedSignatures = append(blindedSignatures, blindSignature)
-		recoverSigDB = append(recoverSigDB, recoverySig)
-
+func (l *LocalSigner) GetPubkey() ([]byte, error) {
+	key, err := l.getSignerPrivateKey()
+	if err != nil {
+		return []byte{}, fmt.Errorf("ParsePubKey: %w", err)
 	}
-	return blindedSignatures, recoverSigDB, nil
-
+	return key.PublicKey().PublicKey().Key, nil
 }
 
-func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage, unit cashu.Unit) error {
+func (l *LocalSigner) SignBlindMessages(messages gonutsC.BlindedMessages, unit cashu.Unit) (gonutsC.BlindedSignatures, error) {
+	var blindedSignatures gonutsC.BlindedSignatures
+
+	for _, message := range messages {
+		correctKeyset := l.activeKeysets[unit.String()][message.Amount]
+
+		if correctKeyset.PrivKey == nil || correctKeyset.Id != message.Id {
+			return nil, cashu.UsingInactiveKeyset
+		}
+
+		decodedB_, err := hex.DecodeString(message.B_)
+		if err != nil {
+			return nil, fmt.Errorf("hex.DecodeString(message.B_) %w", err)
+		}
+
+		B_, err := secp256k1.ParsePubKey(decodedB_)
+		if err != nil {
+			return nil, fmt.Errorf("secp256k1.ParsePubKey(decodedB_)  %w", err)
+		}
+
+		C_ := crypto.SignBlindedMessage(B_, correctKeyset.PrivKey)
+		// blindSignature, err :=
+		dleq_e, dleq_s := crypto.GenerateDLEQ(correctKeyset.PrivKey, B_, C_)
+
+		dleq := gonutsC.DLEQProof{
+			E: hex.EncodeToString(dleq_e.Serialize()),
+			S: hex.EncodeToString(dleq_s.Serialize()),
+		}
+
+		blindSig := gonutsC.BlindedSignature{
+			Amount: message.Amount,
+			C_:     hex.EncodeToString(C_.SerializeCompressed()),
+			Id:     message.Id,
+			DLEQ:   &dleq,
+		}
+		blindedSignatures = append(blindedSignatures, blindSig)
+
+	}
+	return blindedSignatures, nil
+}
+
+func (l *LocalSigner) VerifyProofs(proofs gonutsC.Proofs, blindMessages gonutsC.BlindedMessages, unit cashu.Unit) error {
 	checkOutputs := false
 
 	pubkeysFromProofs := make(map[*btcec.PublicKey]bool)
@@ -302,7 +322,7 @@ func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.B
 	return nil
 }
 
-func (l *LocalSigner) validateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
+func (l *LocalSigner) validateProof(proof gonutsC.Proof, unit cashu.Unit, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
 	var keysetToUse cashu.Keyset
 	for _, keyset := range l.keysets[unit.String()] {
 		if keyset.Amount == proof.Amount && keyset.Id == proof.Id {
@@ -316,6 +336,58 @@ func (l *LocalSigner) validateProof(proof cashu.Proof, unit cashu.Unit, checkOut
 		return cashu.ErrKeysetForProofNotFound
 	}
 
+	secret, err := nut10.DeserializeSecret(proof.Secret)
+	if err != nil {
+		return fmt.Errorf("nut10.DeserializeSecret(proof.Secret): %w", err)
+	}
+
+	if secret.Kind != nut10.AnyoneCanSpend {
+
+		switch secret.Kind {
+		case nut10.P2PK:
+			var witness nut11.P2PKWitness
+			err := json.Unmarshal([]byte(proof.Witness), &witness)
+			if err != nil {
+				return cashu.ErrInvalidProof
+			}
+
+			tags, err := nut11.ParseP2PKTags(secret.Data.Tags)
+			if err != nil {
+				return cashu.ErrInvalidProof
+			}
+
+			hashMessage := sha256.Sum256([]byte(proof.Secret))
+
+			valid := nut11.HasValidSignatures(hashMessage[:], witness.Signatures, tags.NSigs, tags.Pubkeys)
+
+			if !valid {
+				return cashu.ErrInvalidProof
+			}
+		case nut10.HTLC:
+			var witness nut14.HTLCWitness
+			err := json.Unmarshal([]byte(proof.Witness), &witness)
+			if err != nil {
+				return fmt.Errorf("json.Unmarshal([]byte(proof.Witness), &witness): %w", err)
+			}
+
+			tags, err := nut11.ParseP2PKTags(secret.Data.Tags)
+			if err != nil {
+				return fmt.Errorf("nut11.ParseP2PKTags(secret.Data.Tags): %w", err)
+			}
+
+			hashMessage := sha256.Sum256([]byte(proof.Secret))
+
+			valid := nut11.HasValidSignatures(hashMessage[:], witness.Signatures, tags.NSigs, tags.Pubkeys)
+
+			if !valid {
+				return cashu.ErrInvalidProof
+			}
+
+		}
+
+	}
+
+	// proof.Witness
 	// check if a proof is locked to a spend condition and verifies it
 	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
 
