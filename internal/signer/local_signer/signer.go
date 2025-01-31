@@ -3,7 +3,6 @@ package localsigner
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -31,9 +30,13 @@ func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
 		db: db,
 	}
 
-	masterKey, err := localsigner.getSignerPrivateKey()
+	privateKey, err := localsigner.getSignerPrivateKey()
 	if err != nil {
 		return localsigner, fmt.Errorf("signer.getSignerPrivateKey(). %w", err)
+	}
+	masterKey, err := bip32.NewMasterKey(privateKey.Serialize())
+	if err != nil {
+		return localsigner, fmt.Errorf(" bip32.NewMasterKey(privateKey.Serialize()). %w", err)
 	}
 	seeds, err := localsigner.db.GetAllSeeds()
 	if err != nil {
@@ -99,9 +102,6 @@ func (l *LocalSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 	return signer.GetKeysResponse{}, signer.ErrNoKeysetFound
 }
 func (l *LocalSigner) GetKeysByUnit(unit cashu.Unit) ([]cashu.Keyset, error) {
-
-	log.Printf("\n unit: %+v\n", unit)
-
 	var keys []cashu.Keyset
 
 	for _, mintKey := range l.keysets {
@@ -142,23 +142,19 @@ func (l *LocalSigner) GetKeys() (signer.GetKeysetsResponse, error) {
 	return response, nil
 }
 
-func (l *LocalSigner) getSignerPrivateKey() (*bip32.Key, error) {
+func (l *LocalSigner) getSignerPrivateKey() (*secp256k1.PrivateKey, error) {
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 	if mint_privkey == "" {
-		return &bip32.Key{}, fmt.Errorf(`os.Getenv("MINT_PRIVATE_KEY").`)
+		return nil, fmt.Errorf(`os.Getenv("MINT_PRIVATE_KEY").`)
 	}
 
 	decodedPrivKey, err := hex.DecodeString(mint_privkey)
 	if err != nil {
-		return &bip32.Key{}, fmt.Errorf(`hex.DecodeString(mint_privkey). %w`, err)
+		return nil, fmt.Errorf(`hex.DecodeString(mint_privkey). %w`, err)
 	}
 	mintKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-	masterKey, err := bip32.NewMasterKey(mintKey.Serialize())
-	if err != nil {
-		return nil, fmt.Errorf(" bip32.NewMasterKey(mintKey.Serialize()). %w", err)
-	}
 
-	return masterKey, nil
+	return mintKey, nil
 }
 func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, version int, fee uint) (cashu.Seed, error) {
 	// rotate one level up
@@ -200,16 +196,21 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 		seeds[i].Active = false
 	}
 
-	signerMasterKey, err := l.getSignerPrivateKey()
+	mintPrivateKey, err := l.getSignerPrivateKey()
 	if err != nil {
 		return fmt.Errorf(`l.getSignerPrivateKey() %w`, err)
+	}
+
+	signerMasterKey, err := bip32.NewMasterKey(mintPrivateKey.Serialize())
+	if err != nil {
+		return fmt.Errorf(" bip32.NewMasterKey(mintPrivateKey.Serialize()). %w", err)
 	}
 
 	// Create New seed with one higher version
 	newSeed, err := l.createNewSeed(signerMasterKey, unit, highestSeed.Version+1, fee)
 
 	if err != nil {
-		return fmt.Errorf(`m.CreateNewSeed(masterKey,1,0 ) %w`, err)
+		return fmt.Errorf(`l.createNewSeed(signerMasterKey, unit, highestSeed.Version+1, fee) %w`, err)
 	}
 
 	// add new key to db
@@ -385,10 +386,10 @@ func (l *LocalSigner) validateProof(proof cashu.Proof, checkOutputs *bool, pubke
 }
 func (l *LocalSigner) GetSignerPubkey() (string, error) {
 
-	signerMasterKey, err := l.getSignerPrivateKey()
+	mintPrivateKey, err := l.getSignerPrivateKey()
 	if err != nil {
 		return "", fmt.Errorf(`l.getSignerPrivateKey() %w`, err)
 	}
 
-	return hex.EncodeToString(signerMasterKey.PublicKey().Key), nil
+	return hex.EncodeToString(mintPrivateKey.PubKey().SerializeCompressed()), nil
 }
