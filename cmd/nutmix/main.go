@@ -2,14 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
-	"io"
-	"log"
-	"log/slog"
-	"os"
-
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -19,6 +12,10 @@ import (
 	"github.com/lescuer97/nutmix/internal/routes/admin"
 	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"io"
+	"log"
+	"log/slog"
+	"os"
 )
 
 var (
@@ -90,20 +87,6 @@ func main() {
 		log.Panic()
 	}
 
-	mint_privkey := os.Getenv(MINT_PRIVATE_KEY_ENV)
-	if mint_privkey == "" {
-		logger.Error("No mint private key found in env")
-		log.Panic()
-	}
-
-	decodedPrivKey, err := hex.DecodeString(mint_privkey)
-	if err != nil {
-		logger.Error("Could not parse private key hex")
-		log.Panic()
-	}
-
-	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-
 	config, err := mint.SetUpConfigDB(db)
 	if err != nil {
 		log.Fatalf("mint.SetUpConfigFile(): %+v ", err)
@@ -115,11 +98,7 @@ func main() {
 	}
 
 	// remove mint private key from variable
-	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, config, db, &signer)
-
-	// clear mint seeds and privatekey
-	mint_privkey = ""
-	parsedPrivateKey = nil
+	mint, err := mint.SetUpMint(ctx, config, db, &signer)
 
 	if err != nil {
 		logger.Warn(fmt.Sprintf("SetUpMint: %+v ", err))

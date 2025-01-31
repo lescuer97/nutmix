@@ -677,14 +677,6 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 		log.Fatal("Error conecting to db", err)
 	}
 
-	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
-	decodedPrivKey, err := hex.DecodeString(mint_privkey)
-	if err != nil {
-		log.Fatalf("hex.DecodeString(mint_privkey): %+v ", err)
-	}
-
-	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-
 	config, err := mint.SetUpConfigDB(db)
 
 	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
@@ -705,7 +697,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 		log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
 	}
 
-	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, config, db, &signer)
+	mint, err := mint.SetUpMint(ctx, config, db, &signer)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -726,17 +718,10 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
 	db := mockdb.MockDB{}
 
-	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
-	decodedPrivKey, err := hex.DecodeString(mint_privkey)
-	if err != nil {
-		log.Fatalf("hex.DecodeString(mint_privkey): %+v ", err)
-	}
-
 	signer, err := localsigner.SetupLocalSigner(&db)
 	if err != nil {
 		log.Fatalf("localsigner.SetupLocalSigner(&db): %+v ", err)
 	}
-	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
 
 	config, err := mint.SetUpConfigDB(&db)
 
@@ -753,7 +738,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
 
-	mint, err := mint.SetUpMint(ctx, parsedPrivateKey, config, &db, &signer)
+	mint, err := mint.SetUpMint(ctx, config, &db, &signer)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)

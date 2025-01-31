@@ -314,7 +314,6 @@ func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.B
 			return fmt.Errorf("l.validateProof(proof, unit, &checkOutputs, &pubkeysFromProofs): %w", err)
 		}
 	}
-
 	// if any sig allis present all outputs also need to be check with the pubkeys from the proofs
 	if checkOutputs {
 		for _, blindMessage := range blindMessages {
@@ -367,26 +366,29 @@ func (l *LocalSigner) validateProof(proof cashu.Proof, checkOutputs *bool, pubke
 		if !ok {
 			return cashu.ErrInvalidProof
 		}
-
 	}
-
 	parsedBlinding, err := hex.DecodeString(proof.C)
-
 	if err != nil {
 		return fmt.Errorf("hex.DecodeString: %w", err)
 	}
-
 	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
 	if err != nil {
 		return fmt.Errorf("secp256k1.ParsePubKey: %+v", err)
 	}
-
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
-
 	if !verified {
 		return cashu.ErrInvalidProof
 	}
 
 	return nil
 
+}
+func (l *LocalSigner) GetSignerPubkey() (string, error) {
+
+	signerMasterKey, err := l.getSignerPrivateKey()
+	if err != nil {
+		return "", fmt.Errorf(`l.getSignerPrivateKey() %w`, err)
+	}
+
+	return hex.EncodeToString(signerMasterKey.PublicKey().Key), nil
 }

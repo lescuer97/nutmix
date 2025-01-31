@@ -2,11 +2,9 @@ package mint
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
@@ -183,7 +181,7 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 
 }
 
-func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, config utils.Config, db database.MintDB, sig signer.Signer) (*Mint, error) {
+func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig signer.Signer) (*Mint, error) {
 	activeProofs := ActiveProofs{
 		Proofs: make(map[cashu.Proof]bool),
 	}
@@ -247,9 +245,12 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, config u
 	mint.PendingProofs = make([]cashu.Proof, 0)
 
 	// parse mint private key and get hex value pubkey
-	pubkeyhex := hex.EncodeToString(mint_privkey.PubKey().SerializeCompressed())
+	pubkey, err := sig.GetSignerPubkey()
+	if err != nil {
+		return &mint, fmt.Errorf("sig.GetSignerPubkey() %w", err)
+	}
 
-	mint.MintPubkey = pubkeyhex
+	mint.MintPubkey = pubkey
 
 	return &mint, nil
 }
