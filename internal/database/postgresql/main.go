@@ -353,29 +353,33 @@ func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, erro
 	return proofList, nil
 }
 
-func privateKeysToDleq(s_key string, e_key string, dleq *cashu.BlindSignatureDLEQ) error {
-	if s_key == "" || e_key == "" {
+func privateKeysToDleq(s_key *string, e_key *string, sig *cashu.RecoverSigDB) error {
+	if s_key == nil || e_key == nil {
+		return nil
+	}
+	if *s_key == "" || *e_key == "" {
 		return nil
 	}
 
-	sBytes, err := hex.DecodeString(s_key)
+	sBytes, err := hex.DecodeString(*s_key)
 	if err != nil {
 		return errors.New("failed to decode 's' field")
 	}
-	dleq = &cashu.BlindSignatureDLEQ{
+	dleqTmp := &cashu.BlindSignatureDLEQ{
 		S: nil,
 		E: nil,
 	}
 
-	dleq.S = secp256k1.PrivKeyFromBytes(sBytes)
+	dleqTmp.S = secp256k1.PrivKeyFromBytes(sBytes)
 
-	eBytes, err := hex.DecodeString(e_key)
+	eBytes, err := hex.DecodeString(*e_key)
 	if err != nil {
 		return errors.New("failed to decode '' field")
 	}
-	dleq.E = secp256k1.PrivKeyFromBytes(eBytes)
-	return nil
+	dleqTmp.E = secp256k1.PrivKeyFromBytes(eBytes)
 
+	sig.Dleq = dleqTmp
+	return nil
 }
 
 func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error) {
@@ -397,14 +401,14 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.Re
 		var sig cashu.RecoverSigDB
 		sig.Dleq = nil
 
-		var dleq_s_str string = ""
-		var dleq_e_str string = ""
+		var dleq_s_str *string
+		var dleq_e_str *string
 		err := rows.Scan(&sig.Id, &sig.Amount, &sig.C_, &sig.B_, &sig.CreatedAt, &dleq_e_str, &dleq_s_str)
 		if err != nil {
 			return nil, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
 		}
 
-		err = privateKeysToDleq(dleq_s_str, dleq_e_str, sig.Dleq)
+		err = privateKeysToDleq(dleq_s_str, dleq_e_str, &sig)
 		if err != nil {
 			return nil, databaseError(fmt.Errorf("privateKeysToDleq(dleq_s_str, dleq_e_str, sig.Dleq). %w", err))
 		}
