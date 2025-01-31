@@ -6,8 +6,8 @@ import (
 	"strconv"
 )
 
-func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
-	var typesOfUnits = make(map[string][]Keyset)
+func OrderKeysetByUnit(keysets []MintKey) KeysResponse {
+	var typesOfUnits = make(map[string][]MintKey)
 
 	for _, keyset := range keysets {
 		if len(typesOfUnits[keyset.Unit]) == 0 {
@@ -18,12 +18,12 @@ func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
 		}
 	}
 
-	res := make(map[string][]KeysetResponse)
+	res := make(map[string][]Keyset)
 
-	res["keysets"] = []KeysetResponse{}
+	res["keysets"] = []Keyset{}
 
 	for _, value := range typesOfUnits {
-		var keysetResponse KeysetResponse
+		var keysetResponse Keyset
 		keysetResponse.Id = value[0].Id
 		keysetResponse.Unit = value[0].Unit
 		keysetResponse.Keys = make(map[string]string)

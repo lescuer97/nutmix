@@ -217,14 +217,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
-		unit, err := cashu.UnitFromString(quote.Unit)
-		if err != nil {
-			logger.Info(fmt.Errorf("cashu.UnitFromString(quote.Unit): %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-
-		blindedSignatures, recoverySigsDb, err = mint.Signer.SignBlindMessages(mintRequest.Outputs, unit)
+		blindedSignatures, recoverySigsDb, err = mint.Signer.SignBlindMessages(mintRequest.Outputs)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.SignBlindedMessages: %w", err).Error())
@@ -609,7 +602,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			overpaidFees := AmountProofs - totalExpent
 			change := utils.GetChangeOutput(overpaidFees, meltRequest.Outputs)
 
-			blindSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(change, unit)
+			blindSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(change)
 
 			if err != nil {
 				logger.Info("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))

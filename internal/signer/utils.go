@@ -9,8 +9,8 @@ import (
 	"github.com/tyler-smith/go-bip32"
 )
 
-func OrderKeysetByUnit(keysets []cashu.Keyset) GetKeysResponse {
-	var typesOfUnits = make(map[string][]cashu.Keyset)
+func OrderKeysetByUnit(keysets []cashu.MintKey) GetKeysResponse {
+	var typesOfUnits = make(map[string][]cashu.MintKey)
 
 	for _, keyset := range keysets {
 		if len(typesOfUnits[keyset.Unit]) == 0 {
@@ -42,7 +42,7 @@ func OrderKeysetByUnit(keysets []cashu.Keyset) GetKeysResponse {
 	return res
 
 }
-func DeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.Keyset, error) {
+func DeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, error) {
 	unit, err := cashu.UnitFromString(seed.Unit)
 	if err != nil {
 		return nil, fmt.Errorf("UnitFromString(seed.Unit) %w", err)
@@ -68,25 +68,24 @@ func DeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.Keyset, error) {
 	return keyset, nil
 }
 
-func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *bip32.Key) (map[string][]cashu.Keyset, map[string]cashu.KeysetMap, error) {
-	newKeysets := make(map[string][]cashu.Keyset)
-	newActiveKeysets := make(map[string]cashu.KeysetMap)
+func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *bip32.Key) (map[string][]cashu.MintKey, map[string]cashu.MintKeysMap, error) {
+	newKeysets := make(map[string][]cashu.MintKey)
+	newActiveKeysets := make(map[string]cashu.MintKeysMap)
 
 	for _, seed := range seeds {
-
 		keysets, err := DeriveKeyset(mintKey, seed)
 		if err != nil {
 			return newKeysets, newActiveKeysets, fmt.Errorf("DeriveKeyset(mintKey, seed) %w", err)
 		}
 		if seed.Active {
-			newActiveKeysets[seed.Unit] = make(cashu.KeysetMap)
+			newActiveKeysets[seed.Unit] = make(cashu.MintKeysMap)
 			for _, keyset := range keysets {
 				newActiveKeysets[seed.Unit][keyset.Amount] = keyset
 			}
 
 		}
 
-		newKeysets[seed.Unit] = append(newKeysets[seed.Unit], keysets...)
+		newKeysets[seed.Id] = keysets
 	}
 	return newKeysets, newActiveKeysets, nil
 

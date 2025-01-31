@@ -336,8 +336,8 @@ type MintError struct {
 	Code   int8   `json:"code"`
 }
 
-type KeysetMap map[uint64]Keyset
-type Keyset struct {
+type MintKeysMap map[uint64]MintKey
+type MintKey struct {
 	Id          string                `json:"id"`
 	Active      bool                  `json:"active" db:"active"`
 	Unit        string                `json:"unit"`
@@ -347,7 +347,7 @@ type Keyset struct {
 	InputFeePpk uint                  `json:"input_fee_ppk"`
 }
 
-func (keyset *Keyset) GetPubKey() *secp256k1.PublicKey {
+func (keyset *MintKey) GetPubKey() *secp256k1.PublicKey {
 	pubkey := keyset.PrivKey.PubKey()
 	return pubkey
 }
@@ -392,9 +392,9 @@ type GetInfoResponse struct {
 	Nuts            map[string]any `json:"nuts"`
 }
 
-type KeysResponse map[string][]KeysetResponse
+type KeysResponse map[string][]Keyset
 
-type KeysetResponse struct {
+type Keyset struct {
 	Id          string            `json:"id"`
 	Unit        string            `json:"unit"`
 	Keys        map[string]string `json:"keys"`

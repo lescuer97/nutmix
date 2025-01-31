@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -17,11 +18,9 @@ import (
 )
 
 type LocalSigner struct {
-	// activeKeysets map[unit][]cashu.KeysetMap
-	activeKeysets map[string]cashu.KeysetMap
-	// keysets map[unit][]cashu.Keyset
-	keysets map[string][]cashu.Keyset
-	db      database.MintDB
+	activeKeysets map[string]cashu.MintKeysMap
+	keysets       map[string][]cashu.MintKey
+	db            database.MintDB
 }
 
 func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
@@ -68,7 +67,7 @@ func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
 // gets all active keys
 func (l *LocalSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
 	// convert map to slice
-	var keys []cashu.Keyset
+	var keys []cashu.MintKey
 	for _, keyset := range l.activeKeysets {
 		for _, key := range keyset {
 			keys = append(keys, key)
@@ -94,12 +93,30 @@ func (l *LocalSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 }
 func (l *LocalSigner) GetKeysByUnit(unit cashu.Unit) ([]cashu.Keyset, error) {
 
-	val, exists := l.keysets[unit.String()]
-	if exists {
-		return val, nil
+	var keys []cashu.Keyset
 
+	for _, mintKey := range l.keysets {
+
+		if len(mintKey) > 0 {
+
+			if mintKey[0].Unit == unit.String() {
+
+				keysetResp := cashu.Keyset{
+					Id:          mintKey[0].Id,
+					Unit:        mintKey[0].Unit,
+					InputFeePpk: mintKey[0].InputFeePpk,
+				}
+
+				for _, keyset := range mintKey {
+					keysetResp.Keys[strconv.FormatUint(keyset.Amount, 10)] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
+				}
+
+				keys = append(keys, keysetResp)
+			}
+
+		}
 	}
-	return val, signer.ErrNoKeysetFound
+	return keys, nil
 }
 
 // gets all keys from the signer
@@ -240,14 +257,15 @@ func (l *LocalSigner) signBlindMessage(k *secp256k1.PrivateKey, message cashu.Bl
 
 	return blindSig, nil
 }
-func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage, unit cashu.Unit) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
+
+func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
 	var blindedSignatures []cashu.BlindSignature
 	var recoverSigDB []cashu.RecoverSigDB
 
 	for _, output := range messages {
-		correctKeyset := l.activeKeysets[unit.String()][output.Amount]
+		correctKeyset := l.keysets[output.Id][output.Amount]
 
-		if correctKeyset.PrivKey == nil || correctKeyset.Id != output.Id {
+		if correctKeyset.PrivKey == nil || !correctKeyset.Active {
 			return nil, nil, cashu.UsingInactiveKeyset
 		}
 
@@ -303,7 +321,7 @@ func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.B
 }
 
 func (l *LocalSigner) validateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
-	var keysetToUse cashu.Keyset
+	var keysetToUse cashu.MintKey
 	for _, keyset := range l.keysets[unit.String()] {
 		if keyset.Amount == proof.Amount && keyset.Id == proof.Id {
 			keysetToUse = keyset

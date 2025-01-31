@@ -11,5 +11,5 @@ type Signer interface {
 	RotateKeyset(unit cashu.Unit, fee uint) error
 
 	VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage, unit cashu.Unit) error
-	SignBlindMessages(messages []cashu.BlindedMessage, unit cashu.Unit) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error)
+	SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error)
 }
