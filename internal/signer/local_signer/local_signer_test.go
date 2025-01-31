@@ -9,6 +9,8 @@ package localsigner
 
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
 
+
+func TestMint
 // func TestCreateNewSeed(t *testing.T) {
 // 	decodedPrivKey, err := hex.DecodeString(MintPrivateKey)
 // 	if err != nil {

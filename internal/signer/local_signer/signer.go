@@ -177,7 +177,7 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 }
 
 func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
-	seeds, err := l.db.GetSeedsByUnit(cashu.Sat)
+	seeds, err := l.db.GetSeedsByUnit(unit)
 	if err != nil {
 		return fmt.Errorf("database.GetSeedsByUnit(pool, cashu.Sat). %w", err)
 	}

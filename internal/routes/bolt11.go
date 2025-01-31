@@ -333,7 +333,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		dbRequest = cashu.MeltRequestDB{
 			Quote:           response.Quote,
 			Request:         meltRequest.Request,
-			Unit:            cashu.Sat.String(),
+			Unit:            meltRequest.Unit,
 			Expiry:          response.Expiry,
 			Amount:          response.Amount,
 			FeeReserve:      response.FeeReserve,
