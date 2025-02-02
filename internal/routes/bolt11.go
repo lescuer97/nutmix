@@ -481,7 +481,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		}
 
 		// check if we know any of the proofs
-		knownProofs, err := mint.MintDB.GetProofsFromSecret(SecretsList)
+		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(SecretsList)
 
 		if err != nil {
 			logger.Warn(fmt.Sprintf("CheckListOfProofs: %+v", err))
