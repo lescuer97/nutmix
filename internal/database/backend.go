@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -54,6 +55,9 @@ type MintDB interface {
 
 	GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error
+
+	GetProofsMintReserve() (templates.MintReserve, error)
+	GetBlindSigsMintReserve() (templates.MintReserve, error)
 
 	GetConfig() (utils.Config, error)
 	SetConfig(config utils.Config) error

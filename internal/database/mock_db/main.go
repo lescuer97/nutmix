@@ -216,3 +216,16 @@ func (m *MockDB) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
 	return nil
 
 }
+
+func (m *MockDB) GetTotalProofsAmountAndBlindSig() (uint64, uint64, error) {
+	totalProof := uint64(0)
+	totalBlindSig := uint64(0)
+
+	for _, proof := range m.Proofs {
+		totalProof += proof.Amount
+	}
+	for _, sig := range m.RecoverSigDB {
+		totalProof += sig.Amount
+	}
+	return totalProof, totalBlindSig, nil
+}

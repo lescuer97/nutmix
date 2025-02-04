@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/pressly/goose/v3"
 )
 
@@ -407,6 +408,51 @@ func (pql Postgresql) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
 		}
 
 	}
+}
+
+func (pql Postgresql) GetProofsMintReserve() (templates.MintReserve, error) {
+	var mintReserve templates.MintReserve
+
+	rows, err := pql.pool.Query(context.Background(), `SELECT COALESCE(SUM(amount), 0) , COALESCE(COUNT(*), 0)  FROM proofs`)
+	defer rows.Close()
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return mintReserve, nil
+		}
+		return mintReserve, databaseError(fmt.Errorf("Error checking for  recovery_signature and proofs: %w", err))
+	}
+
+	for rows.Next() {
+		err := rows.Scan(&mintReserve.SatAmount, &mintReserve.Amount)
+		if err != nil {
+			return mintReserve, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
+		}
+
+	}
+	return mintReserve, nil
+}
+func (pql Postgresql) GetBlindSigsMintReserve() (templates.MintReserve, error) {
+	var mintReserve templates.MintReserve
+
+	rows, err := pql.pool.Query(context.Background(), `SELECT COALESCE(SUM(amount), 0) , COALESCE(COUNT(*), 0)  FROM recovery_signature`)
+	defer rows.Close()
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return mintReserve, nil
+		}
+		return mintReserve, databaseError(fmt.Errorf("Error checking for  recovery_signature and proofs: %w", err))
+	}
+
+	for rows.Next() {
+		err := rows.Scan(&mintReserve.SatAmount, &mintReserve.Amount)
+		if err != nil {
+			return mintReserve, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
+		}
+
+	}
+	return mintReserve, nil
 }
 
 func (pql Postgresql) Close() {

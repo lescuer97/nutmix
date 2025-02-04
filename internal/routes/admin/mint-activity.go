@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sort"
 	"time"
@@ -17,16 +18,26 @@ import (
 func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
+		isFakeWallet := false
 
 		if mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET {
-			c.HTML(200, "fake-wallet-balance", nil)
-			return
+			isFakeWallet = true
+		}
+		proofsReserve, err := mint.MintDB.GetProofsMintReserve()
 
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.GetProofsMintReserve(). %w", err))
+			return
+		}
+		sigsReserve, err := mint.MintDB.GetBlindSigsMintReserve()
+
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.GetProofsMintReserve(). %w", err))
+			return
 		}
 
 		milillisatBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
-
 			logger.Warn(
 				"mint.LightningComs.WalletBalance()",
 				slog.String(utils.LogExtraInfo, err.Error()))
@@ -38,8 +49,14 @@ func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
+		component := templates.MintBalance(milillisatBalance/1000, isFakeWallet, proofsReserve, sigsReserve)
 
-		c.HTML(200, "node-balance", milillisatBalance/1000)
+		err = component.Render(c.Request.Context(), c.Writer)
+		if err != nil {
+			c.Error(err)
+			c.Status(400)
+			return
+		}
 	}
 }
 
