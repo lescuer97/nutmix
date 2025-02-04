@@ -6,6 +6,7 @@ import (
 
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -217,15 +218,23 @@ func (m *MockDB) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
 
 }
 
-func (m *MockDB) GetTotalProofsAmountAndBlindSig() (uint64, uint64, error) {
-	totalProof := uint64(0)
-	totalBlindSig := uint64(0)
+func (m *MockDB) GetProofsMintReserve() (templates.MintReserve, error) {
+	var mintReserve templates.MintReserve
 
-	for _, proof := range m.Proofs {
-		totalProof += proof.Amount
+	for _, p := range m.Proofs {
+		mintReserve.SatAmount += p.Amount
+		mintReserve.Amount += 1
 	}
-	for _, sig := range m.RecoverSigDB {
-		totalProof += sig.Amount
+
+	return mintReserve, nil
+}
+func (m *MockDB) GetBlindSigsMintReserve() (templates.MintReserve, error) {
+
+	var mintReserve templates.MintReserve
+
+	for _, p := range m.RecoverSigDB {
+		mintReserve.SatAmount += p.Amount
+		mintReserve.Amount += 1
 	}
-	return totalProof, totalBlindSig, nil
+	return mintReserve, nil
 }
