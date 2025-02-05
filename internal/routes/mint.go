@@ -7,7 +7,6 @@ import (
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"log/slog"
-	"slices"
 )
 
 func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
@@ -82,7 +81,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		nuts := make(map[string]any)
 		var baseNuts []string = []string{"1", "2", "3", "4", "5", "6"}
 
-		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12"}
+		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12", "17"}
 
 		if mint.LightningBackend.ActiveMPP() {
 			optionalNuts = append(optionalNuts, "15")
@@ -161,6 +160,22 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				}
 
 				nuts[nut] = info
+			case "17":
+
+				wsMethod := make(map[string][]cashu.SwapMintMethod)
+
+				bolt11Method := cashu.SwapMintMethod{
+					Method: cashu.MethodBolt11,
+					Unit:   cashu.Sat.String(),
+					Commands: []cashu.SubscriptionKind{
+						cashu.Bolt11MeltQuote,
+						cashu.Bolt11MintQuote,
+						cashu.ProofStateWs,
+					},
+				}
+				wsMethod["supported"] = []cashu.SwapMintMethod{bolt11Method}
+
+				nuts[nut] = wsMethod
 
 			default:
 				nuts[nut] = cashu.SwapMintInfo{
@@ -246,7 +261,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		defer mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 
 		// check if we know any of the proofs
-		knownProofs, err := mint.MintDB.GetProofsFromSecret(SecretsList)
+		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(SecretsList)
 
 		if err != nil {
 			logger.Error("database.CheckListOfProofs(pool, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
@@ -319,56 +334,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		checkStateResponse := cashu.PostCheckStateResponse{
 			States: make([]cashu.CheckState, 0),
 		}
-		// set as unspent
-		proofs, err := mint.MintDB.GetProofsFromSecretCurve(checkStateRequest.Ys)
 
-		proofsForRemoval := make([]cashu.Proof, 0)
-
-		for _, state := range checkStateRequest.Ys {
-
-			pendingAndSpent := false
-
-			checkState := cashu.CheckState{
-				Y:       state,
-				State:   cashu.PROOF_UNSPENT,
-				Witness: nil,
-			}
-
-			switch {
-			// check if is in list of pending proofs
-			case slices.ContainsFunc(mint.PendingProofs, func(p cashu.Proof) bool {
-				checkState.Witness = &p.Witness
-				return p.Y == state
-			}):
-				pendingAndSpent = true
-				checkState.State = cashu.PROOF_PENDING
-			// Check if is in list of spents and if its also pending add it for removal of pending list
-			case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
-				compare := p.Y == state
-				if p.Witness != "" {
-					checkState.Witness = &p.Witness
-				}
-				if compare && pendingAndSpent {
-
-					proofsForRemoval = append(proofsForRemoval, p)
-				}
-				return compare
-			}):
-				checkState.State = cashu.PROOF_SPENT
-			}
-
-			checkStateResponse.States = append(checkStateResponse.States, checkState)
-		}
-
-		// remove proofs from pending proofs
-		if len(proofsForRemoval) != 0 {
-			newPendingProofs := []cashu.Proof{}
-			for _, proof := range mint.PendingProofs {
-				if !slices.Contains(proofsForRemoval, proof) {
-					newPendingProofs = append(newPendingProofs, proof)
-				}
-			}
-		}
+		states, err := m.CheckProofState(mint, checkStateRequest.Ys)
+		checkStateResponse.States = states
 
 		c.JSON(200, checkStateResponse)
 
@@ -408,6 +376,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		c.JSON(200, cashu.PostRestoreResponse{
 			Outputs:    restoredBlindMessage,
 			Signatures: restoredBlindSigs,
+			Promises:   restoredBlindSigs,
 		})
 	})
 

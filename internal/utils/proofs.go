@@ -60,13 +60,13 @@ func GetAndCalculateProofsValues(proofs *cashu.Proofs) (uint64, []string, error)
 	var SecretsList []string
 	for i, proof := range *proofs {
 		totalAmount += proof.Amount
-		SecretsList = append(SecretsList, proof.Secret)
 
 		p, err := proof.HashSecretToCurve()
 
 		if err != nil {
 			return 0, SecretsList, fmt.Errorf("proof.HashSecretToCurve(). %w", err)
 		}
+		SecretsList = append(SecretsList, p.Y)
 		(*proofs)[i] = p
 		(*proofs)[i].SeenAt = now
 	}

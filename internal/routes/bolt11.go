@@ -109,7 +109,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 		if err != nil {
-			logger.Error(fmt.Errorf("GetMintQuoteById: %w", err).Error())
+			logger.Error(fmt.Errorf("m.CheckMintRequest(pool, mint,quoteId ): %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -128,7 +128,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			quote.RequestPaid = true
 		}
 
-		c.JSON(200, quote)
+		c.JSON(200, quote.PostMintQuoteBolt11Response())
 	})
 
 	v1.POST("/mint/bolt11", func(c *gin.Context) {
@@ -361,7 +361,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 
 		quote, err := mint.MintDB.GetMeltRequestById(quoteId)
 		if err != nil {
-			logger.Warn(fmt.Errorf("database.GetMeltQuoteById: %w", err).Error())
+			logger.Error(fmt.Errorf("m.CheckMeltRequest(pool, mint, quoteId): %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -481,7 +481,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		}
 
 		// check if we know any of the proofs
-		knownProofs, err := mint.MintDB.GetProofsFromSecret(SecretsList)
+		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(SecretsList)
 
 		if err != nil {
 			logger.Warn(fmt.Sprintf("CheckListOfProofs: %+v", err))

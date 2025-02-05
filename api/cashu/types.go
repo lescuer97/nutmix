@@ -139,7 +139,7 @@ type BlindSignature struct {
 	Amount uint64              `json:"amount"`
 	Id     string              `json:"id"`
 	C_     string              `json:"C_"`
-	Dleq   *BlindSignatureDLEQ `json:"dleq"`
+	Dleq   *BlindSignatureDLEQ `json:"dleq,omitempty"`
 }
 
 type ProofState string
@@ -349,11 +349,12 @@ type Seed struct {
 }
 
 type SwapMintMethod struct {
-	Method    string `json:"method"`
-	Unit      string `json:"unit"`
-	MinAmount int    `json:"min_amount"`
-	MaxAmount int    `json:"max_amount"`
-	Mpp       bool   `json:"mpp,omitempty"`
+	Method    string             `json:"method"`
+	Unit      string             `json:"unit"`
+	MinAmount int                `json:"min_amount"`
+	MaxAmount int                `json:"max_amount"`
+	Mpp       bool               `json:"mpp,omitempty"`
+	Commands  []SubscriptionKind `json:"commands,omitempty"`
 }
 
 type SwapMintInfo struct {
@@ -540,12 +541,12 @@ type PostCheckStateResponse struct {
 }
 
 type RecoverSigDB struct {
-	Amount    uint64 `json:"amount"`
-	Id        string `json:"id"`
-	B_        string `json:"B_" db:"B_"`
-	C_        string `json:"C_" db:"C_"`
-	CreatedAt int64  `json:"created_at" db:"created_at"`
-	// Dleq   *BlindSignatureDLEQ `json:"dleq"`
+	Amount    uint64              `json:"amount"`
+	Id        string              `json:"id"`
+	B_        string              `json:"B_" db:"B_"`
+	C_        string              `json:"C_" db:"C_"`
+	CreatedAt int64               `json:"created_at" db:"created_at"`
+	Dleq      *BlindSignatureDLEQ `json:"dleq,omitempty"`
 }
 
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
@@ -564,6 +565,7 @@ func (r RecoverSigDB) GetBlindSignature() BlindSignature {
 		Amount: r.Amount,
 		Id:     r.Id,
 		C_:     r.C_,
+		Dleq:   r.Dleq,
 	}
 }
 
@@ -574,6 +576,7 @@ type PostRestoreRequest struct {
 type PostRestoreResponse struct {
 	Outputs    []BlindedMessage `json:"outputs"`
 	Signatures []BlindSignature `json:"signatures"`
+	Promises   []BlindSignature `json:"promises"`
 }
 
 type BlindSignatureDLEQ struct {
@@ -612,6 +615,12 @@ func (b *BlindSignatureDLEQ) UnmarshalJSON(data []byte) error {
 }
 
 func (b *BlindSignatureDLEQ) MarshalJSON() ([]byte, error) {
+	if b == nil {
+		return []byte("null"), nil
+	}
+	if b.E == nil || b.S == nil {
+		return []byte("null"), nil
+	}
 
 	return json.Marshal(&struct {
 		E string `json:"e"` // We want to encode the E as a string
