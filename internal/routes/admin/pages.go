@@ -115,7 +115,8 @@ func SwapStatusPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 		ctx := context.Background()
 
 		swapId := c.Param("swapId")
-		tx, err := mint.MintDB.GetTx(c.Request.Context())
+		tx, err := mint.MintDB.GetTx(ctx)
+
 		if err != nil {
 			logger.Debug(
 				"Incorrect body",

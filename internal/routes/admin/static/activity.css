@@ -99,8 +99,12 @@ tr.Melt {
     color: black;
 }
 
+.flex-card {
+    display: flex;
+    flex-direction: row;
+    gap: 40px;
 
-
+}
 .reserve-titles {
     display: flex;
     flex-direction: row;
@@ -120,5 +124,9 @@ tr.Melt {
     gap: 8px;
     margin-right: 8px;
     margin-left: 8px;
+}
+
+.reserves-data .data meter {
+    height: 20px;
 }
 

@@ -113,7 +113,7 @@ func (pql Postgresql) ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils
 	_, err := tx.Exec(context.Background(), "UPDATE liquidity_swaps SET state = $1 WHERE id = $2", state, id)
 
 	if err != nil {
-		return databaseError(fmt.Errorf("INSERT INTO swap_request: %w", err))
+		return databaseError(fmt.Errorf("Update liquidity_swaps: %w", err))
 
 	}
 	return nil

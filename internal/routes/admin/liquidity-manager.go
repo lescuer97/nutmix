@@ -107,7 +107,7 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		now := decodedInvoice.Timestamp.Add(decodedInvoice.Expiry()).Unix()
 		swap.Expiration = uint64(now)
 
-		tx, err := mint.MintDB.GetTx(c.Request.Context())
+		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
 			logger.Debug(
 				"Could not get db transactions",
@@ -120,12 +120,12 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				logger.Error("\n Rolling back  because of failure %+v\n", p)
-				tx.Rollback(c.Request.Context())
+				tx.Rollback(ctx)
 			} else if err != nil {
 				logger.Error(fmt.Sprintf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(c.Request.Context())
+				tx.Rollback(ctx)
 			} else {
-				err = tx.Commit(c.Request.Context())
+				err = tx.Commit(ctx)
 				if err != nil {
 					logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
 				}
@@ -191,7 +191,7 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		now := decodedInvoice.Timestamp.Add(decodedInvoice.Expiry()).Unix()
 		swap.Expiration = uint64(now)
 
-		tx, err := mint.MintDB.GetTx(c.Request.Context())
+		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
 			logger.Debug(
 				"Could not get db transactions",
@@ -204,12 +204,12 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				logger.Error("\n Rolling back  because of failure %+v\n", p)
-				tx.Rollback(c.Request.Context())
+				tx.Rollback(ctx)
 			} else if err != nil {
 				logger.Error(fmt.Sprintf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(c.Request.Context())
+				tx.Rollback(ctx)
 			} else {
-				err = tx.Commit(c.Request.Context())
+				err = tx.Commit(ctx)
 				if err != nil {
 					logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
 				}
@@ -252,7 +252,7 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		// only needs the amount and we generate an invoice from the mint directly
 		swapId := c.Param("swapId")
 
-		tx, err := mint.MintDB.GetTx(c.Request.Context())
+		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
 			logger.Debug(
 				"Could not get db transactions",
@@ -265,12 +265,12 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				logger.Error("\n Rolling back  because of failure %+v\n", p)
-				tx.Rollback(c.Request.Context())
+				tx.Rollback(ctx)
 			} else if err != nil {
 				logger.Error(fmt.Sprintf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(c.Request.Context())
+				tx.Rollback(ctx)
 			} else {
-				err = tx.Commit(c.Request.Context())
+				err = tx.Commit(ctx)
 				if err != nil {
 					logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
 				}
@@ -331,7 +331,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 		// only needs the amount and we generate an invoice from the mint directly
 		swapId := c.Param("swapId")
 
-		tx, err := mint.MintDB.GetTx(c.Request.Context())
+		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
 			logger.Debug(
 				"Could not get db transactions",

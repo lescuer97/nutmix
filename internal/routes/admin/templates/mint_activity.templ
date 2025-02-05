@@ -26,20 +26,23 @@ templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs Mint
 	{{ enoughLiquidity := balance < neededBalance }}
 	{{ percentageOfLiquidity := (float64(balance) / float64(neededBalance)) * 100 }}
 	{{ percentageOfLiquidityStr := fmt.Sprintf("%.2f", percentageOfLiquidity) }}
+
 	{{ 	ratioProofSigAmount := (float64(proofs.Amount) / float64(sigs.Amount)) * 100 }}
 	{{ ratioProofSigAmountStr := fmt.Sprintf("%.2f", ratioProofSigAmount) }}
+
 	{{ 	ratioProofSigAmountSats := (float64(proofs.SatAmount) / float64(sigs.SatAmount)) * 100 }}
 	{{ ratioProofSigAmountSatsStr := fmt.Sprintf("%.2f", ratioProofSigAmountSats) }}
+    <div class="flex-card">
 	<div class="card">
 		if fakeWallet {
 			<h2>Fake Wallet doesn't have a balance</h2>
 		} else {
 			<h2>Node Balance:</h2>
-			<b>{ balanceString }</b> Sats
+			<h3><b>{ balanceString }</b> Sats</h3>
 			<p>Your node has <b>{ percentageOfLiquidityStr } %</b> of liquidity needed.</p>
 		}
 	</div>
-	<div class="card" style="margin-top: 5px;">
+	<div class="card" >
 		<div class={ "reserves-data", templ.KV("iliquid", enoughLiquidity) }>
 			<div class="reserve-titles">
 				<h3>
@@ -69,6 +72,7 @@ templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs Mint
 			</div>
 		</div>
 	</div>
+    </div>
 }
 
 type ActivitySummary struct {
