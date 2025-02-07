@@ -298,6 +298,7 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 			Id:        output.Id,
 			C_:        blindSignature.C_,
 			B_:        output.B_,
+			Dleq:      blindSignature.Dleq,
 			CreatedAt: time.Now().Unix(),
 		}
 
