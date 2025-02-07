@@ -588,6 +588,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		// if fees where lower than expected return sats to the user
 		paidLightningFeeSat = uint64(payment.PaidFeeSat)
 
+
 		//  if total expent is lower that the amount of proofs that where given
 		//  change is returned
 		totalExpent := quote.Amount + paidLightningFeeSat + uint64(fee)

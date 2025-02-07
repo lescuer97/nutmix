@@ -237,9 +237,34 @@ func (pql Postgresql) GetMeltRequestById(id string) (cashu.MeltRequestDB, error)
 	return quote, nil
 }
 
+func (pql Postgresql) 	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
+
+	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp  FROM melt_request WHERE state = $1", state)
+	defer rows.Close()
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return []cashu.MeltRequestDB{}, err
+		}
+	}
+
+	quote, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return []cashu.MeltRequestDB{}, err
+		}
+
+		return quote, databaseError(fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MeltRequestDB]): %w", err))
+	}
+
+	return quote, nil
+}
+
 func (pql Postgresql) SaveMeltRequest(request cashu.MeltRequestDB) error {
 
-	_, err := pql.pool.Exec(context.Background(), "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp)
+	_, err := pql.pool.Exec(context.Background(), 
+    "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", 
+    request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 	}
@@ -328,6 +353,34 @@ func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, erro
 	var proofList []cashu.Proof
 
 	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE y = ANY($1)`, Ys)
+	defer rows.Close()
+
+	if err != nil {
+
+		if err == pgx.ErrNoRows {
+			return proofList, nil
+		}
+	}
+
+	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return proofList, nil
+		}
+		return proofList, fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof]): %w", err)
+	}
+
+	proofList = proof
+
+	return proofList, nil
+}
+
+func (pql Postgresql)	GetProofsFromQuote(quote string) ([]cashu.Proof, error){
+
+	var proofList []cashu.Proof
+
+	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = ANY($1)`, quote)
 	defer rows.Close()
 
 	if err != nil {

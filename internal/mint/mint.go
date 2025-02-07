@@ -253,6 +253,32 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	return nil
 }
 
+func (m *Mint) CheckMeltQuoteState(quote cashu.MeltRequestDB) error {
+
+    // status, preimage, err := m.LightningBackend.CheckPayed(quote.Quote)
+    return nil
+}
+
+func (m *Mint) CheckPendingProofs()  error {
+
+    quotes, err := m.MintDB.GetMeltQuotesByState(cashu.PENDING)
+		if err != nil  {
+			return fmt.Errorf("m.MintDB.GetMeltQuotesByState(cashu.PENDING). %w", err)
+		}
+
+    for _, quote := range quotes {
+        err := m.CheckMeltQuoteState(quote)
+		if err != nil  {
+			return fmt.Errorf("m.MintDB.GetMeltQuotesByState(cashu.PENDING). %w", err)
+		}
+    }
+
+
+
+    return nil
+}
+
+
 func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
 	var blindedSignatures []cashu.BlindSignature
 	var recoverSigDB []cashu.RecoverSigDB
