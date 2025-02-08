@@ -511,6 +511,12 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
+		err = mint.MintDB.SaveMeltChange(meltRequest.Outputs, quote.Quote)
+		if err != nil {
+			logger.Info(fmt.Errorf("mint.MintDB.SaveMeltChange(meltRequest.Outputs, quote.Quote) %w", err).Error())
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
 		var paidLightningFeeSat uint64
 
 		payment, err := mint.LightningBackend.PayInvoice(quote.Request, invoice, quote.FeeReserve, quote.Mpp, quote.Amount)
@@ -524,7 +530,6 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 
 			// if error on checking payement we will save as pending and returns status
 			if err != nil {
-
 				response := quote.GetPostMeltQuoteResponse()
 				err = mint.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted)
 				if err != nil {
@@ -588,7 +593,6 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		// if fees where lower than expected return sats to the user
 		paidLightningFeeSat = uint64(payment.PaidFeeSat)
 
-
 		//  if total expent is lower that the amount of proofs that where given
 		//  change is returned
 		totalExpent := quote.Amount + paidLightningFeeSat + uint64(fee)
@@ -640,6 +644,12 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			logger.Error(fmt.Errorf("SaveProofs: %w", err).Error())
 			logger.Error(fmt.Errorf("Proofs: %+v", meltRequest.Inputs).Error())
 			c.JSON(200, response)
+			return
+		}
+		err = mint.MintDB.DeleteChangeByQuote(quote.Quote)
+		if err != nil {
+			logger.Info(fmt.Errorf("mint.MintDB.SaveMeltChange(meltRequest.Outputs, quote.Quote) %w", err).Error())
+			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 

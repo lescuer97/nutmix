@@ -60,6 +60,10 @@ type MintDB interface {
 	SetConfig(config utils.Config) error
 	UpdateConfig(config utils.Config) error
 
+	SaveMeltChange(change []cashu.BlindedMessage, quote string) error
+	GetMeltChangeByQuote(quote string) ([]cashu.MeltChange, error)
+	DeleteChangeByQuote(quote string) error
+
 	/// Calls for the admin dashboard
 
 	GetMintMeltBalanceByTime(time int64) (MintMeltBalance, error)

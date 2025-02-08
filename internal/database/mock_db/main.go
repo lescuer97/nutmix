@@ -19,6 +19,7 @@ type MockDB struct {
 	MintRequest   []cashu.MintRequestDB
 	RecoverSigDB  []cashu.RecoverSigDB
 	NostrAuth     []database.NostrLoginAuth
+	MeltChange    []cashu.MeltChange
 	Seeds         []cashu.Seed
 	Config        utils.Config
 	ErrorToReturn error
@@ -112,6 +113,19 @@ func (m *MockDB) GetMeltRequestById(id string) (cashu.MeltRequestDB, error) {
 
 	return meltRequests[0], nil
 }
+func (m *MockDB) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
+	var meltRequests []cashu.MeltRequestDB
+	for i := 0; i < len(m.MeltRequest); i++ {
+
+		if m.MeltRequest[i].State == state {
+			meltRequests = append(meltRequests, m.MeltRequest[i])
+
+		}
+
+	}
+
+	return meltRequests, nil
+}
 
 func (m *MockDB) SaveMeltRequest(request cashu.MeltRequestDB) error {
 
@@ -159,6 +173,21 @@ func (m *MockDB) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, error)
 
 		}
 
+	}
+
+	return proofs, nil
+}
+func (m *MockDB) GetProofsFromQuote(quote string) ([]cashu.Proof, error) {
+	var proofs []cashu.Proof
+
+	for j := 0; j < len(m.Proofs); j++ {
+
+		if m.Proofs[j].Quote != nil {
+			if quote == *m.Proofs[j].Quote {
+				proofs = append(proofs, m.Proofs[j])
+
+			}
+		}
 	}
 
 	return proofs, nil

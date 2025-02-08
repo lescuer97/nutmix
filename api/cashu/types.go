@@ -548,9 +548,9 @@ type RecoverSigDB struct {
 	CreatedAt int64               `json:"created_at" db:"created_at"`
 	Dleq      *BlindSignatureDLEQ `json:"dleq,omitempty"`
 
-	    // This fields are use for melt_requests pending queries
-		MeltQuote   string `json:"melt_quote" db:"melt_quote"`
-		Locked   bool `json:"locked" db:"locked"`
+	// This fields are use for melt_requests pending queries
+	MeltQuote string `json:"melt_quote" db:"melt_quote"`
+	Locked    bool   `json:"locked" db:"locked"`
 }
 
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
@@ -760,4 +760,10 @@ func (b *BlindSignature) VerifyDLEQ(
 	// I negate the hashed_keys_priv because the original key got altered when multiplying for A
 	return hashed_keys_priv.Key.Negate().String() == e.Key.String(), nil
 
+}
+
+type MeltChange struct {
+	B_    string `db:"B_"`
+	Id    string
+	Quote string
 }

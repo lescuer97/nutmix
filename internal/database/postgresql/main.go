@@ -239,7 +239,7 @@ func (pql Postgresql) GetMeltRequestById(id string) (cashu.MeltRequestDB, error)
 	return quote, nil
 }
 
-func (pql Postgresql) 	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
+func (pql Postgresql) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
 
 	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp  FROM melt_request WHERE state = $1", state)
 	defer rows.Close()
@@ -264,9 +264,9 @@ func (pql Postgresql) 	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.M
 
 func (pql Postgresql) SaveMeltRequest(request cashu.MeltRequestDB) error {
 
-	_, err := pql.pool.Exec(context.Background(), 
-    "INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", 
-    request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp)
+	_, err := pql.pool.Exec(context.Background(),
+		"INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+		request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 	}
@@ -378,7 +378,7 @@ func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, erro
 	return proofList, nil
 }
 
-func (pql Postgresql)	GetProofsFromQuote(quote string) ([]cashu.Proof, error){
+func (pql Postgresql) GetProofsFromQuote(quote string) ([]cashu.Proof, error) {
 
 	var proofList []cashu.Proof
 
@@ -439,7 +439,7 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.Re
 
 	var signaturesList []cashu.RecoverSigDB
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
+	rows, err := pql.pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1) AND locked = false`, B_)
 	defer rows.Close()
 
 	if err != nil {
