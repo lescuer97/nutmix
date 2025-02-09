@@ -43,7 +43,7 @@ type MintDB interface {
 
 	GetMeltRequestById(quote string) (cashu.MeltRequestDB, error)
 	SaveMeltRequest(request cashu.MeltRequestDB) error
-	ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool) error
+	ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
 	AddPreimageMeltRequest(quote string, preimage string) error
 
 	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error)
@@ -52,6 +52,8 @@ type MintDB interface {
 	GetProofsFromSecret(SecretList []string) ([]cashu.Proof, error)
 	GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, error)
 	GetProofsFromQuote(quote string) ([]cashu.Proof, error)
+	SetProofsStateByQuote(quote string, state cashu.ProofState) error
+	DeleteProofsByQuote(quote string) error
 
 	GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error

@@ -69,7 +69,21 @@ func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeR
 	}, nil
 }
 
-func (f FakeWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
+func (f FakeWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
+	switch {
+	case slices.Contains(f.UnpurposeErrors, FailQueryUnknown):
+		return UNKNOWN, "", 0, nil
+	case slices.Contains(f.UnpurposeErrors, FailQueryFailed):
+		return FAILED, "", 0, nil
+	case slices.Contains(f.UnpurposeErrors, FailQueryPending):
+		return PENDING, "", 0, nil
+
+	}
+
+	return SETTLED, mock_preimage, uint64(10), nil
+}
+
+func (f FakeWallet) CheckReceived(quote string) (PaymentStatus, string, error) {
 	switch {
 	case slices.Contains(f.UnpurposeErrors, FailQueryUnknown):
 		return UNKNOWN, "", nil

@@ -265,8 +265,8 @@ func (pql Postgresql) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.Me
 func (pql Postgresql) SaveMeltRequest(request cashu.MeltRequestDB) error {
 
 	_, err := pql.pool.Exec(context.Background(),
-		"INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
-		request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp)
+		"INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp, paid_fee) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+		request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp, request.PaidFee)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 	}
@@ -282,9 +282,9 @@ func (pql Postgresql) AddPreimageMeltRequest(quote string, preimage string) erro
 	}
 	return nil
 }
-func (pql Postgresql) ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool) error {
+func (pql Postgresql) ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool, paid_fee uint64) error {
 	// change the paid status of the quote
-	_, err := pql.pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, state = $3, melted = $4 WHERE quote = $2", paid, quote, state, melted)
+	_, err := pql.pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, state = $3, melted = $4, paid_fee = $5 WHERE quote = $2", paid, quote, state, melted, paid_fee)
 	if err != nil {
 		return databaseError(fmt.Errorf("updating mint_request: %w", err))
 
@@ -404,6 +404,27 @@ func (pql Postgresql) GetProofsFromQuote(quote string) ([]cashu.Proof, error) {
 	proofList = proof
 
 	return proofList, nil
+}
+func (pql Postgresql) SetProofsStateByQuote(quote string, state cashu.ProofState) error {
+	_, err := pql.pool.Exec(context.Background(), `UPDATE proofs SET state = $1  WHERE quote = ANY($2)`, state, quote)
+
+	if err != nil {
+		return databaseError(fmt.Errorf("pql.pool.Exec(context.Background(), `DELETE FROM melt_change_message WHERE quote = $1`, quote): %w", err))
+	}
+
+	return nil
+
+}
+
+func (pql Postgresql) DeleteProofsByQuote(quote string) error {
+	_, err := pql.pool.Exec(context.Background(), `DELETE FROM proofs WHERE quote = $1`, quote)
+
+	if err != nil {
+		return databaseError(fmt.Errorf("pql.pool.Exec(context.Background(), `DELETE FROM melt_change_message WHERE quote = $1`, quote): %w", err))
+	}
+
+	return nil
+
 }
 
 func privateKeysToDleq(s_key *string, e_key *string, sig *cashu.RecoverSigDB) error {

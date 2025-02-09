@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"sort"
 	"sync"
 	"time"
@@ -253,13 +254,45 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	return nil
 }
 
-func (m *Mint) CheckMeltQuoteState(quote cashu.MeltRequestDB) error {
+func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) {
+	quote, err := m.MintDB.GetMeltRequestById(quoteId)
 
-	// status, preimage, err := m.LightningBackend.CheckPayed(quote.Quote)
-	return nil
+	if err != nil {
+		return quote, fmt.Errorf("m.MintDB.GetMeltRequestById(quoteId). %w", err)
+	}
+
+	if quote.State == cashu.PENDING {
+
+		status, preimage, _, err := m.LightningBackend.CheckPayed(quote.Quote)
+		if err != nil {
+			return quote, fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote). %w", err)
+		}
+
+		if status == lightning.SETTLED {
+			quote.State = cashu.PAID
+			quote.PaymentPreimage = preimage
+
+			err := m.MintDB.SetProofsStateByQuote(quote.Quote, cashu.PROOF_SPENT)
+			if err != nil {
+				return quote, fmt.Errorf("m.MintDB.DeleteProofsByQuote(quote.Quote). %w", err)
+			}
+
+		}
+		if status == lightning.FAILED {
+			quote.State = cashu.UNPAID
+			err := m.MintDB.DeleteProofsByQuote(quote.Quote)
+			if err != nil {
+				return quote, fmt.Errorf("m.MintDB.DeleteProofsByQuote(quote.Quote). %w", err)
+			}
+
+		}
+
+	}
+
+	return quote, nil
 }
 
-func (m *Mint) CheckPendingProofs() error {
+func (m *Mint) CheckPendingQuoteAndProofs(logger *slog.Logger) error {
 
 	quotes, err := m.MintDB.GetMeltQuotesByState(cashu.PENDING)
 	if err != nil {
@@ -267,10 +300,13 @@ func (m *Mint) CheckPendingProofs() error {
 	}
 
 	for _, quote := range quotes {
-		err := m.CheckMeltQuoteState(quote)
+		quote, err := m.CheckMeltQuoteState(quote.Quote)
 		if err != nil {
 			return fmt.Errorf("m.MintDB.GetMeltQuotesByState(cashu.PENDING). %w", err)
 		}
+
+		logger.Info(fmt.Sprintf("Melt quote %v state: %v", quote.Quote, quote.State))
+
 	}
 
 	return nil
@@ -454,34 +490,6 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 	mint.MintPubkey = pubkeyhex
 
 	return &mint, nil
-}
-
-type AddToDBFunc func(string, bool, cashu.ACTION_STATE, bool) error
-
-func (m *Mint) VerifyLightingPaymentHappened(paid bool, quote string, dbCall AddToDBFunc) (cashu.ACTION_STATE, string, error) {
-	state, preimage, err := m.LightningBackend.CheckPayed(quote)
-	if err != nil {
-		return cashu.UNPAID, "", fmt.Errorf("mint.LightningComs.CheckIfInvoicePayed: %w", err)
-	}
-
-	switch {
-	case state == lightning.SETTLED:
-		err := dbCall(quote, true, cashu.PAID, false)
-		if err != nil {
-			return cashu.PAID, preimage, fmt.Errorf("dbCall: %w", err)
-		}
-		return cashu.PAID, preimage, nil
-
-	case state == lightning.PENDING:
-		err := dbCall(quote, false, cashu.UNPAID, false)
-		if err != nil {
-			return cashu.UNPAID, preimage, fmt.Errorf("dbCall: %w", err)
-		}
-		return cashu.UNPAID, preimage, nil
-
-	}
-
-	return cashu.UNPAID, "", nil
 }
 
 func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *bip32.Key) (map[string][]cashu.Keyset, map[string]cashu.KeysetMap, error) {

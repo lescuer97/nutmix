@@ -459,6 +459,7 @@ type MeltRequestDB struct {
 	Expiry     int64  `json:"expiry"`
 	Amount     uint64 `json:"amount"`
 	FeeReserve uint64 `json:"fee_reserve" db:"fee_reserve"`
+	PaidFee    uint64 `json:"paid_fee" db:"paid_fee"`
 	// Deprecated: Should be removed after all main wallets change to the new State format
 	RequestPaid     bool         `json:"paid" db:"request_paid"`
 	Request         string       `json:"request"`

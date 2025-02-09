@@ -209,7 +209,12 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 
 				switch kind {
 				case cashu.Bolt11MintQuote:
-					mintState, err := m.CheckMintRequest(mint, filter)
+					quote, err := mint.MintDB.GetMintRequestById(filter)
+
+					if err != nil {
+						return fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)
+					}
+					mintState, err := m.CheckMintRequest(mint, quote)
 					if err != nil {
 						return fmt.Errorf("m.CheckMintRequest(mint, filter). %w", err)
 					}
@@ -291,11 +296,16 @@ func CheckStatusesOfSubscription(subKind cashu.SubscriptionKind, filters []strin
 	switch subKind {
 	case cashu.Bolt11MintQuote:
 		for _, v := range filters {
-			quote, err := m.CheckMintRequest(mint, v)
+			quote, err := mint.MintDB.GetMintRequestById(v)
+
+			if err != nil {
+				return mintQuote, proofsState, fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)
+			}
+			quote, err = m.CheckMintRequest(mint, quote)
 			if err != nil {
 				return mintQuote, proofsState, fmt.Errorf("m.CheckMintRequest(pool, mint,v ) %w", err)
 			}
-			mintQuote = append(mintQuote, quote)
+			mintQuote = append(mintQuote, quote.PostMintQuoteBolt11Response())
 		}
 	case cashu.ProofStateWs:
 		proofsState, err := m.CheckProofState(mint, filters)

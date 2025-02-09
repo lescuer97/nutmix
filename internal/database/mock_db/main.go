@@ -145,12 +145,13 @@ func (m *MockDB) AddPreimageMeltRequest(preimage string, quote string) error {
 	return nil
 
 }
-func (m *MockDB) ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool) error {
+func (m *MockDB) ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool, paid_fee uint64) error {
 	for i := 0; i < len(m.MeltRequest); i++ {
 		if m.MeltRequest[i].Quote == quote {
 			m.MeltRequest[i].RequestPaid = paid
 			m.MeltRequest[i].State = state
 			m.MeltRequest[i].Melted = melted
+			m.MeltRequest[i].PaidFee = paid_fee
 		}
 
 	}
@@ -217,6 +218,29 @@ func (m *MockDB) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, error) {
 	}
 
 	return proofs, nil
+}
+
+func (m *MockDB) DeleteProofsByQuote(quote string) error {
+	for i := 0; i < len(m.Proofs); i++ {
+
+		if m.Proofs[i].Quote == &quote {
+			m.Proofs = append(m.Proofs[:i], m.Proofs[i+1:]...)
+		}
+
+	}
+
+	return nil
+}
+func (m *MockDB) SetProofsStateByQuote(quote string, state cashu.ProofState) error {
+	for i := 0; i < len(m.Proofs); i++ {
+
+		if m.Proofs[i].Quote == &quote {
+			m.Proofs[i].State = state
+		}
+
+	}
+
+	return nil
 }
 
 func (m *MockDB) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error) {
