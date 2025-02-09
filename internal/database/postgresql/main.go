@@ -409,10 +409,9 @@ func (pql Postgresql) SetProofsState(proofs cashu.Proofs, state cashu.ProofState
 	// change the paid status of the quote
 	batch := pgx.Batch{}
 	for _, proof := range proofs {
-
-		batch.Queue(`UPDATE proofs SET state = $1  WHERE secret = $2`, state, proof.Secret)
-
+		batch.Queue(`UPDATE proofs SET state = $1  WHERE y = $2`, state, proof.Y)
 	}
+
 	results := pql.pool.SendBatch(context.Background(), &batch)
 	defer results.Close()
 
@@ -433,7 +432,7 @@ func (pql Postgresql) DeleteProofs(proofs cashu.Proofs) error {
 	batch := pgx.Batch{}
 	for _, proof := range proofs {
 
-		batch.Queue(`DELETE FROM proofs WHERE secret = $1`, proof.Secret)
+		batch.Queue(`DELETE FROM proofs WHERE y = $1`, proof.Y)
 
 	}
 	results := pql.pool.SendBatch(context.Background(), &batch)
