@@ -292,9 +292,9 @@ func (pql Postgresql) ChangeMeltRequestState(quote string, paid bool, state cash
 	return nil
 }
 
-func (pql Postgresql) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, error) {
+func (pql Postgresql) GetProofsFromSecret(SecretList []string) (cashu.Proofs, error) {
 
-	var proofList []cashu.Proof
+	var proofList cashu.Proofs
 
 	ctx := context.Background()
 	rows, err := pql.pool.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE secret = ANY($1)", SecretList)
@@ -350,9 +350,9 @@ func (pql Postgresql) SaveProof(proofs []cashu.Proof) error {
 
 }
 
-func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, error) {
+func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) (cashu.Proofs, error) {
 
-	var proofList []cashu.Proof
+	var proofList cashu.Proofs
 
 	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE y = ANY($1)`, Ys)
 	defer rows.Close()
@@ -378,9 +378,9 @@ func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, erro
 	return proofList, nil
 }
 
-func (pql Postgresql) GetProofsFromQuote(quote string) ([]cashu.Proof, error) {
+func (pql Postgresql) GetProofsFromQuote(quote string) (cashu.Proofs, error) {
 
-	var proofList []cashu.Proof
+	var proofList cashu.Proofs
 
 	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = ANY($1)`, quote)
 	defer rows.Close()
@@ -405,22 +405,47 @@ func (pql Postgresql) GetProofsFromQuote(quote string) ([]cashu.Proof, error) {
 
 	return proofList, nil
 }
-func (pql Postgresql) SetProofsStateByQuote(quote string, state cashu.ProofState) error {
-	_, err := pql.pool.Exec(context.Background(), `UPDATE proofs SET state = $1  WHERE quote = ANY($2)`, state, quote)
+func (pql Postgresql) SetProofsState(proofs cashu.Proofs, state cashu.ProofState) error {
+	// change the paid status of the quote
+	batch := pgx.Batch{}
+	for _, proof := range proofs {
 
+		batch.Queue(`UPDATE proofs SET state = $1  WHERE secret = $2`, state, proof.Secret)
+
+	}
+	results := pql.pool.SendBatch(context.Background(), &batch)
+	defer results.Close()
+
+	rows, err := results.Query()
+	defer rows.Close()
 	if err != nil {
-		return databaseError(fmt.Errorf("pql.pool.Exec(context.Background(), `DELETE FROM melt_change_message WHERE quote = $1`, quote): %w", err))
+		if err == pgx.ErrNoRows {
+			return err
+		}
+		return databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
 
 	return nil
-
 }
 
-func (pql Postgresql) DeleteProofsByQuote(quote string) error {
-	_, err := pql.pool.Exec(context.Background(), `DELETE FROM proofs WHERE quote = $1`, quote)
+func (pql Postgresql) DeleteProofs(proofs cashu.Proofs) error {
+	// change the paid status of the quote
+	batch := pgx.Batch{}
+	for _, proof := range proofs {
 
+		batch.Queue(`DELETE FROM proofs WHERE secret = $1`, proof.Secret)
+
+	}
+	results := pql.pool.SendBatch(context.Background(), &batch)
+	defer results.Close()
+
+	rows, err := results.Query()
+	defer rows.Close()
 	if err != nil {
-		return databaseError(fmt.Errorf("pql.pool.Exec(context.Background(), `DELETE FROM melt_change_message WHERE quote = $1`, quote): %w", err))
+		if err == pgx.ErrNoRows {
+			return err
+		}
+		return databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
 
 	return nil

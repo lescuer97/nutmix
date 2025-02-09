@@ -49,11 +49,11 @@ type MintDB interface {
 	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error)
 
 	SaveProof(proofs []cashu.Proof) error
-	GetProofsFromSecret(SecretList []string) ([]cashu.Proof, error)
-	GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, error)
-	GetProofsFromQuote(quote string) ([]cashu.Proof, error)
-	SetProofsStateByQuote(quote string, state cashu.ProofState) error
-	DeleteProofsByQuote(quote string) error
+	GetProofsFromSecret(SecretList []string) (cashu.Proofs, error)
+	GetProofsFromSecretCurve(Ys []string) (cashu.Proofs, error)
+	GetProofsFromQuote(quote string) (cashu.Proofs, error)
+	SetProofsState(proofs cashu.Proofs, state cashu.ProofState) error
+	DeleteProofs(proofs cashu.Proofs) error
 
 	GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error

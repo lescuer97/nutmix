@@ -159,8 +159,8 @@ func (m *MockDB) ChangeMeltRequestState(quote string, paid bool, state cashu.ACT
 
 }
 
-func (m *MockDB) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, error) {
-	var proofs []cashu.Proof
+func (m *MockDB) GetProofsFromSecret(SecretList []string) (cashu.Proofs, error) {
+	var proofs cashu.Proofs
 	for i := 0; i < len(SecretList); i++ {
 
 		secret := SecretList[i]
@@ -178,8 +178,8 @@ func (m *MockDB) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, error)
 
 	return proofs, nil
 }
-func (m *MockDB) GetProofsFromQuote(quote string) ([]cashu.Proof, error) {
-	var proofs []cashu.Proof
+func (m *MockDB) GetProofsFromQuote(quote string) (cashu.Proofs, error) {
+	var proofs cashu.Proofs
 
 	for j := 0; j < len(m.Proofs); j++ {
 
@@ -200,8 +200,8 @@ func (m *MockDB) SaveProof(proofs []cashu.Proof) error {
 
 }
 
-func (m *MockDB) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, error) {
-	var proofs []cashu.Proof
+func (m *MockDB) GetProofsFromSecretCurve(Ys []string) (cashu.Proofs, error) {
+	var proofs cashu.Proofs
 	for i := 0; i < len(Ys); i++ {
 
 		secretCurve := Ys[i]
@@ -220,24 +220,27 @@ func (m *MockDB) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, error) {
 	return proofs, nil
 }
 
-func (m *MockDB) DeleteProofsByQuote(quote string) error {
+func (m *MockDB) DeleteProofs(proofs cashu.Proofs) error {
 	for i := 0; i < len(m.Proofs); i++ {
-
-		if m.Proofs[i].Quote == &quote {
-			m.Proofs = append(m.Proofs[:i], m.Proofs[i+1:]...)
+		for j := 0; j < len(proofs); j++ {
+			if proofs[j].Y == m.Proofs[i].Y {
+				m.Proofs = append(m.Proofs[:i], m.Proofs[i+1:]...)
+			}
 		}
-
 	}
 
 	return nil
 }
-func (m *MockDB) SetProofsStateByQuote(quote string, state cashu.ProofState) error {
+
+func (m *MockDB) SetProofsState(proofs cashu.Proofs, state cashu.ProofState) error {
 	for i := 0; i < len(m.Proofs); i++ {
 
-		if m.Proofs[i].Quote == &quote {
-			m.Proofs[i].State = state
-		}
+		for j := 0; j < len(proofs); j++ {
 
+			if proofs[j].Secret == m.Proofs[i].Secret {
+				m.Proofs[i].State = state
+			}
+		}
 	}
 
 	return nil

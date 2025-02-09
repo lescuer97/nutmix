@@ -272,7 +272,12 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			quote.State = cashu.PAID
 			quote.PaymentPreimage = preimage
 
-			err := m.MintDB.SetProofsStateByQuote(quote.Quote, cashu.PROOF_SPENT)
+			pending_proofs, err := m.MintDB.GetProofsFromQuote(quote.Quote)
+			if err != nil {
+				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
+			}
+
+			err = m.MintDB.SetProofsState(pending_proofs, cashu.PROOF_SPENT)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.DeleteProofsByQuote(quote.Quote). %w", err)
 			}
@@ -280,7 +285,12 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 		}
 		if status == lightning.FAILED {
 			quote.State = cashu.UNPAID
-			err := m.MintDB.DeleteProofsByQuote(quote.Quote)
+			pending_proofs, err := m.MintDB.GetProofsFromQuote(quote.Quote)
+			if err != nil {
+				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
+			}
+
+			err = m.MintDB.DeleteProofs(pending_proofs)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.DeleteProofsByQuote(quote.Quote). %w", err)
 			}
