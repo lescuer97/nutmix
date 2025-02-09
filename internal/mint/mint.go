@@ -263,23 +263,66 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 
 	if quote.State == cashu.PENDING {
 
-		status, preimage, _, err := m.LightningBackend.CheckPayed(quote.Quote)
+		status, preimage, fee, err := m.LightningBackend.CheckPayed(quote.Quote)
 		if err != nil {
 			return quote, fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote). %w", err)
 		}
 
 		if status == lightning.SETTLED {
 			quote.State = cashu.PAID
+			quote.PaidFee = fee
 			quote.PaymentPreimage = preimage
 
 			pending_proofs, err := m.MintDB.GetProofsFromQuote(quote.Quote)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
 			}
+			changeMessages, err := m.MintDB.GetMeltChangeByQuote(quote.Quote)
+			if err != nil {
+				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
+			}
+
+			fee, err := cashu.Fees(pending_proofs, m.Keysets[quote.Unit])
+			if err != nil {
+				return quote, fmt.Errorf("cashu.Fees(pending_proofs, m.Keysets[quote.Unit]). %w", err)
+			}
+
+			totalExpent := quote.Amount + quote.PaidFee + uint64(fee)
+
+			overpaidFees := pending_proofs.Amount() - totalExpent
+
+			if len(changeMessages) > 0 && overpaidFees > 0 {
+
+				var blindMessages []cashu.BlindedMessage
+				for _, v := range changeMessages {
+					blindMessages = append(blindMessages, cashu.BlindedMessage{Id: v.Id, B_: v.Id})
+
+				}
+				sigs, err := m.GetChangeOutput(blindMessages, overpaidFees, quote.Unit)
+				if err != nil {
+					return quote, fmt.Errorf("m.GetChangeOutput(changeMessages, quote.Unit ). %w", err)
+				}
+
+				err = m.MintDB.SaveRestoreSigs(sigs)
+				if err != nil {
+					return quote, fmt.Errorf("m.MintDB.SaveRestoreSigs(sigs) %w", err)
+				}
+
+				err = m.MintDB.DeleteChangeByQuote(quote.Quote)
+				if err != nil {
+					return quote, fmt.Errorf("m.MintDB.DeleteChangeByQuote(quote.Quote) %w", err)
+				}
+
+			}
 
 			err = m.MintDB.SetProofsState(pending_proofs, cashu.PROOF_SPENT)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.DeleteProofsByQuote(quote.Quote). %w", err)
+				return quote, fmt.Errorf("m.MintDB.SetProofsState(pending_proofs, cashu.PROOF_SPENT) %w", err)
+			}
+
+			err = m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
+			if err != nil {
+				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee) %w", err)
 			}
 
 		}
@@ -290,6 +333,15 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
 			}
 
+			err = m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
+			if err != nil {
+				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee) %w", err)
+			}
+
+			err = m.MintDB.DeleteChangeByQuote(quote.Quote)
+			if err != nil {
+				return quote, fmt.Errorf("m.MintDB.DeleteChangeByQuote(quote.Quote) %w", err)
+			}
 			err = m.MintDB.DeleteProofs(pending_proofs)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.DeleteProofsByQuote(quote.Quote). %w", err)

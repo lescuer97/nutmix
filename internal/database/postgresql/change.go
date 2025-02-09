@@ -38,7 +38,7 @@ func (pql Postgresql) GetMeltChangeByQuote(quote string) ([]cashu.MeltChange, er
 
 	var meltChangeList []cashu.MeltChange
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT B_, id, quote FROM melt_change_message WHERE quote = ANY($1)`, quote)
+	rows, err := pql.pool.Query(context.Background(), `SELECT B_, id, quote FROM melt_change_message WHERE quote = ANY($1) FOR UPDATE NOWAIT`, quote)
 	defer rows.Close()
 
 	if err != nil {

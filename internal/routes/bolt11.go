@@ -359,19 +359,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1.GET("/melt/quote/bolt11/:quote", func(c *gin.Context) {
 		quoteId := c.Param("quote")
 
-		quote, err := mint.MintDB.GetMeltRequestById(quoteId)
-		if err != nil {
-			logger.Error(fmt.Errorf("m.CheckMeltRequest(pool, mint, quoteId): %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-
-		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
-			c.JSON(200, quote.GetPostMeltQuoteResponse())
-			return
-		}
-
-		quote, err = mint.CheckMeltQuoteState(quoteId)
+        quote, err := mint.CheckMeltQuoteState(quoteId)
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.CheckMeltQuoteState(quoteId): %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -585,7 +573,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		if AmountProofs > totalExpent && len(meltRequest.Outputs) > 0 {
 
 			overpaidFees := AmountProofs - totalExpent
-			change := utils.GetChangeOutput(overpaidFees, meltRequest.Outputs)
+			change := m.GetMessagesForChange(overpaidFees, meltRequest.Outputs)
 
 			blindSignatures, recoverySigsDb, err := mint.SignBlindedMessages(change, quote.Unit)
 

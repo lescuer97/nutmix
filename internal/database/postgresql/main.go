@@ -354,7 +354,7 @@ func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) (cashu.Proofs, error
 
 	var proofList cashu.Proofs
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE y = ANY($1)`, Ys)
+	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE y = ANY($1) FOR UPDATE NOWAIT`, Ys)
 	defer rows.Close()
 
 	if err != nil {
@@ -382,7 +382,7 @@ func (pql Postgresql) GetProofsFromQuote(quote string) (cashu.Proofs, error) {
 
 	var proofList cashu.Proofs
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = ANY($1)`, quote)
+	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = ANY($1) FOR UPDATE NOWAIT`, quote)
 	defer rows.Close()
 
 	if err != nil {

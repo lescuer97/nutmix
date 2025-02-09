@@ -156,6 +156,13 @@ func (p *Proofs) SetPendingAndQuoteRef(quote string) {
 		(*p)[i].Quote = &quote
 	}
 }
+func (p *Proofs) Amount() uint64 {
+	amount := uint64(0)
+	for i := 0; i < len(*p); i++ {
+		amount += (*p)[i].Amount
+	}
+	return amount
+}
 
 func (p *Proofs) SetProofsState(state ProofState) {
 	for i := 0; i < len(*p); i++ {
