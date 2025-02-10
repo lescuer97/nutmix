@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
-	"log/slog"
-	"time"
-
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
+	"log/slog"
+	"time"
 )
 
 func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
@@ -55,9 +53,8 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 					slog.String(utils.LogExtraInfo, err.Error()))
 			}
 
-
 			for _, swap := range swaps {
-			logger.Debug(fmt.Sprintf("Checking out swap. %v", swap.Id))
+				logger.Debug(fmt.Sprintf("Checking out swap. %v", swap.Id))
 
 				swapTx, err := tx.Begin(ctx)
 				if err != nil {
@@ -140,6 +137,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 				}
 
+				logger.Debug(fmt.Sprintf("Commiting swap. %v", swap.Id))
 				err = swapTx.Commit(ctx)
 				if err != nil {
 					logger.Error(fmt.Sprintf("\n Could not commit subTx: %+v \n", err))

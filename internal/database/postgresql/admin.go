@@ -140,7 +140,7 @@ func (pql Postgresql) GetLiquiditySwaps(swap utils.LiquiditySwap) ([]utils.Liqui
 func (pql Postgresql) GetLiquiditySwapById(tx pgx.Tx, id string) (utils.LiquiditySwap, error) {
 
 	var swaps utils.LiquiditySwap
-	rows, err := tx.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration FROM liquidity_swaps WHERE id = $1 FOR UPDATE NOWAIT", id)
+	rows, err := tx.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration FROM liquidity_swaps WHERE id = $1 FOR SHARE", id)
 	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)

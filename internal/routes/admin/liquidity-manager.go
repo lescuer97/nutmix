@@ -3,7 +3,6 @@ package admin
 import (
 	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -279,70 +278,9 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 
 		swapRequest, err := mint.MintDB.GetLiquiditySwapById(tx, swapId)
 		if err != nil {
+
+			// pgx.Lo
 			c.Error(fmt.Errorf("mint.MintDB.GetLiquiditySwapById(swapId). %w", err))
-			return
-		}
-
-		if swapRequest.State == utils.WaitingUserConfirmation {
-			component := templates.SwapState(swapRequest.State, swapId)
-
-			err = component.Render(ctx, c.Writer)
-			if err != nil {
-				c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
-				return
-			}
-			return
-
-		}
-
-		switch swapRequest.Type {
-		case utils.LiquidityIn:
-			decodedInvoice, err := zpay32.Decode(swapRequest.LightningInvoice, mint.LightningBackend.GetNetwork())
-			if err != nil {
-				// If the fees are acceptable, continue to create the Receive Payment
-				c.Error(fmt.Errorf("zpay32.Decode(res.Destination, mint.LightningBackend.GetNetwork()). %w", err))
-				return
-			}
-
-			payHash := hex.EncodeToString(decodedInvoice.PaymentHash[:])
-			status, _, err := mint.LightningBackend.CheckReceived(payHash)
-			if err != nil {
-				c.Error(fmt.Errorf("mint.LightningBackend.CheckPayed(payHash). %w", err))
-				return
-			}
-
-			switch status {
-			case lightning.SETTLED:
-				swapRequest.State = utils.Finished
-			}
-		case utils.LiquidityOut:
-			decodedInvoice, err := zpay32.Decode(swapRequest.LightningInvoice, mint.LightningBackend.GetNetwork())
-			if err != nil {
-				// If the fees are acceptable, continue to create the Receive Payment
-				c.Error(fmt.Errorf("zpay32.Decode(res.Destination, mint.LightningBackend.GetNetwork()). %w", err))
-				return
-			}
-
-			payHash := hex.EncodeToString(decodedInvoice.PaymentHash[:])
-			status, _, _, err := mint.LightningBackend.CheckPayed(payHash)
-			if err != nil {
-				c.Error(fmt.Errorf("mint.LightningBackend.CheckPayed(payHash). %w", err))
-				return
-			}
-
-			switch status {
-			case lightning.SETTLED:
-				swapRequest.State = utils.Finished
-			case lightning.PENDING:
-				swapRequest.State = utils.LightningPaymentPending
-			case lightning.FAILED:
-				swapRequest.State = utils.LightningPaymentFail
-			}
-
-		}
-		err = mint.MintDB.ChangeLiquiditySwapState(tx, swapId, swapRequest.State)
-		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.ChangeLiquiditySwapState(swapId, swapRequest.State). %w", err))
 			return
 		}
 
@@ -353,8 +291,8 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
 			return
 		}
-
 		return
+
 	}
 }
 
@@ -405,6 +343,24 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 		err = mint.MintDB.ChangeLiquiditySwapState(tx, swapId, swapRequest.State)
 		if err != nil {
 			c.Error(fmt.Errorf("mint.MintDB.ChangeLiquiditySwapState(swapId, swapRequest.State). %w", err))
+			return
+		}
+		err = tx.Commit(ctx)
+		if err != nil {
+			logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
+		}
+		tx, err = mint.MintDB.GetTx(ctx)
+		if err != nil {
+			logger.Debug(
+				"Could not get db transactions",
+				slog.String(utils.LogExtraInfo, err.Error()),
+			)
+			c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
+			return
+		}
+		swapRequest, err = mint.MintDB.GetLiquiditySwapById(tx, swapId)
+		if err != nil {
+			c.Error(errors.New("mint.MintDB.GetLiquiditySwapById(swapId)"))
 			return
 		}
 
