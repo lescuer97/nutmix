@@ -46,12 +46,17 @@ type MintDB interface {
 
 	GetMeltRequestById(quote string) (cashu.MeltRequestDB, error)
 	SaveMeltRequest(request cashu.MeltRequestDB) error
-	ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool) error
+	ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
 	AddPreimageMeltRequest(quote string, preimage string) error
 
+	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error)
+
 	SaveProof(proofs []cashu.Proof) error
-	GetProofsFromSecret(SecretList []string) ([]cashu.Proof, error)
-	GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, error)
+	GetProofsFromSecret(SecretList []string) (cashu.Proofs, error)
+	GetProofsFromSecretCurve(Ys []string) (cashu.Proofs, error)
+	GetProofsFromQuote(quote string) (cashu.Proofs, error)
+	SetProofsState(proofs cashu.Proofs, state cashu.ProofState) error
+	DeleteProofs(proofs cashu.Proofs) error
 
 	GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error
@@ -62,6 +67,10 @@ type MintDB interface {
 	GetConfig() (utils.Config, error)
 	SetConfig(config utils.Config) error
 	UpdateConfig(config utils.Config) error
+
+	SaveMeltChange(change []cashu.BlindedMessage, quote string) error
+	GetMeltChangeByQuote(quote string) ([]cashu.MeltChange, error)
+	DeleteChangeByQuote(quote string) error
 
 	/// Calls for the admin dashboard
 

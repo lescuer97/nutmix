@@ -32,27 +32,6 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 
 }
 
-func GetChangeOutput(overpaidFees uint64, outputs []cashu.BlindedMessage) []cashu.BlindedMessage {
-	amounts := cashu.AmountSplit(overpaidFees)
-	// if there are more outputs then amount to change.
-	// we size down the total amount of blind messages
-	switch {
-	case len(amounts) > len(outputs):
-		for i := range outputs {
-			outputs[i].Amount = amounts[i]
-		}
-
-	default:
-		outputs = outputs[:len(amounts)]
-
-		for i := range outputs {
-			outputs[i].Amount = amounts[i]
-		}
-
-	}
-	return outputs
-}
-
 // Sets some values being used by the mint like seen, secretY, seen, and pending state
 func GetAndCalculateProofsValues(proofs *cashu.Proofs) (uint64, []string, error) {
 	now := time.Now().Unix()

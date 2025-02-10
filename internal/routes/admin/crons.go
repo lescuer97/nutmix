@@ -66,7 +66,6 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 						continue
 					}
 				}
-
 				decodedInvoice, err := zpay32.Decode(swap.LightningInvoice, mint.LightningBackend.GetNetwork())
 				if err != nil {
 					logger.Warn(
@@ -76,21 +75,44 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 				}
 
 				payHash := hex.EncodeToString(decodedInvoice.PaymentHash[:])
-				status, _, err := mint.LightningBackend.CheckPayed(payHash)
-				if err != nil {
-					logger.Warn(
-						"mint.LightningBackend.CheckPayed(payHash)",
-						slog.String(utils.LogExtraInfo, err.Error()))
-					continue
-				}
 
-				switch status {
-				case lightning.SETTLED:
-					swap.State = utils.Finished
-				case lightning.PENDING:
-					swap.State = utils.LightningPaymentPending
-				case lightning.FAILED:
-					swap.State = utils.LightningPaymentFail
+				switch swap.Type {
+				case utils.LiquidityIn:
+					status, _, err := mint.LightningBackend.CheckReceived(payHash)
+					if err != nil {
+						logger.Warn(
+							"mint.LightningBackend.CheckReceived(payHash)",
+							slog.String(utils.LogExtraInfo, err.Error()))
+						return
+					}
+
+					switch status {
+					case lightning.SETTLED:
+						swap.State = utils.Finished
+					case lightning.PENDING:
+						swap.State = utils.LightningPaymentPending
+					case lightning.FAILED:
+						swap.State = utils.LightningPaymentFail
+					}
+
+				case utils.LiquidityOut:
+					status, _, _, err := mint.LightningBackend.CheckPayed(payHash)
+					if err != nil {
+						logger.Warn(
+							"mint.LightningBackend.CheckPayed(payHash)",
+							slog.String(utils.LogExtraInfo, err.Error()))
+						continue
+					}
+
+					switch status {
+					case lightning.SETTLED:
+						swap.State = utils.Finished
+					case lightning.PENDING:
+						swap.State = utils.LightningPaymentPending
+					case lightning.FAILED:
+						swap.State = utils.LightningPaymentFail
+					}
+
 				}
 
 				err = mint.MintDB.ChangeLiquiditySwapState(tx, swap.Id, swap.State)

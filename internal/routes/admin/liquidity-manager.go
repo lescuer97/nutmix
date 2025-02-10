@@ -293,7 +293,7 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			}
 
 			payHash := hex.EncodeToString(decodedInvoice.PaymentHash[:])
-			status, _, err := mint.LightningBackend.CheckPayed(payHash)
+			status, _, err := mint.LightningBackend.CheckReceived(payHash)
 			if err != nil {
 				c.Error(fmt.Errorf("mint.LightningBackend.CheckPayed(payHash). %w", err))
 				return
@@ -304,6 +304,28 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 				swapRequest.State = utils.Finished
 			}
 		case utils.LiquidityOut:
+			decodedInvoice, err := zpay32.Decode(swapRequest.LightningInvoice, mint.LightningBackend.GetNetwork())
+			if err != nil {
+				// If the fees are acceptable, continue to create the Receive Payment
+				c.Error(fmt.Errorf("zpay32.Decode(res.Destination, mint.LightningBackend.GetNetwork()). %w", err))
+				return
+			}
+
+			payHash := hex.EncodeToString(decodedInvoice.PaymentHash[:])
+			status, _, _, err := mint.LightningBackend.CheckPayed(payHash)
+			if err != nil {
+				c.Error(fmt.Errorf("mint.LightningBackend.CheckPayed(payHash). %w", err))
+				return
+			}
+
+			switch status {
+			case lightning.SETTLED:
+				swapRequest.State = utils.Finished
+			case lightning.PENDING:
+				swapRequest.State = utils.LightningPaymentPending
+			case lightning.FAILED:
+				swapRequest.State = utils.LightningPaymentFail
+			}
 
 		}
 		err = mint.MintDB.ChangeLiquiditySwapState(tx, swapId, swapRequest.State)
@@ -391,7 +413,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
 
 			// if exception of lightning payment says fail do a payment status recheck.
-			status, _, err := mint.LightningBackend.CheckPayed(swapRequest.LightningInvoice)
+			status, _, _, err := mint.LightningBackend.CheckPayed(swapRequest.LightningInvoice)
 
 			// if error on checking payement we will save as pending and returns status
 			if err != nil {

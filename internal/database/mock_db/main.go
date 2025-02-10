@@ -21,6 +21,7 @@ type MockDB struct {
 	RecoverSigDB  []cashu.RecoverSigDB
 	NostrAuth     []database.NostrLoginAuth
 	LiquiditySwap []utils.LiquiditySwap
+	MeltChange    []cashu.MeltChange
 	Seeds         []cashu.Seed
 	Config        utils.Config
 	ErrorToReturn error
@@ -114,6 +115,19 @@ func (m *MockDB) GetMeltRequestById(id string) (cashu.MeltRequestDB, error) {
 
 	return meltRequests[0], nil
 }
+func (m *MockDB) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
+	var meltRequests []cashu.MeltRequestDB
+	for i := 0; i < len(m.MeltRequest); i++ {
+
+		if m.MeltRequest[i].State == state {
+			meltRequests = append(meltRequests, m.MeltRequest[i])
+
+		}
+
+	}
+
+	return meltRequests, nil
+}
 
 func (m *MockDB) SaveMeltRequest(request cashu.MeltRequestDB) error {
 
@@ -133,12 +147,13 @@ func (m *MockDB) AddPreimageMeltRequest(preimage string, quote string) error {
 	return nil
 
 }
-func (m *MockDB) ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool) error {
+func (m *MockDB) ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool, paid_fee uint64) error {
 	for i := 0; i < len(m.MeltRequest); i++ {
 		if m.MeltRequest[i].Quote == quote {
 			m.MeltRequest[i].RequestPaid = paid
 			m.MeltRequest[i].State = state
 			m.MeltRequest[i].Melted = melted
+			m.MeltRequest[i].PaidFee = paid_fee
 		}
 
 	}
@@ -146,8 +161,8 @@ func (m *MockDB) ChangeMeltRequestState(quote string, paid bool, state cashu.ACT
 
 }
 
-func (m *MockDB) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, error) {
-	var proofs []cashu.Proof
+func (m *MockDB) GetProofsFromSecret(SecretList []string) (cashu.Proofs, error) {
+	var proofs cashu.Proofs
 	for i := 0; i < len(SecretList); i++ {
 
 		secret := SecretList[i]
@@ -165,6 +180,21 @@ func (m *MockDB) GetProofsFromSecret(SecretList []string) ([]cashu.Proof, error)
 
 	return proofs, nil
 }
+func (m *MockDB) GetProofsFromQuote(quote string) (cashu.Proofs, error) {
+	var proofs cashu.Proofs
+
+	for j := 0; j < len(m.Proofs); j++ {
+
+		if m.Proofs[j].Quote != nil {
+			if quote == *m.Proofs[j].Quote {
+				proofs = append(proofs, m.Proofs[j])
+
+			}
+		}
+	}
+
+	return proofs, nil
+}
 
 func (m *MockDB) SaveProof(proofs []cashu.Proof) error {
 	m.Proofs = append(m.Proofs, proofs...)
@@ -172,8 +202,8 @@ func (m *MockDB) SaveProof(proofs []cashu.Proof) error {
 
 }
 
-func (m *MockDB) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, error) {
-	var proofs []cashu.Proof
+func (m *MockDB) GetProofsFromSecretCurve(Ys []string) (cashu.Proofs, error) {
+	var proofs cashu.Proofs
 	for i := 0; i < len(Ys); i++ {
 
 		secretCurve := Ys[i]
@@ -190,6 +220,32 @@ func (m *MockDB) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, error) {
 	}
 
 	return proofs, nil
+}
+
+func (m *MockDB) DeleteProofs(proofs cashu.Proofs) error {
+	for i := 0; i < len(m.Proofs); i++ {
+		for j := 0; j < len(proofs); j++ {
+			if proofs[j].Y == m.Proofs[i].Y {
+				m.Proofs = append(m.Proofs[:i], m.Proofs[i+1:]...)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (m *MockDB) SetProofsState(proofs cashu.Proofs, state cashu.ProofState) error {
+	for i := 0; i < len(m.Proofs); i++ {
+
+		for j := 0; j < len(proofs); j++ {
+
+			if proofs[j].Secret == m.Proofs[i].Secret {
+				m.Proofs[i].State = state
+			}
+		}
+	}
+
+	return nil
 }
 
 func (m *MockDB) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error) {

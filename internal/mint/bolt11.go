@@ -3,33 +3,35 @@ package mint
 import (
 	"errors"
 	"fmt"
-	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lightningnetwork/lnd/invoices"
 	"strings"
+
+	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lightningnetwork/lnd/invoices"
 )
 
-func CheckMintRequest(mint *Mint, quoteId string) (cashu.PostMintQuoteBolt11Response, error) {
-	quote, err := mint.MintDB.GetMintRequestById(quoteId)
-	if err != nil {
-		return quote.PostMintQuoteBolt11Response(), fmt.Errorf("database.GetMintQuoteById(pool, quoteId). %w", err)
-	}
+func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB) (cashu.MintRequestDB, error) {
 
 	if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
-		return quote.PostMintQuoteBolt11Response(), nil
+		return quote, nil
 	}
 
-	state, _, err := mint.VerifyLightingPaymentHappened(quote.RequestPaid, quote.Quote, mint.MintDB.ChangeMintRequestState)
-
+	status, _, err := mint.LightningBackend.CheckReceived(quote.Quote)
 	if err != nil {
-		return quote.PostMintQuoteBolt11Response(), fmt.Errorf("mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid. %w", err)
+		return quote, fmt.Errorf("mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid. %w", err)
 	}
-
-	quote.State = state
-
-	if state == cashu.PAID {
+	switch {
+	case status == lightning.SETTLED:
+		quote.State = cashu.PAID
 		quote.RequestPaid = true
+
+	case status == lightning.PENDING:
+		quote.State = cashu.PENDING
+	case status == lightning.FAILED:
+		quote.State = cashu.UNPAID
+
 	}
-	return quote.PostMintQuoteBolt11Response(), nil
+	return quote, nil
 
 }
 
@@ -43,19 +45,26 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 	if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
 		return quote.GetPostMeltQuoteResponse(), nil
 	}
-
-	state, preimage, err := mint.VerifyLightingPaymentHappened(quote.RequestPaid, quote.Quote, mint.MintDB.ChangeMeltRequestState)
+	status, preimage, fees, err := mint.LightningBackend.CheckPayed(quote.Quote)
 	if err != nil {
 		if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 			return quote.GetPostMeltQuoteResponse(), nil
 		}
-
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid, quote.Quote, database.ModifyQuoteMeltPayStatus) %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("mint.LightningBackend.CheckPayed(quote.Quote). %w", err)
 	}
-	quote.PaymentPreimage = preimage
-	quote.State = state
-	if state == cashu.PAID {
+
+	switch {
+	case status == lightning.SETTLED:
+		quote.PaymentPreimage = preimage
+		quote.State = cashu.PAID
+		quote.PaidFee = fees
 		quote.RequestPaid = true
+
+	case status == lightning.PENDING:
+		quote.State = cashu.PENDING
+	case status == lightning.FAILED:
+		quote.State = cashu.UNPAID
+
 	}
 
 	err = mint.MintDB.AddPreimageMeltRequest(quote.Quote, preimage)
