@@ -91,7 +91,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 	adminRoute.GET("/logs", LogsTab(logger))
 
 	// only have swap routes if liquidity manager is possible
-	if utils.CanUseLiquidityManager(mint.LightningBackend.GetNetwork()) {
+	if utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
 
 		adminRoute.GET("/liquidity", LigthningLiquidityPage(logger, mint))
 		adminRoute.GET("/liquidity/:swapId", SwapStatusPage(logger, mint))

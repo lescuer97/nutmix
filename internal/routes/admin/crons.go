@@ -105,7 +105,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 			}
 
 		}()
-		time.Sleep(10 * time.Second)
+		time.Sleep(40 * time.Second)
 
 	}
 

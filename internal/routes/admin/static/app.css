@@ -103,7 +103,7 @@ main {
   flex-direction: column;
 }
 
-.form {
+form {
   display: flex;
   flex-direction: column;
   background-color: var(--color-surface-200);

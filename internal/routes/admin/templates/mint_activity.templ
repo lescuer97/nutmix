@@ -26,53 +26,51 @@ templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs Mint
 	{{ enoughLiquidity := balance < neededBalance }}
 	{{ percentageOfLiquidity := (float64(balance) / float64(neededBalance)) * 100 }}
 	{{ percentageOfLiquidityStr := fmt.Sprintf("%.2f", percentageOfLiquidity) }}
-
 	{{ 	ratioProofSigAmount := (float64(proofs.Amount) / float64(sigs.Amount)) * 100 }}
 	{{ ratioProofSigAmountStr := fmt.Sprintf("%.2f", ratioProofSigAmount) }}
-
 	{{ 	ratioProofSigAmountSats := (float64(proofs.SatAmount) / float64(sigs.SatAmount)) * 100 }}
 	{{ ratioProofSigAmountSatsStr := fmt.Sprintf("%.2f", ratioProofSigAmountSats) }}
-    <div class="flex-card">
-	<div class="card">
-		if fakeWallet {
-			<h2>Fake Wallet doesn't have a balance</h2>
-		} else {
-			<h2>Node Balance:</h2>
-			<h3><b>{ balanceString }</b> Sats</h3>
-			<p>Your node has <b>{ percentageOfLiquidityStr } %</b> of liquidity needed.</p>
-		}
-	</div>
-	<div class="card" >
-		<div class={ "reserves-data", templ.KV("iliquid", enoughLiquidity) }>
-			<div class="reserve-titles">
-				<h3>
-					Proofs
-				</h3>
-				<h3>
-					Promises
-				</h3>
-			</div>
-			<div class="data">
-				<span>
-					{  proofAmount }
-				</span>
-				<meter min="0" max="100" value={ ratioProofSigAmountStr }></meter>
-				<span>
-					{ sigsAmount }
-				</span>
-			</div>
-			<div class="data">
-				<span>
-					{ proofSatAmount } <small>Sats</small>
-				</span>
-				<meter min="0" max="100" value={ ratioProofSigAmountSatsStr }></meter>
-				<span>
-					{  sigsSatAmount } <small>Sats</small>
-				</span>
+	<div class="flex-card">
+		<div class="card">
+			if fakeWallet {
+				<h2>Fake Wallet doesn't have a balance</h2>
+			} else {
+				<h2>Node Balance:</h2>
+				<h3><b>{ balanceString }</b> Sats</h3>
+				<p>Your node has <b>{ percentageOfLiquidityStr } %</b> of liquidity needed.</p>
+			}
+		</div>
+		<div class="card">
+			<div class={ "reserves-data", templ.KV("iliquid", enoughLiquidity) }>
+				<div class="reserve-titles">
+					<h3>
+						Proofs
+					</h3>
+					<h3>
+						Promises
+					</h3>
+				</div>
+				<div class="data">
+					<span>
+						{  proofAmount }
+					</span>
+					<meter min="0" max="100" value={ ratioProofSigAmountStr }></meter>
+					<span>
+						{ sigsAmount }
+					</span>
+				</div>
+				<div class="data">
+					<span>
+						{ proofSatAmount } <small>Sats</small>
+					</span>
+					<meter min="0" max="100" value={ ratioProofSigAmountSatsStr }></meter>
+					<span>
+						{  sigsSatAmount } <small>Sats</small>
+					</span>
+				</div>
 			</div>
 		</div>
 	</div>
-    </div>
 }
 
 type ActivitySummary struct {

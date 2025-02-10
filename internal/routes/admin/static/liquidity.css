@@ -1,9 +1,9 @@
 .liquidity-dashboard {
-    display: flex;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    justify-content: center;
-    align-content: center;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-content: center;
 }
 
 .liquidity-dashboard .actions-container {
@@ -15,7 +15,7 @@
   align-self: center;
   word-wrap: break-word;
   padding: 20px;
-  }
+}
 
 .liquidity-dashboard .swap-list {
   display: flex;
@@ -24,72 +24,69 @@
   align-self: center;
   max-height: 600px;
   overflow-y: auto;
-  }
+}
 
 .liquidity-actions {
-    display: flex;
-    gap: 15px;
-    padding: 20px;
-    justify-content: center;
+  display: flex;
+  gap: 15px;
+  padding: 20px;
+  justify-content: center;
 }
 
 .invoice-input {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
 
-    min-width: 400px;
-    min-height: 120px;
+  min-width: 400px;
+  min-height: 120px;
 }
 .invoice-input textarea {
-    width: 100%;
-    height: 100%;
+  width: 100%;
+  height: 100%;
 }
 
 .swap-form {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  /* border-radius: 15px; */
-  /* border: 2px solid #020000; */
+  border: 0px;
 }
 
-.active-swaps{
+.active-swaps {
   display: flex;
   flex-direction: column;
   gap: 15px;
   word-wrap: break-word;
-  /* border-radius: 15px; */
-  /* border: 2px solid #020000; */
 }
 
 .summary {
-    padding: 20px;
+  padding: 20px;
 }
 
 .action-button {
-    background-color: var(--darkreader-inline-bgcolor);
-    color: var(--white);
-    padding: 15px 20px;
-    border-radius: 50px;
-    font-weight: 800;
-    font-size: 14px;
-    letter-spacing: 1px;
-    border: 0px;
-    height: max-content;
-    align-self: center
+  background-color: var(--darkreader-inline-bgcolor);
+  color: var(--white);
+  padding: 15px 20px;
+  border-radius: 50px;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 1px;
+  border: 0px;
+  height: max-content;
+  align-self: center;
 }
 
 .action-button:hover {
-    background-color: #0056b3;
+  background-color: #0056b3;
 }
 
 .action-button:active {
-    transform: translateY(1px);
+  transform: translateY(1px);
 }
 
 .action-button:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
 }

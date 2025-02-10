@@ -74,7 +74,7 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
-		err := templates.MintActivityLayout(utils.CanUseLiquidityManager(mint.LightningBackend.GetNetwork())).Render(ctx, c.Writer)
+		err := templates.MintActivityLayout(utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND)).Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(err)

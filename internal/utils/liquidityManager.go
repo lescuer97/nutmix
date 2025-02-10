@@ -2,8 +2,6 @@ package utils
 
 import (
 	"errors"
-
-	"github.com/btcsuite/btcd/chaincfg"
 )
 
 type SwapState string
@@ -59,15 +57,13 @@ func (s SwapType) ToString() string {
 	return ""
 }
 
-func CanUseLiquidityManager(chain *chaincfg.Params) bool {
-	switch chain {
-	case &chaincfg.MainNetParams:
-		return true
-	case &chaincfg.TestNet3Params:
+func CanUseLiquidityManager(backend LightningBackend) bool {
+	switch backend {
+	case FAKE_WALLET:
+		return false
 	default:
 		return true
 	}
-	return false
 }
 
 type LiquiditySwap struct {
