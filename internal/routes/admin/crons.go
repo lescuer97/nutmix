@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"log"
+	"log/slog"
+	"time"
+
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log/slog"
-	"time"
 )
 
 func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
@@ -43,9 +45,8 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 			swaps, err := mint.MintDB.GetLiquiditySwapsByStates([]utils.SwapState{
 				utils.MintWaitingPaymentRecv,
-				utils.LightningPaymentFail,
 				utils.LightningPaymentPending,
-				utils.UnknownProblem,
+				utils.WaitingUserConfirmation,
 			})
 
 			if err != nil {
@@ -54,11 +55,22 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 					slog.String(utils.LogExtraInfo, err.Error()))
 			}
 
+
 			for _, swap := range swaps {
+			logger.Debug(fmt.Sprintf("Checking out swap. %v", swap.Id))
+
+				swapTx, err := tx.Begin(ctx)
+				if err != nil {
+					logger.Debug(
+						"Could not get swapTx for swap",
+						slog.String(utils.LogExtraInfo, err.Error()),
+					)
+					return
+				}
 				now := time.Now().Unix()
 
 				if now > int64(swap.Expiration) {
-					err := mint.MintDB.ChangeLiquiditySwapState(tx, swap.Id, utils.Expired)
+					err := mint.MintDB.ChangeLiquiditySwapState(swapTx, swap.Id, utils.Expired)
 					if err != nil {
 						logger.Warn(
 							"mint.MintDB.ChangeLiquiditySwapState(swap.Id,utils.Expired)",
@@ -71,6 +83,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 					logger.Warn(
 						"zpay32.Decode(swap.Destination, mint.LightningBackend.GetNetwork())",
 						slog.String(utils.LogExtraInfo, err.Error()))
+					swapTx.Rollback(ctx)
 					continue
 				}
 
@@ -83,7 +96,8 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 						logger.Warn(
 							"mint.LightningBackend.CheckReceived(payHash)",
 							slog.String(utils.LogExtraInfo, err.Error()))
-						return
+						swapTx.Rollback(ctx)
+						continue
 					}
 
 					switch status {
@@ -101,6 +115,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 						logger.Warn(
 							"mint.LightningBackend.CheckPayed(payHash)",
 							slog.String(utils.LogExtraInfo, err.Error()))
+						swapTx.Rollback(ctx)
 						continue
 					}
 
@@ -115,15 +130,20 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 				}
 
-				err = mint.MintDB.ChangeLiquiditySwapState(tx, swap.Id, swap.State)
+				err = mint.MintDB.ChangeLiquiditySwapState(swapTx, swap.Id, swap.State)
 				if err != nil {
 					logger.Warn(
 						"mint.MintDB.ChangeLiquiditySwapState(swap.Id,utils.Expired)",
 						slog.String(utils.LogExtraInfo, err.Error()))
+					swapTx.Rollback(ctx)
 					continue
 
 				}
 
+				err = swapTx.Commit(ctx)
+				if err != nil {
+					logger.Error(fmt.Sprintf("\n Could not commit subTx: %+v \n", err))
+				}
 			}
 
 		}()

@@ -283,6 +283,18 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
+		if swapRequest.State == utils.WaitingUserConfirmation {
+			component := templates.SwapState(swapRequest.State, swapId)
+
+			err = component.Render(ctx, c.Writer)
+			if err != nil {
+				c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
+				return
+			}
+			return
+
+		}
+
 		switch swapRequest.Type {
 		case utils.LiquidityIn:
 			decodedInvoice, err := zpay32.Decode(swapRequest.LightningInvoice, mint.LightningBackend.GetNetwork())

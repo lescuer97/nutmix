@@ -143,7 +143,7 @@ templ LightningReceiveSummary(recieveSats string, address string, qrCode string,
 		@QRCode(qrCode)
 		<div
 			hx-get={ "/admin/swap/" + swapId }
-			hx-trigger="load, every 2s"
+			hx-trigger="load"
 			hx-swap="innerHTML"
 			hx-target="this"
 			class="swap-state"
@@ -163,7 +163,7 @@ templ LightningSendSummary(recieveSats string, address string, swapId string) {
 			</p>
 			<div
 				hx-get={ "/admin/swap/" + swapId }
-				hx-trigger="load, every 2s"
+				hx-trigger="load"
 				hx-swap="innerHTML"
 				hx-target="this"
 				class="swap-state"
@@ -182,6 +182,7 @@ templ SwapState(state utils.SwapState, swapId string) {
 		</div>
 		if waitingConfirm {
 			<form
+				class="swap-form"
 				hx-post={ "/admin/swap/" + swapId + "/confirm" }
 				hx-swap="outerHTML"
 				hx-target=".state"

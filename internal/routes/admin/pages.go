@@ -138,7 +138,6 @@ func SwapStatusPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 				if err != nil {
 					logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
 				}
-				fmt.Println("Key rotation finished successfully")
 			}
 		}()
 		swap, err := mint.MintDB.GetLiquiditySwapById(tx, swapId)
