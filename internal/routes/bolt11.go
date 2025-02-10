@@ -349,7 +349,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		if err != nil {
 			logger.Warn(fmt.Errorf("SaveQuoteMeltRequest: %w", err).Error())
 			logger.Warn(fmt.Errorf("dbRequest: %+v", dbRequest).Error())
-			c.JSON(200, response)
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
 
@@ -481,7 +481,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		}
 
 		// check if we know any of the proofs
-		knownProofs, err := mint.MintDB.GetProofsFromSecret(SecretsList)
+		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(SecretsList)
 
 		if err != nil {
 			logger.Warn(fmt.Sprintf("CheckListOfProofs: %+v", err))

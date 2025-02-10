@@ -1,20 +1,30 @@
 package mockdb
 
 import (
+	"context"
+	"slices"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
+func (m *MockDB) GetTx(ctx context.Context) (pgx.Tx, error) {
+	return &pgxpool.Tx{}, nil
+
+}
 func (m *MockDB) SaveNostrAuth(auth database.NostrLoginAuth) error {
 	return nil
 
 }
 
-func (m *MockDB) UpdateNostrAuthActivation(nonce string, activated bool) error {
+func (m *MockDB) UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error {
 	return nil
 }
 
-func (m *MockDB) GetNostrAuth(nonce string) (database.NostrLoginAuth, error) {
+func (m *MockDB) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLoginAuth, error) {
 	var seeds []database.NostrLoginAuth
 	for i := 0; i < len(m.NostrAuth); i++ {
 
@@ -47,4 +57,51 @@ func (m *MockDB) GetMintMeltBalanceByTime(time int64) (database.MintMeltBalance,
 
 	}
 	return mintmeltbalance, nil
+}
+func (m *MockDB) AddLiquiditySwap(tx pgx.Tx, swap utils.LiquiditySwap) error {
+	m.LiquiditySwap = append(m.LiquiditySwap, swap)
+	return nil
+
+}
+func (m *MockDB) ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.SwapState) error {
+	var liquiditySwaps []utils.LiquiditySwap
+	for i := 0; i < len(m.LiquiditySwap); i++ {
+		if m.LiquiditySwap[i].Id == id {
+			liquiditySwaps[i].State = state
+		}
+
+	}
+
+	return nil
+}
+
+func (m *MockDB) GetLiquiditySwapById(tx pgx.Tx, id string) (utils.LiquiditySwap, error) {
+	var liquiditySwaps []utils.LiquiditySwap
+	for i := 0; i < len(m.LiquiditySwap); i++ {
+
+		if m.LiquiditySwap[i].Id == id {
+			liquiditySwaps = append(liquiditySwaps, m.LiquiditySwap[i])
+
+		}
+
+	}
+
+	return liquiditySwaps[0], nil
+}
+
+func (m *MockDB) GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error) {
+	return m.LiquiditySwap, nil
+}
+
+func (m *MockDB) GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error) {
+	var liquiditySwaps []utils.LiquiditySwap
+	for i := 0; i < len(m.LiquiditySwap); i++ {
+		if slices.Contains(states, m.LiquiditySwap[i].State) {
+			liquiditySwaps = append(liquiditySwaps, m.LiquiditySwap[i])
+		}
+
+	}
+
+	return liquiditySwaps, nil
+
 }

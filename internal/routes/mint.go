@@ -261,7 +261,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		defer mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
 
 		// check if we know any of the proofs
-		knownProofs, err := mint.MintDB.GetProofsFromSecret(SecretsList)
+		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(SecretsList)
 
 		if err != nil {
 			logger.Error("database.CheckListOfProofs(pool, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
@@ -376,6 +376,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		c.JSON(200, cashu.PostRestoreResponse{
 			Outputs:    restoredBlindMessage,
 			Signatures: restoredBlindSigs,
+			Promises:   restoredBlindSigs,
 		})
 	})
 

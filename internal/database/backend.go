@@ -1,9 +1,12 @@
 package database
 
 import (
+	"context"
 	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -27,9 +30,9 @@ const (
 )
 
 type MintDB interface {
+	GetTx(ctx context.Context) (pgx.Tx, error)
 
 	/// Calls for the Functioning of the mint
-
 	GetAllSeeds() ([]cashu.Seed, error)
 	GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error)
 	SaveNewSeed(seed cashu.Seed) error
@@ -53,6 +56,9 @@ type MintDB interface {
 	GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error
 
+	GetProofsMintReserve() (templates.MintReserve, error)
+	GetBlindSigsMintReserve() (templates.MintReserve, error)
+
 	GetConfig() (utils.Config, error)
 	SetConfig(config utils.Config) error
 	UpdateConfig(config utils.Config) error
@@ -62,6 +68,15 @@ type MintDB interface {
 	GetMintMeltBalanceByTime(time int64) (MintMeltBalance, error)
 
 	SaveNostrAuth(auth NostrLoginAuth) error
-	UpdateNostrAuthActivation(nonce string, activated bool) error
-	GetNostrAuth(nonce string) (NostrLoginAuth, error)
+	UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error
+	GetNostrAuth(tx pgx.Tx, nonce string) (NostrLoginAuth, error)
+
+	// liquidity swaps
+	AddLiquiditySwap(tx pgx.Tx, swap utils.LiquiditySwap) error
+	GetLiquiditySwapById(tx pgx.Tx, id string) (utils.LiquiditySwap, error)
+	ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.SwapState) error
+	GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error)
+	GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error)
+
+	// liquidity provider state
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -19,6 +20,7 @@ type MockDB struct {
 	MintRequest   []cashu.MintRequestDB
 	RecoverSigDB  []cashu.RecoverSigDB
 	NostrAuth     []database.NostrLoginAuth
+	LiquiditySwap []utils.LiquiditySwap
 	Seeds         []cashu.Seed
 	Config        utils.Config
 	ErrorToReturn error
@@ -214,4 +216,25 @@ func (m *MockDB) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
 	m.RecoverSigDB = append(m.RecoverSigDB, recover_sigs...)
 	return nil
 
+}
+
+func (m *MockDB) GetProofsMintReserve() (templates.MintReserve, error) {
+	var mintReserve templates.MintReserve
+
+	for _, p := range m.Proofs {
+		mintReserve.SatAmount += p.Amount
+		mintReserve.Amount += 1
+	}
+
+	return mintReserve, nil
+}
+func (m *MockDB) GetBlindSigsMintReserve() (templates.MintReserve, error) {
+
+	var mintReserve templates.MintReserve
+
+	for _, p := range m.RecoverSigDB {
+		mintReserve.SatAmount += p.Amount
+		mintReserve.Amount += 1
+	}
+	return mintReserve, nil
 }

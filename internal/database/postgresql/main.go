@@ -2,15 +2,18 @@ package postgresql
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/pressly/goose/v3"
 )
 
@@ -58,6 +61,10 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error)
 	postgresql.pool = pool
 
 	return postgresql, nil
+}
+
+func (pql Postgresql) GetTx(ctx context.Context) (pgx.Tx, error) {
+	return pql.pool.Begin(ctx)
 }
 
 func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
@@ -351,11 +358,40 @@ func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) ([]cashu.Proof, erro
 	return proofList, nil
 }
 
+func privateKeysToDleq(s_key *string, e_key *string, sig *cashu.RecoverSigDB) error {
+	if s_key == nil || e_key == nil {
+		return nil
+	}
+	if *s_key == "" || *e_key == "" {
+		return nil
+	}
+
+	sBytes, err := hex.DecodeString(*s_key)
+	if err != nil {
+		return errors.New("failed to decode 's' field")
+	}
+	dleqTmp := &cashu.BlindSignatureDLEQ{
+		S: nil,
+		E: nil,
+	}
+
+	dleqTmp.S = secp256k1.PrivKeyFromBytes(sBytes)
+
+	eBytes, err := hex.DecodeString(*e_key)
+	if err != nil {
+		return errors.New("failed to decode '' field")
+	}
+	dleqTmp.E = secp256k1.PrivKeyFromBytes(eBytes)
+
+	sig.Dleq = dleqTmp
+	return nil
+}
+
 func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error) {
 
 	var signaturesList []cashu.RecoverSigDB
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at  FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
+	rows, err := pql.pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
 	defer rows.Close()
 
 	if err != nil {
@@ -365,13 +401,24 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.Re
 		return signaturesList, databaseError(fmt.Errorf("Error checking for  recovery_signature: %w", err))
 	}
 
-	signatures, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.RecoverSigDB])
+	signatures := make([]cashu.RecoverSigDB, 0)
+	for rows.Next() {
+		var sig cashu.RecoverSigDB
+		sig.Dleq = nil
 
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return signaturesList, nil
+		var dleq_s_str *string
+		var dleq_e_str *string
+		err := rows.Scan(&sig.Id, &sig.Amount, &sig.C_, &sig.B_, &sig.CreatedAt, &dleq_e_str, &dleq_s_str)
+		if err != nil {
+			return nil, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
 		}
-		return signaturesList, databaseError(fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.RecoverSigDB]): %w", err))
+
+		err = privateKeysToDleq(dleq_s_str, dleq_e_str, &sig)
+		if err != nil {
+			return nil, databaseError(fmt.Errorf("privateKeysToDleq(dleq_s_str, dleq_e_str, sig.Dleq). %w", err))
+		}
+
+		signatures = append(signatures, sig)
 	}
 
 	signaturesList = signatures
@@ -381,12 +428,14 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.Re
 
 func (pql Postgresql) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
 	entries := [][]any{}
-	columns := []string{"id", "amount", "B_", "C_", "created_at"}
+	columns := []string{"id", "amount", "B_", "C_", "created_at", "dleq_e", "dleq_s"}
 	tableName := "recovery_signature"
 	tries := 0
 
 	for _, sig := range recover_sigs {
-		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt})
+		dleq_e_bytes := sig.Dleq.E.Key.Bytes()
+		dleq_s_bytes := sig.Dleq.S.Key.Bytes()
+		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, hex.EncodeToString(dleq_e_bytes[:]), hex.EncodeToString(dleq_s_bytes[:])})
 	}
 
 	for {
@@ -403,6 +452,51 @@ func (pql Postgresql) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
 		}
 
 	}
+}
+
+func (pql Postgresql) GetProofsMintReserve() (templates.MintReserve, error) {
+	var mintReserve templates.MintReserve
+
+	rows, err := pql.pool.Query(context.Background(), `SELECT COALESCE(SUM(amount), 0) , COALESCE(COUNT(*), 0)  FROM proofs`)
+	defer rows.Close()
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return mintReserve, nil
+		}
+		return mintReserve, databaseError(fmt.Errorf("Error checking for  recovery_signature and proofs: %w", err))
+	}
+
+	for rows.Next() {
+		err := rows.Scan(&mintReserve.SatAmount, &mintReserve.Amount)
+		if err != nil {
+			return mintReserve, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
+		}
+
+	}
+	return mintReserve, nil
+}
+func (pql Postgresql) GetBlindSigsMintReserve() (templates.MintReserve, error) {
+	var mintReserve templates.MintReserve
+
+	rows, err := pql.pool.Query(context.Background(), `SELECT COALESCE(SUM(amount), 0) , COALESCE(COUNT(*), 0)  FROM recovery_signature`)
+	defer rows.Close()
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return mintReserve, nil
+		}
+		return mintReserve, databaseError(fmt.Errorf("Error checking for  recovery_signature and proofs: %w", err))
+	}
+
+	for rows.Next() {
+		err := rows.Scan(&mintReserve.SatAmount, &mintReserve.Amount)
+		if err != nil {
+			return mintReserve, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
+		}
+
+	}
+	return mintReserve, nil
 }
 
 func (pql Postgresql) Close() {

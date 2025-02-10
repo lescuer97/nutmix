@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -94,8 +95,34 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 			c.JSON(400, "Malformed body request")
 			return
 		}
+		ctx := context.Background()
 
-		nostrLogin, err := mint.MintDB.GetNostrAuth(nostrEvent.Content)
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			logger.Debug(
+				"Incorrect body",
+				slog.String(utils.LogExtraInfo, err.Error()),
+			)
+			c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
+			return
+		}
+
+		defer func() {
+			if p := recover(); p != nil {
+				logger.Error("\n Rolling back  because of failure %+v\n", p)
+				tx.Rollback(ctx)
+			} else if err != nil {
+				logger.Error(fmt.Sprintf("\n Rolling back  because of failure %+v\n", err))
+				tx.Rollback(ctx)
+			} else {
+				err = tx.Commit(ctx)
+				if err != nil {
+					logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
+				}
+			}
+		}()
+
+		nostrLogin, err := mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)
 
 		if err != nil {
 			logger.Error(
@@ -189,7 +216,7 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		nostrLogin.Activated = verified
 
-		err = mint.MintDB.UpdateNostrAuthActivation(nostrLogin.Nonce, nostrLogin.Activated)
+		err = mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated)
 
 		if err != nil {
 			logger.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.String(utils.LogExtraInfo, err.Error()))
