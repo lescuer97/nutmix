@@ -265,7 +265,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)
 
 		if err != nil {
-			logger.Error("database.CheckListOfProofs(pool, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
@@ -273,6 +273,18 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		if len(knownProofs) != 0 {
 			logger.Warn("Proofs already spent", slog.String(utils.LogExtraInfo, fmt.Sprintf("know proofs: %+v", knownProofs)))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
+			return
+		}
+
+		swapRequest.Inputs.SetProofsState(cashu.PROOF_PENDING)
+
+		// send proofs to database
+		err = mint.MintDB.SaveProof(tx, swapRequest.Inputs)
+
+		if err != nil {
+			logger.Error("mint.MintDB.SaveProof(tx, swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -300,15 +312,12 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			Signatures: blindedSignatures,
 		}
 
-		swapRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
-
-		// send proofs to database
-		err = mint.MintDB.SaveProof(tx, swapRequest.Inputs)
-
+		err = mint.MintDB.SetProofsState(tx, swapRequest.Inputs, cashu.PROOF_SPENT)
 		if err != nil {
-			logger.Error("database.SaveProofs", slog.String(utils.LogExtraInfo, err.Error()))
-			logger.Error("Proofs", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", swapRequest.Inputs)))
-			c.JSON(200, response)
+			logger.Warn("mint.MintDB.SetProofsState(tx,swapRequest.Inputs , cashu.PROOF_SPENT)", slog.String(utils.LogExtraInfo, err.Error()))
+
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 

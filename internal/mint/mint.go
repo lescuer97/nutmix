@@ -8,7 +8,6 @@ import (
 	"log"
 	"log/slog"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -26,87 +25,9 @@ type Mint struct {
 	ActiveKeysets    map[string]cashu.KeysetMap
 	Keysets          map[string][]cashu.Keyset
 	LightningBackend lightning.LightningBackend
-	ActiveQuotes     *ActiveQuote
 	Config           utils.Config
 	MintPubkey       string
 	MintDB           database.MintDB
-}
-
-type ActiveProofs struct {
-	Proofs map[cashu.Proof]bool
-	sync.Mutex
-}
-
-func (a *ActiveProofs) AddProofs(proofs []cashu.Proof) error {
-	a.Lock()
-	defer a.Unlock()
-	// check if proof already exists
-	for _, p := range proofs {
-
-		if a.Proofs[p] {
-			return cashu.AlreadyActiveProof
-		}
-
-		a.Proofs[p] = true
-	}
-	return nil
-}
-
-func (a *ActiveProofs) RemoveProofs(proofs []cashu.Proof) error {
-	a.Lock()
-	defer a.Unlock()
-	// check if proof already exists
-	for _, p := range proofs {
-
-		delete(a.Proofs, p)
-
-	}
-	return nil
-}
-
-type ActiveQuote struct {
-	Quote map[string]bool
-	sync.Mutex
-}
-
-func (q *ActiveQuote) AddQuote(quote string) error {
-	q.Lock()
-
-	defer q.Unlock()
-
-	if q.Quote[quote] {
-		return cashu.AlreadyActiveQuote
-	}
-
-	q.Quote[quote] = true
-
-	return nil
-}
-func (q *ActiveQuote) RemoveQuote(quote string) error {
-	q.Lock()
-	defer q.Unlock()
-
-	delete(q.Quote, quote)
-
-	return nil
-}
-func (m *Mint) AddQuotesAndProofs(quote string, proofs []cashu.Proof) error {
-
-	if quote != "" {
-		err := m.ActiveQuotes.AddQuote(quote)
-		if err != nil {
-			return fmt.Errorf("m.AddActiveMintQuote(quote): %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (m *Mint) RemoveQuotesAndProofs(quote string, proofs []cashu.Proof) {
-	if quote != "" {
-		m.ActiveQuotes.RemoveQuote(quote)
-	}
-
 }
 
 // errors types for validation
@@ -264,7 +185,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 
 		if status == lightning.SETTLED {
 			quote.State = cashu.PAID
-			quote.PaidFee = fee
+			quote.FeePaid = fee
 			quote.PaymentPreimage = preimage
 
 			pending_proofs, err := m.MintDB.GetProofsFromQuote(tx, quote.Quote)
@@ -281,7 +202,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				return quote, fmt.Errorf("cashu.Fees(pending_proofs, m.Keysets[quote.Unit]). %w", err)
 			}
 
-			totalExpent := quote.Amount + quote.PaidFee + uint64(fee)
+			totalExpent := quote.Amount + quote.FeePaid + uint64(fee)
 
 			overpaidFees := pending_proofs.Amount() - totalExpent
 
@@ -314,7 +235,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				return quote, fmt.Errorf("m.MintDB.SetProofsState(pending_proofs, cashu.PROOF_SPENT) %w", err)
 			}
 
-			err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
+			err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee) %w", err)
 			}
@@ -327,7 +248,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
 			}
 
-			err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
+			err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee) %w", err)
 			}
@@ -468,14 +389,10 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 }
 
 func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config utils.Config, db database.MintDB) (*Mint, error) {
-	activeQuotes := ActiveQuote{
-		Quote: make(map[string]bool),
-	}
 	mint := Mint{
 		ActiveKeysets: make(map[string]cashu.KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
 		Config:        config,
-		ActiveQuotes:  &activeQuotes,
 		MintDB:        db,
 	}
 

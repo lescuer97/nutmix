@@ -226,7 +226,7 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 					}
 					statusNotif.Params.Payload = mintState
 					if exists {
-						if value.(cashu.PostMintQuoteBolt11Response).State != mintState.State {
+						if value.(cashu.MintRequestDB).State != mintState.State {
 							alreadyCheckedFilter[filter] = mintState
 							err := m.SendJson(conn, statusNotif)
 							if err != nil {
@@ -253,7 +253,7 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 					statusNotif.Params.Payload = meltState
 					if exists {
 
-						if value.(cashu.PostMeltQuoteBolt11Response).State != meltState.State {
+						if value.(cashu.MeltRequestDB).State != meltState.State {
 							alreadyCheckedFilter[filter] = meltState
 							err := m.SendJson(conn, statusNotif)
 							if err != nil {

@@ -153,7 +153,7 @@ func (m *MockDB) ChangeMeltRequestState(quote string, paid bool, state cashu.ACT
 			m.MeltRequest[i].RequestPaid = paid
 			m.MeltRequest[i].State = state
 			m.MeltRequest[i].Melted = melted
-			m.MeltRequest[i].PaidFee = paid_fee
+			m.MeltRequest[i].FeePaid = paid_fee
 		}
 
 	}

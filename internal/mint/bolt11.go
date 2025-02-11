@@ -13,10 +13,6 @@ import (
 
 func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB) (cashu.MintRequestDB, error) {
 
-	if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
-		return quote, nil
-	}
-
 	status, _, err := mint.LightningBackend.CheckReceived(quote.Quote)
 	if err != nil {
 		return quote, fmt.Errorf("mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid. %w", err)
@@ -64,7 +60,7 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 	case status == lightning.SETTLED:
 		quote.PaymentPreimage = preimage
 		quote.State = cashu.PAID
-		quote.PaidFee = fees
+		quote.FeePaid = fees
 		quote.RequestPaid = true
 
 	case status == lightning.PENDING:

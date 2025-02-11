@@ -3,19 +3,22 @@ package postgresql
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
 func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error {
 	entries := [][]any{}
-	columns := []string{"B_", "id", "quote"}
+	columns := []string{`B_`, "created_at", "quote"}
 	tableName := "melt_change_message"
 
 	tries := 0
 
+	now := time.Now().Unix()
 	for _, sig := range change {
-		entries = append(entries, []any{sig.B_, sig.Id, quote})
+		entries = append(entries, []any{sig.B_, now, quote})
 	}
 
 	for {
