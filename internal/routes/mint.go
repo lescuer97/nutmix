@@ -1,12 +1,14 @@
 package routes
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"log/slog"
 )
 
 func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
@@ -251,17 +253,16 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.ActiveProofs.AddProofs(swapRequest.Inputs)
-
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Error("mint.ActiveProofs.AddProofs(swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
-			c.JSON(400, "There was a problem during swapping")
+			c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
 			return
 		}
-		defer mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
+		defer tx.Rollback(ctx)
 
 		// check if we know any of the proofs
-		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(SecretsList)
+		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)
 
 		if err != nil {
 			logger.Error("database.CheckListOfProofs(pool, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
@@ -302,7 +303,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		swapRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
 
 		// send proofs to database
-		err = mint.MintDB.SaveProof(swapRequest.Inputs)
+		err = mint.MintDB.SaveProof(tx, swapRequest.Inputs)
 
 		if err != nil {
 			logger.Error("database.SaveProofs", slog.String(utils.LogExtraInfo, err.Error()))
@@ -311,11 +312,16 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.MintDB.SaveRestoreSigs(recoverySigsDb)
+		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 		if err != nil {
 			logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
 			logger.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
 			c.JSON(200, response)
+			return
+		}
+		err = tx.Commit(context.Background())
+		if err != nil {
+			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
 			return
 		}
 

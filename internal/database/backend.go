@@ -40,26 +40,26 @@ type MintDB interface {
 	// This should be used to only update the Active Status of seed on the db
 	UpdateSeedsActiveStatus(seeds []cashu.Seed) error
 
-	SaveMintRequest(request cashu.MintRequestDB) error
-	ChangeMintRequestState(quote string, paid bool, state cashu.ACTION_STATE, minted bool) error
-	GetMintRequestById(quote string) (cashu.MintRequestDB, error)
+	SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error
+	ChangeMintRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, minted bool) error
+	GetMintRequestById(tx pgx.Tx, quote string) (cashu.MintRequestDB, error)
 
-	GetMeltRequestById(quote string) (cashu.MeltRequestDB, error)
-	SaveMeltRequest(request cashu.MeltRequestDB) error
-	ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
-	AddPreimageMeltRequest(quote string, preimage string) error
+	GetMeltRequestById(tx pgx.Tx, quote string) (cashu.MeltRequestDB, error)
+	SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error
+	ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
+	AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage string) error
 
 	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error)
 
-	SaveProof(proofs []cashu.Proof) error
-	GetProofsFromSecret(SecretList []string) (cashu.Proofs, error)
-	GetProofsFromSecretCurve(Ys []string) (cashu.Proofs, error)
-	GetProofsFromQuote(quote string) (cashu.Proofs, error)
-	SetProofsState(proofs cashu.Proofs, state cashu.ProofState) error
-	DeleteProofs(proofs cashu.Proofs) error
+	SaveProof(tx pgx.Tx, proofs []cashu.Proof) error
+	GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu.Proofs, error)
+	GetProofsFromSecretCurve(tx pgx.Tx, Ys []string) (cashu.Proofs, error)
+	GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs, error)
+	SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error
+	DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error
 
 	GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error)
-	SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error
+	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
 
 	GetProofsMintReserve() (templates.MintReserve, error)
 	GetBlindSigsMintReserve() (templates.MintReserve, error)
@@ -68,9 +68,9 @@ type MintDB interface {
 	SetConfig(config utils.Config) error
 	UpdateConfig(config utils.Config) error
 
-	SaveMeltChange(change []cashu.BlindedMessage, quote string) error
-	GetMeltChangeByQuote(quote string) ([]cashu.MeltChange, error)
-	DeleteChangeByQuote(quote string) error
+	SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error
+	GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error)
+	DeleteChangeByQuote(tx pgx.Tx, quote string) error
 
 	/// Calls for the admin dashboard
 

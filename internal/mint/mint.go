@@ -26,8 +26,6 @@ type Mint struct {
 	ActiveKeysets    map[string]cashu.KeysetMap
 	Keysets          map[string][]cashu.Keyset
 	LightningBackend lightning.LightningBackend
-	PendingProofs    []cashu.Proof
-	ActiveProofs     *ActiveProofs
 	ActiveQuotes     *ActiveQuote
 	Config           utils.Config
 	MintPubkey       string
@@ -101,13 +99,6 @@ func (m *Mint) AddQuotesAndProofs(quote string, proofs []cashu.Proof) error {
 		}
 	}
 
-	if len(proofs) == 0 {
-		err := m.ActiveProofs.AddProofs(proofs)
-		if err != nil {
-			return fmt.Errorf("AddProofs: %w", err)
-		}
-
-	}
 	return nil
 }
 
@@ -116,10 +107,6 @@ func (m *Mint) RemoveQuotesAndProofs(quote string, proofs []cashu.Proof) {
 		m.ActiveQuotes.RemoveQuote(quote)
 	}
 
-	if len(proofs) == 0 {
-		m.ActiveProofs.RemoveProofs(proofs)
-
-	}
 }
 
 // errors types for validation
@@ -255,7 +242,14 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 }
 
 func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) {
-	quote, err := m.MintDB.GetMeltRequestById(quoteId)
+	ctx := context.Background()
+	tx, err := m.MintDB.GetTx(ctx)
+	if err != nil {
+		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+	}
+
+	defer tx.Rollback(ctx)
+	quote, err := m.MintDB.GetMeltRequestById(tx, quoteId)
 
 	if err != nil {
 		return quote, fmt.Errorf("m.MintDB.GetMeltRequestById(quoteId). %w", err)
@@ -273,11 +267,11 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			quote.PaidFee = fee
 			quote.PaymentPreimage = preimage
 
-			pending_proofs, err := m.MintDB.GetProofsFromQuote(quote.Quote)
+			pending_proofs, err := m.MintDB.GetProofsFromQuote(tx, quote.Quote)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
 			}
-			changeMessages, err := m.MintDB.GetMeltChangeByQuote(quote.Quote)
+			changeMessages, err := m.MintDB.GetMeltChangeByQuote(tx, quote.Quote)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
 			}
@@ -303,24 +297,24 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 					return quote, fmt.Errorf("m.GetChangeOutput(changeMessages, quote.Unit ). %w", err)
 				}
 
-				err = m.MintDB.SaveRestoreSigs(sigs)
+				err = m.MintDB.SaveRestoreSigs(tx, sigs)
 				if err != nil {
 					return quote, fmt.Errorf("m.MintDB.SaveRestoreSigs(sigs) %w", err)
 				}
 
-				err = m.MintDB.DeleteChangeByQuote(quote.Quote)
+				err = m.MintDB.DeleteChangeByQuote(tx, quote.Quote)
 				if err != nil {
 					return quote, fmt.Errorf("m.MintDB.DeleteChangeByQuote(quote.Quote) %w", err)
 				}
 
 			}
 
-			err = m.MintDB.SetProofsState(pending_proofs, cashu.PROOF_SPENT)
+			err = m.MintDB.SetProofsState(tx, pending_proofs, cashu.PROOF_SPENT)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.SetProofsState(pending_proofs, cashu.PROOF_SPENT) %w", err)
 			}
 
-			err = m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
+			err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee) %w", err)
 			}
@@ -328,21 +322,21 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 		}
 		if status == lightning.FAILED {
 			quote.State = cashu.UNPAID
-			pending_proofs, err := m.MintDB.GetProofsFromQuote(quote.Quote)
+			pending_proofs, err := m.MintDB.GetProofsFromQuote(tx, quote.Quote)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
 			}
 
-			err = m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
+			err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee) %w", err)
 			}
 
-			err = m.MintDB.DeleteChangeByQuote(quote.Quote)
+			err = m.MintDB.DeleteChangeByQuote(tx, quote.Quote)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.DeleteChangeByQuote(quote.Quote) %w", err)
 			}
-			err = m.MintDB.DeleteProofs(pending_proofs)
+			err = m.MintDB.DeleteProofs(tx, pending_proofs)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.DeleteProofsByQuote(quote.Quote). %w", err)
 			}
@@ -351,6 +345,10 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 
 	}
 
+	err = tx.Commit(context.Background())
+	if err != nil {
+		return quote, fmt.Errorf("tx.Commit(context.Background()). %w", err)
+	}
 	return quote, nil
 }
 
@@ -470,9 +468,6 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 }
 
 func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []cashu.Seed, config utils.Config, db database.MintDB) (*Mint, error) {
-	activeProofs := ActiveProofs{
-		Proofs: make(map[cashu.Proof]bool),
-	}
 	activeQuotes := ActiveQuote{
 		Quote: make(map[string]bool),
 	}
@@ -480,7 +475,6 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 		ActiveKeysets: make(map[string]cashu.KeysetMap),
 		Keysets:       make(map[string][]cashu.Keyset),
 		Config:        config,
-		ActiveProofs:  &activeProofs,
 		ActiveQuotes:  &activeQuotes,
 		MintDB:        db,
 	}
@@ -530,8 +524,6 @@ func SetUpMint(ctx context.Context, mint_privkey *secp256k1.PrivateKey, seeds []
 	default:
 		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)
 	}
-
-	mint.PendingProofs = make([]cashu.Proof, 0)
 
 	mintKey, err := MintPrivateKeyToBip32(mint_privkey)
 	if err != nil {

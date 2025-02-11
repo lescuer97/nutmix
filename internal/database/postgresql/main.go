@@ -178,10 +178,10 @@ func (pql Postgresql) UpdateSeedsActiveStatus(seeds []cashu.Seed) error {
 
 }
 
-func (pql Postgresql) SaveMintRequest(request cashu.MintRequestDB) error {
+func (pql Postgresql) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error {
 	ctx := context.Background()
 
-	_, err := pql.pool.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt)
+	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 
@@ -189,9 +189,9 @@ func (pql Postgresql) SaveMintRequest(request cashu.MintRequestDB) error {
 	return nil
 }
 
-func (pql Postgresql) ChangeMintRequestState(quote string, paid bool, state cashu.ACTION_STATE, minted bool) error {
+func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, minted bool) error {
 	// change the paid status of the quote
-	_, err := pql.pool.Exec(context.Background(), "UPDATE mint_request SET request_paid = $1, state = $3, minted = $4 WHERE quote = $2", paid, quote, state, minted)
+	_, err := pql.pool.Exec(context.Background(), "UPDATE mint_request SET request_paid = $1, state = $3, minted = $4 WHERE quote = $2 FOR UPDATE NOWAIT", paid, quote, state, minted)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 
@@ -199,9 +199,9 @@ func (pql Postgresql) ChangeMintRequestState(quote string, paid bool, state cash
 	return nil
 }
 
-func (pql Postgresql) GetMintRequestById(id string) (cashu.MintRequestDB, error) {
+func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintRequestDB, error) {
 
-	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE quote = $1", id)
+	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
 	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -221,9 +221,9 @@ func (pql Postgresql) GetMintRequestById(id string) (cashu.MintRequestDB, error)
 	return quote, nil
 }
 
-func (pql Postgresql) GetMeltRequestById(id string) (cashu.MeltRequestDB, error) {
+func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, error) {
 
-	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp  FROM melt_request WHERE quote = $1", id)
+	rows, err := tx.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp  FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
 	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -267,9 +267,9 @@ func (pql Postgresql) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.Me
 	return quote, nil
 }
 
-func (pql Postgresql) SaveMeltRequest(request cashu.MeltRequestDB) error {
+func (pql Postgresql) SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error {
 
-	_, err := pql.pool.Exec(context.Background(),
+	_, err := tx.Exec(context.Background(),
 		"INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp, paid_fee) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
 		request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp, request.PaidFee)
 	if err != nil {
@@ -278,18 +278,18 @@ func (pql Postgresql) SaveMeltRequest(request cashu.MeltRequestDB) error {
 	return nil
 }
 
-func (pql Postgresql) AddPreimageMeltRequest(quote string, preimage string) error {
+func (pql Postgresql) AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage string) error {
 	// change the paid status of the quote
-	_, err := pql.pool.Exec(context.Background(), "UPDATE melt_request SET payment_preimage = $1 WHERE quote = $2", preimage, quote)
+	_, err := tx.Exec(context.Background(), "UPDATE melt_request SET payment_preimage = $1 WHERE quote = $2", preimage, quote)
 	if err != nil {
 		return databaseError(fmt.Errorf("updating melt_request with preimage: %w", err))
 
 	}
 	return nil
 }
-func (pql Postgresql) ChangeMeltRequestState(quote string, paid bool, state cashu.ACTION_STATE, melted bool, paid_fee uint64) error {
+func (pql Postgresql) ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, melted bool, paid_fee uint64) error {
 	// change the paid status of the quote
-	_, err := pql.pool.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, state = $3, melted = $4, paid_fee = $5 WHERE quote = $2", paid, quote, state, melted, paid_fee)
+	_, err := tx.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, state = $3, melted = $4, paid_fee = $5 WHERE quote = $2", paid, quote, state, melted, paid_fee)
 	if err != nil {
 		return databaseError(fmt.Errorf("updating mint_request: %w", err))
 
@@ -297,12 +297,12 @@ func (pql Postgresql) ChangeMeltRequestState(quote string, paid bool, state cash
 	return nil
 }
 
-func (pql Postgresql) GetProofsFromSecret(SecretList []string) (cashu.Proofs, error) {
+func (pql Postgresql) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu.Proofs, error) {
 
 	var proofList cashu.Proofs
 
 	ctx := context.Background()
-	rows, err := pql.pool.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE secret = ANY($1)", SecretList)
+	rows, err := tx.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE secret = ANY($1) FOR UPDATE NOWAIT", SecretList)
 
 	defer rows.Close()
 
@@ -327,7 +327,7 @@ func (pql Postgresql) GetProofsFromSecret(SecretList []string) (cashu.Proofs, er
 	return proofList, nil
 }
 
-func (pql Postgresql) SaveProof(proofs []cashu.Proof) error {
+func (pql Postgresql) SaveProof(tx pgx.Tx, proofs []cashu.Proof) error {
 	entries := [][]any{}
 	columns := []string{"c", "secret", "amount", "id", "y", "witness", "seen_at", "state", "quote"}
 	tableName := "proofs"
@@ -340,7 +340,7 @@ func (pql Postgresql) SaveProof(proofs []cashu.Proof) error {
 
 	for {
 		tries += 1
-		_, err := pql.pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
+		_, err := tx.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
 		switch {
 		case err != nil && tries < 3:
@@ -355,11 +355,11 @@ func (pql Postgresql) SaveProof(proofs []cashu.Proof) error {
 
 }
 
-func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) (cashu.Proofs, error) {
+func (pql Postgresql) GetProofsFromSecretCurve(tx pgx.Tx, Ys []string) (cashu.Proofs, error) {
 
 	var proofList cashu.Proofs
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE y = ANY($1) FOR UPDATE NOWAIT`, Ys)
+	rows, err := tx.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE y = ANY($1) FOR UPDATE NOWAIT`, Ys)
 	defer rows.Close()
 
 	if err != nil {
@@ -383,11 +383,11 @@ func (pql Postgresql) GetProofsFromSecretCurve(Ys []string) (cashu.Proofs, error
 	return proofList, nil
 }
 
-func (pql Postgresql) GetProofsFromQuote(quote string) (cashu.Proofs, error) {
+func (pql Postgresql) GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs, error) {
 
 	var proofList cashu.Proofs
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = ANY($1) FOR UPDATE NOWAIT`, quote)
+	rows, err := tx.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = ANY($1) FOR UPDATE NOWAIT`, quote)
 	defer rows.Close()
 
 	if err != nil {
@@ -410,14 +410,14 @@ func (pql Postgresql) GetProofsFromQuote(quote string) (cashu.Proofs, error) {
 
 	return proofList, nil
 }
-func (pql Postgresql) SetProofsState(proofs cashu.Proofs, state cashu.ProofState) error {
+func (pql Postgresql) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error {
 	// change the paid status of the quote
 	batch := pgx.Batch{}
 	for _, proof := range proofs {
 		batch.Queue(`UPDATE proofs SET state = $1  WHERE y = $2`, state, proof.Y)
 	}
 
-	results := pql.pool.SendBatch(context.Background(), &batch)
+	results := tx.SendBatch(context.Background(), &batch)
 	defer results.Close()
 
 	rows, err := results.Query()
@@ -432,7 +432,7 @@ func (pql Postgresql) SetProofsState(proofs cashu.Proofs, state cashu.ProofState
 	return nil
 }
 
-func (pql Postgresql) DeleteProofs(proofs cashu.Proofs) error {
+func (pql Postgresql) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
 	// change the paid status of the quote
 	batch := pgx.Batch{}
 	for _, proof := range proofs {
@@ -440,7 +440,7 @@ func (pql Postgresql) DeleteProofs(proofs cashu.Proofs) error {
 		batch.Queue(`DELETE FROM proofs WHERE y = $1`, proof.Y)
 
 	}
-	results := pql.pool.SendBatch(context.Background(), &batch)
+	results := tx.SendBatch(context.Background(), &batch)
 	defer results.Close()
 
 	rows, err := results.Query()
@@ -489,7 +489,7 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.Re
 
 	var signaturesList []cashu.RecoverSigDB
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1) AND locked = false`, B_)
+	rows, err := pql.pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
 	defer rows.Close()
 
 	if err != nil {
@@ -524,7 +524,7 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.Re
 	return signaturesList, nil
 }
 
-func (pql Postgresql) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
+func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error {
 	entries := [][]any{}
 	columns := []string{"id", "amount", "B_", "C_", "created_at", "dleq_e", "dleq_s"}
 	tableName := "recovery_signature"
@@ -538,7 +538,7 @@ func (pql Postgresql) SaveRestoreSigs(recover_sigs []cashu.RecoverSigDB) error {
 
 	for {
 		tries += 1
-		_, err := pql.pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
+		_, err := tx.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
 		switch {
 		case err != nil && tries < 3:

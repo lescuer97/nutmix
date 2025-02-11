@@ -7,7 +7,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
-func (pql Postgresql) SaveMeltChange(change []cashu.BlindedMessage, quote string) error {
+func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error {
 	entries := [][]any{}
 	columns := []string{"B_", "id", "quote"}
 	tableName := "melt_change_message"
@@ -20,7 +20,7 @@ func (pql Postgresql) SaveMeltChange(change []cashu.BlindedMessage, quote string
 
 	for {
 		tries += 1
-		_, err := pql.pool.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
+		_, err := tx.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
 		switch {
 		case err != nil && tries < 3:
@@ -34,11 +34,11 @@ func (pql Postgresql) SaveMeltChange(change []cashu.BlindedMessage, quote string
 	}
 
 }
-func (pql Postgresql) GetMeltChangeByQuote(quote string) ([]cashu.MeltChange, error) {
+func (pql Postgresql) GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error) {
 
 	var meltChangeList []cashu.MeltChange
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT B_, id, quote FROM melt_change_message WHERE quote = ANY($1) FOR UPDATE NOWAIT`, quote)
+	rows, err := tx.Query(context.Background(), `SELECT B_, id, quote FROM melt_change_message WHERE quote = ANY($1) FOR UPDATE NOWAIT`, quote)
 	defer rows.Close()
 
 	if err != nil {
@@ -61,9 +61,9 @@ func (pql Postgresql) GetMeltChangeByQuote(quote string) ([]cashu.MeltChange, er
 
 	return meltChangeList, nil
 }
-func (pql Postgresql) DeleteChangeByQuote(quote string) error {
+func (pql Postgresql) DeleteChangeByQuote(tx pgx.Tx, quote string) error {
 
-	_, err := pql.pool.Exec(context.Background(), `DELETE FROM melt_change_message WHERE quote = $1`, quote)
+	_, err := tx.Exec(context.Background(), `DELETE FROM melt_change_message WHERE quote = $1`, quote)
 
 	if err != nil {
 		return databaseError(fmt.Errorf("pql.pool.Exec(context.Background(), `DELETE FROM melt_change_message WHERE quote = $1`, quote): %w", err))

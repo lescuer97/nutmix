@@ -1,6 +1,7 @@
 package mint
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -37,7 +38,13 @@ func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB) (cashu.MintRequestD
 
 func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Response, error) {
 
-	quote, err := mint.MintDB.GetMeltRequestById(quoteId)
+	tx, err := mint.MintDB.GetTx(context.Background())
+	if err != nil {
+		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+	}
+
+	defer tx.Rollback(context.Background())
+	quote, err := mint.MintDB.GetMeltRequestById(tx, quoteId)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("database.GetMintQuoteById(pool, quoteId). %w", err)
 	}
@@ -67,9 +74,14 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 
 	}
 
-	err = mint.MintDB.AddPreimageMeltRequest(quote.Quote, preimage)
+	err = mint.MintDB.AddPreimageMeltRequest(tx, quote.Quote, preimage)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("database.AddPaymentPreimageToMeltRequest(pool, preimage, quote.Quote) %w", err)
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("tx.Commit(context.Background()). %w", err)
 	}
 
 	return quote.GetPostMeltQuoteResponse(), nil

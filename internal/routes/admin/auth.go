@@ -99,25 +99,21 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Debug(
-				"Incorrect body",
-				slog.String(utils.LogExtraInfo, err.Error()),
-			)
 			c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
 			return
 		}
 
 		defer func() {
 			if p := recover(); p != nil {
-			    c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
 				tx.Rollback(ctx)
 			} else if err != nil {
-			    c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
 				tx.Rollback(ctx)
 			} else {
 				err = tx.Commit(ctx)
 				if err != nil {
-			        c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
+					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
 				}
 			}
 		}()

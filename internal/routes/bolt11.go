@@ -1,9 +1,14 @@
 package routes
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
@@ -12,10 +17,6 @@ import (
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log/slog"
-	"slices"
-	"strings"
-	"time"
 )
 
 func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
@@ -88,11 +89,25 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			mintRequestDB.State = cashu.PAID
 		}
 
-		err = mint.MintDB.SaveMintRequest(mintRequestDB)
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		err = mint.MintDB.SaveMintRequest(tx, mintRequestDB)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("SaveQuoteRequest: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
+		err = tx.Commit(context.Background())
+		if err != nil {
+			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
 			return
 		}
 
@@ -102,7 +117,15 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
 		quoteId := c.Param("quote")
 
-		quote, err := mint.MintDB.GetMintRequestById(quoteId)
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		quote, err := mint.MintDB.GetMintRequestById(tx, quoteId)
 
 		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
 			c.JSON(200, quote)
@@ -120,10 +143,16 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
-		err = mint.MintDB.ChangeMintRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
+		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
+		}
+
+		err = tx.Commit(context.Background())
+		if err != nil {
+			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
+			return
 		}
 
 		c.JSON(200, quote.PostMintQuoteBolt11Response())
@@ -139,8 +168,16 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, "Malformed body request")
 			return
 		}
-		err = mint.ActiveQuotes.AddQuote(mintRequest.Quote)
 
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		err = mint.ActiveQuotes.AddQuote(mintRequest.Quote)
 		if err != nil {
 			logger.Warn(fmt.Errorf("AddActiveMintQuote: %w", err).Error())
 			c.JSON(400, "Proof already being minted")
@@ -148,7 +185,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		defer mint.ActiveQuotes.RemoveQuote(mintRequest.Quote)
-		quote, err := mint.MintDB.GetMintRequestById(mintRequest.Quote)
+		quote, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("Incorrect body: %w", err).Error())
@@ -182,7 +219,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
-		err = mint.MintDB.ChangeMintRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
+		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
@@ -229,15 +266,21 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		quote.Minted = true
 		quote.State = cashu.ISSUED
 
-		err = mint.MintDB.ChangeMintRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
+		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
 		}
-		err = mint.MintDB.SaveRestoreSigs(recoverySigsDb)
+		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 		if err != nil {
 			logger.Error(fmt.Errorf("SetRecoverySigs: %w", err).Error())
 			logger.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
+			return
+		}
+
+		err = tx.Commit(context.Background())
+		if err != nil {
+			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
 			return
 		}
 
@@ -344,12 +387,25 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			Mpp:             isMpp,
 		}
 
-		err = mint.MintDB.SaveMeltRequest(dbRequest)
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		err = mint.MintDB.SaveMeltRequest(tx, dbRequest)
 
 		if err != nil {
 			logger.Warn(fmt.Errorf("SaveQuoteMeltRequest: %w", err).Error())
 			logger.Warn(fmt.Errorf("dbRequest: %+v", dbRequest).Error())
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
+			return
+		}
+		err = tx.Commit(context.Background())
+		if err != nil {
+			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
 			return
 		}
 
@@ -361,7 +417,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		quote, err := mint.CheckMeltQuoteState(quoteId)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.CheckMeltQuoteState(quoteId): %w", err).Error())
+			c.Error(fmt.Errorf("mint.CheckMeltQuoteState(quoteId): %w", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -392,7 +448,28 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		defer mint.RemoveQuotesAndProofs(meltRequest.Quote, meltRequest.Inputs)
-		quote, err := mint.MintDB.GetMeltRequestById(meltRequest.Quote)
+
+		quote, err := mint.CheckMeltQuoteState(meltRequest.Quote)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.CheckMeltQuoteState(quoteId): %w", err).Error())
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
+		if quote.State != cashu.UNPAID {
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
+			return
+		}
+
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
+			return
+		}
+		defer tx.Rollback(ctx)
+
+		quote, err = mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
 
 		if err != nil {
 			logger.Info(fmt.Errorf("GetMeltQuoteById: %w", err).Error())
@@ -453,7 +530,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		// check if we know any of the proofs
-		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(SecretsList)
+		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)
 
 		if err != nil {
 			logger.Warn(fmt.Sprintf("CheckListOfProofs: %+v", err))
@@ -483,7 +560,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.MintDB.SaveMeltChange(meltRequest.Outputs, quote.Quote)
+		err = mint.MintDB.SaveMeltChange(tx, meltRequest.Outputs, quote.Quote)
 		if err != nil {
 			logger.Info(fmt.Errorf("mint.MintDB.SaveMeltChange(meltRequest.Outputs, quote.Quote) %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -504,13 +581,13 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			// if error on checking payement we will save as pending and returns status
 			if err != nil {
 				response := quote.GetPostMeltQuoteResponse()
-				err = mint.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
+				err = mint.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
 				if err != nil {
 					logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
 				}
 
 				// Save proofs with pending state
-				err = mint.MintDB.SaveProof(meltRequest.Inputs)
+				err = mint.MintDB.SaveProof(tx, meltRequest.Inputs)
 				if err != nil {
 					logger.Error(fmt.Errorf("SaveProofs: %w", err).Error())
 					logger.Error(fmt.Errorf("Proofs: %+v", meltRequest.Inputs).Error())
@@ -529,13 +606,13 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 				response := quote.GetPostMeltQuoteResponse()
 				// change melt request state
-				err = mint.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
+				err = mint.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
 				if err != nil {
 					logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
 				}
 
 				// Save proofs with pending state
-				err = mint.MintDB.SaveProof(meltRequest.Inputs)
+				err = mint.MintDB.SaveProof(tx, meltRequest.Inputs)
 				if err != nil {
 					logger.Error(fmt.Errorf("SaveProofs: %w", err).Error())
 					logger.Error(fmt.Errorf("Proofs: %+v", meltRequest.Inputs).Error())
@@ -584,7 +661,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				return
 			}
 
-			err = mint.MintDB.SaveRestoreSigs(recoverySigsDb)
+			err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 
 			if err != nil {
 				logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
@@ -594,14 +671,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			response.Change = blindSignatures
 		}
 
-		err = mint.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
+		err = mint.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee)
 		if err != nil {
 			logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
 			c.JSON(200, response)
 			return
 		}
 
-		err = mint.MintDB.AddPreimageMeltRequest(quote.Quote, quote.PaymentPreimage)
+		err = mint.MintDB.AddPreimageMeltRequest(tx, quote.Quote, quote.PaymentPreimage)
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.MintDB.AddPreimageMeltRequest(quote.Quote, quote.PaymentPreimage) %+v", err).Error())
 			c.JSON(200, response)
@@ -612,7 +689,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		meltRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
 
 		// send proofs to database
-		err = mint.MintDB.SaveProof(meltRequest.Inputs)
+		err = mint.MintDB.SaveProof(tx, meltRequest.Inputs)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("SaveProofs: %w", err).Error())
@@ -620,22 +697,18 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(200, response)
 			return
 		}
-		err = mint.MintDB.DeleteChangeByQuote(quote.Quote)
+		err = mint.MintDB.DeleteChangeByQuote(tx, quote.Quote)
 		if err != nil {
 			logger.Info(fmt.Errorf("mint.MintDB.SaveMeltChange(meltRequest.Outputs, quote.Quote) %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
-		newPendingProofs := []cashu.Proof{}
-		// remove proofs from pending proofs
-		for _, proof := range mint.PendingProofs {
-			if !slices.Contains(meltRequest.Inputs, proof) {
-				newPendingProofs = append(newPendingProofs, proof)
-			}
+		err = tx.Commit(context.Background())
+		if err != nil {
+			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
+			return
 		}
-
-		mint.PendingProofs = newPendingProofs
 
 		c.JSON(200, response)
 	})

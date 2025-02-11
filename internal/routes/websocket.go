@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -209,7 +209,13 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 
 				switch kind {
 				case cashu.Bolt11MintQuote:
-					quote, err := mint.MintDB.GetMintRequestById(filter)
+					ctx := context.Background()
+					tx, err := mint.MintDB.GetTx(ctx)
+					if err != nil {
+						return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+					}
+					defer tx.Rollback(ctx)
+					quote, err := mint.MintDB.GetMintRequestById(tx, filter)
 
 					if err != nil {
 						return fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)
@@ -233,6 +239,10 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 						if err != nil {
 							return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 						}
+					}
+					err = tx.Commit(context.Background())
+					if err != nil {
+						return fmt.Errorf("tx.Commit(context.Background()). %w", err)
 					}
 				case cashu.Bolt11MeltQuote:
 					meltState, err := m.CheckMeltRequest(mint, filter)
@@ -288,32 +298,4 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 			time.Sleep(2 * time.Second)
 		}
 	}
-}
-
-func CheckStatusesOfSubscription(subKind cashu.SubscriptionKind, filters []string, pool *pgxpool.Pool, mint *m.Mint, ch chan string) ([]cashu.PostMintQuoteBolt11Response, []cashu.CheckState, error) {
-	var mintQuote []cashu.PostMintQuoteBolt11Response
-	var proofsState []cashu.CheckState
-	switch subKind {
-	case cashu.Bolt11MintQuote:
-		for _, v := range filters {
-			quote, err := mint.MintDB.GetMintRequestById(v)
-
-			if err != nil {
-				return mintQuote, proofsState, fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)
-			}
-			quote, err = m.CheckMintRequest(mint, quote)
-			if err != nil {
-				return mintQuote, proofsState, fmt.Errorf("m.CheckMintRequest(pool, mint,v ) %w", err)
-			}
-			mintQuote = append(mintQuote, quote.PostMintQuoteBolt11Response())
-		}
-	case cashu.ProofStateWs:
-		proofsState, err := m.CheckProofState(mint, filters)
-		if err != nil {
-			return mintQuote, proofsState, fmt.Errorf("m.CheckMintRequest(pool, mint,v ) %w", err)
-		}
-
-	}
-
-	return mintQuote, proofsState, nil
 }
