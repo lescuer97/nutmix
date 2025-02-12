@@ -365,10 +365,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			State:           cashu.UNPAID,
 			PaymentPreimage: "",
 		}
-		if mint.LightningBackend.LightningType() == lightning.FAKEWALLET {
-			response.Paid = true
-			response.State = cashu.PAID
-		}
 
 		dbRequest = cashu.MeltRequestDB{
 			Quote:           response.Quote,
@@ -388,6 +384,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
 			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			logger.Warn(fmt.Sprintf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
 		defer tx.Rollback(ctx)
@@ -403,6 +400,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err = tx.Commit(context.Background())
 		if err != nil {
 			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
+			logger.Warn(fmt.Sprintf("tx.Commit(context.Background()). %w", err))
 			return
 		}
 
