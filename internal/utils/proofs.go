@@ -52,3 +52,23 @@ func GetAndCalculateProofsValues(proofs *cashu.Proofs) (uint64, []string, error)
 
 	return totalAmount, SecretsList, nil
 }
+func GetMessagesForChange(overpaidFees uint64, outputs []cashu.BlindedMessage) []cashu.BlindedMessage {
+	amounts := cashu.AmountSplit(overpaidFees)
+	// if there are more outputs then amount to change.
+	// we size down the total amount of blind messages
+	switch {
+	case len(amounts) > len(outputs):
+		for i := range outputs {
+			outputs[i].Amount = amounts[i]
+		}
+
+	default:
+		outputs = outputs[:len(amounts)]
+
+		for i := range outputs {
+			outputs[i].Amount = amounts[i]
+		}
+
+	}
+	return outputs
+}

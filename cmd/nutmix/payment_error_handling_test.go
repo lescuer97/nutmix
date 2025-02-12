@@ -141,8 +141,13 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	if !postMeltResponse.Paid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+	}
+	defer tx.Rollback(ctx)
 
-	proofs, _ := mint.MintDB.GetProofsFromSecret([]string{meltProofs[0].Secret})
+	proofs, _ := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
 
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)
@@ -168,7 +173,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		secreList = append(secreList, p.Secret)
 	}
 
-	proofsDB, err := mint.MintDB.GetProofsFromSecret(secreList)
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
 	}
@@ -176,6 +181,10 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		if p.State != cashu.PROOF_PENDING {
 			t.Errorf("Proof is not pending %+v", p)
 		}
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("tx.Commit(ctx) %s", w.Body.String())
 	}
 
 }
@@ -325,8 +334,13 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	if !postMeltResponse.Paid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+	}
+	defer tx.Rollback(ctx)
 
-	proofs, _ := mint.MintDB.GetProofsFromSecret([]string{meltProofs[0].Secret})
+	proofs, _ := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
 
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)
@@ -352,7 +366,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		secreList = append(secreList, p.Secret)
 	}
 
-	proofsDB, err := mint.MintDB.GetProofsFromSecret(secreList)
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
 	}
@@ -360,6 +374,10 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		if p.State != cashu.PROOF_PENDING {
 			t.Errorf("Proof is not pending %+v", p)
 		}
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("tx.Commit(ctx) %s", w.Body.String())
 	}
 
 }
@@ -491,8 +509,13 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	for _, p := range meltProofs {
 		secreList = append(secreList, p.Secret)
 	}
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+	}
+	defer tx.Rollback(ctx)
 
-	proofsDB, err := mint.MintDB.GetProofsFromSecret(secreList)
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
 	}
@@ -500,5 +523,9 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		if p.State != cashu.PROOF_PENDING {
 			t.Errorf("Proof is not pending %+v", p)
 		}
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("tx.Commit(ctx) %s", w.Body.String())
 	}
 }
