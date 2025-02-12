@@ -240,6 +240,11 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee) %w", err)
 			}
 
+		    err = m.MintDB.AddPreimageMeltRequest(tx, quote.Quote, quote.PaymentPreimage)
+		    if err != nil {
+				return quote, fmt.Errorf("m.MintDB.AddPreimageMeltRequest(tx, quote.Quote, quote.PaymentPreimage) %w", err)
+		    }
+
 		}
 		if status == lightning.FAILED {
 			quote.State = cashu.UNPAID

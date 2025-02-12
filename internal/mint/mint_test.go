@@ -10,12 +10,11 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
+	pq "github.com/lescuer97/nutmix/internal/database/postgresql"
+	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
-
-	pq "github.com/lescuer97/nutmix/internal/database/postgresql"
-	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
@@ -75,8 +74,7 @@ func TestGeneratedKeysetsMakeTheCorrectIds(t *testing.T) {
 
 }
 
-func TestPendingQuotesAndProofsWithPostgresAndMockLN(t *testing.T) {
-
+func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 	const posgrespassword = "password"
 	const postgresuser = "user"
 	ctx := context.Background()
@@ -100,7 +98,7 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLN(t *testing.T) {
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
-	t.Setenv("DATABASE_URL_ENV", connUri)
+	t.Setenv("DATABASE_URL", connUri)
 
 	db, err := pq.DatabaseSetup(ctx, "../../migrations/")
 	if err != nil {
@@ -143,9 +141,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLN(t *testing.T) {
 
 	config, err := SetUpConfigDB(db)
 
-	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(MINT_LIGHTNING_BACKEND_ENV))
+	config.MINT_LIGHTNING_BACKEND = utils.FAKE_WALLET
 
-	config.NETWORK = os.Getenv(NETWORK_ENV)
+	config.NETWORK = "regtest"
 	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
 	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
 	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
@@ -156,10 +154,97 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLN(t *testing.T) {
 		t.Fatalf("could not setup config file: %+v ", err)
 	}
 
-	_, err = SetUpMint(ctx, parsedPrivateKey, seeds, config, db)
+	mint, err := SetUpMint(ctx, parsedPrivateKey, seeds, config, db)
 
 	if err != nil {
 		t.Fatalf("SetUpMint: %+v ", err)
 	}
+
+	return mint
+
+}
+
+// should succeed and quote should be success and proofs as spent
+func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+
+    now := time.Now().Unix()
+
+	melt_quote := cashu.MeltRequestDB{
+		Quote:       "quoteid",
+		Unit:        cashu.Sat.String(),
+		Expiry:      now,
+		Amount:      2,
+		FeeReserve:  2,
+		RequestPaid: false,
+		Request:     "rest",
+		State:       cashu.PENDING,
+		Melted:      false,
+		SeenAt:      time.Now().Unix(),
+		Mpp:         false,
+	}
+
+	proofs := cashu.Proofs{
+		cashu.Proof{
+			Amount:  2,
+			Id:      "test",
+			Secret:  "secret1",
+			C:       "c1",
+			Y:       "y1",
+			Witness: "",
+			SeenAt:  now,
+			State:   cashu.PROOF_PENDING,
+			Quote:   &melt_quote.Quote,
+		},
+		cashu.Proof{
+			Amount:  2,
+			Id:      "test",
+			Secret:  "secret2",
+			Witness: "",
+			C:       "c2",
+			Y:       "y2",
+			SeenAt:  now,
+			State:   cashu.PROOF_PENDING,
+			Quote:   &melt_quote.Quote,
+		},
+	}
+	// Sets proofs and quotes to pending
+	ctx := context.Background()
+
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
+	}
+	defer tx.Rollback(ctx)
+
+	err = mint.MintDB.SaveMeltRequest(tx, melt_quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.SaveMeltRequest(tx, melt_quote): %+v ", err)
+	}
+
+	err = mint.MintDB.SaveProof(tx, proofs)
+	if err != nil {
+		t.Fatalf("mint.MintDB.SaveProof(tx, proofs): %+v ", err)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("tx.Commit(ctx): %+v ", err)
+	}
+
+	meltRequest, err := mint.CheckMeltQuoteState(melt_quote.Quote)
+	if err != nil {
+		t.Fatalf("mint.CheckMeltQuoteState(melt_quote.Quote): %+v ", err)
+	}
+
+	if meltRequest.State != cashu.PAID {
+		t.Errorf("State should be paid: %+v ", meltRequest.State)
+
+	}
+
+	/// store pending proofs and quotes
+	// mint.MintDB.
+
+	//
 
 }
