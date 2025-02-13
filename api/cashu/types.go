@@ -770,7 +770,8 @@ func (b *BlindSignature) VerifyDLEQ(
 }
 
 type MeltChange struct {
-	B_    string `db:"B_"`
-	Id    string
-	Quote string
+	B_        string `db:"B_"`
+	Id        string `db:"id"`
+	Quote     string `db:"quote"`
+	CreatedAt int64  `json:"created_at" db:"created_at"`
 }

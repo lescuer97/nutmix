@@ -11,14 +11,14 @@ import (
 
 func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error {
 	entries := [][]any{}
-	columns := []string{`B_`, "created_at", "quote"}
+	columns := []string{`B_`, "created_at", "id", "quote"}
 	tableName := "melt_change_message"
 
 	tries := 0
 
 	now := time.Now().Unix()
 	for _, sig := range change {
-		entries = append(entries, []any{sig.B_, now, quote})
+		entries = append(entries, []any{sig.B_, now, sig.Id, quote})
 	}
 
 	for {
@@ -41,7 +41,7 @@ func (pql Postgresql) GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.Mel
 
 	var meltChangeList []cashu.MeltChange
 
-	rows, err := tx.Query(context.Background(), `SELECT B_, id, quote FROM melt_change_message WHERE quote = ANY($1) FOR UPDATE NOWAIT`, quote)
+	rows, err := tx.Query(context.Background(), `SELECT "B_", id, quote, created_at FROM melt_change_message WHERE quote = $1 FOR UPDATE NOWAIT`, quote)
 	defer rows.Close()
 
 	if err != nil {

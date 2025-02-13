@@ -11,6 +11,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
 	pq "github.com/lescuer97/nutmix/internal/database/postgresql"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -164,14 +165,13 @@ func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 
 }
 
-// should succeed and quote should be success and proofs as spent
-func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
-	mint := SetupMintWithLightningMockPostgres(t)
+const quoteId = "quoteid"
 
+func SetupDataOnDB(mint *Mint) error {
 	now := time.Now().Unix()
 
 	melt_quote := cashu.MeltRequestDB{
-		Quote:       "quoteid",
+		Quote:       quoteId,
 		Unit:        cashu.Sat.String(),
 		Expiry:      now,
 		Amount:      2,
@@ -186,26 +186,24 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 
 	proofs := cashu.Proofs{
 		cashu.Proof{
-			Amount:  2,
-			Id:      "test",
-			Secret:  "secret1",
-			C:       "c1",
-			Y:       "y1",
-			Witness: "",
-			SeenAt:  now,
-			State:   cashu.PROOF_PENDING,
-			Quote:   &melt_quote.Quote,
+			Amount: 2,
+			Id:     "00bfa73302d12ffd",
+			Secret: "secret1",
+			C:      "c1",
+			Y:      "y1",
+			SeenAt: now,
+			State:  cashu.PROOF_PENDING,
+			Quote:  &melt_quote.Quote,
 		},
 		cashu.Proof{
-			Amount:  2,
-			Id:      "test",
-			Secret:  "secret2",
-			Witness: "",
-			C:       "c2",
-			Y:       "y2",
-			SeenAt:  now,
-			State:   cashu.PROOF_PENDING,
-			Quote:   &melt_quote.Quote,
+			Amount: 2,
+			Id:     "00bfa73302d12ffd",
+			Secret: "secret2",
+			C:      "c2",
+			Y:      "y2",
+			SeenAt: now,
+			State:  cashu.PROOF_PENDING,
+			Quote:  &melt_quote.Quote,
 		},
 	}
 	// Sets proofs and quotes to pending
@@ -213,38 +211,238 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 
 	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
+		return fmt.Errorf("mint.MintDB.GetTx(ctx): %+v ", err)
 	}
 	defer tx.Rollback(ctx)
 
 	err = mint.MintDB.SaveMeltRequest(tx, melt_quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.SaveMeltRequest(tx, melt_quote): %+v ", err)
+		return fmt.Errorf("mint.MintDB.SaveMeltRequest(tx, melt_quote): %+v ", err)
 	}
 
 	err = mint.MintDB.SaveProof(tx, proofs)
 	if err != nil {
-		t.Fatalf("mint.MintDB.SaveProof(tx, proofs): %+v ", err)
+		return fmt.Errorf("mint.MintDB.SaveProof(tx, proofs): %+v ", err)
+	}
+	//
+	err = tx.Commit(ctx)
+	if err != nil {
+		return fmt.Errorf("tx.Commit(ctx): %+v ", err)
+	}
+
+	return nil
+}
+
+// should succeed and quote should be success and proofs as spent
+func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+	err := SetupDataOnDB(mint)
+	if err != nil {
+		t.Fatalf("SetupDataOnDB(mint): %+v ", err)
+	}
+
+	meltRequest, err := mint.CheckMeltQuoteState(quoteId)
+	if err != nil {
+		t.Fatalf("mint.CheckMeltQuoteState(quoteId): %+v ", err)
+	}
+
+	if meltRequest.Quote != quoteId {
+		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
+	if meltRequest.State != cashu.PAID {
+		t.Errorf("State should be paid: %+v ", meltRequest.State)
+	}
+
+	ctx := context.Background()
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
+	}
+	defer tx.Rollback(ctx)
+
+	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+	}
+	if savedQuote.Quote != quoteId {
+		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
+	if savedQuote.State != cashu.PAID {
+		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
+
+	meltChange, err := mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+	}
+
+	if len(meltChange) > 0 {
+		t.Errorf("\n There should be 0 change.  %+v \n ", len(meltChange))
+	}
+
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, meltRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+	}
+
+	totalProof := 0
+	for _, proof := range savedProofs {
+		totalProof += int(proof.Amount)
+		if proof.State != cashu.PROOF_SPENT {
+			t.Errorf("\n Proof should be spent. %+v\n", proof)
+		}
+	}
+	if totalProof != 4 {
+		t.Errorf("\n Proof amount are not correc. %+v\n", totalProof)
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
 		t.Fatalf("tx.Commit(ctx): %+v ", err)
 	}
+}
+func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
 
-	meltRequest, err := mint.CheckMeltQuoteState(melt_quote.Quote)
+	lightning := lightning.FakeWallet{
+		Network: *mint.LightningBackend.GetNetwork(),
+		UnpurposeErrors: []lightning.FakeWalletError{
+			lightning.FailQueryFailed,
+		},
+	}
+	mint.LightningBackend = lightning
+
+	err := SetupDataOnDB(mint)
 	if err != nil {
-		t.Fatalf("mint.CheckMeltQuoteState(melt_quote.Quote): %+v ", err)
+		t.Fatalf("SetupDataOnDB(mint): %+v ", err)
 	}
 
-	if meltRequest.State != cashu.PAID {
+	meltRequest, err := mint.CheckMeltQuoteState(quoteId)
+	if err != nil {
+		t.Fatalf("mint.CheckMeltQuoteState(quoteId): %+v ", err)
+	}
+
+	if meltRequest.Quote != quoteId {
+		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
+	if meltRequest.State != cashu.UNPAID {
 		t.Errorf("State should be paid: %+v ", meltRequest.State)
-
 	}
 
-	/// store pending proofs and quotes
-	// mint.MintDB.
+	ctx := context.Background()
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
+	}
+	defer tx.Rollback(ctx)
 
-	//
+	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+	}
+	if savedQuote.Quote != quoteId {
+		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
+	if savedQuote.State != cashu.UNPAID {
+		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
 
+	meltChange, err := mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+	}
+
+	if len(meltChange) != 0 {
+		t.Errorf("\n There should be 0 change.  %+v \n ", len(meltChange))
+	}
+
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, meltRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+	}
+
+	if len(savedProofs) > 0 {
+		t.Errorf("\n There should not be any proofs. %+v\n", savedProofs)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("tx.Commit(ctx): %+v ", err)
+	}
+}
+
+func TestPendingQuotesAndProofsWithPostgresAndMockLNPending(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+
+	lightning := lightning.FakeWallet{
+		Network: *mint.LightningBackend.GetNetwork(),
+		UnpurposeErrors: []lightning.FakeWalletError{
+			lightning.FailQueryPending,
+		},
+	}
+	mint.LightningBackend = lightning
+
+	err := SetupDataOnDB(mint)
+	if err != nil {
+		t.Fatalf("SetupDataOnDB(mint): %+v ", err)
+	}
+
+	meltRequest, err := mint.CheckMeltQuoteState(quoteId)
+	if err != nil {
+		t.Fatalf("mint.CheckMeltQuoteState(quoteId): %+v ", err)
+	}
+
+	if meltRequest.Quote != quoteId {
+		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
+	if meltRequest.State != cashu.PENDING {
+		t.Errorf("State should be paid: %+v ", meltRequest.State)
+	}
+
+	ctx := context.Background()
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
+	}
+	defer tx.Rollback(ctx)
+
+	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+	}
+	if savedQuote.Quote != quoteId {
+		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
+	if savedQuote.State != cashu.PENDING {
+		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
+
+	meltChange, err := mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+	}
+
+	if len(meltChange) > 0 {
+		t.Errorf("\n There should be 0 change.  %+v \n ", len(meltChange))
+	}
+
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, meltRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+	}
+
+	totalProof := 0
+	for _, proof := range savedProofs {
+		totalProof += int(proof.Amount)
+		if proof.State != cashu.PROOF_PENDING {
+			t.Errorf("\n Proof should be spent. %+v\n", proof)
+		}
+	}
+	if totalProof != 4 {
+		t.Errorf("\n Proof amount are not correc. %+v\n", totalProof)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("tx.Commit(ctx): %+v ", err)
+	}
 }

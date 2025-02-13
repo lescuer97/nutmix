@@ -41,9 +41,10 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
 			}
+
 			changeMessages, err := m.MintDB.GetMeltChangeByQuote(tx, quote.Quote)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
+				return quote, fmt.Errorf("m.MintDB.GetMeltChangeByQuote(tx, quote.Quote). %w", err)
 			}
 
 			fee, err := cashu.Fees(pending_proofs, m.Keysets[quote.Unit])
@@ -189,7 +190,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	unit, err := m.CheckProofsAreSameUnit(meltRequest.Inputs)
 
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
 	}
 
 	// TODO - REMOVE this when doing multi denomination tokens with Milisats

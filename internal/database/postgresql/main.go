@@ -222,7 +222,6 @@ func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintReques
 }
 
 func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, error) {
-
 	rows, err := tx.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid  FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
 	defer rows.Close()
 	if err != nil {
@@ -387,18 +386,16 @@ func (pql Postgresql) GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs,
 
 	var proofList cashu.Proofs
 
-	rows, err := tx.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = ANY($1) FOR UPDATE NOWAIT`, quote)
+	rows, err := tx.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = $1 FOR UPDATE NOWAIT`, quote)
 	defer rows.Close()
 
 	if err != nil {
-
 		if err == pgx.ErrNoRows {
 			return proofList, nil
 		}
 	}
 
 	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return proofList, nil
