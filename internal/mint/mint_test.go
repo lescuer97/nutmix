@@ -168,7 +168,7 @@ func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 
-    now := time.Now().Unix()
+	now := time.Now().Unix()
 
 	melt_quote := cashu.MeltRequestDB{
 		Quote:       "quoteid",

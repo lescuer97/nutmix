@@ -23,13 +23,27 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		return cashu.UNKNOWN, &message
 	case errors.Is(proofError, cashu.UsingInactiveKeyset):
 		return cashu.INACTIVE_KEYSET, nil
+	case errors.Is(proofError, cashu.ErrMeltAlreadyPaid):
+		message := cashu.ErrMeltAlreadyPaid.Error()
+		return cashu.INVOICE_ALREADY_PAID, &message
+	case errors.Is(proofError, cashu.ErrMeltAlreadyPaid):
+		message := cashu.ErrMeltAlreadyPaid.Error()
+		return cashu.QUOTE_PENDING, &message
+
+	case errors.Is(proofError, cashu.ErrNotEnoughtProofs):
+		message := cashu.ErrNotEnoughtProofs.Error()
+		return cashu.TRANSACTION_NOT_BALANCED, &message
+
+	case errors.Is(proofError, cashu.ErrUnitNotSupported):
+		message := cashu.ErrUnitNotSupported.Error()
+		return cashu.UNIT_NOT_SUPPORTED, &message
+
 	case errors.Is(proofError, cashu.ErrInvalidPreimage):
 		message := cashu.ErrInvalidPreimage.Error()
-		return cashu.UNKNOWN, &message
+		return cashu.TOKEN_NOT_VERIFIED, &message
 	}
 
-	return cashu.TOKEN_NOT_VERIFIED, nil
-
+	return cashu.UNKNOWN, nil
 }
 
 // Sets some values being used by the mint like seen, secretY, seen, and pending state
