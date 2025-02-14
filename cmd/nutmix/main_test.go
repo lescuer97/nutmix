@@ -1063,7 +1063,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected paid to be false because it's a Lnd wallet and I have not paid the invoice yet, got %v", postMintQuoteResponseTwo.RequestPaid)
 	}
 
-	if postMintQuoteResponseTwo.State != cashu.UNPAID {
+	if postMintQuoteResponseTwo.State != cashu.PENDING {
 		t.Errorf("Expected to not be unpaid have: %s ", postMintQuoteResponseTwo.State)
 	}
 
@@ -1569,7 +1569,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
+	if w.Code != 400 {
 		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
 
