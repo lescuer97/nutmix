@@ -15,7 +15,8 @@ func CheckProofState(mint *Mint, Ys []string) ([]cashu.CheckState, error) {
 	if err != nil {
 		return states, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer mint.MintDB.Rollback(ctx, tx)
+
 	// set as unspent
 	proofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, Ys)
 	if err != nil {

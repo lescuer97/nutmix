@@ -39,7 +39,8 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 
-	defer tx.Rollback(context.Background())
+	defer mint.MintDB.Rollback(context.Background(), tx)
+
 	quote, err := mint.MintDB.GetMeltRequestById(tx, quoteId)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("database.GetMintQuoteById(pool, quoteId). %w", err)

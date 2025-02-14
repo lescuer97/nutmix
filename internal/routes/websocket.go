@@ -214,7 +214,7 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 					if err != nil {
 						return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 					}
-					defer tx.Rollback(ctx)
+					defer mint.MintDB.Rollback(ctx, tx)
 					quote, err := mint.MintDB.GetMintRequestById(tx, filter)
 
 					if err != nil {

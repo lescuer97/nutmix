@@ -335,7 +335,7 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
 	}
-	defer tx.Rollback(ctx)
+	defer mint.MintDB.Rollback(ctx, tx)
 
 	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
 	if err != nil {
