@@ -3,7 +3,6 @@ package mint
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -28,14 +27,6 @@ type Mint struct {
 	MintPubkey       string
 	MintDB           database.MintDB
 }
-
-// errors types for validation
-var (
-	ErrInvalidProof        = errors.New("Invalid proof")
-	ErrQuoteNotPaid        = errors.New("Quote not paid")
-	ErrMessageAmountToBig  = errors.New("Message amount is to big")
-	ErrInvalidBlindMessage = errors.New("Invalid blind message")
-)
 
 var (
 	NETWORK_ENV                = "NETWORK"
@@ -125,7 +116,7 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
 
 	if err != nil {
-		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", err)
+		return fmt.Errorf("%w. proof.IsProofSpendConditioned(): %w", cashu.ErrInvalidProof, err)
 	}
 
 	if isProofLocked {
@@ -136,7 +127,7 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 		}
 
 		if !ok {
-			return ErrInvalidProof
+			return cashu.ErrInvalidProof
 		}
 
 	}
@@ -144,18 +135,18 @@ func (m *Mint) ValidateProof(proof cashu.Proof, unit cashu.Unit, checkOutputs *b
 	parsedBlinding, err := hex.DecodeString(proof.C)
 
 	if err != nil {
-		return fmt.Errorf("hex.DecodeString: %w", err)
+		return fmt.Errorf("%w. hex.DecodeString: %w", cashu.ErrInvalidProof, err)
 	}
 
 	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
 	if err != nil {
-		return fmt.Errorf("secp256k1.ParsePubKey: %+v", err)
+		return fmt.Errorf("%w. secp256k1.ParsePubKey: %+v", cashu.ErrInvalidProof, err)
 	}
 
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
 
 	if !verified {
-		return ErrInvalidProof
+		return cashu.ErrInvalidProof
 	}
 
 	return nil
@@ -185,7 +176,7 @@ func (m *Mint) SignBlindedMessages(outputs []cashu.BlindedMessage, unit string) 
 		}
 
 		if err != nil {
-			err = fmt.Errorf("GenerateBlindSignature: %w %w", ErrInvalidBlindMessage, err)
+			err = fmt.Errorf("GenerateBlindSignature: %w %w", cashu.ErrInvalidBlindMessage, err)
 			return nil, nil, err
 		}
 

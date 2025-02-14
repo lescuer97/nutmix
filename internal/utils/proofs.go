@@ -26,9 +26,18 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrMeltAlreadyPaid):
 		message := cashu.ErrMeltAlreadyPaid.Error()
 		return cashu.INVOICE_ALREADY_PAID, &message
-	case errors.Is(proofError, cashu.ErrMeltAlreadyPaid):
-		message := cashu.ErrMeltAlreadyPaid.Error()
-		return cashu.QUOTE_PENDING, &message
+
+	case errors.Is(proofError, cashu.ErrInvalidProof):
+		message := cashu.ErrInvalidProof.Error()
+		return cashu.TOKEN_NOT_VERIFIED, &message
+
+	case errors.Is(proofError, cashu.ErrInvalidBlindMessage):
+		message := cashu.ErrInvalidBlindMessage.Error()
+		return cashu.TOKEN_NOT_VERIFIED, &message
+
+	case errors.Is(proofError, cashu.ErrProofSpent):
+		message := cashu.ErrProofSpent.Error()
+		return cashu.TOKEN_ALREADY_SPENT, &message
 
 	case errors.Is(proofError, cashu.ErrNotEnoughtProofs):
 		message := cashu.ErrNotEnoughtProofs.Error()

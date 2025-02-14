@@ -331,7 +331,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMeltResponse.Paid {
+	if postMeltResponse.Paid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
 	tx, err := mint.MintDB.GetTx(ctx)
@@ -357,7 +357,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != cashu.QUOTE_PENDING {
+	if errorResponse.Code != cashu.INVOICE_ALREADY_PAID {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 	}
 

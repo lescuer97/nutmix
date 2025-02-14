@@ -212,7 +212,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 
 	if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
 		logger.Info(fmt.Sprintf("Not enought proofs to expend. Needs: %v", quote.Amount))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)): %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)): %w", cashu.ErrNotEnoughtProofs, err)
 	}
 
 	// check if we know any of the proofs

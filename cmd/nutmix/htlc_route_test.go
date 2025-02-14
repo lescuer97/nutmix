@@ -254,7 +254,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	if errorRes.Code != cashu.UNKNOWN {
+	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
@@ -735,7 +735,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	if errorRes.Code != cashu.UNKNOWN {
+	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
