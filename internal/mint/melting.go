@@ -18,7 +18,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 
-	defer tx.Rollback(ctx)
+	defer m.MintDB.Rollback(ctx, tx)
 	quote, err := m.MintDB.GetMeltRequestById(tx, quoteId)
 
 	if err != nil {
@@ -121,9 +121,9 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 
 	}
 
-	err = tx.Commit(context.Background())
+	err = m.MintDB.Commit(context.Background(), tx)
 	if err != nil {
-		return quote, fmt.Errorf("tx.Commit(context.Background()). %w", err)
+		return quote, fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 	return quote, nil
 }
@@ -168,7 +168,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	if err != nil {
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer m.MintDB.Rollback(ctx, tx)
 
 	quote, err = m.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
 
@@ -244,7 +244,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("tx.Begin(ctx) %w", err)
 	}
-	defer setUpTx.Rollback(ctx)
+	defer m.MintDB.Rollback(ctx, setUpTx)
 
 	// change state to pending
 	meltRequest.Inputs.SetPendingAndQuoteRef(quote.Quote)
@@ -264,10 +264,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.SaveMeltChange(setUpTx, meltRequest.Outputs, quote.Quote) %w", err)
 	}
 
-	err = setUpTx.Commit(ctx)
+	err = m.MintDB.Commit(context.Background(), setUpTx)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("setUpTx.Commit(ctx) %w", err)
-
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 
 	var paidLightningFeeSat uint64
@@ -298,10 +297,11 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 				logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
 			}
 
-			err = tx.Commit(context.Background())
+			err = m.MintDB.Commit(context.Background(), tx)
 			if err != nil {
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("tx.Commit(context.Background()) %w", err)
+				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 			}
+
 			return quote.GetPostMeltQuoteResponse(), nil
 
 		// finish failure and release the proofs
@@ -320,9 +320,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 			if err != nil {
 				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteChangeByQuote(tx, quote.Quote) %w", err)
 			}
-			err = tx.Commit(context.Background())
+			err = m.MintDB.Commit(context.Background(), tx)
 			if err != nil {
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("tx.Commit(context.Background()) %w", err)
+				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 			}
 
 			// TODO put payment error here
@@ -397,9 +397,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteChangeByQuote(tx, quote.Quote) %w", err)
 	}
 
-	err = tx.Commit(context.Background())
+	err = m.MintDB.Commit(context.Background(), tx)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("tx.Commit(context.Background()) %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 
 	return response, nil

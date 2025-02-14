@@ -53,9 +53,9 @@ func CheckProofState(mint *Mint, Ys []string) ([]cashu.CheckState, error) {
 		states = append(states, checkState)
 	}
 
-	err = tx.Commit(context.Background())
+	err = mint.MintDB.Commit(ctx, tx)
 	if err != nil {
-		return states, fmt.Errorf("tx.Commit(context.Background()). %w", err)
+		return states, fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
 	}
 	return states, nil
 }

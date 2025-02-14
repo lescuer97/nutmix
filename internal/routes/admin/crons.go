@@ -28,15 +28,16 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 			defer func() {
 				if p := recover(); p != nil {
-					logger.Error("\n Rolling back  because of failure %+v\n", p)
-					tx.Rollback(ctx)
+					logger.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err).Error())
+					mint.MintDB.Rollback(ctx, tx)
+
 				} else if err != nil {
-					logger.Error(fmt.Sprintf("\n Rolling back  because of failure %+v\n", err))
-					tx.Rollback(ctx)
+					logger.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err).Error())
+					mint.MintDB.Rollback(ctx, tx)
 				} else {
-					err = tx.Commit(ctx)
+					err = mint.MintDB.Commit(context.Background(), tx)
 					if err != nil {
-						logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
+						logger.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err).Error())
 					}
 				}
 			}()

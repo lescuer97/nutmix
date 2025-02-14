@@ -259,7 +259,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
 			return
 		}
-		defer tx.Rollback(ctx)
+		defer mint.MintDB.Rollback(ctx, tx)
 
 		// check if we know any of the proofs
 		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)
@@ -328,9 +328,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(200, response)
 			return
 		}
-		err = tx.Commit(context.Background())
+		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 

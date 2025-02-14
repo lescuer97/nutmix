@@ -129,12 +129,13 @@ func SwapStatusPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
+
 			} else if err != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
 			} else {
-				err = tx.Commit(ctx)
+				err = mint.MintDB.Commit(context.Background(), tx)
 				if err != nil {
 					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
 				}

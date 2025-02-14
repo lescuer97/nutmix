@@ -89,7 +89,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer tx.Rollback(ctx)
+		defer mint.MintDB.Rollback(ctx, tx)
 
 		err = mint.MintDB.SaveMintRequest(tx, mintRequestDB)
 
@@ -99,9 +99,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = tx.Commit(context.Background())
+		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
@@ -117,7 +117,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer tx.Rollback(ctx)
+		defer mint.MintDB.Rollback(ctx, tx)
 
 		quote, err := mint.MintDB.GetMintRequestById(tx, quoteId)
 
@@ -143,9 +143,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
 		}
 
-		err = tx.Commit(context.Background())
+		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
@@ -169,7 +169,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer tx.Rollback(ctx)
+		defer mint.MintDB.Rollback(ctx, tx)
 
 		quote, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
 
@@ -213,11 +213,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		if quote.State != cashu.PAID {
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
-			err = tx.Commit(context.Background())
-			if err != nil {
-				c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
-				return
-			}
+			return
+		}
+		err = mint.MintDB.Commit(ctx, tx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
@@ -269,9 +269,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = tx.Commit(context.Background())
+		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
@@ -381,7 +381,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			logger.Warn(fmt.Sprintf("m.MintDB.GetTx(ctx). %+v", err))
 			return
 		}
-		defer tx.Rollback(ctx)
+		defer mint.MintDB.Rollback(ctx, tx)
 
 		err = mint.MintDB.SaveMeltRequest(tx, dbRequest)
 
@@ -391,10 +391,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
-		err = tx.Commit(context.Background())
+		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("tx.Commit(context.Background()). %w", err))
-			logger.Warn(fmt.Sprintf("tx.Commit(context.Background()). %+v", err))
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			logger.Warn(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err).Error())
 			return
 		}
 

@@ -240,9 +240,9 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 							return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 						}
 					}
-					err = tx.Commit(context.Background())
+					err = mint.MintDB.Commit(ctx, tx)
 					if err != nil {
-						return fmt.Errorf("tx.Commit(context.Background()). %w", err)
+						return fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
 					}
 				case cashu.Bolt11MeltQuote:
 					meltState, err := m.CheckMeltRequest(mint, filter)

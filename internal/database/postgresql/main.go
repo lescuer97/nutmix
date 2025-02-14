@@ -66,6 +66,12 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error)
 func (pql Postgresql) GetTx(ctx context.Context) (pgx.Tx, error) {
 	return pql.pool.Begin(ctx)
 }
+func (pql Postgresql) Commit(ctx context.Context, tx pgx.Tx) error {
+	return tx.Commit(ctx)
+}
+func (pql Postgresql) RollBack(ctx context.Context, tx pgx.Tx) error {
+	return tx.Rollback(ctx)
+}
 
 func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 	var seeds []cashu.Seed

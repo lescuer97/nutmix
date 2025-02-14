@@ -1,6 +1,7 @@
 package mockdb
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -34,6 +35,12 @@ func databaseError(err error) error {
 
 func (m *MockDB) GetAllSeeds() ([]cashu.Seed, error) {
 	return m.Seeds, nil
+}
+func (m *MockDB) Commit(ctx context.Context, tx pgx.Tx) error {
+	return nil
+}
+func (m *MockDB) RollBack(ctx context.Context, tx pgx.Tx) error {
+	return nil
 }
 
 func (m *MockDB) GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error) {

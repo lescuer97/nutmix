@@ -119,12 +119,13 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
+
 			} else if err != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
 			} else {
-				err = tx.Commit(ctx)
+				err = mint.MintDB.Commit(context.Background(), tx)
 				if err != nil {
 					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
 				}
@@ -203,12 +204,13 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
+
 			} else if err != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
 			} else {
-				err = tx.Commit(ctx)
+				err = mint.MintDB.Commit(context.Background(), tx)
 				if err != nil {
 					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
 				}
@@ -264,12 +266,13 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
+
 			} else if err != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
 			} else {
-				err = tx.Commit(ctx)
+				err = mint.MintDB.Commit(context.Background(), tx)
 				if err != nil {
 					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
 				}
@@ -314,12 +317,13 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 		defer func() {
 			if p := recover(); p != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
+
 			} else if err != nil {
 				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				tx.Rollback(ctx)
+				mint.MintDB.Rollback(ctx, tx)
 			} else {
-				err = tx.Commit(ctx)
+				err = mint.MintDB.Commit(context.Background(), tx)
 				if err != nil {
 					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
 				}
@@ -343,10 +347,14 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 			c.Error(fmt.Errorf("mint.MintDB.ChangeLiquiditySwapState(swapId, swapRequest.State). %w", err))
 			return
 		}
-		err = tx.Commit(ctx)
+
+		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
+			return
 		}
+
 		tx, err = mint.MintDB.GetTx(ctx)
 		if err != nil {
 			logger.Debug(
