@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -35,6 +36,12 @@ func databaseError(err error) error {
 
 func (m *MockDB) GetAllSeeds() ([]cashu.Seed, error) {
 	return m.Seeds, nil
+}
+func (m *MockDB) GetTx(ctx context.Context) (pgx.Tx, error) {
+	return &pgxpool.Tx{}, nil
+}
+func (m *MockDB) SubTx(ctx context.Context, tx pgx.Tx) (pgx.Tx, error) {
+	return &pgxpool.Tx{}, nil
 }
 func (m *MockDB) Commit(ctx context.Context, tx pgx.Tx) error {
 	return nil

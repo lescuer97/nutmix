@@ -240,9 +240,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork()) %w", err)
 	}
 
-	setUpTx, err := tx.Begin(ctx)
+	setUpTx, err := m.MintDB.SubTx(ctx, tx)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("tx.Begin(ctx) %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.SubTx(ctx, tx) %w", err)
 	}
 	defer m.MintDB.Rollback(ctx, setUpTx)
 

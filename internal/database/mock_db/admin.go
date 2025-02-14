@@ -1,20 +1,14 @@
 package mockdb
 
 import (
-	"context"
 	"slices"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-func (m *MockDB) GetTx(ctx context.Context) (pgx.Tx, error) {
-	return &pgxpool.Tx{}, nil
-
-}
 func (m *MockDB) SaveNostrAuth(auth database.NostrLoginAuth) error {
 	return nil
 

@@ -57,7 +57,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 			for _, swap := range swaps {
 				logger.Debug(fmt.Sprintf("Checking out swap. %v", swap.Id))
 
-				swapTx, err := tx.Begin(ctx)
+				swapTx, err := mint.MintDB.SubTx(ctx, tx)
 				if err != nil {
 					logger.Debug(
 						"Could not get swapTx for swap",
@@ -65,6 +65,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 					)
 					return
 				}
+
 				now := time.Now().Unix()
 
 				if now > int64(swap.Expiration) {
@@ -81,7 +82,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 					logger.Warn(
 						"zpay32.Decode(swap.Destination, mint.LightningBackend.GetNetwork())",
 						slog.String(utils.LogExtraInfo, err.Error()))
-					swapTx.Rollback(ctx)
+					mint.MintDB.Rollback(ctx, swapTx)
 					continue
 				}
 
@@ -94,7 +95,8 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 						logger.Warn(
 							"mint.LightningBackend.CheckReceived(payHash)",
 							slog.String(utils.LogExtraInfo, err.Error()))
-						swapTx.Rollback(ctx)
+						mint.MintDB.Rollback(ctx, swapTx)
+
 						continue
 					}
 
@@ -113,7 +115,8 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 						logger.Warn(
 							"mint.LightningBackend.CheckPayed(payHash)",
 							slog.String(utils.LogExtraInfo, err.Error()))
-						swapTx.Rollback(ctx)
+						mint.MintDB.Rollback(ctx, swapTx)
+
 						continue
 					}
 
@@ -133,15 +136,14 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 					logger.Warn(
 						"mint.MintDB.ChangeLiquiditySwapState(swap.Id,utils.Expired)",
 						slog.String(utils.LogExtraInfo, err.Error()))
-					swapTx.Rollback(ctx)
-					continue
+					mint.MintDB.Rollback(ctx, swapTx)
 
 				}
 
 				logger.Debug(fmt.Sprintf("Commiting swap. %v", swap.Id))
-				err = swapTx.Commit(ctx)
+				err = mint.MintDB.Commit(context.Background(), swapTx)
 				if err != nil {
-					logger.Error(fmt.Sprintf("\n Could not commit subTx: %+v \n", err))
+					logger.Error(fmt.Errorf("\n Could not commit sub transaction: %+v \n", err).Error())
 				}
 			}
 

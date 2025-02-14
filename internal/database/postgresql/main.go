@@ -72,6 +72,9 @@ func (pql Postgresql) Commit(ctx context.Context, tx pgx.Tx) error {
 func (pql Postgresql) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return tx.Rollback(ctx)
 }
+func (pql Postgresql) SubTx(ctx context.Context, tx pgx.Tx) (pgx.Tx, error) {
+	return tx.Begin(ctx)
+}
 
 func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 	var seeds []cashu.Seed

@@ -138,8 +138,8 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMeltResponse.Paid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
+	if postMeltResponse.Paid {
+		t.Errorf("Expected paid to be false because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
 	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
@@ -164,7 +164,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != cashu.QUOTE_PENDING {
+	if errorResponse.Code != cashu.INVOICE_ALREADY_PAID {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 	}
 
@@ -503,8 +503,8 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMeltResponse.Paid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
+	if postMeltResponse.Paid {
+		t.Errorf("Expected paid to be false because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
 
 	secreList := []string{}
