@@ -69,7 +69,7 @@ func (pql Postgresql) GetTx(ctx context.Context) (pgx.Tx, error) {
 func (pql Postgresql) Commit(ctx context.Context, tx pgx.Tx) error {
 	return tx.Commit(ctx)
 }
-func (pql Postgresql) RollBack(ctx context.Context, tx pgx.Tx) error {
+func (pql Postgresql) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return tx.Rollback(ctx)
 }
 

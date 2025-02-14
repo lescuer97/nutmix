@@ -39,9 +39,10 @@ func (m *MockDB) GetAllSeeds() ([]cashu.Seed, error) {
 func (m *MockDB) Commit(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
-func (m *MockDB) RollBack(ctx context.Context, tx pgx.Tx) error {
+func (m *MockDB) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
+
 
 func (m *MockDB) GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
