@@ -43,7 +43,6 @@ func (m *MockDB) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
-
 func (m *MockDB) GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 	for i := 0; i < len(m.Seeds); i++ {

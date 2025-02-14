@@ -213,7 +213,7 @@ func SetupDataOnDB(mint *Mint) error {
 	if err != nil {
 		return fmt.Errorf("mint.MintDB.GetTx(ctx): %+v ", err)
 	}
-	defer tx.Rollback(ctx)
+	defer mint.MintDB.Rollback(ctx, tx)
 
 	err = mint.MintDB.SaveMeltRequest(tx, melt_quote)
 	if err != nil {
@@ -225,9 +225,9 @@ func SetupDataOnDB(mint *Mint) error {
 		return fmt.Errorf("mint.MintDB.SaveProof(tx, proofs): %+v ", err)
 	}
 	//
-	err = tx.Commit(ctx)
+	err = mint.MintDB.Commit(ctx, tx)
 	if err != nil {
-		return fmt.Errorf("tx.Commit(ctx): %+v ", err)
+		return fmt.Errorf("mint.MintDB.Commit(ctx, tx): %+v ", err)
 	}
 
 	return nil
@@ -258,7 +258,7 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
 	}
-	defer tx.Rollback(ctx)
+	defer mint.MintDB.Rollback(ctx, tx)
 
 	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
 	if err != nil {
@@ -296,10 +296,11 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 		t.Errorf("\n Proof amount are not correc. %+v\n", totalProof)
 	}
 
-	err = tx.Commit(ctx)
+	err = mint.MintDB.Commit(ctx, tx)
 	if err != nil {
-		t.Fatalf("tx.Commit(ctx): %+v ", err)
+		t.Fatalf("mint.MintDB.Commit(ctx, tx): %+v ", err)
 	}
+
 }
 func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
@@ -364,9 +365,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 	if len(savedProofs) > 0 {
 		t.Errorf("\n There should not be any proofs. %+v\n", savedProofs)
 	}
-	err = tx.Commit(ctx)
+	err = mint.MintDB.Commit(ctx, tx)
 	if err != nil {
-		t.Fatalf("tx.Commit(ctx): %+v ", err)
+		t.Fatalf("mint.MintDB.Commit(ctx, tx): %+v ", err)
 	}
 }
 
@@ -403,7 +404,7 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNPending(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
 	}
-	defer tx.Rollback(ctx)
+	defer mint.MintDB.Rollback(ctx, tx)
 
 	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
 	if err != nil {
@@ -441,8 +442,8 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNPending(t *testing.T) {
 		t.Errorf("\n Proof amount are not correc. %+v\n", totalProof)
 	}
 
-	err = tx.Commit(ctx)
+	err = mint.MintDB.Commit(ctx, tx)
 	if err != nil {
-		t.Fatalf("tx.Commit(ctx): %+v ", err)
+		t.Fatalf("mint.MintDB.Commit(ctx, tx): %+v ", err)
 	}
 }

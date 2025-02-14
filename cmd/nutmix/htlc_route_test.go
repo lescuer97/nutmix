@@ -126,8 +126,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
 
-
-    log.Printf("\n body for call: %s \n", w.Body.Bytes() )
+	log.Printf("\n body for call: %s \n", w.Body.Bytes())
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
 
