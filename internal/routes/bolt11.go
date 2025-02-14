@@ -140,7 +140,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 
 		if err != nil {
-			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
+			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 		}
 
 		err = mint.MintDB.Commit(ctx, tx)
@@ -208,16 +208,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 
 		if err != nil {
-			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
+			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 		}
 
 		if quote.State != cashu.PAID {
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
-			return
-		}
-		err = mint.MintDB.Commit(ctx, tx)
-		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
@@ -259,7 +254,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 
 		if err != nil {
-			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
+			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 		}
 
 		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)

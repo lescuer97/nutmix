@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -124,6 +125,9 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
+
+
+    log.Printf("\n body for call: %s \n", w.Body.Bytes() )
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
 
