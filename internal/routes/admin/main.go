@@ -3,7 +3,10 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+	"embed"
+	"html/template"
 	"log"
+	"net/http"
 
 	"log/slog"
 	"os"
@@ -20,17 +23,19 @@ type ErrorNotif struct {
 	Error string
 }
 
+
+
+//go:embed static/*
+var static embed.FS // 
+
+//go:embed templates/*
+var templates embed.FS // 
+
 func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
-	testPath := os.Getenv("TEST_PATH")
-	if testPath != "" {
-		r.Static("static", testPath+"static")
-		r.LoadHTMLGlob(testPath + "templates/**")
+    templ := template.Must(template.ParseFS(templates, "templates/*.html"))
+	r.SetHTMLTemplate(templ)
+    r.StaticFS("/static", http.FS(static))
 
-	} else {
-		r.Static("static", "internal/routes/admin/static")
-		r.LoadHTMLGlob("internal/routes/admin/templates/**")
-
-	}
 	adminRoute := r.Group("/admin")
 
 	loginKey, err := secp256k1.GeneratePrivateKey()
