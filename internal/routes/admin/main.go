@@ -3,14 +3,15 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+	"log"
 
 	"log/slog"
 	"os"
 	"slices"
 	"time"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
-	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
@@ -32,8 +33,18 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	}
 	adminRoute := r.Group("/admin")
 
+	loginKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		logger.Error(
+			"secp256k1.GeneratePrivateKey()",
+			slog.String(utils.LogExtraInfo, err.Error()),
+		)
+		log.Panicf("secp256k1.GeneratePrivateKey(). %+v", err)
+
+	}
+
 	// I use the first active keyset as secret for jwt token signing
-	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
+	adminRoute.Use(AuthMiddleware(logger, loginKey.Serialize()))
 
 	// PAGES SETUP
 	// This is /admin
@@ -44,7 +55,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.GET("/bolt11", LightningNodePage(mint))
 
 	// change routes
-	adminRoute.POST("/login", Login(mint, logger))
+	adminRoute.POST("/login", Login(mint, logger, loginKey))
 	adminRoute.POST("/mintsettings", MintSettingsForm(mint, logger))
 	adminRoute.POST("/bolt11", Bolt11Post(mint, logger))
 	adminRoute.POST("/rotate/sats", RotateSatsSeed(mint, logger))
