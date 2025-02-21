@@ -1,6 +1,8 @@
 package mint
 
 import (
+	"fmt"
+
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
@@ -10,10 +12,10 @@ func (m *Mint) GetChangeOutput(messages []cashu.BlindedMessage, overPaidFees uin
 
 		change := utils.GetMessagesForChange(overPaidFees, messages)
 
-		_, recoverySigsDb, err := m.SignBlindedMessages(change, unit)
+		_, recoverySigsDb, err := m.Signer.SignBlindMessages(change)
 
 		if err != nil {
-			return recoverySigsDb, nil
+			return recoverySigsDb, fmt.Errorf("m.Signer.SignBlindMessages(change). %w", err)
 		}
 
 		return recoverySigsDb, nil

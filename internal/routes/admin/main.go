@@ -3,15 +3,21 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+	"embed"
 	"errors"
 	"fmt"
+	"html/template"
+	"io/fs"
+	"log"
+	"net/http"
+
 	"log/slog"
 	"os"
 	"slices"
 	"time"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
-	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -51,22 +57,42 @@ func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
 
 	}
 }
+
+//go:embed static/*.css static/*.js
+var static embed.FS
+
+//go:embed templates/*.html
+var templatesFs embed.FS
+
 func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
-	testPath := os.Getenv("TEST_PATH")
-	if testPath != "" {
-		r.Static("static", testPath+"static")
-		r.LoadHTMLGlob(testPath + "templates/**.html")
-
-	} else {
-		r.Static("static", "internal/routes/admin/static")
-		r.LoadHTMLGlob("internal/routes/admin/templates/*.html")
-
+	contentStatic, err := fs.Sub(static, "static")
+	if err != nil {
+		logger.Error(
+			`fs.Sub(static, "static")`,
+			slog.String(utils.LogExtraInfo, err.Error()),
+		)
+		panic(err)
 	}
+	httpFs := http.FS(contentStatic)
+	r.StaticFS("/static", httpFs)
+
+	templ := template.Must(template.ParseFS(templatesFs, "templates/*.html"))
+	r.SetHTMLTemplate(templ)
+
 	adminRoute := r.Group("/admin")
 
-	adminRoute.Use(ErrorHtmlMessageMiddleware(logger))
+	loginKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		logger.Error(
+			"secp256k1.GeneratePrivateKey()",
+			slog.String(utils.LogExtraInfo, err.Error()),
+		)
+		log.Panicf("secp256k1.GeneratePrivateKey(). %+v", err)
+
+	}
+
 	// I use the first active keyset as secret for jwt token signing
-	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
+	adminRoute.Use(AuthMiddleware(logger, loginKey.Serialize()))
 
 	// PAGES SETUP
 	// This is /admin pages
@@ -77,7 +103,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 	adminRoute.GET("/bolt11", LightningNodePage(mint))
 
 	// change routes
-	adminRoute.POST("/login", Login(mint, logger))
+	adminRoute.POST("/login", Login(mint, logger, loginKey))
 	adminRoute.POST("/mintsettings", MintSettingsForm(mint, logger))
 	adminRoute.POST("/bolt11", Bolt11Post(mint, logger))
 	adminRoute.POST("/rotate/sats", RotateSatsSeed(mint, logger))

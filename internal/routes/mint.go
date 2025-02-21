@@ -16,7 +16,12 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 	v1.GET("/keys", func(c *gin.Context) {
 
-		keys := mint.OrderActiveKeysByUnit()
+		keys, err := mint.Signer.GetActiveKeys()
+		if err != nil {
+			logger.Error(fmt.Sprintf("mint.Signer.GetActiveKeys() %+v ", err))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
+			return
+		}
 
 		c.JSON(200, keys)
 
@@ -26,33 +31,24 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		id := c.Param("id")
 
-		keysets, err := mint.GetKeysetById(id)
+		keysets, err := mint.Signer.GetKeysById(id)
 
 		if err != nil {
-			logger.Error(fmt.Sprintf("GetKeysetById: %+v ", err))
+			logger.Error(fmt.Sprintf("mint.Signer.GetKeysById(id) %+v", err))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
 
-		keys := cashu.OrderKeysetByUnit(keysets)
-
-		c.JSON(200, keys)
+		c.JSON(200, keysets)
 
 	})
 	v1.GET("/keysets", func(c *gin.Context) {
 
-		seeds, err := mint.MintDB.GetAllSeeds()
+		keys, err := mint.Signer.GetKeys()
 		if err != nil {
-			logger.Error(fmt.Errorf("could not get keysets, database.GetAllSeeds(pool) %w", err).Error())
+			logger.Error(fmt.Errorf("mint.Signer.GetKeys() %w", err).Error())
 			c.JSON(500, "Server side error")
 			return
-		}
-
-		keys := make(map[string][]cashu.BasicKeysetResponse)
-		keys["keysets"] = []cashu.BasicKeysetResponse{}
-
-		for _, seed := range seeds {
-			keys["keysets"] = append(keys["keysets"], cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
 		}
 
 		c.JSON(200, keys)
@@ -229,8 +225,14 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		for _, output := range swapRequest.Outputs {
 			AmountSignature += output.Amount
 		}
+		keysets, err := mint.Signer.GetKeys()
+		if err != nil {
+			logger.Warn("mint.Signer.GetKeysByUnit(unit)", slog.String(utils.LogExtraInfo, err.Error()))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
+			return
+		}
 
-		unit, err := mint.CheckProofsAreSameUnit(swapRequest.Inputs)
+		_, err = mint.CheckProofsAreSameUnit(swapRequest.Inputs, keysets.Keysets)
 
 		if err != nil {
 			logger.Warn("CheckProofsAreSameUnit", slog.String(utils.LogExtraInfo, err.Error()))
@@ -240,7 +242,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		// check for needed amount of fees
-		fee, err := cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])
+		fee, err := cashu.Fees(swapRequest.Inputs, keysets.Keysets)
 		if err != nil {
 			logger.Warn("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
@@ -288,10 +290,10 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.VerifyListOfProofs(swapRequest.Inputs, swapRequest.Outputs, unit)
+		err = mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs)
 
 		if err != nil {
-			logger.Warn("mint.VerifyListOfProofs", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Warn(" mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs, unit)", slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
@@ -299,10 +301,10 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		// sign the outputs
-		blindedSignatures, recoverySigsDb, err := mint.SignBlindedMessages(swapRequest.Outputs, cashu.Sat.String())
+		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(swapRequest.Outputs)
 
 		if err != nil {
-			logger.Error("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("mint.Signer.SignBlindMessages(swapRequest.Outputs, cashu.Sat)", slog.String(utils.LogExtraInfo, err.Error()))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return

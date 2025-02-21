@@ -47,7 +47,12 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				return quote, fmt.Errorf("m.MintDB.GetMeltChangeByQuote(tx, quote.Quote). %w", err)
 			}
 
-			fee, err := cashu.Fees(pending_proofs, m.Keysets[quote.Unit])
+			keysets, err := m.Signer.GetKeys()
+			if err != nil {
+				return quote, fmt.Errorf("m.Signer.GetKeys(). %w", err)
+			}
+
+			fee, err := cashu.Fees(pending_proofs, keysets.Keysets)
 			if err != nil {
 				return quote, fmt.Errorf("cashu.Fees(pending_proofs, m.Keysets[quote.Unit]). %w", err)
 			}
@@ -186,8 +191,12 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		logger.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w quote.Melted: %w", cashu.ErrMeltAlreadyPaid, err)
 	}
+	keysets, err := m.Signer.GetKeys()
+	if err != nil {
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.Signer.GetKeys(). %w", err)
+	}
 
-	unit, err := m.CheckProofsAreSameUnit(meltRequest.Inputs)
+	unit, err := m.CheckProofsAreSameUnit(meltRequest.Inputs, keysets.Keysets)
 
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
@@ -199,7 +208,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	}
 
 	// check for needed amount of fees
-	fee, err := cashu.Fees(meltRequest.Inputs, m.Keysets[unit.String()])
+	fee, err := cashu.Fees(meltRequest.Inputs, keysets.Keysets)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()]): %w", err)
 	}
@@ -227,11 +236,11 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w len(knownProofs) != 0 %w", cashu.ErrProofSpent, err)
 	}
 
-	err = m.VerifyListOfProofs(meltRequest.Inputs, []cashu.BlindedMessage{}, unit)
+	err = m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs)
 
 	if err != nil {
 		logger.Debug("Could not verify Proofs", slog.String(utils.LogExtraInfo, err.Error()))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.VerifyListOfProofs(meltRequest.Inputs, []cashu.BlindedMessage{}, unit) %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs) %w", err)
 	}
 
 	invoice, err := zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork())
@@ -347,10 +356,10 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		overpaidFees := AmountProofs - totalExpent
 		change := utils.GetMessagesForChange(overpaidFees, meltRequest.Outputs)
 
-		blindSignatures, recoverySigsDb, err := m.SignBlindedMessages(change, quote.Unit)
+		blindSignatures, recoverySigsDb, err := m.Signer.SignBlindMessages(change)
 
 		if err != nil {
-			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.SignBlindedMessages(change, quote.Unit) %w", err)
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.Signer.SignBlindMessages(change) %w", err)
 		}
 
 		err = m.MintDB.SaveRestoreSigs(tx, recoverySigsDb)

@@ -21,14 +21,13 @@ var (
 	ErrKeysetNotFound          = errors.New("Keyset not found")
 	ErrKeysetForProofNotFound  = errors.New("Keyset for proof not found")
 
+	AlreadyActiveProof     = errors.New("Proof already being spent")
+	AlreadyActiveQuote     = errors.New("Quote already being spent")
+	UsingInactiveKeyset    = errors.New("Trying to use an inactive keyset")
 	ErrInvalidProof        = errors.New("Invalid proof")
 	ErrQuoteNotPaid        = errors.New("Quote not paid")
 	ErrMessageAmountToBig  = errors.New("Message amount is to big")
 	ErrInvalidBlindMessage = errors.New("Invalid blind message")
-
-	AlreadyActiveProof  = errors.New("Proof already being spent")
-	AlreadyActiveQuote  = errors.New("Quote already being spent")
-	UsingInactiveKeyset = errors.New("Trying to use an inactive keyset")
 )
 
 const (
@@ -46,10 +45,13 @@ type Unit int
 
 const Sat Unit = iota + 1
 const Msat Unit = iota + 2
+const USD Unit = iota + 3
+const EUR Unit = iota + 4
+const AUTH Unit = iota + 5
 
 // String - Creating common behavior - give the type a String function
 func (d Unit) String() string {
-	return [...]string{"sat", "msat"}[d-1]
+	return [...]string{"sat", "msat", "usd", "eur", "auth"}[d-1]
 }
 
 // EnumIndex - Creating common behavior - give the type a EnumIndex functio
@@ -63,6 +65,12 @@ func UnitFromString(s string) (Unit, error) {
 		return Sat, nil
 	case "msat":
 		return Msat, nil
+	case "usd":
+		return USD, nil
+	case "eur":
+		return EUR, nil
+	case "auth":
+		return AUTH, nil
 	default:
 		return 0, fmt.Errorf("%w: %s", ErrCouldNotParseUnitString, s)
 	}
@@ -335,18 +343,18 @@ type MintError struct {
 	Code   int8   `json:"code"`
 }
 
-type KeysetMap map[uint64]Keyset
-type Keyset struct {
+type MintKeysMap map[uint64]MintKey
+type MintKey struct {
 	Id          string                `json:"id"`
 	Active      bool                  `json:"active" db:"active"`
 	Unit        string                `json:"unit"`
 	Amount      uint64                `json:"amount"`
 	PrivKey     *secp256k1.PrivateKey `json:"priv_key"`
 	CreatedAt   int64                 `json:"created_at"`
-	InputFeePpk int                   `json:"input_fee_ppk"`
+	InputFeePpk uint                  `json:"input_fee_ppk"`
 }
 
-func (keyset *Keyset) GetPubKey() *secp256k1.PublicKey {
+func (keyset *MintKey) GetPubKey() *secp256k1.PublicKey {
 	pubkey := keyset.PrivKey.PubKey()
 	return pubkey
 }
@@ -357,7 +365,7 @@ type Seed struct {
 	Version     int
 	Unit        string
 	Id          string
-	InputFeePpk int `json:"input_fee_ppk" db:"input_fee_ppk"`
+	InputFeePpk uint `json:"input_fee_ppk" db:"input_fee_ppk"`
 }
 
 type SwapMintMethod struct {
@@ -391,13 +399,13 @@ type GetInfoResponse struct {
 	Nuts            map[string]any `json:"nuts"`
 }
 
-type KeysResponse map[string][]KeysetResponse
+type KeysResponse map[string][]Keyset
 
-type KeysetResponse struct {
+type Keyset struct {
 	Id          string            `json:"id"`
 	Unit        string            `json:"unit"`
 	Keys        map[string]string `json:"keys"`
-	InputFeePpk int               `json:"input_fee_ppk"`
+	InputFeePpk uint              `json:"input_fee_ppk"`
 }
 
 type PostMintQuoteBolt11Request struct {
@@ -453,7 +461,7 @@ type BasicKeysetResponse struct {
 	Id          string `json:"id"`
 	Unit        string `json:"unit"`
 	Active      bool   `json:"active"`
-	InputFeePpk int    `json:"input_fee_ppk"`
+	InputFeePpk uint   `json:"input_fee_ppk"`
 }
 
 type ACTION_STATE string

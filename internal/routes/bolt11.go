@@ -239,7 +239,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		blindedSignatures, recoverySigsDb, err = mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
+		blindedSignatures, recoverySigsDb, err = mint.Signer.SignBlindMessages(mintRequest.Outputs)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.SignBlindedMessages: %w", err).Error())
@@ -358,7 +358,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		dbRequest = cashu.MeltRequestDB{
 			Quote:           response.Quote,
 			Request:         meltRequest.Request,
-			Unit:            cashu.Sat.String(),
+			Unit:            meltRequest.Unit,
 			Expiry:          response.Expiry,
 			Amount:          response.Amount,
 			FeeReserve:      response.FeeReserve,

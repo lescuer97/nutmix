@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -13,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database/goose"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
-	"github.com/pressly/goose/v3"
 )
 
 var DBError = errors.New("ERROR DATABASE")
@@ -41,16 +40,9 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error)
 
 	pool, err := pgxpool.New(context.Background(), dbUrl)
 
-	if err := goose.SetDialect("postgres"); err != nil {
-		log.Fatalf("Error setting dialect: %v", err)
-	}
-
 	db := stdlib.OpenDBFromPool(pool)
 
-	if err := goose.Up(db, migrationDir); err != nil {
-		log.Fatalf("Error running migrations: %v", err)
-	}
-
+	err = goose.RunMigration(db, goose.POSTGRES)
 	if err := db.Close(); err != nil {
 		panic(err)
 	}
