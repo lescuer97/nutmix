@@ -174,7 +174,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		quote, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
 
 		if err != nil {
-			logger.Error(fmt.Errorf("Incorrect body: %w", err).Error())
+			logger.Error(fmt.Errorf("mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -242,7 +242,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		blindedSignatures, recoverySigsDb, err = mint.Signer.SignBlindMessages(mintRequest.Outputs)
 
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.SignBlindedMessages: %w", err).Error())
+			logger.Error(fmt.Errorf("mint.Signer.SignBlindMessages(mintRequest.Outputs): %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -335,6 +335,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, "Sorry! MPP is not available")
 			return
 		}
+
 		queryFee, err := mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, amount)
 
 		if err != nil {
