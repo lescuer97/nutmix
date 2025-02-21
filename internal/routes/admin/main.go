@@ -41,11 +41,8 @@ func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
 				case errors.Is(e, ErrInvalidNostrKey):
 					message = "Nostr npub is not valid"
 					return
-
 				}
-
 			}
-
 			logger.Error(fmt.Sprintf("Error from calls: %+v", c.Errors.String()))
 			component := templates.ErrorNotif(message)
 			err := component.Render(c.Request.Context(), c.Writer)
@@ -122,17 +119,12 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 		adminRoute.GET("/liquidity", LigthningLiquidityPage(logger, mint))
 		adminRoute.GET("/liquidity/:swapId", SwapStatusPage(logger, mint))
 		adminRoute.GET("/swaps-list", SwapsList(mint, logger))
-		// defer sdk.Disconnect()
-		// liquidity manager
 		adminRoute.GET("/liquidity-button", LiquidityButton(logger))
 		adminRoute.GET("/liquid-swap-form", SwapOutForm(logger, mint))
 		adminRoute.GET("/lightning-swap-form", LightningSwapForm(logger))
-
 		adminRoute.POST("/out-swap-req", SwapOutRequest(logger, mint))
 		adminRoute.POST("/in-swap-req", SwapInRequest(logger, mint))
-
 		adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
-
 		adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(logger, mint))
 		go CheckStatusOfLiquiditySwaps(mint, logger)
 	}

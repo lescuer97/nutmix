@@ -23,6 +23,7 @@ templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs Mint
 	{{ sigsSatAmount := strconv.FormatUint(sigs.SatAmount, 10) }}
 	{{ balanceString := strconv.FormatUint(balance, 10) }}
 	{{ neededBalance := sigs.SatAmount - proofs.SatAmount }}
+	{{ neededBalanceString := strconv.FormatUint(neededBalance, 10) }}
 	{{ enoughLiquidity := balance < neededBalance }}
 	{{ percentageOfLiquidity := (float64(balance) / float64(neededBalance)) * 100 }}
 	{{ percentageOfLiquidityStr := fmt.Sprintf("%.2f", percentageOfLiquidity) }}
@@ -68,6 +69,9 @@ templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs Mint
 						{  sigsSatAmount } <small>Sats</small>
 					</span>
 				</div>
+					<h3>
+						Needed Balance: { neededBalanceString }(Sats)
+					</h3>
 			</div>
 		</div>
 	</div>
