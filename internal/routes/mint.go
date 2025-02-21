@@ -294,7 +294,6 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		if err != nil {
 			logger.Warn(" mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs, unit)", slog.String(utils.LogExtraInfo, err.Error()))
-
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
 			return
