@@ -1,9 +1,12 @@
 package admin
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	m "github.com/lescuer97/nutmix/internal/mint"
-	"github.com/lescuer97/nutmix/internal/utils"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 )
 
 func LightningDataFormFields(mint *m.Mint) gin.HandlerFunc {
@@ -11,28 +14,13 @@ func LightningDataFormFields(mint *m.Mint) gin.HandlerFunc {
 
 		backend := c.Query(m.MINT_LIGHTNING_BACKEND_ENV)
 
-		switch {
+		ctx := context.Background()
+		err := templates.SetupForms(backend, mint.Config).Render(ctx, c.Writer)
 
-		case backend == string(utils.LNDGRPC):
-			c.HTML(200, "lnd-grpc-form", mint.Config)
-			break
-		case backend == string(utils.CLNGRPC):
-			c.HTML(200, "cln-grpc-form", mint.Config)
-			break
-
-		case backend == string(utils.FAKE_WALLET):
-			c.HTML(200, "fake-wallet-form", mint.Config)
-			break
-
-		case backend == string(utils.LNBITS):
-			c.HTML(200, "lnbits-wallet-form", mint.Config)
-			break
-
-		default:
-			c.HTML(200, "problem-form", nil)
-
+		if err != nil {
+			c.Error(fmt.Errorf("templates.SetupForms(mint.Config).Render(ctx, c.Writer). %w", err))
+			return
 		}
-
 		return
 	}
 }

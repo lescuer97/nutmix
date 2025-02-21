@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"os"
 )
@@ -16,6 +15,7 @@ const FAKE_WALLET LightningBackend = "FakeWallet"
 const LNDGRPC LightningBackend = "LndGrpcWallet"
 const LNBITS LightningBackend = "LNbitsWallet"
 const CLNGRPC LightningBackend = "ClnGrpcWallet"
+const Strike LightningBackend = "Strike"
 
 func StringToLightningBackend(text string) LightningBackend {
 
@@ -26,6 +26,8 @@ func StringToLightningBackend(text string) LightningBackend {
 		return LNDGRPC
 	case string(LNBITS):
 		return LNBITS
+	case string(Strike):
+		return Strike
 	default:
 		return FAKE_WALLET
 
@@ -57,6 +59,8 @@ type Config struct {
 	CLN_CLIENT_KEY  string `db:"cln_client_key"`
 	CLN_MACAROON    string `db:"cln_macaroon"`
 
+	STRIKE_KEY string `db:"strike_key"`
+
 	PEG_OUT_ONLY       bool `db:"peg_out_only"`
 	PEG_OUT_LIMIT_SATS *int `db:"peg_out_limit_sats,omitempty"`
 	PEG_IN_LIMIT_SATS  *int `db:"peg_in_limit_sats,omitempty"`
@@ -84,6 +88,8 @@ func (c *Config) Default() {
 	c.PEG_OUT_ONLY = false
 	c.PEG_OUT_LIMIT_SATS = nil
 	c.PEG_IN_LIMIT_SATS = nil
+
+	c.STRIKE_KEY = ""
 }
 func (c *Config) UseEnviromentVars() {
 	c.NAME = os.Getenv("NAME")
@@ -104,23 +110,4 @@ func (c *Config) UseEnviromentVars() {
 	c.MINT_LNBITS_ENDPOINT = os.Getenv("MINT_LNBITS_ENDPOINT")
 	c.MINT_LNBITS_KEY = os.Getenv("MINT_LNBITS_KEY")
 
-}
-
-func getConfigFile() ([]byte, error) {
-	dir, err := os.UserConfigDir()
-
-	if err != nil {
-		return []byte{}, fmt.Errorf("os.UserHomeDir(), %w", err)
-	}
-
-	var pathToProjectDir string = dir + "/" + ConfigDirName
-	var pathToProjectConfigFile string = pathToProjectDir + "/" + ConfigFileName
-	err = CreateDirectoryAndPath(pathToProjectDir, ConfigFileName)
-
-	if err != nil {
-		return []byte{}, fmt.Errorf("utils.CreateDirectoryAndPath(pathToProjectDir, ConfigFileName), %w", err)
-	}
-
-	// Manipulate Config file and parse
-	return os.ReadFile(pathToProjectConfigFile)
 }
