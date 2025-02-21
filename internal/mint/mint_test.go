@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
+
 func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 	const posgrespassword = "password"
 	const postgresuser = "user"
@@ -35,6 +37,7 @@ func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 		t.Fatal(err)
 	}
 
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	connUri, err := postgresContainer.ConnectionString(ctx)
 
 	if err != nil {
