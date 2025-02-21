@@ -300,6 +300,8 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	// turn to sats
 	fee = fee / 1000
 
+	fee = GetFeeReserve(amount_sat, fee)
+
 	return fee, nil
 }
 

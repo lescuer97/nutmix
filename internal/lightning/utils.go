@@ -1,6 +1,10 @@
 package lightning
 
-import "github.com/lightningnetwork/lnd/lnrpc"
+import (
+	"math"
+
+	"github.com/lightningnetwork/lnd/lnrpc"
+)
 
 const (
 	MAINNET = "mainnet"
@@ -8,6 +12,8 @@ const (
 	TESTNET = "testnet"
 	SIGNET  = "signet"
 )
+
+const MinimumLightningFee float64 = 0.01
 
 func GetAverageRouteFee(routes []*lnrpc.Route) uint64 {
 	var fees uint64
@@ -18,4 +24,11 @@ func GetAverageRouteFee(routes []*lnrpc.Route) uint64 {
 		amount_routes += 1
 	}
 	return fees / amount_routes
+}
+
+func GetFeeReserve(invoiceSatAmount uint64, queriedFee uint64) uint64 {
+	invoiceMinFee := float64(invoiceSatAmount) * MinimumLightningFee
+
+	fee := uint64(math.Max(invoiceMinFee, float64(queriedFee)))
+	return fee
 }

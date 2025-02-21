@@ -181,7 +181,8 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 		return 0, fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	return queryResponse.FeeReserve, nil
+	fee := GetFeeReserve(amount_sat, queryResponse.FeeReserve)
+	return fee, nil
 }
 
 func (l LnbitsWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {

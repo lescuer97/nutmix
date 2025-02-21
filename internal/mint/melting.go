@@ -147,7 +147,6 @@ func (m *Mint) CheckPendingQuoteAndProofs(logger *slog.Logger) error {
 		}
 
 		logger.Info(fmt.Sprintf("Melt quote %v state: %v", quote.Quote, quote.State))
-
 	}
 
 	return nil

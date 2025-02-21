@@ -27,6 +27,7 @@ const (
 type FakeWallet struct {
 	Network         chaincfg.Params
 	UnpurposeErrors []FakeWalletError
+	InvoiceFee      uint64
 }
 
 const mock_preimage = "fakewalletpreimage"
@@ -98,7 +99,8 @@ func (f FakeWallet) CheckReceived(quote string) (PaymentStatus, string, error) {
 }
 
 func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
-	return 0, nil
+	fee := GetFeeReserve(amount_sat, f.InvoiceFee)
+	return fee, nil
 }
 
 func (f FakeWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
