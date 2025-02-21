@@ -354,7 +354,7 @@ func (l *LocalSigner) validateProof(proof cashu.Proof, checkOutputs *bool, pubke
 	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
 
 	if err != nil {
-		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", err)
+		return fmt.Errorf("proof.IsProofSpendConditioned(): %w %w", err, cashu.ErrInvalidProof)
 	}
 
 	if isProofLocked {
@@ -370,11 +370,11 @@ func (l *LocalSigner) validateProof(proof cashu.Proof, checkOutputs *bool, pubke
 	}
 	parsedBlinding, err := hex.DecodeString(proof.C)
 	if err != nil {
-		return fmt.Errorf("hex.DecodeString: %w", err)
+		return fmt.Errorf("hex.DecodeString: %w %w", err, cashu.ErrInvalidProof)
 	}
 	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
 	if err != nil {
-		return fmt.Errorf("secp256k1.ParsePubKey: %+v", err)
+		return fmt.Errorf("secp256k1.ParsePubKey: %w %w", err, cashu.ErrInvalidProof)
 	}
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
 	if !verified {

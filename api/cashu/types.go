@@ -169,6 +169,13 @@ func (p *Proofs) SetPendingAndQuoteRef(quote string) {
 		(*p)[i].Quote = &quote
 	}
 }
+func (p *Proofs) Amount() uint64 {
+	amount := uint64(0)
+	for i := 0; i < len(*p); i++ {
+		amount += (*p)[i].Amount
+	}
+	return amount
+}
 
 func (p *Proofs) SetProofsState(state ProofState) {
 	for i := 0; i < len(*p); i++ {
@@ -472,6 +479,7 @@ type MeltRequestDB struct {
 	Expiry     int64  `json:"expiry"`
 	Amount     uint64 `json:"amount"`
 	FeeReserve uint64 `json:"fee_reserve" db:"fee_reserve"`
+	FeePaid    uint64 `json:"paid_fee" db:"fee_paid"`
 	// Deprecated: Should be removed after all main wallets change to the new State format
 	RequestPaid     bool         `json:"paid" db:"request_paid"`
 	Request         string       `json:"request"`
@@ -560,6 +568,9 @@ type RecoverSigDB struct {
 	C_        string              `json:"C_" db:"C_"`
 	CreatedAt int64               `json:"created_at" db:"created_at"`
 	Dleq      *BlindSignatureDLEQ `json:"dleq,omitempty"`
+
+	// This fields are use for melt_requests pending queries
+	MeltQuote string `json:"melt_quote" db:"melt_quote"`
 }
 
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
@@ -769,4 +780,11 @@ func (b *BlindSignature) VerifyDLEQ(
 	// I negate the hashed_keys_priv because the original key got altered when multiplying for A
 	return hashed_keys_priv.Key.Negate().String() == e.Key.String(), nil
 
+}
+
+type MeltChange struct {
+	B_        string `db:"B_"`
+	Id        string `db:"id"`
+	Quote     string `db:"quote"`
+	CreatedAt int64  `json:"created_at" db:"created_at"`
 }

@@ -1,0 +1,228 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/lescuer97/nutmix/internal/utils"
+	"strconv"
+	"time"
+)
+
+type MintReserve struct {
+	SatAmount uint64
+	Amount    uint64
+}
+
+css progressBarColor(percent string) {
+	--progress: { percent };
+}
+
+templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs MintReserve) {
+	{{ proofAmount := strconv.FormatUint(proofs.Amount, 10) }}
+	{{ proofSatAmount := strconv.FormatUint(proofs.SatAmount, 10) }}
+	{{ sigsAmount := strconv.FormatUint(sigs.Amount, 10) }}
+	{{ sigsSatAmount := strconv.FormatUint(sigs.SatAmount, 10) }}
+	{{ balanceString := strconv.FormatUint(balance, 10) }}
+	{{ neededBalance := sigs.SatAmount - proofs.SatAmount }}
+	{{ neededBalanceString := strconv.FormatUint(neededBalance, 10) }}
+	{{ enoughLiquidity := balance < neededBalance }}
+	{{ percentageOfLiquidity := (float64(balance) / float64(neededBalance)) * 100 }}
+	{{ percentageOfLiquidityStr := fmt.Sprintf("%.2f", percentageOfLiquidity) }}
+	{{ 	ratioProofSigAmount := (float64(proofs.Amount) / float64(sigs.Amount)) * 100 }}
+	{{ ratioProofSigAmountStr := fmt.Sprintf("%.2f", ratioProofSigAmount) }}
+	{{ 	ratioProofSigAmountSats := (float64(proofs.SatAmount) / float64(sigs.SatAmount)) * 100 }}
+	{{ ratioProofSigAmountSatsStr := fmt.Sprintf("%.2f", ratioProofSigAmountSats) }}
+	<div class="flex-card">
+		<div class="card">
+			if fakeWallet {
+				<h2>Fake Wallet doesn't have a balance</h2>
+			} else {
+				<h2>Node Balance:</h2>
+				<h3><b>{ balanceString }</b> Sats</h3>
+				<p>Your node has <b>{ percentageOfLiquidityStr } %</b> of liquidity needed.</p>
+			}
+		</div>
+		<div class="card">
+			<div class={ "reserves-data", templ.KV("iliquid", enoughLiquidity) }>
+				<div class="reserve-titles">
+					<h3>
+						Proofs
+					</h3>
+					<h3>
+						Promises
+					</h3>
+				</div>
+				<div class="data">
+					<span>
+						{  proofAmount }
+					</span>
+					<meter min="0" max="100" value={ ratioProofSigAmountStr }></meter>
+					<span>
+						{ sigsAmount }
+					</span>
+				</div>
+				<div class="data">
+					<span>
+						{ proofSatAmount } <small>Sats</small>
+					</span>
+					<meter min="0" max="100" value={ ratioProofSigAmountSatsStr }></meter>
+					<span>
+						{  sigsSatAmount } <small>Sats</small>
+					</span>
+				</div>
+					<h3>
+						Needed Balance: { neededBalanceString }(Sats)
+					</h3>
+			</div>
+		</div>
+	</div>
+}
+
+type ActivitySummary struct {
+	Mint int64
+	Melt int64
+	Net  int64
+}
+
+templ MintMovements(statuses ActivitySummary) {
+	<div class="card activity">
+		{{ mint := strconv.FormatInt(statuses.Mint, 10) }}
+		<div class=""><b>Inflows:</b> { mint } Sats</div>
+		{{ melt := strconv.FormatInt(statuses.Melt, 10) }}
+		<div class=""><b>Outflows:</b> { melt } Sats</div>
+		{{ net := strconv.FormatInt(statuses.Net, 10) }}
+		<div class=""><b>Net flows:</b> { net } Sats</div>
+	</div>
+}
+
+templ Logs(logs []utils.SlogRecordJSON) {
+	<h2>Logs</h2>
+	<div class="">
+		<table class="">
+			<thead>
+				<tr>
+					<th class="level" scope="col">Level</th>
+					<th scope="col">Message</th>
+					<th scope="col">Time</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, log := range logs {
+					<tr class={ log.Level.String() }>
+						<th scope="row">{ log.Level.String() }</th>
+						<td class="request-row">{ log.Msg } { log.ExtraInfo } </td>
+						<td class="time">{ log.Time.Format(time.UnixDate) }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+type MintMeltRequestVisual struct {
+	Type    string
+	Unit    string
+	Request string
+	Status  string
+	SeenAt  string
+}
+
+type ListMintMeltVisual []MintMeltRequestVisual
+
+func (ms ListMintMeltVisual) Len() int {
+	return len(ms)
+}
+
+func (ms ListMintMeltVisual) Less(i, j int) bool {
+	return ms[i].SeenAt < ms[j].SeenAt
+}
+
+func (ms ListMintMeltVisual) Swap(i, j int) {
+	ms[i], ms[j] = ms[j], ms[i]
+}
+
+templ MintMeltEventList(eventList []MintMeltRequestVisual) {
+	<h2>Mint & Melt</h2>
+	<div>
+		<table class="">
+			<thead>
+				<tr>
+					<th scope="col">Type</th>
+					<th scope="col">Request</th>
+					<th scope="col">Unit</th>
+					<th scope="col">Status</th>
+					<th scope="col">Time</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, event := range eventList {
+					<tr class={ event.Type }>
+						<th scope="row">{ event.Type }</th>
+						<td class="request-row">{ event.Request }</td>
+						<td class="unit">{ event.Unit }</td>
+						<td>{ event.Status }</td>
+						<td>{ event.SeenAt }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+templ MintActivityLayout(liquidityManagerAvailable bool) {
+	@Layout() {
+		<div hx-ext="remove-me" id="notifications"></div>
+		<main class="activity">
+			<div class="time-select">
+				<button class="time-button selected" value="24h" hx-target="#mint-summary" hx-trigger="click" type="button">24h</button>
+				<button class="time-button" value="48h" type="button">48h</button>
+				<button class="time-button" value="72h" type="button">72h</button>
+				<button class="time-button" value="7d" type="button">7d</button>
+				<button class="time-button" value="all" type="button">All</button>
+			</div>
+			<div class="balance">
+				<div
+					hx-get="/admin/mint-balance"
+					hx-trigger="load"
+					hx-target="this"
+					hx-swap="innerHTML"
+					class=""
+				></div>
+				<div
+					hx-get="/admin/mint-melt-summary"
+					hx-target="this"
+					hx-swap="innerHTML"
+					hx-trigger="load, reload"
+					hx-headers="javascript:{time: event?.detail?.time}"
+					id="mint-summary"
+					class="summary-table"
+				></div>
+				if liquidityManagerAvailable {
+					<div
+						hx-get="/admin/liquidity-button"
+						hx-target="this"
+						hx-swap="outerHTML"
+						hx-trigger="load, reload"
+					></div>
+				}
+			</div>
+			<div class="data-list">
+				<div
+					hx-get="/admin/logs"
+					hx-target="this"
+					hx-swap="innerHTML"
+					hx-trigger="load, reload"
+					hx-headers="javascript:{time: event?.detail?.time}"
+					class="data-table log-table"
+				></div>
+				<div
+					hx-get="/admin/mint-melt-list"
+					hx-target="this"
+					hx-swap="innerHTML"
+					hx-trigger="load, reload"
+					hx-headers="javascript:{time: event?.detail?.time}"
+					class="data-table mint-melt-table"
+				></div>
+			</div>
+		</main>
+	}
+}

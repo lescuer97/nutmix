@@ -113,6 +113,11 @@ func main() {
 
 	r.Use(cors.Default())
 
+	err = mint.CheckPendingQuoteAndProofs(logger)
+	if err != nil {
+		logger.Error(fmt.Sprintf("SetUpMint: %+v ", err))
+		return
+	}
 	routes.V1Routes(r, mint, logger)
 
 	admin.AdminRoutes(ctx, r, mint, logger)

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http/httptest"
 	"os"
 	"strconv"
@@ -129,6 +130,8 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
+
+	log.Printf("\n body for call: %s \n", w.Body.Bytes())
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
 
@@ -261,7 +264,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	if errorRes.Code != cashu.UNKNOWN {
+	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
@@ -752,7 +755,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	if errorRes.Code != cashu.UNKNOWN {
+	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 

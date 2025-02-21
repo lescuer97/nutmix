@@ -1,12 +1,14 @@
 package routes
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"log/slog"
 )
 
 func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
@@ -253,20 +255,19 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.ActiveProofs.AddProofs(swapRequest.Inputs)
-
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Error("mint.ActiveProofs.AddProofs(swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
-			c.JSON(400, "There was a problem during swapping")
+			c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
 			return
 		}
-		defer mint.ActiveProofs.RemoveProofs(swapRequest.Inputs)
+		defer mint.MintDB.Rollback(ctx, tx)
 
 		// check if we know any of the proofs
-		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(SecretsList)
+		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)
 
 		if err != nil {
-			logger.Error("database.CheckListOfProofs(pool, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
@@ -277,11 +278,22 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
+		swapRequest.Inputs.SetProofsState(cashu.PROOF_PENDING)
+
+		// send proofs to database
+		err = mint.MintDB.SaveProof(tx, swapRequest.Inputs)
+
+		if err != nil {
+			logger.Error("mint.MintDB.SaveProof(tx, swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+
 		err = mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs)
 
 		if err != nil {
 			logger.Warn(" mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs, unit)", slog.String(utils.LogExtraInfo, err.Error()))
-
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -301,23 +313,25 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			Signatures: blindedSignatures,
 		}
 
-		swapRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
-
-		// send proofs to database
-		err = mint.MintDB.SaveProof(swapRequest.Inputs)
-
+		err = mint.MintDB.SetProofsState(tx, swapRequest.Inputs, cashu.PROOF_SPENT)
 		if err != nil {
-			logger.Error("database.SaveProofs", slog.String(utils.LogExtraInfo, err.Error()))
-			logger.Error("Proofs", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", swapRequest.Inputs)))
-			c.JSON(200, response)
+			logger.Warn("mint.MintDB.SetProofsState(tx,swapRequest.Inputs , cashu.PROOF_SPENT)", slog.String(utils.LogExtraInfo, err.Error()))
+
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
-		err = mint.MintDB.SaveRestoreSigs(recoverySigsDb)
+		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 		if err != nil {
 			logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
 			logger.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
 			c.JSON(200, response)
+			return
+		}
+		err = mint.MintDB.Commit(ctx, tx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 

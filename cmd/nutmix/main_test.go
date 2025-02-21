@@ -97,11 +97,11 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMintQuoteResponse.RequestPaid {
+	if postMintQuoteResponse.RequestPaid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponse.RequestPaid)
 	}
-	if postMintQuoteResponse.State != cashu.PAID {
-		t.Errorf("Expected state to be PAID, got %v", postMintQuoteResponse.State)
+	if postMintQuoteResponse.State != cashu.UNPAID {
+		t.Errorf("Expected state to be UNPAID, got %v", postMintQuoteResponse.State)
 
 	}
 
@@ -129,8 +129,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponseTwo.RequestPaid)
 	}
 
-	if postMintQuoteResponse.State != cashu.PAID {
-		t.Errorf("Expected state to be PAID, got %v", postMintQuoteResponse.State)
+	if postMintQuoteResponse.State != cashu.UNPAID {
+		t.Errorf("Expected state to be UNPAID, got %v", postMintQuoteResponse.State)
 
 	}
 
@@ -445,6 +445,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
+	log.Printf("body: %v", string(w.Body.Bytes()))
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
@@ -526,12 +527,12 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMeltQuoteResponse.Paid {
+	if postMeltQuoteResponse.Paid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
 	}
 
-	if postMeltQuoteResponse.State != cashu.PAID {
-		t.Errorf("Expected state to be PAID, got %v", postMeltQuoteResponse.State)
+	if postMeltQuoteResponse.State != cashu.UNPAID {
+		t.Errorf("Expected state to be UNPAID, got %v", postMeltQuoteResponse.State)
 	}
 
 	if postMeltQuoteResponse.Amount != 1000 {
@@ -552,16 +553,12 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	}
 
-	if !postMeltQuoteResponse.Paid {
+	if postMeltQuoteResponse.Paid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
 	}
 
-	if postMeltQuoteResponse.State != cashu.PAID {
-		t.Errorf("Expected state to be PAID, got %v", postMeltQuoteResponse.State)
-	}
-
-	if postMeltQuoteResponse.State != cashu.PAID {
-		t.Errorf("Expected state to be PAID, got %v", postMeltQuoteResponse.State)
+	if postMeltQuoteResponse.State != cashu.UNPAID {
+		t.Errorf("Expected state to be UNPAID, got %v", postMeltQuoteResponse.State)
 	}
 
 	if postMeltQuoteResponse.Amount != 1000 {
@@ -588,7 +585,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
+	if w.Code != 400 {
 		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
 	var errorRes cashu.ErrorResponse
@@ -1014,7 +1011,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected paid to be false because it's a Lnd wallet and I have not paid the invoice yet, got %v", postMintQuoteResponseTwo.RequestPaid)
 	}
 
-	if postMintQuoteResponseTwo.State != cashu.UNPAID {
+	if postMintQuoteResponseTwo.State != cashu.PENDING {
 		t.Errorf("Expected to not be unpaid have: %s ", postMintQuoteResponseTwo.State)
 	}
 
@@ -1523,7 +1520,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
+	if w.Code != 400 {
 		t.Errorf("Expected status code 403, got %d", w.Code)
 	}
 
