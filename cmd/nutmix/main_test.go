@@ -369,7 +369,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(1009, activeKeys)
+	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(2000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -405,7 +405,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		totalAmountSigned += output.Amount
 	}
 
-	if totalAmountSigned != 1009 {
+	if totalAmountSigned != 2000 {
 		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
 	}
 
@@ -594,6 +594,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
+	fmt.Println("body ", string(w.Body.Bytes()))
+
 	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
@@ -626,7 +628,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
 	if postMeltResponse.State != cashu.PAID {
-		t.Errorf("Expected state to be MINTED, got %v", postMintQuoteResponseTwo.State)
+		t.Errorf("Expected state to be Paid, got %v", postMintQuoteResponseTwo.State)
 	}
 	if postMeltResponse.PaymentPreimage != "fakewalletpreimage" {
 		t.Errorf("Expected payment preimage to be empty, got %s", postMeltResponse.PaymentPreimage)
