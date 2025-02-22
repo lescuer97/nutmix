@@ -389,7 +389,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	var postSwapResponse cashu.PostSwapResponse
 
-	log.Printf("body: %v ", string(w.Body.Bytes()))
 	if w.Code != 200 {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
@@ -446,7 +445,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
-	log.Printf("body: %v", string(w.Body.Bytes()))
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
