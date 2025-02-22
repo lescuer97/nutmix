@@ -251,7 +251,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		log.Println("Amount proofs: ", AmountProofs)
-		log.Println("Amount Fees: ", (AmountSignature))
+		log.Println("Amount signature: ", (AmountSignature))
 		log.Println("Fee : ", fee)
 		balance := (AmountProofs - (uint64(fee) + AmountSignature))
 		if balance != 0 {

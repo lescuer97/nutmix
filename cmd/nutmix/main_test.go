@@ -369,7 +369,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(2000, activeKeys)
+	swapBlindedMessages, swapSecrets, swapPrivateKeySecrets, err := CreateBlindedMessages(10000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -389,6 +389,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	var postSwapResponse cashu.PostSwapResponse
 
+	log.Printf("body: %v ", string(w.Body.Bytes()))
 	if w.Code != 200 {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
@@ -405,7 +406,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		totalAmountSigned += output.Amount
 	}
 
-	if totalAmountSigned != 2000 {
+	if totalAmountSigned != 10000 {
 		t.Errorf("Expected total amount signed to be 1000, got %d", totalAmountSigned)
 	}
 
@@ -420,7 +421,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
-	swapInvalidSigBlindedMessages, _, _, err := CreateBlindedMessages(1000, activeKeys)
+	swapInvalidSigBlindedMessages, _, _, err := CreateBlindedMessages(10000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
