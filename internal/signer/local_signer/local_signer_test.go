@@ -37,8 +37,8 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 	if len(keys.Keysets) != 3 {
 		t.Errorf("Version should be 3. it's %v", len(keys.Keysets))
 	}
-    ctx := context.Background()
-    tx, err := localsigner.db.GetTx(ctx)
+	ctx := context.Background()
+	tx, err := localsigner.db.GetTx(ctx)
 	if err != nil {
 		t.Fatalf("localsigner.db.GetTx(ctx) %+v", err)
 	}

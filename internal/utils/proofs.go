@@ -17,7 +17,7 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrNoValidSignatures):
 		return cashu.TOKEN_NOT_VERIFIED, nil
 	case errors.Is(proofError, cashu.ErrNotEnoughSignatures):
-		return cashu.TRANSACTION_NOT_BALANCED, nil
+		return cashu.TOKEN_NOT_VERIFIED, nil
 
 	case errors.Is(proofError, cashu.ErrLocktimePassed):
 		message := cashu.ErrLocktimePassed.Error()

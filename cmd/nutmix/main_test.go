@@ -594,8 +594,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	fmt.Println("body ", string(w.Body.Bytes()))
-
 	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}

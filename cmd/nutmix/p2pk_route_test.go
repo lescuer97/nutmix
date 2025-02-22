@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http/httptest"
 	"os"
 	"strconv"
@@ -476,6 +477,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	var postSwapResponse cashu.PostSwapResponse
 
+	log.Printf("Body: %+v", string(w.Body.Bytes()))
 	if w.Code != 200 {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
@@ -591,6 +593,8 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	errorResponse := cashu.ErrorResponse{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
+	log.Printf("Body: %+v", string(w.Body.Bytes()))
 
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())

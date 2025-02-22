@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -249,7 +250,11 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		if AmountProofs < (uint64(fee) + AmountSignature) {
+		log.Println("Amount proofs: ", AmountProofs)
+		log.Println("Amount Fees: ", (AmountSignature))
+		log.Println("Fee : ", fee)
+		balance := (AmountProofs - (uint64(fee) + AmountSignature))
+		if balance != 0 {
 			logger.Info(fmt.Sprintf("didn't provide enough fees. ProofAmount: %v, needed Proofs: %v", AmountProofs, (uint64(fee) + AmountSignature)))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TRANSACTION_NOT_BALANCED, nil))
 			return
