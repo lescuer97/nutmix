@@ -41,7 +41,7 @@ templ LightningBackendPage(config utils.Config) {
 							hx-target="#lightning-data"
 							selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNBITS }
 						>LNBITS wallet</option>
-							<option
+						<option
 							value="Strike"
 							hx-trigger="selected"
 							hx-get="/admin/lightningdata"

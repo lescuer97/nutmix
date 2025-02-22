@@ -1,6 +1,6 @@
 -- +goose Up
 ALTER TABLE config ADD strike_key text;
-UPDATE config SET strike_key = "" WHERE strike_key IS NULL;
+UPDATE config SET strike_key = '' WHERE strike_key IS NULL;
 
 
 

@@ -1,9 +1,11 @@
 package localsigner
 
 import (
+	"context"
+	"testing"
+
 	"github.com/lescuer97/nutmix/api/cashu"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
-	"testing"
 )
 
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
@@ -35,8 +37,13 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 	if len(keys.Keysets) != 3 {
 		t.Errorf("Version should be 3. it's %v", len(keys.Keysets))
 	}
+    ctx := context.Background()
+    tx, err := localsigner.db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("localsigner.db.GetTx(ctx) %+v", err)
+	}
 
-	msatSeeds, err := db.GetSeedsByUnit(cashu.Msat)
+	msatSeeds, err := db.GetSeedsByUnit(tx, cashu.Msat)
 	if err != nil {
 		t.Fatalf("db.GetSeedsByUnit(cashu.Msat) %+v", err)
 	}
@@ -48,7 +55,7 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 		t.Errorf("Input fee should be 100. its %v", msatSeeds[0].InputFeePpk)
 	}
 
-	satSeeds, err := db.GetSeedsByUnit(cashu.Sat)
+	satSeeds, err := db.GetSeedsByUnit(tx, cashu.Sat)
 	if err != nil {
 		t.Fatalf("db.GetSeedsByUnit(cashu.Sat) %+v", err)
 	}

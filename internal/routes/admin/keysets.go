@@ -1,35 +1,41 @@
 package admin
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"log/slog"
-	"strconv"
 )
+
+var ErrUnitNotCorrect = errors.New("Unit not correct")
 
 func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
+		ctx := context.Background()
+		err := templates.KeysetsPage().Render(ctx, c.Writer)
 
-		c.HTML(200, "keysets.html", nil)
+		if err != nil {
+			c.Error(fmt.Errorf("templates.KeysetsPage().Render(ctx, c.Writer). %w", err))
+			// c.HTML(400,"", nil)
+			return
+		}
+
 	}
 }
 func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		type KeysetData struct {
-			Id        string
-			Active    bool
-			Unit      string
-			Fees      uint
-			CreatedAt int64
-			Version   int
-		}
 
 		keysetArr := struct {
-			Keysets []KeysetData
+			Keysets []templates.KeysetData
 		}{}
 
 		seeds, err := mint.MintDB.GetAllSeeds()
@@ -40,7 +46,7 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		}
 
 		for _, seed := range seeds {
-			keysetArr.Keysets = append(keysetArr.Keysets, KeysetData{
+			keysetArr.Keysets = append(keysetArr.Keysets, templates.KeysetData{
 				Id:        seed.Id,
 				Active:    seed.Active,
 				Unit:      seed.Unit,
@@ -49,13 +55,19 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 				Version:   seed.Version,
 			})
 		}
+		ctx := context.Background()
+		err = templates.KeysetsList(keysetArr.Keysets).Render(ctx, c.Writer)
 
-		c.HTML(200, "keysets", keysetArr)
+		if err != nil {
+			c.Error(fmt.Errorf("templates.KeysetsList(keysetArr.Keysets).Render(ctx, c.Writer). %w", err))
+			return
+		}
 	}
 }
 
 type RotateRequest struct {
-	Fee uint
+	Fee  uint
+	Unit cashu.Unit
 }
 
 func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
@@ -70,6 +82,20 @@ func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		} else {
 			// get Inputed fee
 			feeString := c.Request.PostFormValue("FEE")
+
+			unitStr := c.Request.PostFormValue("UNIT")
+
+			if unitStr == "" {
+				c.Error(ErrUnitNotCorrect)
+				return
+			}
+			unit, err := cashu.UnitFromString(unitStr)
+
+			if err != nil {
+				c.Error(fmt.Errorf("cashu.UnitFromString(unitStr). %w. %w", err, ErrUnitNotCorrect))
+				return
+			}
+			rotateRequest.Unit = unit
 
 			newSeedFee, err := strconv.ParseUint(feeString, 10, 64)
 			if err != nil {
@@ -87,7 +113,7 @@ func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			rotateRequest.Fee = uint(newSeedFee)
 		}
 
-		err := mint.Signer.RotateKeyset(cashu.Sat, rotateRequest.Fee)
+		err := mint.Signer.RotateKeyset(rotateRequest.Unit, rotateRequest.Fee)
 
 		if err != nil {
 			logger.Error(

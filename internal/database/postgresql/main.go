@@ -91,8 +91,8 @@ func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 	return seeds_collect, nil
 }
 
-func (pql Postgresql) GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error) {
-	rows, err := pql.pool.Query(context.Background(), "SELECT  created_at, active, version, unit, id, input_fee_ppk FROM seeds WHERE unit = $1", unit.String())
+func (pql Postgresql) GetSeedsByUnit(tx pgx.Tx, unit cashu.Unit) ([]cashu.Seed, error) {
+	rows, err := tx.Query(context.Background(), "SELECT  created_at, active, version, unit, id, input_fee_ppk FROM seeds WHERE unit = $1", unit.String())
 	defer rows.Close()
 	if err != nil {
 		return []cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
@@ -101,19 +101,22 @@ func (pql Postgresql) GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error) {
 	seeds, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
 
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return seeds, nil
+		}
 		return seeds, databaseError(fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed]): %w", err))
 	}
 
 	return seeds, nil
 }
 
-func (pql Postgresql) SaveNewSeed(seed cashu.Seed) error {
+func (pql Postgresql) SaveNewSeed(tx pgx.Tx, seed cashu.Seed) error {
 
 	tries := 0
 
 	for {
 		tries += 1
-		_, err := pql.pool.Exec(context.Background(), "INSERT INTO seeds ( active, created_at, unit, id, version, input_fee_ppk) VALUES ($1, $2, $3, $4, $5, $6)", seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk)
+		_, err := tx.Exec(context.Background(), "INSERT INTO seeds ( active, created_at, unit, id, version, input_fee_ppk) VALUES ($1, $2, $3, $4, $5, $6)", seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk)
 
 		switch {
 		case err != nil && tries < 3:
@@ -155,7 +158,7 @@ func (pql Postgresql) SaveNewSeeds(seeds []cashu.Seed) error {
 
 }
 
-func (pql Postgresql) UpdateSeedsActiveStatus(seeds []cashu.Seed) error {
+func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) error {
 	// change the paid status of the quote
 	batch := pgx.Batch{}
 	for _, seed := range seeds {
@@ -163,7 +166,7 @@ func (pql Postgresql) UpdateSeedsActiveStatus(seeds []cashu.Seed) error {
 		batch.Queue("UPDATE seeds SET active = $1 WHERE id = $2", seed.Active, seed.Id)
 
 	}
-	results := pql.pool.SendBatch(context.Background(), &batch)
+	results := tx.SendBatch(context.Background(), &batch)
 	defer results.Close()
 
 	rows, err := results.Query()
