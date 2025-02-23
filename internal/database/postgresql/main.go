@@ -486,11 +486,11 @@ func privateKeysToDleq(s_key *string, e_key *string, sig *cashu.RecoverSigDB) er
 	return nil
 }
 
-func (pql Postgresql) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error) {
+func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error) {
 
 	var signaturesList []cashu.RecoverSigDB
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
+	rows, err := tx.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
 	defer rows.Close()
 
 	if err != nil {

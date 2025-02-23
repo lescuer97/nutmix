@@ -28,6 +28,9 @@ var (
 	ErrQuoteNotPaid        = errors.New("Quote not paid")
 	ErrMessageAmountToBig  = errors.New("Message amount is to big")
 	ErrInvalidBlindMessage = errors.New("Invalid blind message")
+
+	ErrUnbalanced   = errors.New("Unbalanced transactions")
+	ErrNotSameUnits = errors.New("Not same units")
 )
 
 const (

@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/routerrpc"
 	"github.com/lightningnetwork/lnd/lnwire"
@@ -408,4 +409,11 @@ func (f LndGrpcWallet) GetNetwork() *chaincfg.Params {
 }
 func (f LndGrpcWallet) ActiveMPP() bool {
 	return true
+}
+func (f LndGrpcWallet) VerifyUnitSupport(unit cashu.Unit) bool {
+	if unit == cashu.Sat {
+		return true
+	} else {
+		return false
+	}
 }

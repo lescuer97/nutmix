@@ -139,3 +139,6 @@ func (f FakeWallet) GetNetwork() *chaincfg.Params {
 func (f FakeWallet) ActiveMPP() bool {
 	return false
 }
+func (f FakeWallet) VerifyUnitSupport(unit cashu.Unit) bool {
+	return true
+}

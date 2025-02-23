@@ -3,13 +3,11 @@ package mint
 import (
 	"context"
 	"fmt"
-	"log"
-	"log/slog"
-
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
+	"log/slog"
 )
 
 func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) {
@@ -27,6 +25,11 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 	}
 
 	if quote.State == cashu.PENDING {
+
+		err = m.VerifyUnitSupport(quote.Unit)
+		if err != nil {
+			return quote, fmt.Errorf("m.VerifyUnitSupport(quote.Unit). %w", err)
+		}
 
 		status, preimage, fee, err := m.LightningBackend.CheckPayed(quote.Quote)
 		if err != nil {
@@ -201,11 +204,22 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
 	}
 
-	// TODO - REMOVE this when doing multi denomination tokens with Milisats
-	if unit != cashu.Sat {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. incorrect unit: %w", cashu.ErrUnitNotSupported, err)
+	// if there are change outputs you need to check if the outputs are valid if they have the correct unit
+	if len(meltRequest.Outputs) > 0 {
+		outputUnit, err := m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets)
+		if err != nil {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.VerifyOutputs(meltRequest.Outputs): %w", cashu.ErrUnitNotSupported, err)
+		}
+
+		if outputUnit != unit {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. Change output unit is different: ", cashu.ErrUnitNotSupported)
+		}
 	}
 
+	err = m.VerifyUnitSupport(quote.Unit)
+	if err != nil {
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.VerifyUnitSupport(quote.Unit). %w", err)
+	}
 	// check for needed amount of fees
 	fee, err := cashu.Fees(meltRequest.Inputs, keysets.Keysets)
 	if err != nil {
@@ -218,10 +232,6 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("utils.GetAndCalculateProofsValues(&meltRequest.Inputs) %w", err)
 	}
 
-	log.Println("Amount proofs: ", AmountProofs)
-	log.Println("Amount Fees: ", (quote.Amount + quote.FeeReserve + uint64(fee)))
-	log.Println("Fee Reserve: ", quote.FeeReserve)
-	log.Println("Fee : ", fee)
 	if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
 		logger.Info(fmt.Sprintf("Not enought proofs to expend. Needs: %v", quote.Amount))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)): %w", cashu.ErrNotEnoughtProofs, err)

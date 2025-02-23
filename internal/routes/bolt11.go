@@ -30,12 +30,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, "Malformed body request")
 			return
 		}
-		// TODO - REMOVE this when doing multi denomination tokens with Milisats
-		if mintRequest.Unit != cashu.Sat.String() {
-			logger.Warn("Incorrect Unit for minting: %+v", slog.String(utils.LogExtraInfo, mintRequest.Unit))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
-			return
-		}
 
 		if mintRequest.Amount == 0 {
 			logger.Info("Amount missing")
@@ -58,6 +52,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				return
 			}
 
+		}
+
+		err = mint.VerifyUnitSupport(mintRequest.Unit)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(mintRequest.Unit). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
 		}
 
 		expireTime := cashu.ExpiryTimeMinUnit(15)
@@ -185,6 +187,28 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
+		err = mint.VerifyUnitSupport(quote.Unit)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(quote.Unit). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+		keysets, err := mint.Signer.GetKeys()
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+		_, err = mint.VerifyOutputs(mintRequest.Outputs, keysets.Keysets)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyOutputs(mintRequest.Outputs). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+
 		amountBlindMessages := uint64(0)
 
 		for _, blindMessage := range mintRequest.Outputs {
@@ -195,7 +219,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		recoverySigsDb := []cashu.RecoverSigDB{}
 
 		quote, err = m.CheckMintRequest(mint, quote)
-
 		if err != nil {
 			if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 				c.JSON(200, quote)
@@ -205,8 +228,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
-		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 
+		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 		}
@@ -217,7 +240,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
-
 		if err != nil {
 			logger.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -225,7 +247,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
-
 		if err != nil {
 			logger.Info(fmt.Errorf("UnmarshallAmt: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -240,7 +261,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		blindedSignatures, recoverySigsDb, err = mint.Signer.SignBlindMessages(mintRequest.Outputs)
-
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.Signer.SignBlindMessages(mintRequest.Outputs): %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -252,7 +272,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		quote.State = cashu.ISSUED
 
 		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
-
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 		}
@@ -286,10 +305,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		// TODO - REMOVE this when doing multi denomination tokens with Milisats
-		if meltRequest.Unit != cashu.Sat.String() {
-			logger.Info("Incorrect Unit for minting", slog.String(utils.LogExtraInfo, meltRequest.Unit))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
+		err = mint.VerifyUnitSupport(meltRequest.Unit)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(quote.Unit). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 

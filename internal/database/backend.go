@@ -61,7 +61,7 @@ type MintDB interface {
 	SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error
 	DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error
 
-	GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error)
+	GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
 
 	GetProofsMintReserve() (templates.MintReserve, error)

@@ -14,43 +14,43 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-type LnbitsWallet struct {
+type Strike struct {
 	Network  chaincfg.Params
 	Endpoint string
 	Key      string
 }
 
-type LNBitsDetailErrorData struct {
-	Detail string
-	Status string
-}
-type lnbitsInvoiceRequest struct {
-	Amount int64  `json:"amount"`
-	Unit   string `json:"unit,omitempty"`
-	Memo   string `json:"memo"`
-	Out    bool   `json:"out"`
-	Expiry int64  `json:"expiry"`
-	Bolt11 string `json:"bolt11"`
-}
+// type LNBitsDetailErrorData struct {
+// 	Detail string
+// 	Status string
+// }
+// type lnbitsInvoiceRequest struct {
+// 	Amount int64  `json:"amount"`
+// 	Unit   string `json:"unit,omitempty"`
+// 	Memo   string `json:"memo"`
+// 	Out    bool   `json:"out"`
+// 	Expiry int64  `json:"expiry"`
+// 	Bolt11 string `json:"bolt11"`
+// }
+//
+// type LNBitsPaymentStatusDetail struct {
+// 	Memo    string
+// 	Fee     int64
+// 	Pending bool
+// }
+// type LNBitsPaymentStatus struct {
+// 	Paid     bool   `json:"paid"`
+// 	Pending  bool   `json:"pending"`
+// 	Preimage string `json:"preimage"`
+// 	Details  LNBitsPaymentStatusDetail
+// }
+// type lnbitsFeeResponse struct {
+// 	FeeReserve uint64 `json:"fee_reserve"`
+// }
 
-type LNBitsPaymentStatusDetail struct {
-	Memo    string
-	Fee     int64
-	Pending bool
-}
-type LNBitsPaymentStatus struct {
-	Paid     bool   `json:"paid"`
-	Pending  bool   `json:"pending"`
-	Preimage string `json:"preimage"`
-	Details  LNBitsPaymentStatusDetail
-}
-type lnbitsFeeResponse struct {
-	FeeReserve uint64 `json:"fee_reserve"`
-}
+// var ErrLnbitsFailedPayment = errors.New("failed payment")
 
-var ErrLnbitsFailedPayment = errors.New("failed payment")
-
-func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
+func (l *Strike) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{}
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
@@ -100,7 +100,7 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 
 }
 
-func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
+func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 
 	var lnbitsInvoice struct {
@@ -137,7 +137,7 @@ func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, fe
 	return invoiceRes, nil
 }
 
-func (l LnbitsWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
+func (l Strike) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
@@ -153,7 +153,7 @@ func (l LnbitsWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, e
 
 	}
 }
-func (l LnbitsWallet) CheckReceived(quote string) (PaymentStatus, string, error) {
+func (l Strike) CheckReceived(quote string) (PaymentStatus, string, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
@@ -170,7 +170,7 @@ func (l LnbitsWallet) CheckReceived(quote string) (PaymentStatus, string, error)
 	}
 }
 
-func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
+func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
 	var queryResponse lnbitsFeeResponse
 	invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
@@ -185,7 +185,7 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 	return fee, nil
 }
 
-func (l LnbitsWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
+func (l Strike) RequestInvoice(amount int64) (InvoiceResponse, error) {
 	reqInvoice := lnbitsInvoiceRequest{
 		Amount: amount,
 		Unit:   cashu.Sat.String(),
@@ -210,7 +210,7 @@ func (l LnbitsWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
 
 }
 
-func (l LnbitsWallet) WalletBalance() (uint64, error) {
+func (l Strike) WalletBalance() (uint64, error) {
 	var channelBalance struct {
 		Id      string `json:"id"`
 		Name    string `json:"name"`
@@ -224,17 +224,17 @@ func (l LnbitsWallet) WalletBalance() (uint64, error) {
 	return uint64(channelBalance.Balance), nil
 }
 
-func (f LnbitsWallet) LightningType() Backend {
+func (f Strike) LightningType() Backend {
 	return LNBITS
 }
 
-func (f LnbitsWallet) GetNetwork() *chaincfg.Params {
+func (f Strike) GetNetwork() *chaincfg.Params {
 	return &f.Network
 }
-func (f LnbitsWallet) ActiveMPP() bool {
+func (f Strike) ActiveMPP() bool {
 	return false
 }
-func (f LnbitsWallet) VerifyUnitSupport(unit cashu.Unit) bool {
+func (f Strike) VerifyUnitSupport(unit cashu.Unit) bool {
 	if unit == cashu.Sat {
 		return true
 	} else {

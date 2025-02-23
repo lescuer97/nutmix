@@ -9,6 +9,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/google/uuid"
+	"github.com/lescuer97/nutmix/api/cashu"
 	cln_grpc "github.com/lescuer97/nutmix/internal/lightning/proto"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"google.golang.org/grpc"
@@ -380,4 +381,11 @@ func (f CLNGRPCWallet) GetNetwork() *chaincfg.Params {
 }
 func (f CLNGRPCWallet) ActiveMPP() bool {
 	return true
+}
+func (f CLNGRPCWallet) VerifyUnitSupport(unit cashu.Unit) bool {
+	if unit == cashu.Sat {
+		return true
+	} else {
+		return false
+	}
 }
