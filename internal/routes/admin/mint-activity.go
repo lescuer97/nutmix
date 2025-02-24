@@ -1,29 +1,43 @@
 package admin
 
 import (
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/gin-gonic/gin"
-	m "github.com/lescuer97/nutmix/internal/mint"
-	"github.com/lescuer97/nutmix/internal/utils"
-	"github.com/lightningnetwork/lnd/zpay32"
+	"context"
+	"fmt"
 	"log/slog"
 	"sort"
 	"time"
+
+	"github.com/btcsuite/btcd/btcutil"
+	"github.com/gin-gonic/gin"
+	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
+	"github.com/lescuer97/nutmix/internal/utils"
+	"github.com/lightningnetwork/lnd/zpay32"
 )
 
 func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
+		isFakeWallet := false
 
 		if mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET {
-			c.HTML(200, "fake-wallet-balance", nil)
-			return
+			isFakeWallet = true
+		}
+		proofsReserve, err := mint.MintDB.GetProofsMintReserve()
 
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.GetProofsMintReserve(). %w", err))
+			return
+		}
+		sigsReserve, err := mint.MintDB.GetBlindSigsMintReserve()
+
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.GetProofsMintReserve(). %w", err))
+			return
 		}
 
 		milillisatBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
-
 			logger.Warn(
 				"mint.LightningComs.WalletBalance()",
 				slog.String(utils.LogExtraInfo, err.Error()))
@@ -35,8 +49,14 @@ func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
+		component := templates.MintBalance(milillisatBalance/1000, isFakeWallet, proofsReserve, sigsReserve)
 
-		c.HTML(200, "node-balance", milillisatBalance/1000)
+		err = component.Render(c.Request.Context(), c.Writer)
+		if err != nil {
+			c.Error(err)
+			c.Status(400)
+			return
+		}
 	}
 }
 
@@ -119,13 +139,13 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		mintMeltRequestVisual := ListMintMeltVisual{}
+		mintMeltRequestVisual := templates.ListMintMeltVisual{}
 
 		// sum up mint
 		for _, mintRequest := range mintMeltBalance.Mint {
 			utc := time.Unix(mintRequest.SeenAt, 0).UTC().Format("2006-Jan-2  15:04:05 MST")
 
-			mintMeltRequestVisual = append(mintMeltRequestVisual, MintMeltRequestVisual{
+			mintMeltRequestVisual = append(mintMeltRequestVisual, templates.MintMeltRequestVisual{
 				Type:    "Mint",
 				Unit:    mintRequest.Unit,
 				Request: mintRequest.Request,
@@ -139,7 +159,7 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		for _, meltRequest := range mintMeltBalance.Melt {
 			utc := time.Unix(meltRequest.SeenAt, 0).UTC().Format("2006-Jan-2  15:04:05 MST")
 
-			mintMeltRequestVisual = append(mintMeltRequestVisual, MintMeltRequestVisual{
+			mintMeltRequestVisual = append(mintMeltRequestVisual, templates.MintMeltRequestVisual{
 				Type:    "Melt",
 				Unit:    meltRequest.Unit,
 				Request: meltRequest.Request,
@@ -150,28 +170,43 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		sort.Sort(mintMeltRequestVisual)
 
-		c.HTML(200, "mint-melt-list", mintMeltRequestVisual)
+		ctx := context.Background()
+
+		err = templates.MintMeltEventList(mintMeltRequestVisual).Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(err)
+			c.Status(400)
+			return
+		}
 	}
 }
 
-type MintMeltRequestVisual struct {
-	Type    string
-	Unit    string
-	Request string
-	Status  string
-	SeenAt  string
-}
+func SwapsList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
 
-type ListMintMeltVisual []MintMeltRequestVisual
+		swaps, err := mint.MintDB.GetAllLiquiditySwaps()
 
-func (ms ListMintMeltVisual) Len() int {
-	return len(ms)
-}
+		if err != nil {
+			logger.Error(
+				"database.GetMintMeltBalanceByTime(pool",
+				slog.String(utils.LogExtraInfo, err.Error()))
 
-func (ms ListMintMeltVisual) Less(i, j int) bool {
-	return ms[i].SeenAt < ms[j].SeenAt
-}
+			errorMessage := ErrorNotif{
 
-func (ms ListMintMeltVisual) Swap(i, j int) {
-	ms[i], ms[j] = ms[j], ms[i]
+				Error: "There was an error getting mint activity",
+			}
+
+			c.HTML(200, "settings-error", errorMessage)
+			return
+		}
+
+		ctx := context.Background()
+
+		err = templates.ListOfSwaps(swaps).Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(err)
+			c.Status(400)
+			return
+		}
+	}
 }

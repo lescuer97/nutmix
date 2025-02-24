@@ -195,7 +195,68 @@ func (l LndGrpcWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, f
 	return invoiceRes, nil
 }
 
-func (l LndGrpcWallet) getPaymentStatus(quote string) (*lnrpc.Invoice, error) {
+type LndPayStatus struct {
+	Fee      uint64
+	Status   PaymentStatus
+	Preimage string
+}
+
+func (l LndGrpcWallet) getPaymentStatus(quote string) (LndPayStatus, error) {
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+
+	routerClient := routerrpc.NewRouterClient(l.grpcClient)
+
+	var payStatus LndPayStatus
+	decodedHash, err := hex.DecodeString(quote)
+	if err != nil {
+		return payStatus, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
+	}
+
+	paymentstatusRequest := routerrpc.TrackPaymentRequest{PaymentHash: decodedHash}
+
+	res, err := routerClient.TrackPaymentV2(ctx, &paymentstatusRequest)
+
+	if err != nil {
+		return payStatus, err
+	}
+
+	for {
+		payment, err := res.Recv()
+		if err != nil {
+			return payStatus, err
+		}
+		payStatus.Fee = uint64(payment.FeeSat)
+		switch payment.Status {
+		case lnrpc.Payment_IN_FLIGHT:
+			payStatus.Status = PENDING
+			return payStatus, nil
+		case lnrpc.Payment_FAILED:
+			payStatus.Status = FAILED
+			return payStatus, nil
+		case lnrpc.Payment_SUCCEEDED:
+			payStatus.Status = SETTLED
+			payStatus.Preimage = payment.PaymentPreimage
+			return payStatus, nil
+		case lnrpc.Payment_UNKNOWN:
+			payStatus.Status = UNKNOWN
+			return payStatus, nil
+		default:
+			continue
+
+		}
+	}
+}
+
+func (l LndGrpcWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
+	payStatus, err := l.getPaymentStatus(quote)
+	if err != nil {
+		return FAILED, "", 0, fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
+	}
+
+	return payStatus.Status, payStatus.Preimage, payStatus.Fee, nil
+}
+
+func (l LndGrpcWallet) getInvoiceStatus(quote string) (*lnrpc.Invoice, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
@@ -218,11 +279,11 @@ func (l LndGrpcWallet) getPaymentStatus(quote string) (*lnrpc.Invoice, error) {
 	return invoice, nil
 }
 
-func (l LndGrpcWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
-	invoice, err := l.getPaymentStatus(quote)
+func (l LndGrpcWallet) CheckReceived(quote string) (PaymentStatus, string, error) {
+	invoice, err := l.getInvoiceStatus(quote)
 
 	if err != nil {
-		return FAILED, "", fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
+		return FAILED, "", fmt.Errorf(`l.getInvoiceStatus(quote) %w`, err)
 	}
 
 	switch {
@@ -298,6 +359,8 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	}
 
 	fee := GetAverageRouteFee(res.Routes) / 1000
+
+	fee = GetFeeReserve(amount_sat, fee)
 
 	return fee, nil
 }

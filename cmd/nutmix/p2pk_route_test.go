@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/signer"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -90,10 +92,13 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+	}
 
 	// ask for minting
-	p2pkBlindedMessages, p2pkMintingSecrets, P2PKMintingSecretKeys, err := CreateP2PKBlindedMessages(1000, referenceKeyset, lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	p2pkBlindedMessages, p2pkMintingSecrets, P2PKMintingSecretKeys, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -129,13 +134,13 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	aliceBlindSigs = append(aliceBlindSigs, postMintResponse.Signatures...)
 
 	// SWAP P2PK TOKEN with other P2PK TOKENS
-	swapProofs, err := GenerateProofsP2PK(postMintResponse.Signatures, mint.ActiveKeysets, p2pkMintingSecrets, P2PKMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKey})
+	swapProofs, err := GenerateProofsP2PK(postMintResponse.Signatures, activeKeys, p2pkMintingSecrets, P2PKMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PK, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	swapBlindedMessagesP2PK, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -167,13 +172,13 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	}
 
 	// TRY SWAPING with WRONG SIGNATURES
-	swapProofsWrongSigs, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{wrongPrivKey})
+	swapProofsWrongSigs, err := GenerateProofsP2PK(postSwapResponse.Signatures, activeKeys, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{wrongPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PKWrongSigs, _, _, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	swapBlindedMessagesP2PKWrongSigs, _, _, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -211,7 +216,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 }
 
-func CreateP2PKBlindedMessages(amount uint64, keyset cashu.Keyset, pubkey *secp256k1.PublicKey, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
+func CreateP2PKBlindedMessages(amount uint64, keyset signer.GetKeysResponse, pubkey *secp256k1.PublicKey, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
 	splitAmounts := cashu.AmountSplit(amount)
 	splitLen := len(splitAmounts)
 
@@ -248,7 +253,7 @@ func CreateP2PKBlindedMessages(amount uint64, keyset cashu.Keyset, pubkey *secp2
 			}
 		}
 
-		blindedMessage := newBlindedMessage(keyset.Id, amt, B_)
+		blindedMessage := newBlindedMessage(keyset.Keysets[0].Id, amt, B_)
 		blindedMessages[i] = blindedMessage
 		secrets[i] = secret
 		rs[i] = r
@@ -277,7 +282,7 @@ func makeP2PKSpendCondition(pubkey *secp256k1.PublicKey, nSigs int, pubkeys []*s
 	return spendCondition, nil
 }
 
-func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]cashu.KeysetMap, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
+func GenerateProofsP2PK(signatures []cashu.BlindSignature, keyset signer.GetKeysResponse, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 	// try to swap tokens
 	var proofs []cashu.Proof
 	// unblid the signatures and make proofs
@@ -292,7 +297,14 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keysets map[string]ca
 			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
-		mintPublicKey, err := secp256k1.ParsePubKey(keysets[cashu.Sat.String()][output.Amount].PrivKey.PubKey().SerializeCompressed())
+		amountStr := strconv.FormatUint(output.Amount, 10)
+
+		pubkeyStr := keyset.Keysets[0].Keys[amountStr]
+		pubkeyBytes, err := hex.DecodeString(pubkeyStr)
+		if err != nil {
+			return nil, fmt.Errorf("hex.DecodeString(pubkeyStr): %w", err)
+		}
+		mintPublicKey, err := secp256k1.ParsePubKey(pubkeyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
@@ -391,11 +403,14 @@ func TestP2PKMultisigSigning(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+	}
 
 	// ask for minting
 	// Create multisig token for 2 pubkeys
-	p2pkBlindedMessages, p2pkMintingSecrets, P2PKMintingSecretKeys, err := CreateP2PKBlindedMessages(1000, referenceKeyset, lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, nil, 0, cashu.SigInputs)
+	p2pkBlindedMessages, p2pkMintingSecrets, P2PKMintingSecretKeys, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -432,7 +447,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	// SWAP P2PK TOKEN with other P2PK TOKENS
 	// sign multisig with correct privkeys
-	swapProofs, err := GenerateProofsP2PK(postMintResponse.Signatures, mint.ActiveKeysets, p2pkMintingSecrets, P2PKMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKeyOne, lockingPrivKeyTwo})
+	swapProofs, err := GenerateProofsP2PK(postMintResponse.Signatures, activeKeys, p2pkMintingSecrets, P2PKMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKeyOne, lockingPrivKeyTwo})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
@@ -440,7 +455,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	refundPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x06})
 
-	swapBlindedMessagesP2PK, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+	swapBlindedMessagesP2PK, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -472,13 +487,13 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	}
 
 	// // TRY SWAPING with Timelock passed
-	swapProofsTimelockNotExpiredWrongSig, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
+	swapProofsTimelockNotExpiredWrongSig, err := GenerateProofsP2PK(postSwapResponse.Signatures, activeKeys, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PKWrongSigs, _, _, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+	swapBlindedMessagesP2PKWrongSigs, _, _, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -512,12 +527,12 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	}
 
 	// TRY SWAPPING with refund key
-	swapProofsRefund, err := GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, refundPrivKey})
+	swapProofsRefund, err := GenerateProofsP2PK(postSwapResponse.Signatures, activeKeys, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, refundPrivKey})
 
 	currentPlus15 := time.Now().Add(15 * time.Minute).Unix()
 
 	// generate new blind signatures with timelock over 15 minutes of current time
-	swapBlindedMessagesP2PKWrongSigsOverlock, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, int(currentPlus15), cashu.SigInputs)
+	swapBlindedMessagesP2PKWrongSigsOverlock, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, int(currentPlus15), cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
@@ -549,13 +564,13 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	// try swapping with wrong refund key and timelock not yet expired
 
-	swapProofsTimelockNotExpiredWrongSig, err = GenerateProofsP2PK(postSwapResponse.Signatures, mint.ActiveKeysets, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
+	swapProofsTimelockNotExpiredWrongSig, err = GenerateProofsP2PK(postSwapResponse.Signatures, activeKeys, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, wrongPrivKey})
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PKWrongSigs, _, _, err = CreateP2PKBlindedMessages(1000, mint.ActiveKeysets[cashu.Sat.String()][1], lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+	swapBlindedMessagesP2PKWrongSigs, _, _, err = CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKeyOne.PubKey(), 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)

@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -9,9 +10,9 @@ import (
 	"os"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
@@ -79,7 +80,7 @@ func AuthMiddleware(logger *slog.Logger, secret []byte) gin.HandlerFunc {
 	}
 }
 
-func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
+func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// parse data for login
 		logger.Debug("Attempting log in")
@@ -94,8 +95,31 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 			c.JSON(400, "Malformed body request")
 			return
 		}
+		ctx := context.Background()
 
-		nostrLogin, err := mint.MintDB.GetNostrAuth(nostrEvent.Content)
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
+			return
+		}
+
+		defer func() {
+			if p := recover(); p != nil {
+				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				mint.MintDB.Rollback(ctx, tx)
+
+			} else if err != nil {
+				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				mint.MintDB.Rollback(ctx, tx)
+			} else {
+				err = mint.MintDB.Commit(context.Background(), tx)
+				if err != nil {
+					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
+				}
+			}
+		}()
+
+		nostrLogin, err := mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)
 
 		if err != nil {
 			logger.Error(
@@ -189,7 +213,7 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		nostrLogin.Activated = verified
 
-		err = mint.MintDB.UpdateNostrAuthActivation(nostrLogin.Nonce, nostrLogin.Activated)
+		err = mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated)
 
 		if err != nil {
 			logger.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.String(utils.LogExtraInfo, err.Error()))
@@ -197,7 +221,7 @@ func Login(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		token, err := makeJWTToken(mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize())
+		token, err := makeJWTToken(loginKey.Serialize())
 
 		if err != nil {
 			logger.Warn("Could not makeJWTToken", slog.String(utils.LogExtraInfo, err.Error()))

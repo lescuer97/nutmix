@@ -1,0 +1,210 @@
+package templates 
+
+import (
+	"github.com/lescuer97/nutmix/internal/utils"
+	"strconv"
+	"time"
+)
+
+templ LiquidityButton() {
+	<a
+		href="/admin/liquidity"
+		class="action-button"
+	>
+		Manage node's liquidity
+	</a>
+}
+
+templ LiquidityDashboard(swapForm string, nodeBalance string) {
+	<script type="text/javascript">
+  </script>
+	@Layout() {
+		<main class="liquidity-dashboard">
+			<div class="actions-container">
+				<div class="liquidity-actions">
+					<button
+						hx-get="/admin/liquid-swap-form"
+						hx-target=".active-swaps"
+						hx-swap="innerHTML"
+						hx-push-url="/admin/liquidity?swapForm=out"
+						type="button"
+					>
+						Send funds out
+					</button>
+					<button
+						hx-get="/admin/lightning-swap-form"
+						hx-target=".active-swaps"
+						hx-swap="innerHTML"
+						hx-push-url="/admin/liquidity?swapForm=in"
+						type="button"
+					>Send funds to mint</button>
+				</div>
+				<div class="active-swaps">
+					switch  swapForm {
+						case "out":
+							@SwapOutPostForm(nodeBalance)
+						case "in":
+							@SwapInPostForm()
+						default:
+							<h3 style="margin-left: 15px;">List of Liquidity Movements</h3>
+							<div
+								hx-get="/admin/swaps-list"
+								hx-trigger="load"
+								class="swap-list"
+								hx-swap="innerHTML"
+							></div>
+					}
+				</div>
+			</div>
+		</main>
+	}
+}
+
+templ ListOfSwaps(swaps []utils.LiquiditySwap) {
+	<table class="">
+		<thead>
+			<tr>
+				<th class="level" scope="col">Amount (sats)</th>
+				<th scope="col">Type</th>
+				<th scope="col">Expiration</th>
+				<th scope="col">State</th>
+				<th scope="col"></th>
+			</tr>
+		</thead>
+		<tbody>
+			for _, item := range swaps {
+				@ListItem(item)
+			}
+		</tbody>
+	</table>
+}
+
+templ ListItem(swap utils.LiquiditySwap) {
+	{{ unixTime := time.Unix(int64(swap.Expiration), 0) }}
+	{{ formattedDate := unixTime.Format(time.UnixDate) }}
+	{{ amount := strconv.FormatUint(swap.Amount, 10) }}
+	{{ liquidityType := swap.Type.ToString() }}
+	{{ state := swap.State.ToString() }}
+	{{ url := "liquidity/" + swap.Id }}
+	<tr>
+		<th scope="row">{ amount }</th>
+		<td class="request-row">{ liquidityType }</td>
+		<td class="time">{ formattedDate }</td>
+		<td class="request-row">{ state }</td>
+		<td class="request-row"><a href={ templ.URL(url) }>INFO</a></td>
+	</tr>
+}
+
+templ SwapOutPostForm(nodeBalance string) {
+	<form
+		class="swap-form"
+		hx-post="/admin/out-swap-req"
+		hx-target=".actions-container"
+		hx-swap="innerHTML"
+	>
+		<h3>Move funds out</h3>
+		<h4>Node Balance: { nodeBalance }</h4>
+		<label class="invoice-input" for="invoice">
+			Lightning Invoice to pay
+			<textarea required name="invoice" type="text"></textarea>
+		</label>
+		<button hx-disabled-elt="this" type="submit">Move funds out of mint</button>
+	</form>
+}
+
+templ SwapInPostForm() {
+	<form
+		class="swap-form"
+		hx-post="/admin/in-swap-req"
+		hx-target=".actions-container"
+		hx-swap="innerHTML"
+	>
+		<h3>Move fund into Mint</h3>
+		<label for="amount">
+			Amount (SATS)
+			<input required name="amount" min="1" type="number"/>
+		</label>
+		<button hx-disabled-elt="this" type="submit">Move funds into mint</button>
+	</form>
+}
+
+templ LightningReceiveSummary(recieveSats string, address string, qrCode string, swapId string) {
+	<h3 style="margin-left: 15px;">Liquidity In</h3>
+	<div class="summary">
+		<p>
+			Please pay this invoice: 
+		</p>
+		<p>
+			{ address }
+		</p>
+		<p>
+			For receiving:  { recieveSats }
+		</p>
+		@QRCode(qrCode)
+		<div
+			hx-get={ "/admin/swap/" + swapId }
+			hx-trigger="load"
+			hx-swap="innerHTML"
+			hx-target="this"
+			class="swap-state"
+		></div>
+	</div>
+}
+
+templ LightningSendSummary(recieveSats string, address string, swapId string) {
+	<div>
+		<h3 style="margin-left: 15px;">Liquidity Out</h3>
+		<div class="summary">
+			<p>
+				Please confirm you want to send:  { recieveSats }. To this invoice:
+			</p>
+			<p>
+				{ address }
+			</p>
+			<div
+				hx-get={ "/admin/swap/" + swapId }
+				hx-trigger="load"
+				hx-swap="innerHTML"
+				hx-target="this"
+				class="swap-state"
+			></div>
+		</div>
+	</div>
+}
+
+templ SwapState(state utils.SwapState, swapId string) {
+	{{ waitingConfirm := state == utils.WaitingUserConfirmation }}
+	{{ stringState := state.ToString() }}
+	<div class="state">
+		<h3>Swap State</h3>
+		<div>
+			Current state: <b>{ stringState } </b>
+		</div>
+		if waitingConfirm {
+			<form
+				class="swap-form"
+				hx-post={ "/admin/swap/" + swapId + "/confirm" }
+				hx-swap="outerHTML"
+				hx-target=".state"
+				hx-disabled-elt="find button"
+			>
+				<button style="margin-top: 10px;" hx-disabled-elt="this" type="submit">Confirm Swap</button>
+			</form>
+		}
+	</div>
+}
+
+templ SwapStatusPage(summary templ.Component) {
+	@Layout() {
+		<main class="liquidity-dashboard">
+			<div class="actions-container">
+				@summary
+			</div>
+		</main>
+	}
+}
+
+// QR component
+templ QRCode(qrData string) {
+	<img src={ "data:image/png;base64," + qrData } alt="QR Code"/>
+}

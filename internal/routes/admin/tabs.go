@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -11,6 +12,10 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
+)
+
+var (
+	ErrInvalidNostrKey = errors.New("NOSTR npub is not valid")
 )
 
 func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
@@ -104,22 +109,15 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			isValid, err := isNostrKeyValid(nostrKey)
 
 			if err != nil {
+				c.Error(ErrInvalidNostrKey)
 				logger.Warn(
 					"nip19.Decode(nostrKey)",
 					slog.String(utils.LogExtraInfo, err.Error()))
-				errorMessage := ErrorNotif{
-					Error: "Nostr npub is not valid",
-				}
-				c.HTML(200, "settings-error", errorMessage)
 				return
 			}
 
 			if !isValid {
-				logger.Warn("Nostr npub is not valid")
-				errorMessage := ErrorNotif{
-					Error: "Nostr npub is not valid",
-				}
-				c.HTML(200, "settings-error", errorMessage)
+				c.Error(ErrInvalidNostrKey)
 				return
 			}
 

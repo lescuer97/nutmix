@@ -1,15 +1,11 @@
 package admin
 
 import (
-	"encoding/hex"
-	"fmt"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"log/slog"
-	"os"
 	"strconv"
 )
 
@@ -27,7 +23,7 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			Id        string
 			Active    bool
 			Unit      string
-			Fees      int
+			Fees      uint
 			CreatedAt int64
 			Version   int
 		}
@@ -59,71 +55,7 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 }
 
 type RotateRequest struct {
-	Fee int
-}
-
-func rotateSatsSeed(mint *m.Mint, rotateRequest RotateRequest) error {
-	seeds, err := mint.MintDB.GetSeedsByUnit(cashu.Sat)
-	if err != nil {
-
-		return fmt.Errorf("database.GetSeedsByUnit(pool, cashu.Sat). %w", err)
-	}
-	// get current highest seed version
-	var highestSeed cashu.Seed
-	for i, seed := range seeds {
-		if highestSeed.Version < seed.Version {
-			highestSeed = seed
-		}
-		seeds[i].Active = false
-	}
-
-	// get mint private_key
-	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
-	if mint_privkey == "" {
-		return fmt.Errorf(`os.Getenv("MINT_PRIVATE_KEY"). %w`, err)
-	}
-	decodedPrivKey, err := hex.DecodeString(mint_privkey)
-	if err != nil {
-		return fmt.Errorf(`hex.DecodeString(mint_privkey). %w`, err)
-	}
-
-	parsedPrivateKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
-	masterKey, err := m.MintPrivateKeyToBip32(parsedPrivateKey)
-	if err != nil {
-		return fmt.Errorf(`m.MintPrivateKeyToBip32(parsedPrivateKey) %w`, err)
-	}
-
-	// Create New seed with one higher version
-	newSeed, err := m.CreateNewSeed(masterKey, highestSeed.Version+1, rotateRequest.Fee)
-
-	if err != nil {
-		return fmt.Errorf(`m.CreateNewSeed(masterKey,1,0 ) %w`, err)
-	}
-
-	// add new key to db
-	err = mint.MintDB.SaveNewSeed(newSeed)
-	if err != nil {
-		return fmt.Errorf(`database.SaveNewSeed(pool, &generatedSeed). %w`, err)
-	}
-	err = mint.MintDB.UpdateSeedsActiveStatus(seeds)
-	if err != nil {
-		return fmt.Errorf(`database.UpdateActiveStatusSeeds(pool, seeds). %w`, err)
-	}
-
-	seeds = append(seeds, newSeed)
-
-	keysets, activeKeysets, err := m.GetKeysetsFromSeeds(seeds, masterKey)
-	if err != nil {
-		return fmt.Errorf(`m.DeriveKeysetFromSeeds(seeds, parsedPrivateKey). %w`, err)
-	}
-
-	mint.Keysets = keysets
-	mint.ActiveKeysets = activeKeysets
-
-	mint_privkey = ""
-	parsedPrivateKey = nil
-	masterKey = nil
-	return nil
+	Fee uint
 }
 
 func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
@@ -139,7 +71,7 @@ func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			// get Inputed fee
 			feeString := c.Request.PostFormValue("FEE")
 
-			newSeedFee, err := strconv.Atoi(feeString)
+			newSeedFee, err := strconv.ParseUint(feeString, 10, 64)
 			if err != nil {
 				logger.Error(
 					"Err: There was a problem rotating the key",
@@ -152,14 +84,14 @@ func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 				c.HTML(200, "settings-error", errorMessage)
 				return
 			}
-			rotateRequest.Fee = newSeedFee
+			rotateRequest.Fee = uint(newSeedFee)
 		}
 
-		err := rotateSatsSeed(mint, rotateRequest)
+		err := mint.Signer.RotateKeyset(cashu.Sat, rotateRequest.Fee)
 
 		if err != nil {
 			logger.Error(
-				"otateSatsSeed(pool,mint, logger, rotateRequest)",
+				"mint.Signer.RotateKeyset(cashu.Sat, rotateRequest.Fee)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorMessage := ErrorNotif{

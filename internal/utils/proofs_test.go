@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"github.com/lescuer97/nutmix/api/cashu"
 	"testing"
+
+	"github.com/lescuer97/nutmix/api/cashu"
 )
 
 func setListofEmptyBlindMessages(amounts int) []cashu.BlindedMessage {
@@ -23,7 +24,7 @@ func TestGetChangeWithEnoughBlindMessages(t *testing.T) {
 	emptyBlindMessages := setListofEmptyBlindMessages(10)
 
 	// create change for value of 2
-	change := GetChangeOutput(2, emptyBlindMessages)
+	change := GetMessagesForChange(2, emptyBlindMessages)
 
 	if len(change) != 1 {
 		t.Errorf("Incorrect size for change slice %v, should be 1", len(change))
@@ -35,7 +36,7 @@ func TestGetChangeWithEnoughBlindMessages(t *testing.T) {
 	}
 
 	// create change for a 0 amount
-	change = GetChangeOutput(0, emptyBlindMessages)
+	change = GetMessagesForChange(0, emptyBlindMessages)
 
 	if len(change) != 0 {
 		t.Errorf("Incorrect size for change slice %v, should be 0", len(change))
@@ -48,7 +49,7 @@ func TestGetChangeWithOutEnoughBlindMessages(t *testing.T) {
 	emptyBlindMessages := setListofEmptyBlindMessages(1)
 
 	// create change for value of 2
-	change := GetChangeOutput(10, emptyBlindMessages)
+	change := GetMessagesForChange(10, emptyBlindMessages)
 
 	if len(change) != 1 {
 		t.Errorf("Incorrect size for change slice %v, should be 1", len(change))

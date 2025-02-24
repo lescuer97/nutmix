@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -209,13 +209,24 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 
 				switch kind {
 				case cashu.Bolt11MintQuote:
-					mintState, err := m.CheckMintRequest(mint, filter)
+					ctx := context.Background()
+					tx, err := mint.MintDB.GetTx(ctx)
+					if err != nil {
+						return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+					}
+					defer mint.MintDB.Rollback(ctx, tx)
+					quote, err := mint.MintDB.GetMintRequestById(tx, filter)
+
+					if err != nil {
+						return fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)
+					}
+					mintState, err := m.CheckMintRequest(mint, quote)
 					if err != nil {
 						return fmt.Errorf("m.CheckMintRequest(mint, filter). %w", err)
 					}
 					statusNotif.Params.Payload = mintState
 					if exists {
-						if value.(cashu.PostMintQuoteBolt11Response).State != mintState.State {
+						if value.(cashu.MintRequestDB).State != mintState.State {
 							alreadyCheckedFilter[filter] = mintState
 							err := m.SendJson(conn, statusNotif)
 							if err != nil {
@@ -229,6 +240,10 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 							return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 						}
 					}
+					err = mint.MintDB.Commit(ctx, tx)
+					if err != nil {
+						return fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
+					}
 				case cashu.Bolt11MeltQuote:
 					meltState, err := m.CheckMeltRequest(mint, filter)
 					if err != nil {
@@ -238,7 +253,7 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 					statusNotif.Params.Payload = meltState
 					if exists {
 
-						if value.(cashu.PostMeltQuoteBolt11Response).State != meltState.State {
+						if value.(cashu.MeltRequestDB).State != meltState.State {
 							alreadyCheckedFilter[filter] = meltState
 							err := m.SendJson(conn, statusNotif)
 							if err != nil {
@@ -283,27 +298,4 @@ func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websoc
 			time.Sleep(2 * time.Second)
 		}
 	}
-}
-
-func CheckStatusesOfSubscription(subKind cashu.SubscriptionKind, filters []string, pool *pgxpool.Pool, mint *m.Mint, ch chan string) ([]cashu.PostMintQuoteBolt11Response, []cashu.CheckState, error) {
-	var mintQuote []cashu.PostMintQuoteBolt11Response
-	var proofsState []cashu.CheckState
-	switch subKind {
-	case cashu.Bolt11MintQuote:
-		for _, v := range filters {
-			quote, err := m.CheckMintRequest(mint, v)
-			if err != nil {
-				return mintQuote, proofsState, fmt.Errorf("m.CheckMintRequest(pool, mint,v ) %w", err)
-			}
-			mintQuote = append(mintQuote, quote)
-		}
-	case cashu.ProofStateWs:
-		proofsState, err := m.CheckProofState(mint, filters)
-		if err != nil {
-			return mintQuote, proofsState, fmt.Errorf("m.CheckMintRequest(pool, mint,v ) %w", err)
-		}
-
-	}
-
-	return mintQuote, proofsState, nil
 }

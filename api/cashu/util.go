@@ -6,8 +6,8 @@ import (
 	"strconv"
 )
 
-func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
-	var typesOfUnits = make(map[string][]Keyset)
+func OrderKeysetByUnit(keysets []MintKey) KeysResponse {
+	var typesOfUnits = make(map[string][]MintKey)
 
 	for _, keyset := range keysets {
 		if len(typesOfUnits[keyset.Unit]) == 0 {
@@ -18,12 +18,12 @@ func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
 		}
 	}
 
-	res := make(map[string][]KeysetResponse)
+	res := make(map[string][]Keyset)
 
-	res["keysets"] = []KeysetResponse{}
+	res["keysets"] = []Keyset{}
 
 	for _, value := range typesOfUnits {
-		var keysetResponse KeysetResponse
+		var keysetResponse Keyset
 		keysetResponse.Id = value[0].Id
 		keysetResponse.Unit = value[0].Unit
 		keysetResponse.Keys = make(map[string]string)
@@ -39,6 +39,7 @@ func OrderKeysetByUnit(keysets []Keyset) KeysResponse {
 	return res
 
 }
+
 func GenerateNonceHex() (string, error) {
 
 	// generate random Nonce
@@ -51,10 +52,10 @@ func GenerateNonceHex() (string, error) {
 	return hex.EncodeToString(nonce), nil
 }
 
-func Fees(proofs []Proof, keysets []Keyset) (int, error) {
-	totalFees := 0
+func Fees(proofs []Proof, keysets []BasicKeysetResponse) (uint, error) {
+	totalFees := uint(0)
 
-	var keysetToUse Keyset
+	var keysetToUse BasicKeysetResponse
 	for _, proof := range proofs {
 		// find keyset to compare to fees if keyset id is not found throw error
 		// only check for new keyset if proofs id is different
