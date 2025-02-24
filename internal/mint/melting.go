@@ -3,13 +3,11 @@ package mint
 import (
 	"context"
 	"fmt"
-	"log"
-	"log/slog"
-
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
+	"log/slog"
 )
 
 func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) {
@@ -218,10 +216,6 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("utils.GetAndCalculateProofsValues(&meltRequest.Inputs) %w", err)
 	}
 
-	log.Println("Amount proofs: ", AmountProofs)
-	log.Println("Amount Fees: ", (quote.Amount + quote.FeeReserve + uint64(fee)))
-	log.Println("Fee Reserve: ", quote.FeeReserve)
-	log.Println("Fee : ", fee)
 	if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
 		logger.Info(fmt.Sprintf("Not enought proofs to expend. Needs: %v", quote.Amount))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)): %w", cashu.ErrNotEnoughtProofs, err)

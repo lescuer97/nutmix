@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -51,6 +52,11 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrInvalidPreimage):
 		message := cashu.ErrInvalidPreimage.Error()
 		return cashu.TOKEN_NOT_VERIFIED, &message
+
+	case strings.Contains(proofError.Error(), "could not obtain lock"):
+		message := "Transaction is already pending"
+		return cashu.QUOTE_PENDING, &message
+
 	}
 
 	return cashu.UNKNOWN, nil
