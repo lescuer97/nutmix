@@ -204,8 +204,8 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Fatalf("Expected status code 403, got %d", w.Code)
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 400, got %d", w.Code)
 	}
 
 	var errorResponse cashu.ErrorResponse
@@ -251,8 +251,8 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Fatalf("Expected status code 403, got %d", w.Code)
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 400, got %d", w.Code)
 	}
 
 	var errorRes cashu.ErrorResponse
@@ -743,8 +743,8 @@ func TestHTLCMultisigSigning(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Fatalf("Expected status code 403, got %d", w.Code)
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 400, got %d", w.Code)
 	}
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorRes)

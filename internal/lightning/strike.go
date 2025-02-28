@@ -205,35 +205,50 @@ func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReser
 }
 
 func (l Strike) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
-	var paymentStatus LNBitsPaymentStatus
+	var paymentStatus strikePaymentStatus
 
 	err := l.StrikeRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
 	if err != nil {
-		return FAILED, "", uint64(paymentStatus.Details.Fee), fmt.Errorf("json.Marshal: %w", err)
+		return FAILED, "", uint64(0), fmt.Errorf(`l.StrikeRequest("GET", "/api/v1/payments/"+quote: %w`, err)
 	}
 
-	switch {
-	case paymentStatus.Paid:
-		return SETTLED, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
-	default:
-		return PENDING, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+	lnFee, err := strconv.ParseUint(paymentStatus.LightningNetworkFee.Amount, 10, 64)
+	if err != nil {
+		return FAILED, "", uint64(0), fmt.Errorf(`strconv.ParseUint(paymentStatus.LightningNetworkFee, 10, 64): %w`, err)
+	}
 
+	switch paymentStatus.State {
+	case UNPAID:
+		return UNKNOWN, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
+	case PAID:
+		return SETTLED, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
+	case PENDING_STRIKE:
+		return PENDING, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
+	case CANCELLED:
+		return FAILED, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
+	default:
+		return PENDING, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
 	}
 }
 func (l Strike) CheckReceived(quote string) (PaymentStatus, string, error) {
-	var paymentStatus LNBitsPaymentStatus
+	var paymentStatus strikeInvoiceResponse
 
-	err := l.StrikeRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
+	err := l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/%s", quote), nil, &paymentStatus)
 	if err != nil {
-		return FAILED, "", fmt.Errorf("json.Marshal: %w", err)
+		return FAILED, "", fmt.Errorf(`l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/", quote), nil, &paymentStatus) %w`, err)
 	}
 
-	switch {
-	case paymentStatus.Paid:
-		return SETTLED, paymentStatus.Preimage, nil
+	switch paymentStatus.State {
+	case UNPAID:
+		return FAILED, "", nil
+	case PAID:
+		return SETTLED, "", nil
+	case PENDING_STRIKE:
+		return PENDING, "", nil
+	case CANCELLED:
+		return FAILED, "", nil
 	default:
-		return PENDING, paymentStatus.Preimage, nil
-
+		return PENDING, "", nil
 	}
 }
 
