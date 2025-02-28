@@ -291,7 +291,11 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 
 	var paidLightningFeeSat uint64
 
-	payment, err := m.LightningBackend.PayInvoice(quote.Request, invoice, quote.FeeReserve, quote.Mpp, quote.Amount)
+	amount := cashu.Amount{
+		Unit:   unit,
+		Amount: quote.Amount,
+	}
+	payment, err := m.LightningBackend.PayInvoice(quote.Request, invoice, quote.FeeReserve, quote.Mpp, amount)
 	// Hardened error handling
 	if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {
 		logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))

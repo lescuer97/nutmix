@@ -8,8 +8,10 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"strconv"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
@@ -20,37 +22,99 @@ type Strike struct {
 	Key      string
 }
 
-// type LNBitsDetailErrorData struct {
-// 	Detail string
-// 	Status string
-// }
-// type lnbitsInvoiceRequest struct {
-// 	Amount int64  `json:"amount"`
-// 	Unit   string `json:"unit,omitempty"`
-// 	Memo   string `json:"memo"`
-// 	Out    bool   `json:"out"`
-// 	Expiry int64  `json:"expiry"`
-// 	Bolt11 string `json:"bolt11"`
-// }
-//
-// type LNBitsPaymentStatusDetail struct {
-// 	Memo    string
-// 	Fee     int64
-// 	Pending bool
-// }
-// type LNBitsPaymentStatus struct {
-// 	Paid     bool   `json:"paid"`
-// 	Pending  bool   `json:"pending"`
-// 	Preimage string `json:"preimage"`
-// 	Details  LNBitsPaymentStatusDetail
-// }
-// type lnbitsFeeResponse struct {
-// 	FeeReserve uint64 `json:"fee_reserve"`
-// }
+type strikeAccountBalanceResponse struct {
+	Currency strikeCurrency `json:"currency"`
+	Current  string         `json:"current"`
+}
+type strikeInvoiceRequest struct {
+	CorrelationId uuid.UUID    `json:"correlationId"`
+	Description   string       `json:"description"`
+	Amount        strikeAmount `json:"amount"`
+}
 
-// var ErrLnbitsFailedPayment = errors.New("failed payment")
+type strikeState string
 
-func (l *Strike) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
+const UNPAID strikeState = "UNPAID"
+const PAID strikeState = "PAID"
+const PENDING_STRIKE strikeState = "PENDING"
+const CANCELLED strikeState = "CANCELLED"
+
+type strikeCurrency string
+
+const BTC strikeCurrency = "BTC"
+const USD strikeCurrency = "USD"
+const EUR strikeCurrency = "EUR"
+
+type strikeAmount struct {
+	Amount   string         `json:"amount"`
+	Currency strikeCurrency `json:"currency"`
+}
+
+func CashuAmountToStrikeAmount(amount cashu.Amount) (strikeAmount, error) {
+	var strikeAmt strikeAmount
+	floatStr, err := amount.ToFloatString()
+	if err != nil {
+		return strikeAmt, fmt.Errorf("amount.ToFloatString(): %w", err)
+	}
+	switch amount.Unit {
+	case cashu.Sat:
+		return strikeAmount{
+			Amount:   floatStr,
+			Currency: BTC,
+		}, nil
+	case cashu.EUR:
+		return strikeAmount{
+			Amount:   floatStr,
+			Currency: EUR,
+		}, nil
+
+	}
+	return strikeAmt, cashu.ErrCouldNotConvertUnit
+
+}
+
+type strikeInvoiceResponse struct {
+	InvoiceId   uuid.UUID    `json:"invoiceId"`
+	Description string       `json:"description"`
+	Amount      strikeAmount `json:"amount"`
+	State       strikeState  `json:"state"`
+}
+type strikeInvoiceQuoteResponse struct {
+	QuoteId         string       `json:"quoteId"`
+	Description     string       `json:"description"`
+	LnInvoice       string       `json:"lnInvoice"`
+	Expiration      string       `json:"expiration"`
+	ExpirationInSec int64        `json:"expirationInSec"`
+	TargetAmount    strikeAmount `json:"targetAmount"`
+}
+
+type strikePaymentRequest struct {
+	LnInvoice      string         `json:"lnInvoice"`
+	SourceCurrency strikeCurrency `json:"sourceCurrency"`
+	Amount         strikeAmount   `json:"amount"`
+}
+
+type strikePaymentQuoteResponse struct {
+	PaymentQuoteId      uuid.UUID    `json:"paymentQuoteId"`
+	LightningNetworkFee strikeAmount `json:"lightningNetworkFee"`
+	Amount              strikeAmount `json:"amount"`
+	TotalFee            strikeAmount `json:"totalFee"`
+	TotalAmount         strikeAmount `json:"totalAmount"`
+}
+
+type strikePaymentStatus struct {
+	PaymentId           string       `json:"paymentId"`
+	State               strikeState  `json:"state"`
+	Completed           uint64       `json:"completed"`
+	Amount              strikeAmount `json:"amount"`
+	TotalFee            strikeAmount `json:"totalFee"`
+	LightningNetworkFee strikeAmount `json:"lightningNetworkFee"`
+	Lightning           struct {
+		NetworkFee strikeAmount `json:"networkFee"`
+	} `json:"lightning"`
+}
+
+func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{}
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
@@ -63,7 +127,9 @@ func (l *Strike) LnbitsRequest(method string, endpoint string, reqBody any, resp
 	if err != nil {
 		return fmt.Errorf("http.NewRequest: %w", err)
 	}
-	req.Header.Set("X-Api-Key", l.Key)
+	// req.H
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", l.Key))
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -84,11 +150,11 @@ func (l *Strike) LnbitsRequest(method string, endpoint string, reqBody any, resp
 
 	switch {
 	case detailBody.Status == "failed":
-		return fmt.Errorf("LNBITS payment failed %+v. Request Body %+v, %w", detailBody, reqBody, ErrLnbitsFailedPayment)
+		return fmt.Errorf("Strike payment failed %+v. Request Body %+v, %w", detailBody, reqBody, ErrLnbitsFailedPayment)
 
 	case detailBody.Detail == "Payment does not exist.":
 	case len(detailBody.Detail) > 0:
-		return fmt.Errorf("LNBITS Unknown error %+v. Request Body %+v", detailBody, reqBody)
+		return fmt.Errorf("strike Unknown error %+v. Request Body %+v", detailBody, reqBody)
 	}
 
 	err = json.Unmarshal(body, &responseType)
@@ -100,19 +166,20 @@ func (l *Strike) LnbitsRequest(method string, endpoint string, reqBody any, resp
 
 }
 
-func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
+func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 
 	var lnbitsInvoice struct {
 		PaymentHash    string `json:"payment_hash"`
 		PaymentRequest string `json:"payment_request"`
 	}
+
 	reqInvoice := lnbitsInvoiceRequest{
 		Out:    true,
 		Bolt11: invoice,
-		Amount: int64(amount_sat),
+		Amount: amount.Amount,
 	}
-	err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
+	err := l.StrikeRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
 	}
@@ -120,7 +187,7 @@ func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReser
 	var paymentStatus LNBitsPaymentStatus
 
 	// check invoice payment to get the preimage and fee
-	err = l.LnbitsRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus)
+	err = l.StrikeRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus)
 	if err != nil {
 		if errors.Is(err, ErrLnbitsFailedPayment) {
 			invoiceRes.PaymentState = FAILED
@@ -140,7 +207,7 @@ func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReser
 func (l Strike) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
 	var paymentStatus LNBitsPaymentStatus
 
-	err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
+	err := l.StrikeRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
 	if err != nil {
 		return FAILED, "", uint64(paymentStatus.Details.Fee), fmt.Errorf("json.Marshal: %w", err)
 	}
@@ -156,7 +223,7 @@ func (l Strike) CheckPayed(quote string) (PaymentStatus, string, uint64, error) 
 func (l Strike) CheckReceived(quote string) (PaymentStatus, string, error) {
 	var paymentStatus LNBitsPaymentStatus
 
-	err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
+	err := l.StrikeRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
 	if err != nil {
 		return FAILED, "", fmt.Errorf("json.Marshal: %w", err)
 	}
@@ -170,35 +237,45 @@ func (l Strike) CheckReceived(quote string) (PaymentStatus, string, error) {
 	}
 }
 
-func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
+func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
 	var queryResponse lnbitsFeeResponse
 	invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
-	err := l.LnbitsRequest("GET", invoiceString, nil, &queryResponse)
+	err := l.StrikeRequest("GET", invoiceString, nil, &queryResponse)
 	queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
 
 	if err != nil {
 		return 0, fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	fee := GetFeeReserve(amount_sat, queryResponse.FeeReserve)
+	fee := GetFeeReserve(amount.Amount, queryResponse.FeeReserve)
 	return fee, nil
 }
 
-func (l Strike) RequestInvoice(amount int64) (InvoiceResponse, error) {
-	reqInvoice := lnbitsInvoiceRequest{
-		Amount: amount,
-		Unit:   cashu.Sat.String(),
-		Memo:   "",
-		Out:    false,
-		Expiry: 900,
-	}
+func (l Strike) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
+	uuid := uuid.New()
+
 	var response InvoiceResponse
+	supported := l.VerifyUnitSupport(amount.Unit)
+	if !supported {
+		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit). %w", cashu.ErrUnitNotSupported)
+	}
+
+	strikeAmt, err := CashuAmountToStrikeAmount(amount)
+	if err != nil {
+		return response, fmt.Errorf("CashuAmountToStrikeAmount(amount): %w", err)
+	}
+	reqInvoice := strikeInvoiceRequest{
+		CorrelationId: uuid,
+		Description:   "",
+		Amount:        strikeAmt,
+	}
+
 	var lnbitsInvoice struct {
 		PaymentHash    string `json:"payment_hash"`
 		PaymentRequest string `json:"payment_request"`
 	}
-	err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
+	err = l.StrikeRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 	if err != nil {
 		return response, fmt.Errorf("json.Marshal: %w", err)
 	}
@@ -211,33 +288,39 @@ func (l Strike) RequestInvoice(amount int64) (InvoiceResponse, error) {
 }
 
 func (l Strike) WalletBalance() (uint64, error) {
-	var channelBalance struct {
-		Id      string `json:"id"`
-		Name    string `json:"name"`
-		Balance int    `json:"balance"`
-	}
-	err := l.LnbitsRequest("GET", "/api/v1/wallet", nil, &channelBalance)
+	var balance strikeAccountBalanceResponse
+	err := l.StrikeRequest("GET", "/v1/balances", nil, &balance)
 	if err != nil {
-		return 0, fmt.Errorf("l.LnbitsInvoiceRequest: %w", err)
+		return 0, fmt.Errorf(`l.StrikeRequest("GET", "/v1/balances": %w`, err)
 	}
 
-	return uint64(channelBalance.Balance), nil
+	currentBalance, err := strconv.ParseUint(balance.Current, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf(`strconv.ParseUint(balance.Current, 10, 64). %w`, err)
+	}
+
+	return currentBalance, nil
 }
 
 func (f Strike) LightningType() Backend {
-	return LNBITS
+	return STRIKE
 }
 
 func (f Strike) GetNetwork() *chaincfg.Params {
 	return &f.Network
 }
+
 func (f Strike) ActiveMPP() bool {
 	return false
 }
+
 func (f Strike) VerifyUnitSupport(unit cashu.Unit) bool {
-	if unit == cashu.Sat {
+	switch unit {
+	case cashu.Sat:
 		return true
-	} else {
+	case cashu.EUR:
+		return true
+	default:
 		return false
 	}
 }

@@ -18,13 +18,14 @@ const LNDGRPC Backend = iota + 1
 const LNBITS Backend = iota + 2
 const CLNGRPC Backend = iota + 3
 const FAKEWALLET Backend = iota + 4
+const STRIKE Backend = iota + 5
 
 type LightningBackend interface {
-	PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error)
+	PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error)
 	CheckPayed(quote string) (PaymentStatus, string, uint64, error)
 	CheckReceived(quote string) (PaymentStatus, string, error)
-	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error)
-	RequestInvoice(amount int64) (InvoiceResponse, error)
+	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error)
+	RequestInvoice(amount cashu.Amount) (InvoiceResponse, error)
 	WalletBalance() (uint64, error)
 	LightningType() Backend
 	GetNetwork() *chaincfg.Params

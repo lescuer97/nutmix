@@ -25,7 +25,7 @@ type LNBitsDetailErrorData struct {
 	Status string
 }
 type lnbitsInvoiceRequest struct {
-	Amount int64  `json:"amount"`
+	Amount uint64 `json:"amount"`
 	Unit   string `json:"unit,omitempty"`
 	Memo   string `json:"memo"`
 	Out    bool   `json:"out"`
@@ -100,18 +100,20 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 
 }
 
-func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
+func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 
 	var lnbitsInvoice struct {
 		PaymentHash    string `json:"payment_hash"`
 		PaymentRequest string `json:"payment_request"`
 	}
+
 	reqInvoice := lnbitsInvoiceRequest{
 		Out:    true,
 		Bolt11: invoice,
-		Amount: int64(amount_sat),
+		Amount: amount.Amount,
 	}
+
 	err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
@@ -170,7 +172,7 @@ func (l LnbitsWallet) CheckReceived(quote string) (PaymentStatus, string, error)
 	}
 }
 
-func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
+func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
 	var queryResponse lnbitsFeeResponse
 	invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
@@ -181,19 +183,25 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 		return 0, fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	fee := GetFeeReserve(amount_sat, queryResponse.FeeReserve)
+	fee := GetFeeReserve(amount.Amount, queryResponse.FeeReserve)
 	return fee, nil
 }
 
-func (l LnbitsWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
+func (l LnbitsWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
 	reqInvoice := lnbitsInvoiceRequest{
-		Amount: amount,
+		Amount: amount.Amount,
 		Unit:   cashu.Sat.String(),
 		Memo:   "",
 		Out:    false,
 		Expiry: 900,
 	}
 	var response InvoiceResponse
+
+	supported := l.VerifyUnitSupport(amount.Unit)
+	if !supported {
+		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit). %w", cashu.ErrUnitNotSupported)
+	}
+
 	var lnbitsInvoice struct {
 		PaymentHash    string `json:"payment_hash"`
 		PaymentRequest string `json:"payment_request"`
