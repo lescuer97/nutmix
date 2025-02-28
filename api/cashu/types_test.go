@@ -132,38 +132,73 @@ func TestGenerateDLEQ(t *testing.T) {
 
 }
 
-func TestCashuAmountChangeSatToMsat(t * testing.T){
-    amount:= Amount{
-        Amount: 1000, 
-        Unit: Sat,
-    }
-    err := amount.To(Msat)
+func TestCashuAmountChangeSatToMsat(t *testing.T) {
+	amount := Amount{
+		Amount: 1000,
+		Unit:   Sat,
+	}
+	err := amount.To(Msat)
 
-    if err != nil {
-        t.Fatalf("amount.To(Msat). %v", err)
-    }
-    if amount.Amount != 1000000 {
-        t.Errorf("Amount is not correct")
-    }
-    if amount.Unit != Msat {
-        t.Errorf("unit is not correct")
-    }
+	if err != nil {
+		t.Fatalf("amount.To(Msat). %v", err)
+	}
+	if amount.Amount != 1000000 {
+		t.Errorf("Amount is not correct")
+	}
+	if amount.Unit != Msat {
+		t.Errorf("unit is not correct")
+	}
 }
 
-func TestCashuAmountChangeMsatToSat(t * testing.T){
-    amount:= Amount{
-        Amount: 1000, 
-        Unit: Msat,
-    }
-    err := amount.To(Sat)
+func TestCashuAmountChangeMsatToSat(t *testing.T) {
+	amount := Amount{
+		Amount: 1000,
+		Unit:   Msat,
+	}
+	err := amount.To(Sat)
 
-    if err != nil {
-        t.Fatalf("amount.To(Sat). %v", err)
-    }
-    if amount.Amount != 1 {
-        t.Errorf("Amount is not correct")
-    }
-    if amount.Unit != Sat {
-        t.Errorf("unit is not correct")
-    }
+	if err != nil {
+		t.Fatalf("amount.To(Sat). %v", err)
+	}
+	if amount.Amount != 1 {
+		t.Errorf("Amount is not correct")
+	}
+	if amount.Unit != Sat {
+		t.Errorf("unit is not correct")
+	}
+}
+
+func TestCashuAmountUSDtoCents(t *testing.T) {
+	amount := Amount{
+		Amount: 10,
+		Unit:   USD,
+	}
+	str, err := amount.CentsToUSD()
+
+	if err != nil {
+		t.Fatalf("amount.SatToBTC(). %v", err)
+	}
+	if str != "0.10" {
+		t.Errorf("Amount is not correct")
+	}
+	if amount.Unit != USD {
+		t.Errorf("unit is not correct")
+	}
+}
+func TestCashuAmountEURtoCents(t *testing.T) {
+	amount := Amount{
+		Amount: 10000,
+		Unit:   EUR,
+	}
+	str, err := amount.CentsToUSD()
+
+	if err != nil {
+		t.Fatalf("amount.SatToBTC(). %v", err)
+	}
+	if str != "100.00" {
+		t.Errorf("Amount is not correct")
+	}
+	if amount.Unit != EUR {
+		t.Errorf("unit is not correct")
+	}
 }

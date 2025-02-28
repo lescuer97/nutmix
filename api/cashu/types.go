@@ -837,7 +837,7 @@ func (a *Amount) ToFloatString() (string, error) {
 
 func (a *Amount) SatToBTC() (string, error) {
 	if a.Unit != Sat {
-		return "", ErrCouldNotParseSpendCondition
+		return "", ErrCouldNotParseAmountToString
 	}
 	btc := float64(a.Amount) / 1e8
 	return fmt.Sprintf("%.8f", btc), nil
@@ -845,7 +845,7 @@ func (a *Amount) SatToBTC() (string, error) {
 
 func (a *Amount) CentsToUSD() (string, error) {
 	if a.Unit != USD && a.Unit != EUR {
-		return "", ErrCouldNotParseSpendCondition
+		return "", ErrCouldNotParseAmountToString
 	}
 	dollars := float64(a.Amount) / 100
 	return fmt.Sprintf("%.2f", dollars), nil
