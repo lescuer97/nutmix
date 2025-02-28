@@ -131,3 +131,39 @@ func TestGenerateDLEQ(t *testing.T) {
 	}
 
 }
+
+func TestCashuAmountChangeSatToMsat(t * testing.T){
+    amount:= Amount{
+        Amount: 1000, 
+        Unit: Sat,
+    }
+    err := amount.To(Msat)
+
+    if err != nil {
+        t.Fatalf("amount.To(Msat). %v", err)
+    }
+    if amount.Amount != 1000000 {
+        t.Errorf("Amount is not correct")
+    }
+    if amount.Unit != Msat {
+        t.Errorf("unit is not correct")
+    }
+}
+
+func TestCashuAmountChangeMsatToSat(t * testing.T){
+    amount:= Amount{
+        Amount: 1000, 
+        Unit: Msat,
+    }
+    err := amount.To(Sat)
+
+    if err != nil {
+        t.Fatalf("amount.To(Sat). %v", err)
+    }
+    if amount.Amount != 1 {
+        t.Errorf("Amount is not correct")
+    }
+    if amount.Unit != Sat {
+        t.Errorf("unit is not correct")
+    }
+}

@@ -271,20 +271,25 @@ func (l Strike) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
 		Amount:        strikeAmt,
 	}
 
-	var lnbitsInvoice struct {
-		PaymentHash    string `json:"payment_hash"`
-		PaymentRequest string `json:"payment_request"`
-	}
-	err = l.StrikeRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
+    // get invoice request
+	var strikeInvoiceResponse strikeInvoiceResponse
+	err = l.StrikeRequest("POST", "/v1/invoices", reqInvoice, &strikeInvoiceResponse)
 	if err != nil {
-		return response, fmt.Errorf("json.Marshal: %w", err)
+		return response, fmt.Errorf(`l.StrikeRequest("POST", "/v1/invoices", r: %w`, err)
 	}
 
-	response.PaymentRequest = lnbitsInvoice.PaymentRequest
-	response.Rhash = lnbitsInvoice.PaymentHash
+    // get invoice quote
+	var strikeInvoiceQuoteResponse strikeInvoiceQuoteResponse
+	err = l.StrikeRequest("GET",fmt.Sprintf("/v1/invoices/%s", strikeInvoiceResponse.InvoiceId.String()), nil, &strikeInvoiceQuoteResponse)
+	if err != nil {
+		return response, fmt.Errorf(`l.StrikeRequest("GET",fmt.Sprintf("/v1/invoices/", strikeInvoiceResponse.InvoiceId.String()), nil, &strikeInvoiceQuoteResponse): %w`, err)
+	}
+
+    response.PaymentRequest = strikeInvoiceQuoteResponse.LnInvoice
+    response.Rhash = strikeInvoiceQuoteResponse.QuoteId
+
 
 	return response, nil
-
 }
 
 func (l Strike) WalletBalance() (uint64, error) {

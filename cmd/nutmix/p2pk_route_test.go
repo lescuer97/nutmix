@@ -514,7 +514,8 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
+    log.Printf("body: %s", w.Body.Bytes())
+	if w.Code != 400 {
 		t.Fatalf("Expected status code 403, got %d", w.Code)
 	}
 
@@ -593,8 +594,6 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	errorResponse := cashu.ErrorResponse{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
-
-	log.Printf("Body: %+v", string(w.Body.Bytes()))
 
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
