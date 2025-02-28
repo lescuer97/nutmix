@@ -56,6 +56,10 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrUnitNotSupported.Error()
 		return cashu.UNIT_NOT_SUPPORTED, &message
 
+	case errors.Is(proofError, cashu.ErrInvalidPreimage):
+		message := cashu.ErrInvalidPreimage.Error()
+		return cashu.TOKEN_NOT_VERIFIED, &message
+
 	case strings.Contains(proofError.Error(), "could not obtain lock"):
 		message := "Transaction is already pending"
 		return cashu.QUOTE_PENDING, &message

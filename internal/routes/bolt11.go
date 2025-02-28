@@ -132,13 +132,16 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		quote, err := mint.MintDB.GetMintRequestById(tx, quoteId)
 
+		if err != nil {
+			logger.Error(fmt.Errorf("mint:quote mint.MintDB.GetMintRequestById(tx, quoteId): %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+
+		}
+
 		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
 			c.JSON(200, quote)
-			return
-		}
-		if err != nil {
-			logger.Error(fmt.Errorf("m.CheckMintRequest(pool, mint,quoteId ): %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
@@ -185,8 +188,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		quote, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
 
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %w", err).Error())
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_ISSUED, nil))
+			logger.Error(fmt.Errorf(" mint-resquest mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -449,8 +453,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		quote, err := mint.CheckMeltQuoteState(quoteId)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.CheckMeltQuoteState(quoteId): %w", err))
-			c.JSON(500, "Opps!, something went wrong")
+			logger.Error(fmt.Errorf("mint.Melt(meltRequest, logger ). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
