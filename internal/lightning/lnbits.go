@@ -100,7 +100,7 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 
 }
 
-func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 
 	var lnbitsInvoice struct {
@@ -110,7 +110,7 @@ func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, fe
 
 	reqInvoice := lnbitsInvoiceRequest{
 		Out:    true,
-		Bolt11: invoice,
+		Bolt11: melt_quote.Request,
 		Amount: amount.Amount,
 	}
 

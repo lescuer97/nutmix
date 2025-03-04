@@ -381,7 +381,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 		fee := uint64(float64(swapRequest.Amount) * 0.10)
 
 		logger.Info(fmt.Sprintf("making payment to invoice: %+v", swapRequest.LightningInvoice))
-		payment, err := mint.LightningBackend.PayInvoice(swapRequest.LightningInvoice, decodedInvoice, fee, false, cashu.Amount{Unit: cashu.Sat, Amount: swapRequest.Amount})
+		payment, err := mint.LightningBackend.PayInvoice(cashu.MeltRequestDB{Request: swapRequest.LightningInvoice}, decodedInvoice, fee, false, cashu.Amount{Unit: cashu.Sat, Amount: swapRequest.Amount})
 
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN {

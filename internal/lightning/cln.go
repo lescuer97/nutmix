@@ -173,7 +173,7 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 
 }
 
-func (l CLNGRPCWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+func (l CLNGRPCWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 
 	hexHash := hex.EncodeToString(zpayInvoice.PaymentHash[:])
@@ -188,12 +188,12 @@ func (l CLNGRPCWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, f
 		return invoiceRes, ErrAlreadyPaid
 	}
 	if mpp {
-		err := l.clnGrpcPayPartialInvoice(invoice, zpayInvoice, cashu.Amount{Unit: cashu.Sat, Amount: feeReserve}, amount, &invoiceRes)
+		err := l.clnGrpcPayPartialInvoice(melt_quote.Request, zpayInvoice, cashu.Amount{Unit: cashu.Sat, Amount: feeReserve}, amount, &invoiceRes)
 		if err != nil {
 			return invoiceRes, fmt.Errorf(`l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes) %w`, err)
 		}
 	} else {
-		err := l.clnGrpcPayInvoice(invoice, feeReserve, &invoiceRes)
+		err := l.clnGrpcPayInvoice(melt_quote.Request, feeReserve, &invoiceRes)
 		if err != nil {
 			return invoiceRes, fmt.Errorf(`l.clnGrpcPayInvoice(invoice, feeReserve, &invoiceRes) %w`, err)
 		}

@@ -179,15 +179,15 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(invoice string,
 
 }
 
-func (l LndGrpcWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 	if mpp {
-		err := l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount.Amount, &invoiceRes)
+		err := l.lndGrpcPayPartialInvoice(melt_quote.Request, zpayInvoice, feeReserve, amount.Amount, &invoiceRes)
 		if err != nil {
 			return invoiceRes, fmt.Errorf(`l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes) %w`, err)
 		}
 	} else {
-		err := l.lndGrpcPayInvoice(invoice, feeReserve, &invoiceRes)
+		err := l.lndGrpcPayInvoice(melt_quote.Request, feeReserve, &invoiceRes)
 		if err != nil {
 			return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
 		}

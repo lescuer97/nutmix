@@ -32,7 +32,7 @@ type FakeWallet struct {
 
 const mock_preimage = "fakewalletpreimage"
 
-func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	switch {
 	case slices.Contains(f.UnpurposeErrors, FailPaymentUnknown):
 		return PaymentResponse{
@@ -63,7 +63,7 @@ func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeR
 
 	return PaymentResponse{
 		Preimage:       mock_preimage,
-		PaymentRequest: invoice,
+		PaymentRequest: melt_quote.Request,
 		PaymentState:   SETTLED,
 		Rhash:          "",
 		PaidFeeSat:     0,

@@ -214,11 +214,11 @@ func (l Strike) fee(amount strikeAmount) (uint64, error) {
 	return fee, nil
 }
 
-func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var strikePayment strikePaymentStatus
 	var invoiceRes PaymentResponse
 
-	err := l.StrikeRequest("PATCH", fmt.Sprintf("/v1/payment-quotes/%s/execute"), nil, &strikePayment)
+	err := l.StrikeRequest("PATCH", fmt.Sprintf("/v1/payment-quotes/%s/execute", melt_quote.Quote), nil, &strikePayment)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
 	}
@@ -235,7 +235,7 @@ func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReser
 	payHash := *zpayInvoice.PaymentHash
 	invoiceRes.PaidFeeSat = int64(fee)
 	invoiceRes.PaymentState = state
-	invoiceRes.PaymentRequest = invoice
+	invoiceRes.PaymentRequest = melt_quote.Request
 	invoiceRes.Rhash = hex.EncodeToString(payHash[:])
 
 	return invoiceRes, nil
@@ -284,9 +284,19 @@ func (l Strike) CheckReceived(quote string) (PaymentStatus, string, error) {
 
 func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
 	var queryResponse strikePaymentQuoteResponse
-	invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
-	err := l.StrikeRequest("GET", invoiceString, nil, &queryResponse)
+	strikeAmount, err := CashuAmountToStrikeAmount(amount)
+	if err != nil {
+		return 0, fmt.Errorf(`CashuAmountToStrikeAmount(): %w`, err)
+	}
+	strikeQuery := strikePaymentRequest{
+		LnInvoice:      invoice,
+		SourceCurrency: strikeAmount.Currency,
+	}
+
+	invoiceString := "/v1/payment-quotes/lightning"
+
+	err = l.StrikeRequest("POST", invoiceString, strikeQuery, &queryResponse)
 	if err != nil {
 		return 0, fmt.Errorf(`l.StrikeRequest("GET", invoiceString, nil, &queryResponse): %w`, err)
 	}
