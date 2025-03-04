@@ -2,11 +2,10 @@ package lightning
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"strconv"
 
@@ -32,12 +31,18 @@ type strikeInvoiceRequest struct {
 	Amount        strikeAmount `json:"amount"`
 }
 
-type strikeState string
+type strikeInvoiceState string
 
-const UNPAID strikeState = "UNPAID"
-const PAID strikeState = "PAID"
-const PENDING_STRIKE strikeState = "PENDING"
-const CANCELLED strikeState = "CANCELLED"
+const UNPAID strikeInvoiceState = "UNPAID"
+const PAID strikeInvoiceState = "PAID"
+const PENDING_STRIKE strikeInvoiceState = "PENDING"
+const CANCELLED strikeInvoiceState = "CANCELLED"
+
+type strikePaymentState string
+
+const PENDING_STRIKE_PAYMENT strikePaymentState = "PENDING"
+const COMPLETED strikePaymentState = "COMPLETED"
+const FAILED_STRIKE_PAYMENT strikePaymentState = "FAILED"
 
 type strikeCurrency string
 
@@ -48,6 +53,34 @@ const EUR strikeCurrency = "EUR"
 type strikeAmount struct {
 	Amount   string         `json:"amount"`
 	Currency strikeCurrency `json:"currency"`
+}
+
+func strikeInvoiceStateToCashuState(state strikeInvoiceState) (PaymentStatus, error) {
+	switch state {
+	case UNPAID:
+		return UNKNOWN, nil
+	case PAID:
+		return SETTLED, nil
+	case PENDING_STRIKE:
+		return PENDING, nil
+	case CANCELLED:
+		return FAILED, nil
+	default:
+		return PENDING, fmt.Errorf("Could not get payement status from strike state")
+	}
+}
+
+func strikePaymentStateToCashuState(state strikePaymentState) (PaymentStatus, error) {
+	switch state {
+	case PENDING_STRIKE_PAYMENT:
+		return PENDING, nil
+	case COMPLETED:
+		return SETTLED, nil
+	case FAILED_STRIKE_PAYMENT:
+		return FAILED, nil
+	default:
+		return PENDING, fmt.Errorf("Could not get payement status from strike state")
+	}
 }
 
 func CashuAmountToStrikeAmount(amount cashu.Amount) (strikeAmount, error) {
@@ -74,10 +107,10 @@ func CashuAmountToStrikeAmount(amount cashu.Amount) (strikeAmount, error) {
 }
 
 type strikeInvoiceResponse struct {
-	InvoiceId   uuid.UUID    `json:"invoiceId"`
-	Description string       `json:"description"`
-	Amount      strikeAmount `json:"amount"`
-	State       strikeState  `json:"state"`
+	InvoiceId   uuid.UUID          `json:"invoiceId"`
+	Description string             `json:"description"`
+	Amount      strikeAmount       `json:"amount"`
+	State       strikeInvoiceState `json:"state"`
 }
 type strikeInvoiceQuoteResponse struct {
 	QuoteId         string       `json:"quoteId"`
@@ -103,12 +136,12 @@ type strikePaymentQuoteResponse struct {
 }
 
 type strikePaymentStatus struct {
-	PaymentId           string       `json:"paymentId"`
-	State               strikeState  `json:"state"`
-	Completed           uint64       `json:"completed"`
-	Amount              strikeAmount `json:"amount"`
-	TotalFee            strikeAmount `json:"totalFee"`
-	LightningNetworkFee strikeAmount `json:"lightningNetworkFee"`
+	PaymentId           string             `json:"paymentId"`
+	State               strikePaymentState `json:"state"`
+	Completed           uint64             `json:"completed"`
+	Amount              strikeAmount       `json:"amount"`
+	TotalFee            strikeAmount       `json:"totalFee"`
+	LightningNetworkFee strikeAmount       `json:"lightningNetworkFee"`
 	Lightning           struct {
 		NetworkFee strikeAmount `json:"networkFee"`
 	} `json:"lightning"`
@@ -166,40 +199,44 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 
 }
 
+func (l Strike) fee(amount strikeAmount) (uint64, error) {
+	fee, err := strconv.ParseUint(amount.Amount, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("strconv.ParseUint(fee_str, 10, 64): %w", err)
+	}
+
+	if amount.Currency == BTC {
+		fee = fee * 1e8
+	} else if amount.Currency == EUR {
+		fee = fee * 100
+	}
+
+	return fee, nil
+}
+
 func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+	var strikePayment strikePaymentStatus
 	var invoiceRes PaymentResponse
 
-	var lnbitsInvoice struct {
-		PaymentHash    string `json:"payment_hash"`
-		PaymentRequest string `json:"payment_request"`
-	}
-
-	reqInvoice := lnbitsInvoiceRequest{
-		Out:    true,
-		Bolt11: invoice,
-		Amount: amount.Amount,
-	}
-	err := l.StrikeRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
+	err := l.StrikeRequest("PATCH", fmt.Sprintf("/v1/payment-quotes/%s/execute"), nil, &strikePayment)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
 	}
 
-	var paymentStatus LNBitsPaymentStatus
-
-	// check invoice payment to get the preimage and fee
-	err = l.StrikeRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus)
+	fee, err := l.fee(strikePayment.LightningNetworkFee)
 	if err != nil {
-		if errors.Is(err, ErrLnbitsFailedPayment) {
-			invoiceRes.PaymentState = FAILED
-		}
-		return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("GET", "/api/v1/payments/"+lnbitsInvoice.PaymentHash, nil, &paymentStatus): %w`, err)
+		return invoiceRes, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
 	}
 
-	invoiceRes.PaymentRequest = lnbitsInvoice.PaymentRequest
-	invoiceRes.PaymentState = SETTLED
-	invoiceRes.Rhash = lnbitsInvoice.PaymentHash
-	invoiceRes.Preimage = paymentStatus.Preimage
-	invoiceRes.PaidFeeSat = int64(math.Abs(float64(paymentStatus.Details.Fee)))
+	state, err := strikePaymentStateToCashuState(strikePayment.State)
+	if err != nil {
+		return invoiceRes, fmt.Errorf(`strikeStateToCashuState(strikePayment.State) %w`, err)
+	}
+	payHash := *zpayInvoice.PaymentHash
+	invoiceRes.PaidFeeSat = int64(fee)
+	invoiceRes.PaymentState = state
+	invoiceRes.PaymentRequest = invoice
+	invoiceRes.Rhash = hex.EncodeToString(payHash[:])
 
 	return invoiceRes, nil
 }
@@ -207,7 +244,7 @@ func (l Strike) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReser
 func (l Strike) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
 	var paymentStatus strikePaymentStatus
 
-	err := l.StrikeRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
+	err := l.StrikeRequest("GET", "/v1/payments/"+quote, nil, &paymentStatus)
 	if err != nil {
 		return FAILED, "", uint64(0), fmt.Errorf(`l.StrikeRequest("GET", "/api/v1/payments/"+quote: %w`, err)
 	}
@@ -217,18 +254,11 @@ func (l Strike) CheckPayed(quote string) (PaymentStatus, string, uint64, error) 
 		return FAILED, "", uint64(0), fmt.Errorf(`strconv.ParseUint(paymentStatus.LightningNetworkFee, 10, 64): %w`, err)
 	}
 
-	switch paymentStatus.State {
-	case UNPAID:
-		return UNKNOWN, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
-	case PAID:
-		return SETTLED, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
-	case PENDING_STRIKE:
-		return PENDING, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
-	case CANCELLED:
-		return FAILED, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
-	default:
-		return PENDING, "", lnFee, fmt.Errorf("json.Marshal: %w", err)
+	state, err := strikePaymentStateToCashuState(paymentStatus.State)
+	if err != nil {
+		return PENDING, "", lnFee, fmt.Errorf("strikePaymentStateToCashuState(strikePayment.State): %w", err)
 	}
+	return state, "", lnFee, nil
 }
 func (l Strike) CheckReceived(quote string) (PaymentStatus, string, error) {
 	var paymentStatus strikeInvoiceResponse
@@ -253,17 +283,20 @@ func (l Strike) CheckReceived(quote string) (PaymentStatus, string, error) {
 }
 
 func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
-	var queryResponse lnbitsFeeResponse
+	var queryResponse strikePaymentQuoteResponse
 	invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
 	err := l.StrikeRequest("GET", invoiceString, nil, &queryResponse)
-	queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
-
 	if err != nil {
-		return 0, fmt.Errorf("json.Marshal: %w", err)
+		return 0, fmt.Errorf(`l.StrikeRequest("GET", invoiceString, nil, &queryResponse): %w`, err)
 	}
 
-	fee := GetFeeReserve(amount.Amount, queryResponse.FeeReserve)
+	fee, err := l.fee(queryResponse.TotalFee)
+	if err != nil {
+		return 0, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
+	}
+
+	fee = GetFeeReserve(amount.Amount, fee)
 	return fee, nil
 }
 
