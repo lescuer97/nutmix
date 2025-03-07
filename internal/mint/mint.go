@@ -18,6 +18,7 @@ type Mint struct {
 	MintPubkey       string
 	MintDB           database.MintDB
 	Signer           signer.Signer
+	AuthSigner       signer.Signer
 }
 
 var (

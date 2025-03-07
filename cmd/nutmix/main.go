@@ -97,6 +97,11 @@ func main() {
 		log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
 	}
 
+	// signer, err = localsigner.SetupLocalSigner(db)
+	// if err != nil {
+	// 	log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
+	// }
+
 	// remove mint private key from variable
 	mint, err := mint.SetUpMint(ctx, config, db, &signer)
 
@@ -124,5 +129,5 @@ func main() {
 
 	logger.Info("Nutmix started in port 8080")
 
-	r.Run(":8080")
+	r.Run(":8120")
 }

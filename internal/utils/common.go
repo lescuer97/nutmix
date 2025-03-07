@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"os"
 )
@@ -60,6 +59,12 @@ type Config struct {
 	PEG_OUT_ONLY       bool `db:"peg_out_only"`
 	PEG_OUT_LIMIT_SATS *int `db:"peg_out_limit_sats,omitempty"`
 	PEG_IN_LIMIT_SATS  *int `db:"peg_in_limit_sats,omitempty"`
+
+	MINT_REQUIRE_AUTH               bool   `db:"mint_require_auth,omitempty"`
+	MINT_AUTH_OICD_DISCOVERY_URL    string `db:"mint_auth_discovery_url,omitempty"`
+	MINT_AUTH_OICD_CLIENT_ID        string `db:"mint_auth_oicd_client_id,omitempty"`
+	MINT_AUTH_RATE_LIMIT_PER_MINUTE int    `db:"mint_auth_rate_limit_per_minute,omitempty"`
+	MINT_AUTH_MAX_BLIND_TOKENS      int32  `db:"mint_auth_max_blind_tokens,omitempty"`
 }
 
 func (c *Config) Default() {
@@ -84,6 +89,9 @@ func (c *Config) Default() {
 	c.PEG_OUT_ONLY = false
 	c.PEG_OUT_LIMIT_SATS = nil
 	c.PEG_IN_LIMIT_SATS = nil
+
+	c.MINT_REQUIRE_AUTH = false
+	// c.MINT_AUTH_OICD_CLIENT_ID
 }
 func (c *Config) UseEnviromentVars() {
 	c.NAME = os.Getenv("NAME")
@@ -104,23 +112,4 @@ func (c *Config) UseEnviromentVars() {
 	c.MINT_LNBITS_ENDPOINT = os.Getenv("MINT_LNBITS_ENDPOINT")
 	c.MINT_LNBITS_KEY = os.Getenv("MINT_LNBITS_KEY")
 
-}
-
-func getConfigFile() ([]byte, error) {
-	dir, err := os.UserConfigDir()
-
-	if err != nil {
-		return []byte{}, fmt.Errorf("os.UserHomeDir(), %w", err)
-	}
-
-	var pathToProjectDir string = dir + "/" + ConfigDirName
-	var pathToProjectConfigFile string = pathToProjectDir + "/" + ConfigFileName
-	err = CreateDirectoryAndPath(pathToProjectDir, ConfigFileName)
-
-	if err != nil {
-		return []byte{}, fmt.Errorf("utils.CreateDirectoryAndPath(pathToProjectDir, ConfigFileName), %w", err)
-	}
-
-	// Manipulate Config file and parse
-	return os.ReadFile(pathToProjectConfigFile)
 }
