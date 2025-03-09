@@ -55,7 +55,6 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
 }
 
 func (pql Postgresql) SetConfig(config utils.Config) error {
-
 	tries := 0
 	stmt := `
         INSERT INTO config (

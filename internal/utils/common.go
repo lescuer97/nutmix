@@ -32,7 +32,6 @@ func StringToLightningBackend(text string) LightningBackend {
 		return FAKE_WALLET
 
 	}
-
 }
 
 type Config struct {

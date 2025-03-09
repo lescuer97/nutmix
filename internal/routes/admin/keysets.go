@@ -33,11 +33,6 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-
-		keysetArr := struct {
-			Keysets []templates.KeysetData
-		}{}
-
 		seeds, err := mint.MintDB.GetAllSeeds()
 		if err != nil {
 			logger.Error("database.GetAllSeeds(pool) %+v", slog.String(utils.LogExtraInfo, err.Error()))
@@ -45,18 +40,37 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
+		keysetMap := make(map[string][]templates.KeysetData)
 		for _, seed := range seeds {
-			keysetArr.Keysets = append(keysetArr.Keysets, templates.KeysetData{
-				Id:        seed.Id,
-				Active:    seed.Active,
-				Unit:      seed.Unit,
-				Fees:      seed.InputFeePpk,
-				CreatedAt: seed.CreatedAt,
-				Version:   seed.Version,
-			})
+			val, exits := keysetMap[seed.Unit]
+			if exits {
+				val = append(val, templates.KeysetData{
+					Id:        seed.Id,
+					Active:    seed.Active,
+					Unit:      seed.Unit,
+					Fees:      seed.InputFeePpk,
+					CreatedAt: seed.CreatedAt,
+					Version:   seed.Version,
+				})
+
+				keysetMap[seed.Unit] = val
+
+			} else {
+				keysetMap[seed.Unit] = []templates.KeysetData{
+
+					{
+						Id:        seed.Id,
+						Active:    seed.Active,
+						Unit:      seed.Unit,
+						Fees:      seed.InputFeePpk,
+						CreatedAt: seed.CreatedAt,
+						Version:   seed.Version,
+					},
+				}
+			}
 		}
 		ctx := context.Background()
-		err = templates.KeysetsList(keysetArr.Keysets).Render(ctx, c.Writer)
+		err = templates.KeysetsList(keysetMap).Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(fmt.Errorf("templates.KeysetsList(keysetArr.Keysets).Render(ctx, c.Writer). %w", err))
