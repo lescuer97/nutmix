@@ -31,6 +31,9 @@
   border-radius: 15px;
   width: 100%;
 }
+.unit-list h2 {
+    text-transform: uppercase;
+}
 .unit-list div {
   display: flex;
   flex-wrap: wrap;

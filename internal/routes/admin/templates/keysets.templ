@@ -55,11 +55,11 @@ templ KeysetsList(keysetMap map[string][]KeysetData) {
 			<h2>
 				{ unit }
 			</h2>
-            <div>
-			for _, keyset := range keysets {
-				@keysetCard(keyset)
-			}
-            </div>
+			<div>
+				for _, keyset := range keysets {
+					@keysetCard(keyset)
+				}
+			</div>
 		</div>
 	}
 }
