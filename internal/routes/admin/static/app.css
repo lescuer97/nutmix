@@ -2,6 +2,8 @@
 @import url("bolt11.css");
 @import url("keysets.css");
 @import url("activity.css");
+@import url("dialog.css");
+@import url("liquidity.css");
 
 :root {
   /** CSS DARK THEME PRIMARY COLORS */
@@ -260,6 +262,7 @@ option {
   min-width: 200px;
   padding: 15px 15px;
   border-radius: 15px;
+  justify-content: flex-start;
 }
 
 /* lds loading ring */

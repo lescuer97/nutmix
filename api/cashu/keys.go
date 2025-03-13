@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func DeriveKeysetId(keysets []Keyset) (string, error) {
+func DeriveKeysetId(keysets []MintKey) (string, error) {
 	concatBinaryArray := []byte{}
 	for _, keyset := range keysets {
 		pubkey := keyset.GetPubKey()
@@ -22,8 +22,8 @@ func DeriveKeysetId(keysets []Keyset) (string, error) {
 	return "00" + hex[:14], nil
 }
 
-func GenerateKeysets(versionKey *bip32.Key, values []uint64, id string, unit Unit, inputFee int, active bool) ([]Keyset, error) {
-	var keysets []Keyset
+func GenerateKeysets(versionKey *bip32.Key, values []uint64, id string, unit Unit, inputFee uint, active bool) ([]MintKey, error) {
+	var keysets []MintKey
 
 	// Get the current time
 	currentTime := time.Now()
@@ -39,7 +39,7 @@ func GenerateKeysets(versionKey *bip32.Key, values []uint64, id string, unit Uni
 		}
 		privKey := secp256k1.PrivKeyFromBytes(childKey.Key)
 
-		keyset := Keyset{
+		keyset := MintKey{
 			Id:          id,
 			Active:      active,
 			Unit:        unit.String(),

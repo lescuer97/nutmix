@@ -3,15 +3,23 @@ package admin
 import (
 	"context"
 	"crypto/rand"
+	"embed"
+	"errors"
+	"fmt"
+	"html/template"
+	"io/fs"
+	"log"
+	"net/http"
 
 	"log/slog"
 	"os"
 	"slices"
 	"time"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
-	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/mint"
+	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -19,24 +27,72 @@ type ErrorNotif struct {
 	Error string
 }
 
-func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
-	testPath := os.Getenv("TEST_PATH")
-	if testPath != "" {
-		r.Static("static", testPath+"static")
-		r.LoadHTMLGlob(testPath + "templates/**")
+func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
 
-	} else {
-		r.Static("static", "internal/routes/admin/static")
-		r.LoadHTMLGlob("internal/routes/admin/templates/**")
+		if len(c.Errors) > 0 {
+			message := "Unknown Problem"
+			for _, e := range c.Errors {
+				switch {
+				case errors.Is(e, utils.ErrAlreadyLNPaying):
+					message = "Error paying invoice"
+					return
+				case errors.Is(e, ErrInvalidNostrKey):
+					message = "Nostr npub is not valid"
+					return
+				}
+			}
+			logger.Error(fmt.Sprintf("Error from calls: %+v", c.Errors.String()))
+			component := templates.ErrorNotif(message)
+			err := component.Render(c.Request.Context(), c.Writer)
+			if err != nil {
+				logger.Error(fmt.Sprintf("could not render error notification: %+v", err))
+				return
+			}
+		}
 
 	}
+}
+
+//go:embed static/*.css static/*.js
+var static embed.FS
+
+//go:embed templates/*.html
+var templatesFs embed.FS
+
+func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
+	contentStatic, err := fs.Sub(static, "static")
+	if err != nil {
+		logger.Error(
+			`fs.Sub(static, "static")`,
+			slog.String(utils.LogExtraInfo, err.Error()),
+		)
+		panic(err)
+	}
+	httpFs := http.FS(contentStatic)
+	r.StaticFS("/static", httpFs)
+
+	templ := template.Must(template.ParseFS(templatesFs, "templates/*.html"))
+	r.SetHTMLTemplate(templ)
+
 	adminRoute := r.Group("/admin")
 
+	loginKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		logger.Error(
+			"secp256k1.GeneratePrivateKey()",
+			slog.String(utils.LogExtraInfo, err.Error()),
+		)
+		log.Panicf("secp256k1.GeneratePrivateKey(). %+v", err)
+
+	}
+
 	// I use the first active keyset as secret for jwt token signing
-	adminRoute.Use(AuthMiddleware(logger, mint.ActiveKeysets[cashu.Sat.String()][1].PrivKey.Serialize()))
+	adminRoute.Use(AuthMiddleware(logger, loginKey.Serialize()))
 
 	// PAGES SETUP
-	// This is /admin
+	// This is /admin pages
 	adminRoute.GET("", InitPage(mint))
 	adminRoute.GET("/keysets", KeysetsPage(mint))
 	adminRoute.GET("/settings", MintSettingsPage(mint))
@@ -44,7 +100,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.GET("/bolt11", LightningNodePage(mint))
 
 	// change routes
-	adminRoute.POST("/login", Login(mint, logger))
+	adminRoute.POST("/login", Login(mint, logger, loginKey))
 	adminRoute.POST("/mintsettings", MintSettingsForm(mint, logger))
 	adminRoute.POST("/bolt11", Bolt11Post(mint, logger))
 	adminRoute.POST("/rotate/sats", RotateSatsSeed(mint, logger))
@@ -56,6 +112,22 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *mint.Mint, logger *sl
 	adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint, logger))
 	adminRoute.GET("/mint-melt-list", MintMeltList(mint, logger))
 	adminRoute.GET("/logs", LogsTab(logger))
+
+	// only have swap routes if liquidity manager is possible
+	if utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
+
+		adminRoute.GET("/liquidity", LigthningLiquidityPage(logger, mint))
+		adminRoute.GET("/liquidity/:swapId", SwapStatusPage(logger, mint))
+		adminRoute.GET("/swaps-list", SwapsList(mint, logger))
+		adminRoute.GET("/liquidity-button", LiquidityButton(logger))
+		adminRoute.GET("/liquid-swap-form", SwapOutForm(logger, mint))
+		adminRoute.GET("/lightning-swap-form", LightningSwapForm(logger))
+		adminRoute.POST("/out-swap-req", SwapOutRequest(logger, mint))
+		adminRoute.POST("/in-swap-req", SwapInRequest(logger, mint))
+		adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
+		adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(logger, mint))
+		go CheckStatusOfLiquiditySwaps(mint, logger)
+	}
 
 }
 
@@ -90,7 +162,6 @@ func ParseToTimeRequest(str string) TIME_REQUEST {
 
 // return 24 hours by default
 func (t TIME_REQUEST) RollBackFromNow() time.Time {
-
 	rollBackHour := time.Now()
 
 	switch t {
@@ -131,7 +202,7 @@ func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 
 		}
 
-		file, err := os.Open(logsdir + "/" + mint.LogFileName)
+		file, err := os.Open(logsdir + "/" + m.LogFileName)
 		defer file.Close()
 		if err != nil {
 			logger.Warn(
@@ -149,8 +220,14 @@ func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo}, timeRequestDuration.RollBackFromNow())
 
 		slices.Reverse(logs)
+		ctx := context.Background()
 
-		c.HTML(200, "logs", logs)
+		err = templates.Logs(logs).Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(err)
+			// c.HTML(400,"", nil)
+			return
+		}
 	}
 }
 
