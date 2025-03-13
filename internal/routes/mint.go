@@ -3,12 +3,11 @@ package routes
 import (
 	"context"
 	"fmt"
-	"log/slog"
-
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"log/slog"
 )
 
 func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
