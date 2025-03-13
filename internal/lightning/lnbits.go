@@ -137,7 +137,23 @@ func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, fe
 	return invoiceRes, nil
 }
 
-func (l LnbitsWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
+func (l LnbitsWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
+	var paymentStatus LNBitsPaymentStatus
+
+	err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
+	if err != nil {
+		return FAILED, "", uint64(paymentStatus.Details.Fee), fmt.Errorf("json.Marshal: %w", err)
+	}
+
+	switch {
+	case paymentStatus.Paid:
+		return SETTLED, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+	default:
+		return PENDING, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+
+	}
+}
+func (l LnbitsWallet) CheckReceived(quote string) (PaymentStatus, string, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
@@ -165,7 +181,8 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 		return 0, fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	return queryResponse.FeeReserve, nil
+	fee := GetFeeReserve(amount_sat, queryResponse.FeeReserve)
+	return fee, nil
 }
 
 func (l LnbitsWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {

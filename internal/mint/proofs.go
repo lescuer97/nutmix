@@ -1,15 +1,24 @@
 package mint
 
 import (
+	"context"
 	"fmt"
-	"github.com/lescuer97/nutmix/api/cashu"
 	"slices"
+
+	"github.com/lescuer97/nutmix/api/cashu"
 )
 
 func CheckProofState(mint *Mint, Ys []string) ([]cashu.CheckState, error) {
 	var states []cashu.CheckState
+	ctx := context.Background()
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		return states, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+	}
+	defer mint.MintDB.Rollback(ctx, tx)
+
 	// set as unspent
-	proofs, err := mint.MintDB.GetProofsFromSecretCurve(Ys)
+	proofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, Ys)
 	if err != nil {
 		return states, fmt.Errorf("database.CheckListOfProofsBySecretCurve(pool, Ys). %w", err)
 	}
@@ -27,13 +36,6 @@ func CheckProofState(mint *Mint, Ys []string) ([]cashu.CheckState, error) {
 		}
 
 		switch {
-		// check if is in list of pending proofs
-		case slices.ContainsFunc(mint.PendingProofs, func(p cashu.Proof) bool {
-			checkState.Witness = &p.Witness
-			return p.Y == state
-		}):
-			pendingAndSpent = true
-			checkState.State = cashu.PROOF_PENDING
 		// Check if is in list of spents and if its also pending add it for removal of pending list
 		case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
 			compare := p.Y == state
@@ -52,15 +54,9 @@ func CheckProofState(mint *Mint, Ys []string) ([]cashu.CheckState, error) {
 		states = append(states, checkState)
 	}
 
-	// remove proofs from pending proofs
-	if len(proofsForRemoval) != 0 {
-		newPendingProofs := []cashu.Proof{}
-		for _, proof := range mint.PendingProofs {
-			if !slices.Contains(proofsForRemoval, proof) {
-				newPendingProofs = append(newPendingProofs, proof)
-			}
-		}
+	err = mint.MintDB.Commit(ctx, tx)
+	if err != nil {
+		return states, fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
 	}
 	return states, nil
-
 }
