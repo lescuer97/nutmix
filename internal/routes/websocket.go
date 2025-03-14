@@ -45,11 +45,12 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		proofChan := make(chan cashu.Proof)
-		mintChan := make(chan cashu.MintRequestDB)
-		meltChan := make(chan cashu.MeltRequestDB)
+		proofChan := make(chan cashu.Proof, 2)
+		mintChan := make(chan cashu.MintRequestDB, 1)
+		meltChan := make(chan cashu.MeltRequestDB, 1)
+		closeChan := make(chan string, 1)
 		// parse request check if subscription or unsubscribe
-		err = handleWSRequest(request, mint.Observer, proofChan, mintChan, meltChan)
+		err = handleWSRequest(request, mint.Observer, proofChan, mintChan, meltChan, closeChan)
 
 		if err != nil {
 			if errors.Is(err, ErrAlreadySubscribed) {
@@ -91,7 +92,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		listenError := make(chan error)
-		go ListenToIncommingMessage(mint.Observer, conn, listenError, proofChan, mintChan, meltChan)
+		go ListenToIncommingMessage(mint.Observer, conn, listenError, proofChan, mintChan, meltChan, closeChan)
 
 		for {
 			select {
@@ -99,62 +100,73 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				logger.Warn("go ListenToIncommingMessage(&activeSubs, conn, listining).", slog.String(utils.LogExtraInfo, error.Error()))
 				return
 
-			case proof := <-proofChan:
-				statusNotif := cashu.WsNotification{
-					JsonRpc: "2.0",
-					Method:  cashu.Subcribe,
-					Params: cashu.WebRequestParams{
-						SubId: request.Params.SubId,
-					},
-				}
-				state := cashu.CheckState{Y: proof.Y, State: proof.State, Witness: &proof.Witness}
-				statusNotif.Params.Payload = state
+			case proof, ok := <-proofChan:
+				if ok {
+					statusNotif := cashu.WsNotification{
+						JsonRpc: "2.0",
+						Method:  cashu.Subcribe,
+						Params: cashu.WebRequestParams{
+							SubId: request.Params.SubId,
+						},
+					}
+					state := cashu.CheckState{Y: proof.Y, State: proof.State, Witness: &proof.Witness}
+					statusNotif.Params.Payload = state
 
-				log.Printf("sending proof on web socket: %+v", proof)
-				err = m.SendJson(conn, statusNotif)
-				if err != nil {
-					logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
-					return
+					err = m.SendJson(conn, statusNotif)
+					if err != nil {
+						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						return
+					}
 				}
-			case mintState := <-mintChan:
-				statusNotif := cashu.WsNotification{
-					JsonRpc: "2.0",
-					Method:  cashu.Subcribe,
-					Params: cashu.WebRequestParams{
-						SubId: request.Params.SubId,
-					},
-				}
-				statusNotif.Params.Payload = mintState.PostMintQuoteBolt11Response()
 
-				log.Printf("sending mint on web socket: %+v", mintState)
-				err = m.SendJson(conn, statusNotif)
-				if err != nil {
-					logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
-					return
-				}
-			case meltState := <-meltChan:
-				statusNotif := cashu.WsNotification{
-					JsonRpc: "2.0",
-					Method:  cashu.Subcribe,
-					Params: cashu.WebRequestParams{
-						SubId: request.Params.SubId,
-					},
-				}
-				statusNotif.Params.Payload = meltState.GetPostMeltQuoteResponse()
+			case mintState, ok := <-mintChan:
+				if ok {
+					statusNotif := cashu.WsNotification{
+						JsonRpc: "2.0",
+						Method:  cashu.Subcribe,
+						Params: cashu.WebRequestParams{
+							SubId: request.Params.SubId,
+						},
+					}
+					statusNotif.Params.Payload = mintState.PostMintQuoteBolt11Response()
 
-				log.Printf("sending meltQuote on web socket: %+v", meltState)
-				err = m.SendJson(conn, statusNotif)
-				if err != nil {
-					logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
-					return
+					log.Printf("sending mint on web socket: %+v", mintState)
+					err = m.SendJson(conn, statusNotif)
+					if err != nil {
+						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						return
+					}
 				}
+			case meltState, ok := <-meltChan:
+				if ok {
+					statusNotif := cashu.WsNotification{
+						JsonRpc: "2.0",
+						Method:  cashu.Subcribe,
+						Params: cashu.WebRequestParams{
+							SubId: request.Params.SubId,
+						},
+					}
+					statusNotif.Params.Payload = meltState.GetPostMeltQuoteResponse()
+
+					log.Printf("sending meltQuote on web socket: %+v", meltState)
+					err = m.SendJson(conn, statusNotif)
+					if err != nil {
+						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						return
+					}
+				}
+
+			case _ = <-closeChan:
+				return
 			}
 		}
 
 	})
 }
 
-func handleWSRequest(request cashu.WsRequest, observer *mint.Observer, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB) error {
+func handleWSRequest(request cashu.WsRequest, observer *mint.Observer, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB,
+	closeChan chan string,
+) error {
 	switch request.Method {
 	case cashu.Subcribe:
 
@@ -176,11 +188,12 @@ func handleWSRequest(request cashu.WsRequest, observer *mint.Observer, proofChan
 
 	case cashu.Unsubcribe:
 		observer.RemoveWatch(request.Params.SubId)
+		closeChan <- "asked for unsubscribe"
 	}
 	return nil
 }
 
-func ListenToIncommingMessage(subs *mint.Observer, conn *websocket.Conn, listenChannel chan error, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB) {
+func ListenToIncommingMessage(subs *mint.Observer, conn *websocket.Conn, listenChannel chan error, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB, closeChan chan string) {
 	for {
 		var request cashu.WsRequest
 		err := conn.ReadJSON(&request)
@@ -189,7 +202,7 @@ func ListenToIncommingMessage(subs *mint.Observer, conn *websocket.Conn, listenC
 			return
 		}
 
-		err = handleWSRequest(request, subs, proofChan, mintChan, meltChan)
+		err = handleWSRequest(request, subs, proofChan, mintChan, meltChan, closeChan)
 		if err != nil {
 			listenChannel <- fmt.Errorf("handleWSRequest(request, subs) %w", err)
 			return
