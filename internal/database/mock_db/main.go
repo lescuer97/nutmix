@@ -263,7 +263,7 @@ func (m *MockDB) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.Proo
 	return nil
 }
 
-func (m *MockDB) GetRestoreSigsFromBlindedMessages(B_ []string) ([]cashu.RecoverSigDB, error) {
+func (m *MockDB) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error) {
 	var restore []cashu.RecoverSigDB
 	for i := 0; i < len(B_); i++ {
 

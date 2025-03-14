@@ -189,6 +189,21 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
+		keysets, err := mint.Signer.GetKeys()
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+		_, err = mint.VerifyOutputs(mintRequest.Outputs, keysets.Keysets)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyOutputs(mintRequest.Outputs). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+
 		amountBlindMessages := uint64(0)
 
 		for _, blindMessage := range mintRequest.Outputs {
@@ -196,7 +211,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			// check all blind messages have the same unit
 		}
 		blindedSignatures := []cashu.BlindSignature{}
-		recoverySigsDb := []cashu.RecoverSigDB{}
 
 		quote, err = m.CheckMintRequest(mint, quote)
 
@@ -213,6 +227,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+			return
 		}
 
 		if quote.State != cashu.PAID {
@@ -243,8 +258,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		blindedSignatures, recoverySigsDb, err = mint.Signer.SignBlindMessages(mintRequest.Outputs)
-
+		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(mintRequest.Outputs)
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.Signer.SignBlindMessages(mintRequest.Outputs): %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -256,14 +270,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		quote.State = cashu.ISSUED
 
 		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
-
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+			return
 		}
 
 		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 		if err != nil {
-			logger.Error(fmt.Errorf("SetRecoverySigs: %w", err).Error())
+			logger.Error(fmt.Errorf("SetRecoverySigs on minting: %w", err).Error())
 			logger.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
 			return
 		}
@@ -274,6 +288,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
+		mint.Observer.SendMintEvent(quote)
 		// Store BlidedSignature
 		c.JSON(200, cashu.PostMintBolt11Response{
 			Signatures: blindedSignatures,
