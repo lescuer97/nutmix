@@ -1,9 +1,10 @@
 package utils
 
 import (
-	"fmt"
-	"github.com/lescuer97/nutmix/internal/lightning"
+	"crypto/rand"
+	"encoding/base64"
 	"os"
+	"github.com/lescuer97/nutmix/internal/lightning"
 )
 
 const ConfigFileName string = "config.toml"
@@ -105,22 +106,14 @@ func (c *Config) UseEnviromentVars() {
 	c.MINT_LNBITS_KEY = os.Getenv("MINT_LNBITS_KEY")
 
 }
-
-func getConfigFile() ([]byte, error) {
-	dir, err := os.UserConfigDir()
-
+func RandomHash() (string, error) {
+	// Create a byte slice of 30 random bytes
+	randomBytes := make([]byte, 30)
+	_, err := rand.Read(randomBytes)
 	if err != nil {
-		return []byte{}, fmt.Errorf("os.UserHomeDir(), %w", err)
+        return "", err
 	}
-
-	var pathToProjectDir string = dir + "/" + ConfigDirName
-	var pathToProjectConfigFile string = pathToProjectDir + "/" + ConfigFileName
-	err = CreateDirectoryAndPath(pathToProjectDir, ConfigFileName)
-
-	if err != nil {
-		return []byte{}, fmt.Errorf("utils.CreateDirectoryAndPath(pathToProjectDir, ConfigFileName), %w", err)
-	}
-
-	// Manipulate Config file and parse
-	return os.ReadFile(pathToProjectConfigFile)
+	
+	// Encode the random bytes as base64-urlsafe string
+	return base64.URLEncoding.EncodeToString(randomBytes), nil
 }

@@ -201,18 +201,15 @@ type LndPayStatus struct {
 	Preimage string
 }
 
-func (l LndGrpcWallet) getPaymentStatus(quote string) (LndPayStatus, error) {
+func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	routerClient := routerrpc.NewRouterClient(l.grpcClient)
 
 	var payStatus LndPayStatus
-	decodedHash, err := hex.DecodeString(quote)
-	if err != nil {
-		return payStatus, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
-	}
+	hash := invoice.PaymentHash[:]
 
-	paymentstatusRequest := routerrpc.TrackPaymentRequest{PaymentHash: decodedHash}
+	paymentstatusRequest := routerrpc.TrackPaymentRequest{PaymentHash: hash}
 
 	res, err := routerClient.TrackPaymentV2(ctx, &paymentstatusRequest)
 
@@ -247,8 +244,8 @@ func (l LndGrpcWallet) getPaymentStatus(quote string) (LndPayStatus, error) {
 	}
 }
 
-func (l LndGrpcWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
-	payStatus, err := l.getPaymentStatus(quote)
+func (l LndGrpcWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
+	payStatus, err := l.getPaymentStatus(invoice)
 	if err != nil {
 		return FAILED, "", 0, fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
 	}
@@ -256,44 +253,41 @@ func (l LndGrpcWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, 
 	return payStatus.Status, payStatus.Preimage, payStatus.Fee, nil
 }
 
-func (l LndGrpcWallet) getInvoiceStatus(quote string) (*lnrpc.Invoice, error) {
+func (l LndGrpcWallet) getInvoiceStatus(invoice *zpay32.Invoice) (*lnrpc.Invoice, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
-	decodedHash, err := hex.DecodeString(quote)
-	if err != nil {
-		return nil, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
-	}
+	hash := invoice.PaymentHash[:]
 
 	rhash := lnrpc.PaymentHash{
-		RHash: decodedHash,
+		RHash: hash,
 	}
 
-	invoice, err := client.LookupInvoice(ctx, &rhash)
+	invoiceStat, err := client.LookupInvoice(ctx, &rhash)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return invoice, nil
+	return invoiceStat, nil
 }
 
-func (l LndGrpcWallet) CheckReceived(quote string) (PaymentStatus, string, error) {
-	invoice, err := l.getInvoiceStatus(quote)
+func (l LndGrpcWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
+	invoiceStatus, err := l.getInvoiceStatus(invoice)
 
 	if err != nil {
 		return FAILED, "", fmt.Errorf(`l.getInvoiceStatus(quote) %w`, err)
 	}
 
 	switch {
-	case invoice.State == lnrpc.Invoice_SETTLED:
-		return SETTLED, hex.EncodeToString(invoice.RPreimage), nil
-	case invoice.State == lnrpc.Invoice_CANCELED:
-		return FAILED, hex.EncodeToString(invoice.RPreimage), nil
+	case invoiceStatus.State == lnrpc.Invoice_SETTLED:
+		return SETTLED, hex.EncodeToString(invoiceStatus.RPreimage), nil
+	case invoiceStatus.State == lnrpc.Invoice_CANCELED:
+		return FAILED, hex.EncodeToString(invoiceStatus.RPreimage), nil
 
-	case invoice.State == lnrpc.Invoice_OPEN:
-		return PENDING, hex.EncodeToString(invoice.RPreimage), nil
+	case invoiceStatus.State == lnrpc.Invoice_OPEN:
+		return PENDING, hex.EncodeToString(invoiceStatus.RPreimage), nil
 
 	}
 	return PENDING, "", nil
