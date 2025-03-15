@@ -133,7 +133,7 @@ func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicK
 	}
 
 	if len(blindRecoverySigs) != 0 {
-		return unit, fmt.Errorf("Blind Message already has been signed")
+		return unit, fmt.Errorf("Blind Message already has been signed. %w", cashu.ErrBlindMessageAlreadySigned)
 	}
 	return unit, nil
 }

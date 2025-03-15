@@ -60,6 +60,10 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrInvalidPreimage.Error()
 		return cashu.TOKEN_NOT_VERIFIED, &message
 
+	case errors.Is(proofError, cashu.ErrBlindMessageAlreadySigned):
+		message := cashu.ErrBlindMessageAlreadySigned.Error()
+		return cashu.OUTPUT_BLINDED_MESSAGE_ALREADY_SIGNED, &message
+
 	case strings.Contains(proofError.Error(), "could not obtain lock"):
 		message := "Transaction is already pending"
 		return cashu.QUOTE_PENDING, &message
