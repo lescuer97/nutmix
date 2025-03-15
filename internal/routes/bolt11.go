@@ -385,7 +385,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(403, "Internal MPP not allowed")
 			return
 		}
-        queryFee := uint64(0)
+		queryFee := uint64(0)
 		if !isInternal {
 			queryFee, err = mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, amount)
 			if err != nil {
