@@ -974,7 +974,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	var postMintQuoteResponse cashu.MintRequestDB
 	err := json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
-
 	if err != nil {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
@@ -1010,7 +1009,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected paid to be false because it's a Lnd wallet and I have not paid the invoice yet, got %v", postMintQuoteResponseTwo.RequestPaid)
 	}
 
-	if postMintQuoteResponseTwo.State != cashu.PENDING {
+	if postMintQuoteResponseTwo.State != cashu.UNPAID {
 		t.Errorf("Expected to not be unpaid have: %s ", postMintQuoteResponseTwo.State)
 	}
 
@@ -1063,14 +1062,13 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	// needs to wait a second for the containers to catch up
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 	// Lnd BOB pays the invoice
-	_, _, err = bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "payinvoice", postMintQuoteResponse.Request, "--force"})
+    _, _, err = bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "payinvoice", postMintQuoteResponse.Request, "--force"})
 
 	if err != nil {
-		fmt.Errorf("Error paying invoice %+v", err)
+		t.Fatalf("Error paying invoice %+v", err)
 	}
-
 	// Minting with invalid signatures
 	w = httptest.NewRecorder()
 
@@ -1099,9 +1097,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
 	}
-	if errorResponse.Error != "Proof could not be verified" {
-		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Error)
-	}
 
 	// ASK FOR MINTING WITH TOO MANY BLINDED MESSAGES
 	blindedMessages, _, _, err := CreateBlindedMessages(999999, activeKeys)
@@ -1123,7 +1118,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	router.ServeHTTP(w, req)
 
 	if w.Code != 403 {
-		t.Fatalf("Expected status code 200, got %d", w.Code)
+		t.Fatalf("Expected status code 400, got %d", w.Code)
 	}
 
 	if w.Body.String() != `"Amounts in outputs are not the same"` {

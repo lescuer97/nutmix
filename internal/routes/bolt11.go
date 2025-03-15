@@ -4,17 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"log/slog"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log/slog"
-	"strings"
-	"time"
 )
 
 func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
@@ -71,15 +72,15 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
-		uuidV4, err := uuid.NewRandom()
+		quoteId, err := utils.RandomHash()
 		if err != nil {
-			logger.Info("uuid.NewRandom()", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
+			logger.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
 			c.JSON(500, "Opps! there was a problem with the mint")
 			return
 		}
 
 		mintRequestDB = cashu.MintRequestDB{
-			Quote:       uuidV4.String(),
+			Quote:       quoteId,
 			Request:     resInvoice.PaymentRequest,
 			RequestPaid: false,
 			Expiry:      expireTime,
@@ -229,30 +230,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		if !quote.RequestPaid || quote.State == cashu.UNPAID {
-
-			quote, err = m.CheckMintRequest(mint, quote, invoice)
-			if err != nil {
-				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
-					c.JSON(200, quote)
-					return
-				}
-				logger.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
-				c.JSON(500, "Opps!, something went wrong")
-				return
-			}
-
-			err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
-			if err != nil {
-				logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
-				return
-			}
-
-			if quote.State != cashu.PAID {
-				c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
-				return
-			}
-		}
 
 		amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
 
@@ -267,6 +244,31 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			logger.Info(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)).Error())
 			c.JSON(403, "Amounts in outputs are not the same")
 			return
+		}
+		if !quote.RequestPaid && quote.State == cashu.UNPAID {
+
+			quote, err = m.CheckMintRequest(mint, quote, invoice)
+			if err != nil {
+				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
+					c.JSON(200, quote)
+					return
+				}
+				logger.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
+            log.Printf("\n quote: %v", quote)
+			err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
+			if err != nil {
+				logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+				return
+			}
+
+			if quote.State != cashu.PAID {
+				c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
+				return
+			}
 		}
 
 		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(mintRequest.Outputs)
@@ -342,9 +344,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			}
 		}
 
-		uuidV4, err := uuid.NewRandom()
+		quoteId, err := utils.RandomHash()
 		if err != nil {
-			logger.Info("uuid.NewRandom()")
+			logger.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(meltRequest.Request)))
 			c.JSON(500, "Opps! there was a problem with the mint")
 			return
 		}
@@ -399,7 +401,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			Expiry:          expireTime,
 			FeeReserve:      (queryFee + 1),
 			Amount:          amount,
-			Quote:           uuidV4.String(),
+			Quote:           quoteId,
 			State:           cashu.UNPAID,
 			PaymentPreimage: "",
 		}
