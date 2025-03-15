@@ -252,12 +252,18 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
 	}
-	_, err = m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets)
-	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets): %w", cashu.ErrUnitNotSupported, err)
+	// TODO - R	// if there are change outputs you need to check if the outputs are valid if they have the correct unit
+	if len(meltRequest.Outputs) > 0 {
+		outputUnit, err := m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets)
+		if err != nil {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.VerifyOutputs(meltRequest.Outputs): %w", cashu.ErrUnitNotSupported, err)
+		}
+
+		if outputUnit != unit {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. Change output unit is different: ", cashu.ErrUnitNotSupported)
+		}
 	}
 
-	// TODO - REMOVE this when doing multi denomination tokens with Milisats
 	if unit != cashu.Sat {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. incorrect unit: %w", cashu.ErrUnitNotSupported, err)
 	}
@@ -331,6 +337,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 
+	// NOTE: Checks if the request is internal to the mint
 	quote, err = m.settleIfInternalMelt(tx, quote, logger)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)

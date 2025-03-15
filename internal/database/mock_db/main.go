@@ -113,17 +113,22 @@ func (m *MockDB) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintRequestDB, 
 		}
 
 	}
+	if len(mintRequests) == 0 {
+		return cashu.MintRequestDB{}, pgx.ErrNoRows
+	}
 
 	return mintRequests[0], nil
 }
 func (m *MockDB) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error) {
 	var mintRequests []cashu.MintRequestDB
 	for i := 0; i < len(m.MintRequest); i++ {
-
 		if m.MintRequest[i].Request == request {
 			mintRequests = append(mintRequests, m.MintRequest[i])
 		}
+	}
 
+	if len(mintRequests) == 0 {
+		return cashu.MintRequestDB{}, pgx.ErrNoRows
 	}
 
 	return mintRequests[0], nil
@@ -135,9 +140,10 @@ func (m *MockDB) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, 
 
 		if m.MeltRequest[i].Quote == id {
 			meltRequests = append(meltRequests, m.MeltRequest[i])
-
 		}
-
+	}
+	if len(meltRequests) == 0 {
+		return cashu.MeltRequestDB{}, pgx.ErrNoRows
 	}
 
 	return meltRequests[0], nil
@@ -150,7 +156,9 @@ func (m *MockDB) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltReq
 			meltRequests = append(meltRequests, m.MeltRequest[i])
 
 		}
-
+	}
+	if len(meltRequests) == 0 {
+		return meltRequests, pgx.ErrNoRows
 	}
 
 	return meltRequests, nil
