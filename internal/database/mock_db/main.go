@@ -116,6 +116,18 @@ func (m *MockDB) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintRequestDB, 
 
 	return mintRequests[0], nil
 }
+func (m *MockDB) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error) {
+	var mintRequests []cashu.MintRequestDB
+	for i := 0; i < len(m.MintRequest); i++ {
+
+		if m.MintRequest[i].Request == request {
+			mintRequests = append(mintRequests, m.MintRequest[i])
+		}
+
+	}
+
+	return mintRequests[0], nil
+}
 
 func (m *MockDB) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, error) {
 	var meltRequests []cashu.MeltRequestDB

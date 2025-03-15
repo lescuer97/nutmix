@@ -14,6 +14,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"github.com/lightningnetwork/lnd/zpay32"
 )
 
 var ErrAlreadySubscribed = errors.New("Filter already subscribed")
@@ -252,7 +253,12 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 			if err != nil {
 				return fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)
 			}
-			mintState, err := m.CheckMintRequest(mint, quote)
+
+			decodedInvoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
+			if err != nil {
+				return fmt.Errorf("m.CheckMintRequest(mint, filter). %w", err)
+			}
+			mintState, err := m.CheckMintRequest(mint, quote, decodedInvoice)
 			if err != nil {
 				return fmt.Errorf("m.CheckMintRequest(mint, filter). %w", err)
 			}

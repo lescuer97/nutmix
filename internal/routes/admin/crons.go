@@ -90,7 +90,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 				switch swap.Type {
 				case utils.LiquidityIn:
-					status, _, err := mint.LightningBackend.CheckReceived(payHash)
+					status, _, err := mint.LightningBackend.CheckReceived(payHash, decodedInvoice)
 					if err != nil {
 						logger.Warn(
 							"mint.LightningBackend.CheckReceived(payHash)",
@@ -110,7 +110,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 					}
 
 				case utils.LiquidityOut:
-					status, _, _, err := mint.LightningBackend.CheckPayed(payHash)
+					status, _, _, err := mint.LightningBackend.CheckPayed(payHash, decodedInvoice)
 					if err != nil {
 						logger.Warn(
 							"mint.LightningBackend.CheckPayed(payHash)",

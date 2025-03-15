@@ -87,8 +87,16 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 		return fmt.Errorf("LNBITS payment failed %+v. Request Body %+v, %w", detailBody, reqBody, ErrLnbitsFailedPayment)
 
 	case detailBody.Detail == "Payment does not exist.":
+		val, ok := responseType.(LNBitsPaymentStatus)
+		if ok {
+			val.Paid = false
+			val.Pending = false
+			val.Details.Pending = false
+			responseType = val
+			return nil
+		}
 	case len(detailBody.Detail) > 0:
-		return fmt.Errorf("LNBITS Unknown error %+v. Request Body %+v", detailBody, reqBody)
+		return fmt.Errorf("LNBITS Unknown error %+v. Request Body %+v. body:%s. %w ", detailBody, reqBody, body, ErrLnbitsFailedPayment)
 	}
 
 	err = json.Unmarshal(body, &responseType)
@@ -97,7 +105,6 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 	}
 
 	return nil
-
 }
 
 func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
@@ -137,7 +144,7 @@ func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, fe
 	return invoiceRes, nil
 }
 
-func (l LnbitsWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
+func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
@@ -153,7 +160,7 @@ func (l LnbitsWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, e
 
 	}
 }
-func (l LnbitsWallet) CheckReceived(quote string) (PaymentStatus, string, error) {
+func (l LnbitsWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	err := l.LnbitsRequest("GET", "/api/v1/payments/"+quote, nil, &paymentStatus)
@@ -165,7 +172,7 @@ func (l LnbitsWallet) CheckReceived(quote string) (PaymentStatus, string, error)
 	case paymentStatus.Paid:
 		return SETTLED, paymentStatus.Preimage, nil
 	default:
-		return PENDING, paymentStatus.Preimage, nil
+		return FAILED, paymentStatus.Preimage, nil
 
 	}
 }
