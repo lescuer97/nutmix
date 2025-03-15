@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 
@@ -131,7 +130,6 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 					}
 					statusNotif.Params.Payload = mintState.PostMintQuoteBolt11Response()
 
-					log.Printf("sending mint on web socket: %+v", mintState)
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
 						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
@@ -149,7 +147,6 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 					}
 					statusNotif.Params.Payload = meltState.GetPostMeltQuoteResponse()
 
-					log.Printf("sending meltQuote on web socket: %+v", meltState)
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
 						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))

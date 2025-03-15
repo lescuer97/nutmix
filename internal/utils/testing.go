@@ -293,7 +293,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	tlscertReader := strings.NewReader(tlsCert)
 
 	aliceLnbitsContainerReq := testcontainers.ContainerRequest{
-        Image:      "lnbits/lnbits:v0.12.12",
+		Image:      "lnbits/lnbits:v0.12.12",
 		WaitingFor: wait.ForLog("Application startup complete"),
 		Files: []testcontainers.ContainerFile{
 			{

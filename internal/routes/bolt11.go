@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"strings"
 	"time"
@@ -230,7 +229,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-
 		amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
 
 		if err != nil {
@@ -258,7 +256,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				return
 			}
 
-            log.Printf("\n quote: %v", quote)
 			err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 			if err != nil {
 				logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
@@ -388,12 +385,15 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(403, "Internal MPP not allowed")
 			return
 		}
+		queryFee := uint64(0)
+		if !isInternal {
+			queryFee, err = mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, amount)
+			if err != nil {
+				logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
 
-		queryFee, err := mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, amount)
-		if err != nil {
-			logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
 		}
 
 		response = cashu.PostMeltQuoteBolt11Response{
