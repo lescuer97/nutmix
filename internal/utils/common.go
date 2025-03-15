@@ -3,8 +3,8 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"os"
 	"github.com/lescuer97/nutmix/internal/lightning"
+	"os"
 )
 
 const ConfigFileName string = "config.toml"
@@ -111,9 +111,9 @@ func RandomHash() (string, error) {
 	randomBytes := make([]byte, 30)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
-        return "", err
+		return "", err
 	}
-	
+
 	// Encode the random bytes as base64-urlsafe string
 	return base64.URLEncoding.EncodeToString(randomBytes), nil
 }

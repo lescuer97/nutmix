@@ -26,13 +26,13 @@ type LNBitsDetailErrorData struct {
 	Status string
 }
 type lnbitsInvoiceRequest struct {
-	Amount int64  `json:"amount"`
-	Unit   string `json:"unit,omitempty"`
-	CheckingId   string `json:"checking_id,omitempty"`
-	Memo   string `json:"memo"`
-	Out    bool   `json:"out"`
-	Expiry int64  `json:"expiry"`
-	Bolt11 string `json:"bolt11"`
+	Amount     int64  `json:"amount"`
+	Unit       string `json:"unit,omitempty"`
+	CheckingId string `json:"checking_id,omitempty"`
+	Memo       string `json:"memo"`
+	Out        bool   `json:"out"`
+	Expiry     int64  `json:"expiry"`
+	Bolt11     string `json:"bolt11"`
 }
 
 type LNBitsPaymentStatusDetail struct {
@@ -149,7 +149,7 @@ func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, fe
 func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
 	var paymentStatus LNBitsPaymentStatus
 
-    hash := invoice.PaymentHash[:]
+	hash := invoice.PaymentHash[:]
 	err := l.LnbitsRequest("GET", "/api/v1/payments/"+hex.EncodeToString(hash), nil, &paymentStatus)
 	if err != nil {
 		return FAILED, "", uint64(paymentStatus.Details.Fee), fmt.Errorf("json.Marshal: %w", err)
@@ -170,7 +170,7 @@ func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (Payment
 func (l LnbitsWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	var paymentStatus LNBitsPaymentStatus
 
-    hash := invoice.PaymentHash[:]
+	hash := invoice.PaymentHash[:]
 
 	err := l.LnbitsRequest("GET", "/api/v1/payments/"+hex.EncodeToString(hash), nil, &paymentStatus)
 	if err != nil {

@@ -68,7 +68,7 @@ func (l *CLNGRPCWallet) SetupGrpc(host string, caCert string, clientCert string,
 		tlsDialOption,
 	}
 
-	clientConn, err := grpc.Dial(host, dialOpts...)
+	clientConn, err := grpc.NewClient(host, dialOpts...)
 
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func (l *CLNGRPCWallet) SetupGrpc(host string, caCert string, clientCert string,
 }
 
 func (l *CLNGRPCWallet) clnGrpcPayInvoice(invoice string, feeReserve uint64, lightningResponse *PaymentResponse) error {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	max_fee := cln_grpc.Amount{
@@ -124,7 +124,7 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 	feeReserve uint64,
 	amount_sat uint64,
 	lightningResponse *PaymentResponse) error {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	max_fee := cln_grpc.Amount{
@@ -191,7 +191,7 @@ func (l CLNGRPCWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, f
 }
 
 func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 	fee := uint64(0)
@@ -222,7 +222,7 @@ func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (Paymen
 	return PENDING, "", fee, nil
 }
 func (l CLNGRPCWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
@@ -251,7 +251,7 @@ func (l CLNGRPCWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (Pay
 }
 
 func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	_, _, _, err := l.CheckPayed("", zpayInvoice)
 
@@ -295,7 +295,7 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 func (l CLNGRPCWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
 	var response InvoiceResponse
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
@@ -334,7 +334,7 @@ func (l CLNGRPCWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
 }
 
 func (l CLNGRPCWallet) WalletBalance() (uint64, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	spent := false
