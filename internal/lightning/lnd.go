@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/routerrpc"
 	"github.com/lightningnetwork/lnd/lnwire"
@@ -178,15 +179,15 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(invoice string,
 
 }
 
-func (l LndGrpcWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
+func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 	if mpp {
-		err := l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes)
+		err := l.lndGrpcPayPartialInvoice(melt_quote.Request, zpayInvoice, feeReserve, amount.Amount, &invoiceRes)
 		if err != nil {
 			return invoiceRes, fmt.Errorf(`l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes) %w`, err)
 		}
 	} else {
-		err := l.lndGrpcPayInvoice(invoice, feeReserve, &invoiceRes)
+		err := l.lndGrpcPayInvoice(melt_quote.Request, feeReserve, &invoiceRes)
 		if err != nil {
 			return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
 		}
@@ -326,7 +327,7 @@ func getFeatureBits(features *lnwire.FeatureVector) []lnrpc.FeatureBit {
 	return featureBits
 }
 
-func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
+func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
@@ -340,7 +341,7 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 		RouteHints:        routeHints,
 		DestFeatures:      featureBits,
 		UseMissionControl: true,
-		Amt:               int64(amount_sat),
+		Amt:               int64(amount.Amount),
 	}
 
 	res, err := client.QueryRoutes(ctx, &queryRoutes)
@@ -354,19 +355,28 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 	fee := GetAverageRouteFee(res.Routes) / 1000
 
-	fee = GetFeeReserve(amount_sat, fee)
+	fee = GetFeeReserve(amount.Amount, fee)
 
 	return fee, nil
 }
 
-func (l LndGrpcWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
+func (l LndGrpcWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
 	var response InvoiceResponse
+	supported := l.VerifyUnitSupport(amount.Unit)
+	if !supported {
+		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit). %w.", cashu.ErrUnitNotSupported)
+	}
+
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
+	err := amount.To(cashu.Sat)
+	if err != nil {
+		return response, fmt.Errorf(`amount.To(cashu.Sat) %w`, err)
+	}
 	// Expiry time is 15 minutes
-	res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: amount, Expiry: 900})
+	res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: int64(amount.Amount), Expiry: 900})
 
 	if err != nil {
 		return response, err
@@ -402,4 +412,11 @@ func (f LndGrpcWallet) GetNetwork() *chaincfg.Params {
 }
 func (f LndGrpcWallet) ActiveMPP() bool {
 	return true
+}
+func (f LndGrpcWallet) VerifyUnitSupport(unit cashu.Unit) bool {
+	if unit == cashu.Sat {
+		return true
+	} else {
+		return false
+	}
 }

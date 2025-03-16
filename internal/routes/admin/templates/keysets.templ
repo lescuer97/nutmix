@@ -1,0 +1,78 @@
+package templates 
+
+import "strconv"
+
+type KeysetData struct {
+	Id        string
+	Active    bool
+	Unit      string
+	Fees      uint
+	CreatedAt int64
+	Version   int
+}
+
+templ KeysetsPage() {
+	@Layout() {
+		<main class="keysets">
+			<div hx-ext="remove-me" id="notifications"></div>
+			<form
+				hx-indicator="#loader"
+				hx-target="#notifications"
+				hx-swap="innerHTML"
+				hx-post="/admin/rotate/sats"
+				class="fees-form form"
+			>
+				<label for="UNIT" class="">
+					UNIT
+					<select name="UNIT">
+						<option value="sat">SAT</option>
+						<option value="eur">EUR</option>
+					</select>
+				</label>
+				<label for="FEE" class="settings-input">
+					Fees (PPK). Ex: 100 PPK = 1 sat / 10 Inputs
+					<input type="number" name="FEE" value="0"/>
+				</label>
+				<button style="min-width: 150px;" hx-disabled-elt="this" class="square" type="submit">
+					Rotate Sats keys up
+				</button>
+				<div id="loader" class="htmx-indicator lds-dual-ring"></div>
+			</form>
+			<div
+				hx-get="/admin/keysets-layout"
+				hx-trigger="load, recharge-keyset from:body"
+				hx-swap="innerHTML"
+				hx-target="this"
+				class="keysets-list"
+			></div>
+		</main>
+	}
+}
+
+templ KeysetsList(keysetMap map[string][]KeysetData) {
+	for unit, keysets := range keysetMap {
+		<div class="unit-list">
+			<h2>
+				{ unit }
+			</h2>
+			<div>
+				for _, keyset := range keysets {
+					@keysetCard(keyset)
+				}
+			</div>
+		</div>
+	}
+}
+
+templ keysetCard(keyset KeysetData) {
+	{{ activeStr := strconv.FormatBool(keyset.Active) }}
+	{{ inputFeeStr := strconv.FormatUint(uint64(keyset.Fees), 10) }}
+	{{ versionStr := strconv.FormatInt(int64(keyset.Version), 10) }}
+	<div class="card">
+		<span>Id: { keyset.Id }</span>
+		<span>Active: { activeStr }</span>
+		<span>Unit: <span class="unit">{ keyset.Unit }</span></span>
+		<span>Fees (PPK): { inputFeeStr }</span>
+		<span>Version: { versionStr }</span>
+	</div>
+}

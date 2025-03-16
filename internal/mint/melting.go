@@ -74,6 +74,11 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 
 	if quote.State == cashu.PENDING {
 
+		err = m.VerifyUnitSupport(quote.Unit)
+		if err != nil {
+			return quote, fmt.Errorf("m.VerifyUnitSupport(quote.Unit). %w", err)
+		}
+
 		invoice, err := zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork())
 
 		if err != nil {
@@ -264,10 +269,22 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		}
 	}
 
-	if unit != cashu.Sat {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. incorrect unit: %w", cashu.ErrUnitNotSupported, err)
+	// if there are change outputs you need to check if the outputs are valid if they have the correct unit
+	if len(meltRequest.Outputs) > 0 {
+		outputUnit, err := m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets)
+		if err != nil {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.VerifyOutputs(meltRequest.Outputs): %w", cashu.ErrUnitNotSupported, err)
+		}
+
+		if outputUnit != unit {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. Change output unit is different: ", cashu.ErrUnitNotSupported)
+		}
 	}
 
+	err = m.VerifyUnitSupport(quote.Unit)
+	if err != nil {
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.VerifyUnitSupport(quote.Unit). %w", err)
+	}
 	// check for needed amount of fees
 	fee, err := cashu.Fees(meltRequest.Inputs, keysets.Keysets)
 	if err != nil {
@@ -344,9 +361,12 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	}
 
 	var paidLightningFeeSat uint64
-
+	amount := cashu.Amount{
+		Unit:   unit,
+		Amount: quote.Amount,
+	}
 	if !quote.RequestPaid {
-		payment, err := m.LightningBackend.PayInvoice(quote.Request, invoice, quote.FeeReserve, quote.Mpp, quote.Amount)
+		payment, err := m.LightningBackend.PayInvoice(quote, invoice, quote.FeeReserve, quote.Mpp, amount)
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {
 			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))

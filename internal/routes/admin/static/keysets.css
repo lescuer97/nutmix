@@ -17,11 +17,28 @@
 
 .keysets-list {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
+  flex-direction: column;
   align-self: center;
   gap: 15px;
+}
+.unit-list {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 15px;
   margin-top: 30px;
+  border-radius: 15px;
+  width: 100%;
+}
+.unit-list h2 {
+    text-transform: uppercase;
+}
+.unit-list div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 15px;
   border-radius: 15px;
 }
 

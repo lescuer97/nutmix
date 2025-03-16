@@ -2,10 +2,11 @@ package cashu
 
 import (
 	"encoding/hex"
+	"testing"
+
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 	"github.com/tyler-smith/go-bip32"
-	"testing"
 )
 
 func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
@@ -130,4 +131,128 @@ func TestGenerateDLEQ(t *testing.T) {
 		t.Errorf("DLEQ is not correct")
 	}
 
+}
+
+func TestCashuAmountChangeSatToMsat(t *testing.T) {
+	amount := Amount{
+		Amount: 1000,
+		Unit:   Sat,
+	}
+	err := amount.To(Msat)
+
+	if err != nil {
+		t.Fatalf("amount.To(Msat). %v", err)
+	}
+	if amount.Amount != 1000000 {
+		t.Errorf("Amount is not correct")
+	}
+	if amount.Unit != Msat {
+		t.Errorf("unit is not correct")
+	}
+}
+
+func TestCashuAmountChangeMsatToSat(t *testing.T) {
+	amount := Amount{
+		Amount: 1000,
+		Unit:   Msat,
+	}
+	err := amount.To(Sat)
+
+	if err != nil {
+		t.Fatalf("amount.To(Sat). %v", err)
+	}
+	if amount.Amount != 1 {
+		t.Errorf("Amount is not correct")
+	}
+	if amount.Unit != Sat {
+		t.Errorf("unit is not correct")
+	}
+}
+func TestCashuAmountChangeMsatToSatMinimum(t *testing.T) {
+	amount := Amount{
+		Amount: 1,
+		Unit:   Msat,
+	}
+	err := amount.To(Sat)
+
+	if err != nil {
+		t.Fatalf("amount.To(Sat). %v", err)
+	}
+
+	if amount.Amount != 0 {
+		t.Errorf("Amount is not correct")
+	}
+	if amount.Unit != Sat {
+		t.Errorf("unit is not correct")
+	}
+}
+
+func TestCashuAmountUSDtoCents(t *testing.T) {
+	amount := Amount{
+		Amount: 10,
+		Unit:   USD,
+	}
+	str, err := amount.CentsToUSD()
+
+	if err != nil {
+		t.Fatalf("amount.SatToBTC(). %v", err)
+	}
+	if str != "0.10" {
+		t.Errorf("Amount is not correct")
+	}
+	if amount.Unit != USD {
+		t.Errorf("unit is not correct")
+	}
+}
+func TestCashuAmountEURtoCents(t *testing.T) {
+	amount := Amount{
+		Amount: 10000,
+		Unit:   EUR,
+	}
+	str, err := amount.CentsToUSD()
+
+	if err != nil {
+		t.Fatalf("amount.SatToBTC(). %v", err)
+	}
+	if str != "100.00" {
+		t.Errorf("Amount is not correct")
+	}
+	if amount.Unit != EUR {
+		t.Errorf("unit is not correct")
+	}
+}
+func TestCashuAmountConvertError(t *testing.T) {
+	amount := Amount{
+		Amount: 10000,
+		Unit:   Sat,
+	}
+	err := amount.To(EUR)
+
+	if err != ErrCouldNotConvertUnit {
+		t.Errorf("err != ErrCouldNotConvertUnit. %v", err)
+	}
+}
+
+func TestCashuAmountConvertUSDStrError(t *testing.T) {
+	amount := Amount{
+		Amount: 10000,
+		Unit:   Sat,
+	}
+	_, err := amount.CentsToUSD()
+
+	if err != ErrCouldNotParseAmountToString {
+		t.Errorf("err != ErrCouldNotParseAmountToString. %v", err)
+	}
+}
+
+func TestCashuAmountConvertEURStrError(t *testing.T) {
+	amount := Amount{
+		Amount: 10000,
+		Unit:   EUR,
+	}
+	_, err := amount.SatToBTC()
+
+	if err != ErrCouldNotParseAmountToString {
+		t.Errorf("err != ErrCouldNotParseAmountToString. %v", err)
+	}
 }

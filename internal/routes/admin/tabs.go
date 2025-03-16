@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
@@ -154,7 +156,13 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.HTML(200, "bolt11.html", mint.Config)
+		ctx := context.Background()
+		err := templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer)
+
+		if err != nil {
+			c.Error(fmt.Errorf("templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer). %w", err))
+			return
+		}
 	}
 }
 
@@ -253,6 +261,12 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			mint.Config.MINT_LIGHTNING_BACKEND = utils.LNBITS
 			mint.Config.MINT_LNBITS_KEY = lnbitsKey
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
+		case string(utils.Strike):
+			strikeKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
+
+			// TODO ADD strike backend to mint.LightningBackend
+			mint.Config.MINT_LIGHTNING_BACKEND = utils.Strike
+			mint.Config.STRIKE_KEY = strikeKey
 		case string(utils.CLNGRPC):
 			clnHost := c.Request.PostFormValue("CLN_GRPC_HOST")
 			clnCaCert := c.Request.PostFormValue("CLN_CA_CERT")
