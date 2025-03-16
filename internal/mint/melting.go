@@ -71,6 +71,10 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 	if err != nil {
 		return quote, fmt.Errorf("m.MintDB.GetMeltRequestById(quoteId). %w", err)
 	}
+	pending_proofs, err := m.MintDB.GetProofsFromQuote(tx, quote.Quote)
+	if err != nil {
+		return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
+	}
 
 	if quote.State == cashu.PENDING {
 
@@ -83,10 +87,6 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 		status, preimage, fee, err := m.LightningBackend.CheckPayed(quote.Quote, invoice)
 		if err != nil {
 			return quote, fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote). %w", err)
-		}
-		pending_proofs, err := m.MintDB.GetProofsFromQuote(tx, quote.Quote)
-		if err != nil {
-			return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
 		}
 
 		if status == lightning.SETTLED {
