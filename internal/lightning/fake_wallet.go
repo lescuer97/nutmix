@@ -102,7 +102,7 @@ func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp b
 	return fee, nil
 }
 
-func (f FakeWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
+func (f FakeWallet) RequestInvoice(amount uint64) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	expireTime := cashu.ExpiryTimeMinUnit(15)
 

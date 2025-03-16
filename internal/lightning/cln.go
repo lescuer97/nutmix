@@ -293,14 +293,14 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	return fee, nil
 }
 
-func (l CLNGRPCWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
+func (l CLNGRPCWallet) RequestInvoice(amount uint64) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	amountCln := cln_grpc.Amount{
-		Msat: uint64(amount) * 1000,
+		Msat: amount * 1000,
 	}
 
 	amountOrAllCln := cln_grpc.AmountOrAny_Amount{

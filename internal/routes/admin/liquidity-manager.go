@@ -166,7 +166,7 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		resp, err := mint.LightningBackend.RequestInvoice(int64(amount))
+		resp, err := mint.LightningBackend.RequestInvoice(amount)
 		if err != nil {
 			c.Error(fmt.Errorf("mint.LightningBackend.RequestInvoice(int64(amount)). %w", err))
 			return
