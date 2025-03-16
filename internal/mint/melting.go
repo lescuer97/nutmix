@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log/slog"
 )
 
 func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB, logger *slog.Logger) (cashu.MeltRequestDB, error) {
@@ -170,9 +170,11 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.DeleteChangeByQuote(quote.Quote) %w", err)
 			}
-			err = m.MintDB.DeleteProofs(tx, pending_proofs)
-			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.DeleteProofsByQuote(quote.Quote). %w", err)
+			if len(pending_proofs) > 0 {
+				err = m.MintDB.DeleteProofs(tx, pending_proofs)
+				if err != nil {
+					return quote, fmt.Errorf("m.MintDB.DeleteProofs(tx, pending_proofs). %w", err)
+				}
 			}
 
 		}
@@ -187,16 +189,16 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 }
 
 func (m *Mint) CheckPendingQuoteAndProofs(logger *slog.Logger) error {
-
 	quotes, err := m.MintDB.GetMeltQuotesByState(cashu.PENDING)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetMeltQuotesByState(cashu.PENDING). %w", err)
 	}
 
 	for _, quote := range quotes {
+		logger.Info(fmt.Sprintf("Attempting to solve pending quote for: %v", quote))
 		quote, err := m.CheckMeltQuoteState(quote.Quote)
 		if err != nil {
-			return fmt.Errorf("m.MintDB.GetMeltQuotesByState(cashu.PENDING). %w", err)
+			return fmt.Errorf("m.CheckMeltQuoteState(quote.Quote). %w", err)
 		}
 
 		logger.Info(fmt.Sprintf("Melt quote %v state: %v", quote.Quote, quote.State))
