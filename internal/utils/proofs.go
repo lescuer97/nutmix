@@ -11,6 +11,10 @@ import (
 
 func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	switch {
+	case errors.Is(proofError, cashu.ErrBlindMessageAlreadySigned):
+		message := cashu.ErrBlindMessageAlreadySigned.Error()
+		return cashu.OUTPUT_BLINDED_MESSAGE_ALREADY_SIGNED, &message
+
 	case errors.Is(proofError, cashu.ErrEmptyWitness):
 
 		message := "Empty Witness"

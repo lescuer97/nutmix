@@ -276,6 +276,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			Signatures: blindedSignatures,
 		}
 
+		swapRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
 		err = mint.MintDB.SetProofsState(tx, swapRequest.Inputs, cashu.PROOF_SPENT)
 		if err != nil {
 			logger.Warn("mint.MintDB.SetProofsState(tx,swapRequest.Inputs , cashu.PROOF_SPENT)", slog.String(utils.LogExtraInfo, err.Error()))
@@ -298,6 +299,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
+		mint.Observer.SendProofsEvent(swapRequest.Inputs)
 		c.JSON(200, response)
 	})
 

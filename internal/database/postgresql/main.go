@@ -205,7 +205,28 @@ func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool,
 
 func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintRequestDB, error) {
 
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
+	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE quote = $1 FOR UPDATE", id)
+	defer rows.Close()
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return cashu.MintRequestDB{}, err
+		}
+	}
+
+	quote, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MintRequestDB])
+	rows.Close()
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return cashu.MintRequestDB{}, err
+		}
+		return quote, databaseError(fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.PostMintQuoteBolt11Response]): %w", err))
+	}
+
+	return quote, nil
+}
+
+func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error) {
+	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE request = $1 FOR UPDATE", request)
 	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {

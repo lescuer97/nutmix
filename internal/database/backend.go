@@ -46,6 +46,7 @@ type MintDB interface {
 	SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error
 	ChangeMintRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, minted bool) error
 	GetMintRequestById(tx pgx.Tx, quote string) (cashu.MintRequestDB, error)
+	GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error)
 
 	GetMeltRequestById(tx pgx.Tx, quote string) (cashu.MeltRequestDB, error)
 	SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error

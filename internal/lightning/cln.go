@@ -69,7 +69,7 @@ func (l *CLNGRPCWallet) SetupGrpc(host string, caCert string, clientCert string,
 		tlsDialOption,
 	}
 
-	clientConn, err := grpc.Dial(host, dialOpts...)
+	clientConn, err := grpc.NewClient(host, dialOpts...)
 
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (l *CLNGRPCWallet) SetupGrpc(host string, caCert string, clientCert string,
 }
 
 func (l *CLNGRPCWallet) clnGrpcPayInvoice(invoice string, feeReserve uint64, lightningResponse *PaymentResponse) error {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	max_fee := cln_grpc.Amount{
@@ -125,7 +125,7 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 	feeReserve cashu.Amount,
 	amount cashu.Amount,
 	lightningResponse *PaymentResponse) error {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	err := amount.To(cashu.Msat)
@@ -176,10 +176,8 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 func (l CLNGRPCWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 
-	hexHash := hex.EncodeToString(zpayInvoice.PaymentHash[:])
-
 	// first check if invoice is already paid.
-	status, _, _, err := l.CheckPayed(hexHash)
+	status, _, _, err := l.CheckPayed("", zpayInvoice)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.CheckPayed(hexHash) %w`, err)
 	}
@@ -202,19 +200,14 @@ func (l CLNGRPCWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 	return invoiceRes, nil
 }
 
-func (l CLNGRPCWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 	fee := uint64(0)
 
-	decodedHash, err := hex.DecodeString(quote)
-	if err != nil {
-		return FAILED, "", fee, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
-	}
-
 	rhash := cln_grpc.ListpaysRequest{
-		PaymentHash: decodedHash,
+		PaymentHash: invoice.PaymentHash[:],
 	}
 
 	pays, err := client.ListPays(ctx, &rhash)
@@ -238,18 +231,13 @@ func (l CLNGRPCWallet) CheckPayed(quote string) (PaymentStatus, string, uint64, 
 	}
 	return PENDING, "", fee, nil
 }
-func (l CLNGRPCWallet) CheckReceived(quote string) (PaymentStatus, string, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+func (l CLNGRPCWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
-	decodedHash, err := hex.DecodeString(quote)
-	if err != nil {
-		return FAILED, "", fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
-	}
-
 	invoiceReq := cln_grpc.ListinvoicesRequest{
-		PaymentHash: decodedHash,
+		PaymentHash: invoice.PaymentHash[:],
 	}
 
 	invoices, err := client.ListInvoices(ctx, &invoiceReq)
@@ -273,9 +261,9 @@ func (l CLNGRPCWallet) CheckReceived(quote string) (PaymentStatus, string, error
 }
 
 func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
-	_, _, _, err := l.CheckPayed(hex.EncodeToString(zpayInvoice.PaymentHash[:]))
+	_, _, _, err := l.CheckPayed("", zpayInvoice)
 
 	if err != nil {
 		return 1, fmt.Errorf(`l.CheckPayed(invoice) %w`, err)
@@ -327,7 +315,7 @@ func (l CLNGRPCWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, err
 		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit). %w.", cashu.ErrUnitNotSupported)
 	}
 
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
@@ -370,7 +358,7 @@ func (l CLNGRPCWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, err
 }
 
 func (l CLNGRPCWallet) WalletBalance() (uint64, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	spent := false

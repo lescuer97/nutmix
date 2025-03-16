@@ -2,8 +2,11 @@ package mint
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
@@ -183,4 +186,32 @@ func (m *Mint) VerifyInputsAndOutputs(proofs cashu.Proofs, outputs []cashu.Blind
 	}
 
 	return nil
+}
+func (m *Mint) IsInternalTransaction(request string) (bool, error) {
+	ctx := context.Background()
+	tx, err := m.MintDB.GetTx(context.Background())
+	if err != nil {
+		return false, fmt.Errorf("m.MintDB.GetTx(context.Background()). %w", err)
+	}
+	defer m.MintDB.Rollback(ctx, tx)
+
+	mintRequest, err := m.MintDB.GetMintRequestByRequest(tx, request)
+	log.Printf("Mint request %+v", mintRequest)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("m.MintDB.GetMintRequestById() %w", err)
+	}
+
+	err = m.MintDB.Commit(ctx, tx)
+	if err != nil {
+		return false, fmt.Errorf("m.MintDB.Commit(ctx, tx) %w", err)
+	}
+
+	if mintRequest.Request == request {
+		return true, nil
+	}
+
+	return false, nil
 }
