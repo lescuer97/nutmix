@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
+	"log/slog"
 )
 
 func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB, logger *slog.Logger) (cashu.MeltRequestDB, error) {
@@ -84,16 +84,15 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 		if err != nil {
 			return quote, fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote). %w", err)
 		}
+		pending_proofs, err := m.MintDB.GetProofsFromQuote(tx, quote.Quote)
+		if err != nil {
+			return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
+		}
 
 		if status == lightning.SETTLED {
 			quote.State = cashu.PAID
 			quote.FeePaid = fee
 			quote.PaymentPreimage = preimage
-
-			pending_proofs, err := m.MintDB.GetProofsFromQuote(tx, quote.Quote)
-			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
-			}
 
 			changeMessages, err := m.MintDB.GetMeltChangeByQuote(tx, quote.Quote)
 			if err != nil {
@@ -156,10 +155,6 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 		}
 		if status == lightning.FAILED {
 			quote.State = cashu.UNPAID
-			pending_proofs, err := m.MintDB.GetProofsFromQuote(tx, quote.Quote)
-			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
-			}
 
 			err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
 			if err != nil {
