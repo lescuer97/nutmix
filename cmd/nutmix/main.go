@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -108,6 +109,15 @@ func main() {
 	if err != nil {
 		logger.Warn(fmt.Sprintf("SetUpMint: %+v ", err))
 		return
+	}
+	if config.MINT_REQUIRE_AUTH {
+
+		oidcClient, err := oidc.NewProvider(ctx, config.MINT_AUTH_OICD_DISCOVERY_URL)
+		if err != nil {
+			logger.Warn(fmt.Sprintf("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_DISCOVERY_URL): %+v ", err))
+			return
+		}
+		mint.OICDClient = oidcClient
 	}
 
 	r := gin.Default()

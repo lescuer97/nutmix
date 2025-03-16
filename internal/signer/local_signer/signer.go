@@ -3,11 +3,6 @@ package localsigner
 import (
 	"encoding/hex"
 	"fmt"
-	"os"
-	"sort"
-	"strconv"
-	"time"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/elnosh/gonuts/crypto"
@@ -15,14 +10,15 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/signer"
 	"github.com/tyler-smith/go-bip32"
+	"os"
+	"sort"
+	"time"
 )
 
 type LocalSigner struct {
-	// activeKeysets map[id]cashu.MintKeysMap
 	activeKeysets map[string]cashu.MintKeysMap
-	// keyests map[id]cashu.MintKeysMap
-	keysets map[string]cashu.MintKeysMap
-	db      database.MintDB
+	keysets       map[string]cashu.MintKeysMap
+	db            database.MintDB
 }
 
 func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
@@ -76,7 +72,9 @@ func (l *LocalSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
 	var keys []cashu.MintKey
 	for _, keyset := range l.activeKeysets {
 		for _, key := range keyset {
-			keys = append(keys, key)
+			if key.Unit != cashu.AUTH.String() {
+				keys = append(keys, key)
+			}
 		}
 	}
 
@@ -93,40 +91,15 @@ func (l *LocalSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 	if exists {
 		var keys []cashu.MintKey
 		for _, key := range val {
-			keys = append(keys, key)
+			if key.Unit != cashu.AUTH.String() {
+				keys = append(keys, key)
+			}
 		}
 
 		return signer.OrderKeysetByUnit(keys), nil
 
 	}
 	return signer.GetKeysResponse{}, signer.ErrNoKeysetFound
-}
-func (l *LocalSigner) GetKeysByUnit(unit cashu.Unit) ([]cashu.Keyset, error) {
-	var keys []cashu.Keyset
-
-	for _, mintKey := range l.keysets {
-
-		if len(mintKey) > 0 {
-
-			if mintKey[0].Unit == unit.String() {
-
-				keysetResp := cashu.Keyset{
-					Id:          mintKey[0].Id,
-					Unit:        mintKey[0].Unit,
-					InputFeePpk: mintKey[0].InputFeePpk,
-					Keys:        make(map[string]string),
-				}
-
-				for _, keyset := range mintKey {
-					keysetResp.Keys[strconv.FormatUint(keyset.Amount, 10)] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
-				}
-
-				keys = append(keys, keysetResp)
-			}
-
-		}
-	}
-	return keys, nil
 }
 
 // gets all keys from the signer
@@ -137,7 +110,9 @@ func (l *LocalSigner) GetKeys() (signer.GetKeysetsResponse, error) {
 		return response, fmt.Errorf(" l.db.GetAllSeeds(). %w", err)
 	}
 	for _, seed := range seeds {
-		response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+		if seed.Unit != cashu.AUTH.String() {
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+		}
 	}
 	return response, nil
 }
@@ -392,4 +367,55 @@ func (l *LocalSigner) GetSignerPubkey() (string, error) {
 	}
 
 	return hex.EncodeToString(mintPrivateKey.PubKey().SerializeCompressed()), nil
+}
+
+// gets all active keys
+func (l *LocalSigner) GetAuthActiveKeys() (signer.GetKeysResponse, error) {
+	// convert map to slice
+	var keys []cashu.MintKey
+	for _, keyset := range l.activeKeysets {
+		for _, key := range keyset {
+			if key.Unit == cashu.AUTH.String() {
+				keys = append(keys, key)
+			}
+		}
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].Amount < keys[j].Amount
+	})
+
+	return signer.OrderKeysetByUnit(keys), nil
+}
+
+func (l *LocalSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error) {
+
+	val, exists := l.keysets[id]
+	if exists {
+		var keys []cashu.MintKey
+		for _, key := range val {
+			if key.Unit == cashu.AUTH.String() {
+				keys = append(keys, key)
+			}
+		}
+
+		return signer.OrderKeysetByUnit(keys), nil
+
+	}
+	return signer.GetKeysResponse{}, signer.ErrNoKeysetFound
+}
+
+// gets all keys from the signer
+func (l *LocalSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
+	var response signer.GetKeysetsResponse
+	seeds, err := l.db.GetAllSeeds()
+	if err != nil {
+		return response, fmt.Errorf(" l.db.GetAllSeeds(). %w", err)
+	}
+	for _, seed := range seeds {
+		if seed.Unit == cashu.AUTH.String() {
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+		}
+	}
+	return response, nil
 }

@@ -175,6 +175,17 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
+		err = mint.MintDB.UpdateConfig(mint.Config)
+
+		if err != nil {
+			logger.Error(
+				"mint.MintDB.UpdateConfig(mint.Config)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+
+			c.Error(fmt.Errorf("mint.MintDB.UpdateConfig(mint.Config). %w", err))
+			return
+
+		}
 
 		successMessage := struct {
 			Success string
