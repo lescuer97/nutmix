@@ -6,60 +6,18 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/mint"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"github.com/lightningnetwork/lnd/zpay32"
 )
 
 var ErrAlreadySubscribed = errors.New("Filter already subscribed")
 
-// type of subscription: map[filter]IdOfSubscription
-type ActiveSubs map[cashu.SubscriptionKind]map[string]string
-
-type WalletSubscription struct {
-	Subscriptions ActiveSubs
-	sync.Mutex
-}
-
-func (w *WalletSubscription) Subscribe(kind cashu.SubscriptionKind, filters []string, subId string) error {
-	w.Lock()
-	for i := 0; i < len(filters); i++ {
-		_, kindExists := w.Subscriptions[kind]
-
-		if kindExists {
-			_, filterExists := w.Subscriptions[kind][filters[i]]
-			if filterExists {
-				return ErrAlreadySubscribed
-			}
-		} else {
-			w.Subscriptions[kind] = make(map[string]string)
-
-		}
-
-		w.Subscriptions[kind][filters[i]] = subId
-	}
-
-	w.Unlock()
-	return nil
-}
-
-func (w *WalletSubscription) Unsubcribe(subId string) {
-	w.Lock()
-
-	for kind, filters := range w.Subscriptions {
-		for filter, id := range filters {
-			if subId == id {
-				delete(w.Subscriptions[kind], filter)
-			}
-		}
-	}
-	w.Unlock()
-}
 func checkOrigin(r *http.Request) bool {
 	return true
 }
@@ -87,12 +45,12 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		activeSubs := WalletSubscription{
-			Subscriptions: make(ActiveSubs),
-		}
-
+		proofChan := make(chan cashu.Proof, 2)
+		mintChan := make(chan cashu.MintRequestDB, 1)
+		meltChan := make(chan cashu.MeltRequestDB, 1)
+		closeChan := make(chan string, 1)
 		// parse request check if subscription or unsubscribe
-		err = handleWSRequest(request, &activeSubs)
+		err = handleWSRequest(request, mint.Observer, proofChan, mintChan, meltChan, closeChan)
 
 		if err != nil {
 			if errors.Is(err, ErrAlreadySubscribed) {
@@ -126,51 +84,125 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
+		// Get initial state from proofs
+		err = CheckStatusOfSub(request, mint, conn)
+		if err != nil {
+			logger.Warn("CheckStatusOfSub(request, mint,conn)", slog.String(utils.LogExtraInfo, err.Error()))
+			return
+		}
 
-		listining := make(chan string)
-		writing := make(chan string)
+		listenError := make(chan error)
+		go ListenToIncommingMessage(mint.Observer, conn, listenError, proofChan, mintChan, meltChan, closeChan)
 
-		go ListenToIncommingMessage(&activeSubs, conn, listining)
+		for {
+			select {
+			case error := <-listenError:
+				logger.Warn("go ListenToIncommingMessage(&activeSubs, conn, listining).", slog.String(utils.LogExtraInfo, error.Error()))
+				return
 
-		go CheckingForSubsUpdates(&activeSubs, mint, conn, writing)
-		select {
-		case listenInfo := <-listining:
-			logger.Warn("go ListenToIncommingMessage(&activeSubs, conn, listining).", slog.String(utils.LogExtraInfo, listenInfo))
+			case proof, ok := <-proofChan:
+				if ok {
+					statusNotif := cashu.WsNotification{
+						JsonRpc: "2.0",
+						Method:  cashu.Subcribe,
+						Params: cashu.WebRequestParams{
+							SubId: request.Params.SubId,
+						},
+					}
+					state := cashu.CheckState{Y: proof.Y, State: proof.State, Witness: &proof.Witness}
+					statusNotif.Params.Payload = state
 
-		case writeInfo := <-writing:
-			logger.Warn("go CheckingForSubsUpdates(&activeSubs, mint, conn, writing).", slog.String(utils.LogExtraInfo, writeInfo))
+					err = m.SendJson(conn, statusNotif)
+					if err != nil {
+						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						return
+					}
+				}
 
+			case mintState, ok := <-mintChan:
+				if ok {
+					statusNotif := cashu.WsNotification{
+						JsonRpc: "2.0",
+						Method:  cashu.Subcribe,
+						Params: cashu.WebRequestParams{
+							SubId: request.Params.SubId,
+						},
+					}
+					statusNotif.Params.Payload = mintState.PostMintQuoteBolt11Response()
+
+					err = m.SendJson(conn, statusNotif)
+					if err != nil {
+						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						return
+					}
+				}
+			case meltState, ok := <-meltChan:
+				if ok {
+					statusNotif := cashu.WsNotification{
+						JsonRpc: "2.0",
+						Method:  cashu.Subcribe,
+						Params: cashu.WebRequestParams{
+							SubId: request.Params.SubId,
+						},
+					}
+					statusNotif.Params.Payload = meltState.GetPostMeltQuoteResponse()
+
+					err = m.SendJson(conn, statusNotif)
+					if err != nil {
+						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						return
+					}
+				}
+
+			case _ = <-closeChan:
+				return
+			}
 		}
 
 	})
 }
 
-func handleWSRequest(request cashu.WsRequest, subs *WalletSubscription) error {
+func handleWSRequest(request cashu.WsRequest, observer *mint.Observer, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB,
+	closeChan chan string,
+) error {
 	switch request.Method {
 	case cashu.Subcribe:
-		err := subs.Subscribe(request.Params.Kind, request.Params.Filters, request.Params.SubId)
-		if err != nil {
-			return err
+
+		switch request.Params.Kind {
+		case cashu.ProofStateWs:
+			for _, filter := range request.Params.Filters {
+				observer.AddProofWatch(filter, mint.ProofWatchChannel{Channel: proofChan, SubId: request.Params.SubId})
+			}
+		case cashu.Bolt11MintQuote:
+			for _, filter := range request.Params.Filters {
+				observer.AddMintWatch(filter, mint.MintQuoteChannel{Channel: mintChan, SubId: request.Params.SubId})
+			}
+		case cashu.Bolt11MeltQuote:
+			for _, filter := range request.Params.Filters {
+				observer.AddMeltWatch(filter, mint.MeltQuoteChannel{Channel: meltChan, SubId: request.Params.SubId})
+			}
+
 		}
 
 	case cashu.Unsubcribe:
-		subs.Unsubcribe(request.Params.SubId)
+		observer.RemoveWatch(request.Params.SubId)
+		closeChan <- "asked for unsubscribe"
 	}
 	return nil
 }
 
-func ListenToIncommingMessage(subs *WalletSubscription, conn *websocket.Conn, ch chan string) {
+func ListenToIncommingMessage(subs *mint.Observer, conn *websocket.Conn, listenChannel chan error, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB, closeChan chan string) {
 	for {
 		var request cashu.WsRequest
 		err := conn.ReadJSON(&request)
 		if err != nil {
-			ch <- fmt.Errorf("conn.ReadJSON(&request).%w", err).Error()
+			listenChannel <- fmt.Errorf("conn.ReadJSON(&request).%w", err)
 			return
 		}
 
-		err = handleWSRequest(request, subs)
+		err = handleWSRequest(request, subs, proofChan, mintChan, meltChan, closeChan)
 		if err != nil {
-			ch <- fmt.Errorf("handleWSRequest(request, subs) %w", err).Error()
+			listenChannel <- fmt.Errorf("handleWSRequest(request, subs) %w", err)
 			return
 		}
 		response := cashu.WsResponse{
@@ -184,118 +216,119 @@ func ListenToIncommingMessage(subs *WalletSubscription, conn *websocket.Conn, ch
 
 		err = m.SendJson(conn, response)
 		if err != nil {
-			ch <- fmt.Errorf("m.SendJson(conn, response) %w", err).Error()
+			listenChannel <- fmt.Errorf("m.SendJson(conn, response) %w", err)
 			return
 		}
 	}
 }
 
-func CheckingForSubsUpdates(subs *WalletSubscription, mint *m.Mint, conn *websocket.Conn, ch chan string) error {
+func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Conn) error {
 
-	alreadyCheckedFilter := make(map[string]any)
-	for {
-		for kind, filters := range subs.Subscriptions {
-			for filter, subId := range filters {
-				// check if a new stored notif has already been seen and if no send a status update and store state
-				value, exists := alreadyCheckedFilter[filter]
-
-				statusNotif := cashu.WsNotification{
-					JsonRpc: "2.0",
-					Method:  cashu.Subcribe,
-					Params: cashu.WebRequestParams{
-						SubId: subId,
-					},
-				}
-
-				switch kind {
-				case cashu.Bolt11MintQuote:
-					ctx := context.Background()
-					tx, err := mint.MintDB.GetTx(ctx)
-					if err != nil {
-						return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
-					}
-					defer mint.MintDB.Rollback(ctx, tx)
-					quote, err := mint.MintDB.GetMintRequestById(tx, filter)
-
-					if err != nil {
-						return fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)
-					}
-					mintState, err := m.CheckMintRequest(mint, quote)
-					if err != nil {
-						return fmt.Errorf("m.CheckMintRequest(mint, filter). %w", err)
-					}
-					statusNotif.Params.Payload = mintState
-					if exists {
-						if value.(cashu.MintRequestDB).State != mintState.State {
-							alreadyCheckedFilter[filter] = mintState
-							err := m.SendJson(conn, statusNotif)
-							if err != nil {
-								return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
-							}
-						}
-					} else {
-						alreadyCheckedFilter[filter] = mintState
-						err := m.SendJson(conn, statusNotif)
-						if err != nil {
-							return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
-						}
-					}
-					err = mint.MintDB.Commit(ctx, tx)
-					if err != nil {
-						return fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
-					}
-				case cashu.Bolt11MeltQuote:
-					meltState, err := m.CheckMeltRequest(mint, filter)
-					if err != nil {
-						return fmt.Errorf("m.CheckMeltRequest(mint, filter). %w", err)
-					}
-
-					statusNotif.Params.Payload = meltState
-					if exists {
-
-						if value.(cashu.MeltRequestDB).State != meltState.State {
-							alreadyCheckedFilter[filter] = meltState
-							err := m.SendJson(conn, statusNotif)
-							if err != nil {
-								return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
-							}
-						}
-					} else {
-						alreadyCheckedFilter[filter] = meltState
-						err := m.SendJson(conn, statusNotif)
-						if err != nil {
-							return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
-						}
-					}
-
-				case cashu.ProofStateWs:
-					proofsState, err := m.CheckProofState(mint, []string{filter})
-					if err != nil {
-						return fmt.Errorf("m.CheckProofState(mint, []string{filter}). %w", err)
-					}
-					// check for subscription and if the state changed
-					if exists && len(proofsState) > 0 {
-						if value.(cashu.CheckState).State != proofsState[0].State {
-							statusNotif.Params.Payload = proofsState[0]
-
-							alreadyCheckedFilter[filter] = proofsState[0]
-							err := m.SendJson(conn, statusNotif)
-							if err != nil {
-								return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
-							}
-						}
-					} else {
-						statusNotif.Params.Payload = proofsState[0]
-						alreadyCheckedFilter[filter] = proofsState[0]
-						err := m.SendJson(conn, statusNotif)
-						if err != nil {
-							return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
-						}
-					}
-				}
-
-			}
-			time.Sleep(2 * time.Second)
-		}
+	statusNotif := cashu.WsNotification{
+		JsonRpc: "2.0",
+		Method:  cashu.Subcribe,
+		Params: cashu.WebRequestParams{
+			SubId: request.Params.SubId,
+		},
 	}
+	alreadyCheckedFilter := make(map[string]any)
+	for _, filter := range request.Params.Filters {
+		// check if a new stored notif has already been seen and if no send a status update and store state
+		value, exists := alreadyCheckedFilter[filter]
+
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+		}
+		defer mint.MintDB.Rollback(ctx, tx)
+
+		switch request.Params.Kind {
+		case cashu.Bolt11MintQuote:
+			quote, err := mint.MintDB.GetMintRequestById(tx, filter)
+
+			if err != nil {
+				return fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)
+			}
+
+			decodedInvoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
+			if err != nil {
+				return fmt.Errorf("m.CheckMintRequest(mint, filter). %w", err)
+			}
+			mintState, err := m.CheckMintRequest(mint, quote, decodedInvoice)
+			if err != nil {
+				return fmt.Errorf("m.CheckMintRequest(mint, filter). %w", err)
+			}
+			statusNotif.Params.Payload = mintState
+			if exists {
+				if value.(cashu.MintRequestDB).State != mintState.State {
+					alreadyCheckedFilter[filter] = mintState
+					err := m.SendJson(conn, statusNotif)
+					if err != nil {
+						return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
+					}
+				}
+			} else {
+				alreadyCheckedFilter[filter] = mintState
+				err := m.SendJson(conn, statusNotif)
+				if err != nil {
+					return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
+				}
+			}
+		case cashu.Bolt11MeltQuote:
+			meltState, err := m.CheckMeltRequest(mint, filter)
+			if err != nil {
+				return fmt.Errorf("m.CheckMeltRequest(mint, filter). %w", err)
+			}
+
+			statusNotif.Params.Payload = meltState
+			if exists {
+
+				if value.(cashu.MeltRequestDB).State != meltState.State {
+					alreadyCheckedFilter[filter] = meltState
+					err := m.SendJson(conn, statusNotif)
+					if err != nil {
+						return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
+					}
+				}
+			} else {
+				alreadyCheckedFilter[filter] = meltState
+				err := m.SendJson(conn, statusNotif)
+				if err != nil {
+					return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
+				}
+			}
+
+		case cashu.ProofStateWs:
+			proofsState, err := m.CheckProofState(mint, []string{filter})
+			if err != nil {
+				return fmt.Errorf("m.CheckProofState(mint, []string{filter}). %w", err)
+			}
+			// check for subscription and if the state changed
+			if exists && len(proofsState) > 0 {
+				if value.(cashu.CheckState).State != proofsState[0].State {
+					statusNotif.Params.Payload = proofsState[0]
+
+					alreadyCheckedFilter[filter] = proofsState[0]
+					err := m.SendJson(conn, statusNotif)
+					if err != nil {
+						return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
+					}
+				}
+			} else {
+				statusNotif.Params.Payload = proofsState[0]
+				alreadyCheckedFilter[filter] = proofsState[0]
+				err := m.SendJson(conn, statusNotif)
+				if err != nil {
+					return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
+				}
+			}
+		}
+		err = mint.MintDB.Commit(ctx, tx)
+		if err != nil {
+			return fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
+		}
+
+	}
+	return nil
 }

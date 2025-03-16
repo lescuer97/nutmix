@@ -20,8 +20,8 @@ const FAKEWALLET Backend = iota + 4
 
 type LightningBackend interface {
 	PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error)
-	CheckPayed(quote string) (PaymentStatus, string, uint64, error)
-	CheckReceived(quote string) (PaymentStatus, string, error)
+	CheckPayed(amount string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error)
+	CheckReceived(amount string, invoice *zpay32.Invoice) (PaymentStatus, string, error)
 	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error)
 	RequestInvoice(amount int64) (InvoiceResponse, error)
 	WalletBalance() (uint64, error)

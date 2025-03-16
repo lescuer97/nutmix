@@ -2,13 +2,61 @@ package mint
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"log/slog"
 )
+
+func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB, logger *slog.Logger) (cashu.MeltRequestDB, error) {
+	mintRequest, err := m.MintDB.GetMintRequestByRequest(tx, meltQuote.Request)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return meltQuote, nil
+		}
+		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetMintRequestById() %w", err)
+	}
+
+	if mintRequest.Request != meltQuote.Request {
+		return meltQuote, nil
+	}
+
+	if meltQuote.State == cashu.PAID {
+		return meltQuote, cashu.ErrMeltAlreadyPaid
+	}
+
+	if meltQuote.Unit != mintRequest.Unit {
+		return meltQuote, fmt.Errorf("Unit for internal mint are not the same. %w", cashu.ErrUnitNotSupported)
+	}
+
+	if mintRequest.State != cashu.UNPAID {
+		return meltQuote, fmt.Errorf("Mint request has already been paid. Mint State: %v", cashu.UNPAID)
+	}
+
+	meltQuote.FeePaid = 0
+	meltQuote.State = cashu.PAID
+	meltQuote.Melted = true
+
+	mintRequest.State = cashu.PAID
+	mintRequest.RequestPaid = true
+
+	logger.Info(fmt.Sprintf("Settling bolt11 payment internally: %v. mintRequest: %v, %v, %v", meltQuote.Quote, mintRequest.Quote, meltQuote.Amount, meltQuote.Unit))
+
+	err = m.MintDB.ChangeMeltRequestState(tx, meltQuote.Quote, meltQuote.RequestPaid, meltQuote.State, meltQuote.Melted, meltQuote.FeePaid)
+	if err != nil {
+		return meltQuote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(tx, meltQuote.Quote, meltQuote.RequestPaid, meltQuote.State, meltQuote.Melted, meltQuote.FeePaid) %w", err)
+	}
+	err = m.MintDB.ChangeMintRequestState(tx, mintRequest.Quote, mintRequest.RequestPaid, mintRequest.State, mintRequest.Minted)
+	if err != nil {
+		return meltQuote, fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, mintRequest.Quote, mintRequest.RequestPaid, mintRequest.State, mintRequest.Minted): %w", err)
+	}
+
+	return meltQuote, nil
+}
 
 func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) {
 	ctx := context.Background()
@@ -26,7 +74,13 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 
 	if quote.State == cashu.PENDING {
 
-		status, preimage, fee, err := m.LightningBackend.CheckPayed(quote.Quote)
+		invoice, err := zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork())
+
+		if err != nil {
+			return quote, fmt.Errorf("zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork()). %w", err)
+		}
+
+		status, preimage, fee, err := m.LightningBackend.CheckPayed(quote.Quote, invoice)
 		if err != nil {
 			return quote, fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote). %w", err)
 		}
@@ -198,8 +252,18 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
 	}
+	// TODO - R	// if there are change outputs you need to check if the outputs are valid if they have the correct unit
+	if len(meltRequest.Outputs) > 0 {
+		outputUnit, err := m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets)
+		if err != nil {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.VerifyOutputs(meltRequest.Outputs): %w", cashu.ErrUnitNotSupported, err)
+		}
 
-	// TODO - REMOVE this when doing multi denomination tokens with Milisats
+		if outputUnit != unit {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. Change output unit is different: ", cashu.ErrUnitNotSupported)
+		}
+	}
+
 	if unit != cashu.Sat {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. incorrect unit: %w", cashu.ErrUnitNotSupported, err)
 	}
@@ -273,74 +337,82 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 
-	var paidLightningFeeSat uint64
-
-	payment, err := m.LightningBackend.PayInvoice(quote.Request, invoice, quote.FeeReserve, quote.Mpp, quote.Amount)
-	// Hardened error handling
-	if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {
-		logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
-
-		// if exception of lightning payment says fail do a payment status recheck.
-		status, _, fee_paid, err := m.LightningBackend.CheckPayed(quote.Quote)
-
-		quote.FeePaid = fee_paid
-		// if error on checking payement we will save as pending and returns status
-		if err != nil {
-			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote) %w", err)
-
-		}
-
-		switch status {
-		// halt transaction and return a pending state
-		case lightning.PENDING, lightning.SETTLED:
-			quote.State = cashu.PENDING
-			// change melt request state
-			err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
-			if err != nil {
-				logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
-			}
-
-			err = m.MintDB.Commit(context.Background(), tx)
-			if err != nil {
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
-			}
-
-			return quote.GetPostMeltQuoteResponse(), nil
-
-		// finish failure and release the proofs
-		case lightning.FAILED, lightning.UNKNOWN:
-			quote.State = cashu.UNPAID
-			err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
-			if err != nil {
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid) %w", err)
-			}
-			err = m.MintDB.DeleteProofs(tx, meltRequest.Inputs)
-			if err != nil {
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteProofs(tx, meltRequest.Inputs) %w", err)
-			}
-			err = m.MintDB.DeleteChangeByQuote(tx, quote.Quote)
-			if err != nil {
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteChangeByQuote(tx, quote.Quote) %w", err)
-			}
-			err = m.MintDB.Commit(context.Background(), tx)
-			if err != nil {
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
-			}
-
-			// TODO put payment error here
-			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("Couldn not pay ")
-		}
+	// NOTE: Checks if the request is internal to the mint
+	quote, err = m.settleIfInternalMelt(tx, quote, logger)
+	if err != nil {
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 
-	quote.RequestPaid = true
-	quote.State = cashu.PAID
-	quote.PaymentPreimage = payment.Preimage
-	quote.Melted = true
+	var paidLightningFeeSat uint64
+
+	if !quote.RequestPaid {
+		payment, err := m.LightningBackend.PayInvoice(quote.Request, invoice, quote.FeeReserve, quote.Mpp, quote.Amount)
+		// Hardened error handling
+		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {
+			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
+
+			// if exception of lightning payment says fail do a payment status recheck.
+			status, _, fee_paid, err := m.LightningBackend.CheckPayed(quote.Quote, invoice)
+
+			quote.FeePaid = fee_paid
+			// if error on checking payement we will save as pending and returns status
+			if err != nil {
+				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote) %w", err)
+
+			}
+
+			switch status {
+			// halt transaction and return a pending state
+			case lightning.PENDING, lightning.SETTLED:
+				quote.State = cashu.PENDING
+				// change melt request state
+				err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
+				if err != nil {
+					logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
+				}
+
+				err = m.MintDB.Commit(context.Background(), tx)
+				if err != nil {
+					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
+				}
+
+				return quote.GetPostMeltQuoteResponse(), nil
+
+			// finish failure and release the proofs
+			case lightning.FAILED, lightning.UNKNOWN:
+				quote.State = cashu.UNPAID
+				err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
+				if err != nil {
+					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid) %w", err)
+				}
+				err = m.MintDB.DeleteProofs(tx, meltRequest.Inputs)
+				if err != nil {
+					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteProofs(tx, meltRequest.Inputs) %w", err)
+				}
+				err = m.MintDB.DeleteChangeByQuote(tx, quote.Quote)
+				if err != nil {
+					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteChangeByQuote(tx, quote.Quote) %w", err)
+				}
+				err = m.MintDB.Commit(context.Background(), tx)
+				if err != nil {
+					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
+				}
+
+				// TODO put payment error here
+				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("Couldn not pay ")
+			}
+		}
+		quote.PaymentPreimage = payment.Preimage
+		paidLightningFeeSat = uint64(payment.PaidFeeSat)
+		quote.FeePaid = paidLightningFeeSat
+		quote.RequestPaid = true
+		quote.State = cashu.PAID
+		quote.Melted = true
+	}
+
 	response := quote.GetPostMeltQuoteResponse()
 
 	// if fees where lower than expected return sats to the user
-	paidLightningFeeSat = uint64(payment.PaidFeeSat)
-	quote.FeePaid = paidLightningFeeSat
 
 	//  if total expent is lower that the amount of proofs that where given
 	//  change is returned
@@ -402,5 +474,6 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 
+	m.Observer.SendMeltEvent(quote)
 	return response, nil
 }
