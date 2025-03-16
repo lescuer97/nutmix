@@ -9,11 +9,12 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lightningnetwork/lnd/invoices"
+	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB) (cashu.MintRequestDB, error) {
+func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB, invoice *zpay32.Invoice) (cashu.MintRequestDB, error) {
 
-	status, _, err := mint.LightningBackend.CheckReceived(quote.Quote)
+	status, _, err := mint.LightningBackend.CheckReceived(quote.Quote, invoice)
 	if err != nil {
 		return quote, fmt.Errorf("mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid. %w", err)
 	}
@@ -21,9 +22,8 @@ func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB) (cashu.MintRequestD
 	case status == lightning.SETTLED:
 		quote.State = cashu.PAID
 		quote.RequestPaid = true
-
-	case status == lightning.PENDING:
-		quote.State = cashu.PENDING
+	// case status == lightning.PENDING:
+	// 	quote.State = cashu.PENDING
 	case status == lightning.FAILED:
 		quote.State = cashu.UNPAID
 
@@ -49,7 +49,13 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 	if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
 		return quote.GetPostMeltQuoteResponse(), nil
 	}
-	status, preimage, fees, err := mint.LightningBackend.CheckPayed(quote.Quote)
+
+	invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
+	if err != nil {
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork()). %w", err)
+	}
+
+	status, preimage, fees, err := mint.LightningBackend.CheckPayed(quote.Quote, invoice)
 	if err != nil {
 		if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 			return quote.GetPostMeltQuoteResponse(), nil

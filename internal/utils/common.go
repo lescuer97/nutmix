@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"os"
 )
@@ -112,4 +114,15 @@ func (c *Config) UseEnviromentVars() {
 	c.MINT_LNBITS_ENDPOINT = os.Getenv("MINT_LNBITS_ENDPOINT")
 	c.MINT_LNBITS_KEY = os.Getenv("MINT_LNBITS_KEY")
 
+}
+func RandomHash() (string, error) {
+	// Create a byte slice of 30 random bytes
+	randomBytes := make([]byte, 30)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+
+	// Encode the random bytes as base64-urlsafe string
+	return base64.URLEncoding.EncodeToString(randomBytes), nil
 }

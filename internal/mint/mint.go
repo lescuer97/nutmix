@@ -21,6 +21,7 @@ type Mint struct {
 	MintDB           database.MintDB
 	Signer           signer.Signer
 	OICDClient       *oidc.Provider
+	Observer         *Observer
 }
 
 var (
@@ -37,10 +38,9 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKe
 	for _, v := range keys {
 		seenKeys[v.Id] = v
 	}
+
 	for _, proof := range proofs {
-
 		val, exists := seenKeys[proof.Id]
-
 		if exists {
 			units[val.Unit] = true
 		}
@@ -143,6 +143,11 @@ func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig
 	}
 
 	mint.MintPubkey = pubkey
+	observer := Observer{}
+	observer.Proofs = make(map[string][]ProofWatchChannel)
+	observer.MeltQuote = make(map[string][]MeltQuoteChannel)
+	observer.MintQuote = make(map[string][]MintQuoteChannel)
 
+	mint.Observer = &observer
 	return &mint, nil
 }

@@ -92,7 +92,7 @@ func SetupDataOnDB(mint *Mint) error {
 		Amount:      2,
 		FeeReserve:  2,
 		RequestPaid: false,
-		Request:     "rest",
+		Request:     "lnbcrt2u1pna2hrlpp5gv4edjsvjzflaxex5y4jcm87yhhm7s6clt6hjar50yhswan83fesdqqcqzzsxqzuysp5u3kq8etcat22w2hraktrgppltaegt3prrf5qz9z4cplreje2kzrq9qxpqysgq2ujupalzlwz9nhn55pl6nuwtv4qqkdlkn02rf835l3janjwy7w3n0tl0whh6v3frpvfcsyzud3g6dsx6gqgmw04xj2c0alz4px5hjecq0pnclr",
 		State:       cashu.PENDING,
 		Melted:      false,
 		SeenAt:      time.Now().Unix(),
