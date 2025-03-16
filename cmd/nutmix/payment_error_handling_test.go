@@ -350,6 +350,11 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)
 	}
+	err = mint.MintDB.Commit(ctx, tx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.Commit(ctx, tx) %s", err)
+		return
+	}
 
 	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
 	w = httptest.NewRecorder()
@@ -370,6 +375,11 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	for _, p := range meltProofs {
 		secreList = append(secreList, p.Secret)
 	}
+	tx, err = mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+	}
+	defer mint.MintDB.Rollback(ctx, tx)
 
 	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {

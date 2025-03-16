@@ -455,10 +455,9 @@ func (pql Postgresql) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
 	// change the paid status of the quote
 	batch := pgx.Batch{}
 	for _, proof := range proofs {
-
 		batch.Queue(`DELETE FROM proofs WHERE y = $1`, proof.Y)
-
 	}
+
 	results := tx.SendBatch(context.Background(), &batch)
 	defer results.Close()
 
