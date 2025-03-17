@@ -141,13 +141,11 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 		InputFeePpk: fee,
 	}
 
-	keyset, err := signer.DeriveKeyset(mintPrivateKey, newSeed)
-
+	keysets, err := signer.DeriveKeyset(mintPrivateKey, newSeed)
 	if err != nil {
 		return newSeed, fmt.Errorf("DeriveKeyset(mintPrivateKey, newSeed) %w", err)
 	}
-
-	newSeedId, err := cashu.DeriveKeysetId(keyset)
+	newSeedId, err := cashu.DeriveKeysetId(keysets)
 	if err != nil {
 		return newSeed, fmt.Errorf("cashu.DeriveKeysetId(keyset) %w", err)
 	}

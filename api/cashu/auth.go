@@ -10,4 +10,10 @@ type Nut21Info struct {
 	ProtectedRoutes []ProtectedRoute `json:"protected_endpoints"`
 }
 
-// type 
+type PostAuthBlindMintRequest struct {
+    Outputs []BlindedMessage `json:"outputs"`
+}
+
+type PostAuthBlindMintResponse struct {
+    Signatures []BlindSignature `json:"signatures"`
+}

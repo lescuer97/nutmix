@@ -81,3 +81,39 @@ func TestCreateNewSeed(t *testing.T) {
 		t.Errorf("seed id incorrect. %v", keys.Keysets[1].Id)
 	}
 }
+func TestRotateAuthSeedUnit(t *testing.T) {
+	db := mockdb.MockDB{}
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+	localsigner.getSignerPrivateKey()
+
+	err = localsigner.RotateKeyset(cashu.AUTH, uint(100))
+	if err != nil {
+		t.Fatalf("localsigner.RotateKeyset(cashu.Msat, uint(100)) %+v", err)
+	}
+
+	keys, err := localsigner.GetAuthActiveKeys()
+	if err != nil {
+		t.Fatalf("localsigner.GetKeys() %+v", err)
+
+	}
+    if len(keys.Keysets) != 1 {
+
+        t.Errorf("There should only be one keyset for auth. there is: %v",len(keys.Keysets))
+    }
+
+    if keys.Keysets[0].Unit != cashu.AUTH.String() {
+        t.Errorf("Should be Auth key: it is %v",keys.Keysets[0].Unit)
+    }
+
+    _, ok := keys.Keysets[0].Keys["1"]
+    if !ok {
+        t.Errorf("We should have a keysey of value 1. %+v",keys.Keysets[0])
+    }
+    // if keys.Keysets[1].Keys[] == 1 {
+    //     t.Errorf("Should be Auth key %v",keys.Keysets[1].Unit)
+    // }
+}

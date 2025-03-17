@@ -37,10 +37,13 @@ func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
 				switch {
 				case errors.Is(e, utils.ErrAlreadyLNPaying):
 					message = "Error paying invoice"
-					return
+                    break
 				case errors.Is(e, ErrInvalidNostrKey):
 					message = "Nostr npub is not valid"
-					return
+                    break
+				case errors.Is(e, ErrInvalidOICDURL):
+					message = ErrInvalidOICDURL.Error()
+				    break	
 				}
 			}
 			logger.Error(fmt.Sprintf("Error from calls: %+v", c.Errors.String()))

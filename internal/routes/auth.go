@@ -1,17 +1,11 @@
 package routes
 
 import (
-	"context"
 	"fmt"
-	"log"
 	"log/slog"
-
-	// "github.com/coreos/go-oidc/v3/oidc"
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
-	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 func v1AuthRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
@@ -42,6 +36,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		c.JSON(200, keysets)
 	})
+
 	auth.GET("/blind/keys/keysets", func(c *gin.Context) {
 		keys, err := mint.Signer.GetAuthKeys()
 		if err != nil {
@@ -54,23 +49,17 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	})
 
 	auth.GET("/blind/mint", func(c *gin.Context) {
-
-        ctx := context.Background()
-        verifier := mint.OICDClient.Verifier(&oidc.Config{ClientID: mint.Config.MINT_AUTH_OICD_CLIENT_ID})
-        // check if it's valid token
-        token := c.GetHeader("Clear-auth")
-
-        idToken, err := verifier.Verify(ctx,token )
-        if err != nil {
-            logger.Error(fmt.Errorf("verifier.Verify(ctx,token ). %w", err).Error())
-			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+		var mintRequest cashu.PostMintBolt11Request
+		err := c.BindJSON(&mintRequest)
+		if err != nil {
+			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			c.JSON(400, "Malformed body request")
 			return
-        }
-        log.Printf("\n idToken hash: %v\n", idToken.AccessTokenHash)
-        // oidc.Config
-        // mint.OICDClient.Endpoint
-        // oidc.Provider
-        c.JSON(200, nil)
+		}
+		// log.Printf("\n idToken hash: %v\n", idToken.AccessTokenHash)
+		// oidc.Config
+		// mint.OICDClient.Endpoint
+		// oidc.Provider
+		c.JSON(200, nil)
 	})
 }

@@ -93,8 +93,14 @@ func (c *Config) Default() {
 	c.PEG_IN_LIMIT_SATS = nil
 
 	c.MINT_REQUIRE_AUTH = false
-	// c.MINT_AUTH_OICD_CLIENT_ID
+
+	c.MINT_REQUIRE_AUTH = false
+	c.MINT_AUTH_OICD_CLIENT_ID = ""
+	c.MINT_AUTH_MAX_BLIND_TOKENS = 100
+	c.MINT_AUTH_OICD_DISCOVERY_URL = ""
+	c.MINT_AUTH_RATE_LIMIT_PER_MINUTE = 5
 }
+
 func (c *Config) UseEnviromentVars() {
 	c.NAME = os.Getenv("NAME")
 	c.DESCRIPTION = os.Getenv("DESCRIPTION")
