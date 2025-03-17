@@ -106,7 +106,6 @@ func main() {
 		return
 	}
 	if config.MINT_REQUIRE_AUTH {
-
 		oidcClient, err := oidc.NewProvider(ctx, config.MINT_AUTH_OICD_DISCOVERY_URL)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_DISCOVERY_URL): %+v ", err))

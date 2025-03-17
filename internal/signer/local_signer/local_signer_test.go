@@ -100,20 +100,20 @@ func TestRotateAuthSeedUnit(t *testing.T) {
 		t.Fatalf("localsigner.GetKeys() %+v", err)
 
 	}
-    if len(keys.Keysets) != 1 {
+	if len(keys.Keysets) != 1 {
 
-        t.Errorf("There should only be one keyset for auth. there is: %v",len(keys.Keysets))
-    }
+		t.Errorf("There should only be one keyset for auth. there is: %v", len(keys.Keysets))
+	}
 
-    if keys.Keysets[0].Unit != cashu.AUTH.String() {
-        t.Errorf("Should be Auth key: it is %v",keys.Keysets[0].Unit)
-    }
+	if keys.Keysets[0].Unit != cashu.AUTH.String() {
+		t.Errorf("Should be Auth key: it is %v", keys.Keysets[0].Unit)
+	}
 
-    _, ok := keys.Keysets[0].Keys["1"]
-    if !ok {
-        t.Errorf("We should have a keysey of value 1. %+v",keys.Keysets[0])
-    }
-    // if keys.Keysets[1].Keys[] == 1 {
-    //     t.Errorf("Should be Auth key %v",keys.Keysets[1].Unit)
-    // }
+	_, ok := keys.Keysets[0].Keys["1"]
+	if !ok {
+		t.Errorf("We should have a keysey of value 1. %+v", keys.Keysets[0])
+	}
+	// if keys.Keysets[1].Keys[] == 1 {
+	//     t.Errorf("Should be Auth key %v",keys.Keysets[1].Unit)
+	// }
 }

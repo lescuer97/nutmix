@@ -21,26 +21,26 @@ func ClearAuthMiddleware(allowedPathPatterns []string, mint *mint.Mint, logger *
 		// Check if current path matches any of the patterns
 		for _, pattern := range allowedPathPatterns {
 			if matchesPattern(requestPath, pattern) {
-                logger.Info("Trying to access restricted route")
+				logger.Info("Trying to access restricted route")
 				// For paths matching the pattern, check for the "clear auth" header
 				clearAuth := c.GetHeader("Clear-auth")
 				if clearAuth == "" {
-		            logger.Warn(fmt.Errorf("Tried to do a clear auth without token.").Error())
-		            c.JSON(400, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
+					logger.Warn(fmt.Errorf("Tried to do a clear auth without token.").Error())
+					c.JSON(400, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
 					c.Abort()
 					return
 				}
-                    verifier := mint.OICDClient.Verifier(&oidc.Config{ClientID: mint.Config.MINT_AUTH_OICD_CLIENT_ID})
-		            // check if it's valid token
-		            token := c.GetHeader("Clear-auth")
+				verifier := mint.OICDClient.Verifier(&oidc.Config{ClientID: mint.Config.MINT_AUTH_OICD_CLIENT_ID})
+				// check if it's valid token
+				token := c.GetHeader("Clear-auth")
 
-                    ctx := context.Background()
-		            _, err := verifier.Verify(ctx, token)
-		            if err != nil {
-		            	logger.Error(fmt.Errorf("verifier.Verify(ctx,token ). %w", err).Error())
-		            	c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
-		            	return
-		            }
+				ctx := context.Background()
+				_, err := verifier.Verify(ctx, token)
+				if err != nil {
+					logger.Error(fmt.Errorf("verifier.Verify(ctx,token ). %w", err).Error())
+					c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
+					return
+				}
 				// Header exists, continue processing
 				break
 			}
@@ -59,7 +59,7 @@ func matchesPattern(path, pattern string) bool {
 		prefix := pattern[:len(pattern)-2] // Remove the "/*"
 		return strings.HasPrefix(path, prefix)
 	}
-	
+
 	// Otherwise, exact match
 	return path == pattern
 }

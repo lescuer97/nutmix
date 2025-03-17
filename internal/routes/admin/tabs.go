@@ -19,7 +19,7 @@ import (
 
 var (
 	ErrInvalidNostrKey = errors.New("NOSTR npub is not valid")
-	ErrInvalidOICDURL = errors.New("Invalid OICD Discovery URL")
+	ErrInvalidOICDURL  = errors.New("Invalid OICD Discovery URL")
 )
 
 func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
@@ -89,18 +89,18 @@ func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
 		return fmt.Errorf("strconv.ParseUint(rateLimitPerMinuteStr, 10, 64). %w", err)
 	}
 
-    if activateAuth {
-        if oicdDiscoveryUrl == ""{
-            return ErrInvalidOICDURL
+	if activateAuth {
+		if oicdDiscoveryUrl == "" {
+			return ErrInvalidOICDURL
 
-        }
+		}
 
 		oidcClient, err := oidc.NewProvider(context.Background(), oicdDiscoveryUrl)
 		if err != nil {
 			return fmt.Errorf("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_DISCOVERY_URL): %w %w", err, ErrInvalidOICDURL)
 		}
 		mint.OICDClient = oidcClient
-    }
+	}
 	mint.Config.MINT_REQUIRE_AUTH = activateAuth
 	mint.Config.MINT_AUTH_OICD_DISCOVERY_URL = oicdDiscoveryUrl
 	mint.Config.MINT_AUTH_OICD_CLIENT_ID = oicdClientId

@@ -11,9 +11,9 @@ type Nut21Info struct {
 }
 
 type PostAuthBlindMintRequest struct {
-    Outputs []BlindedMessage `json:"outputs"`
+	Outputs []BlindedMessage `json:"outputs"`
 }
 
 type PostAuthBlindMintResponse struct {
-    Signatures []BlindSignature `json:"signatures"`
+	Signatures []BlindSignature `json:"signatures"`
 }
