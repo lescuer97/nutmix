@@ -221,7 +221,6 @@ func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, p
 	}
 
 	return ok, nil
-
 }
 
 func (p Proof) parseWitnessAndSecret() (*SpendCondition, *Witness, error) {

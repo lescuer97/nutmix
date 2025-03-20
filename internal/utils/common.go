@@ -66,7 +66,10 @@ type Config struct {
 	MINT_AUTH_OICD_DISCOVERY_URL    string `db:"mint_auth_discovery_url,omitempty"`
 	MINT_AUTH_OICD_CLIENT_ID        string `db:"mint_auth_oicd_client_id,omitempty"`
 	MINT_AUTH_RATE_LIMIT_PER_MINUTE int    `db:"mint_auth_rate_limit_per_minute,omitempty"`
-	MINT_AUTH_MAX_BLIND_TOKENS      int32  `db:"mint_auth_max_blind_tokens,omitempty"`
+	MINT_AUTH_MAX_BLIND_TOKENS      uint64 `db:"mint_auth_max_blind_tokens,omitempty"`
+
+	MINT_AUTH_CLEAR_AUTH_URLS []string `db:"mint_auth_clear_auth_urls,omitempty"`
+	MINT_AUTH_BLIND_AUTH_URLS []string `db:"mint_auth_blind_auth_urls,omitempty"`
 }
 
 func (c *Config) Default() {
@@ -99,6 +102,8 @@ func (c *Config) Default() {
 	c.MINT_AUTH_MAX_BLIND_TOKENS = 100
 	c.MINT_AUTH_OICD_DISCOVERY_URL = ""
 	c.MINT_AUTH_RATE_LIMIT_PER_MINUTE = 5
+	c.MINT_AUTH_CLEAR_AUTH_URLS = []string{}
+	c.MINT_AUTH_BLIND_AUTH_URLS = []string{}
 }
 
 func (c *Config) UseEnviromentVars() {

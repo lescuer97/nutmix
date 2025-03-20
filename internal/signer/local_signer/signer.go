@@ -417,3 +417,47 @@ func (l *LocalSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	}
 	return response, nil
 }
+
+func (l *LocalSigner) VerifyAuthProof(authProof cashu.AuthProof) error {
+	err := l.validateAuthProof(authProof)
+	if err != nil {
+		return fmt.Errorf("l.validateAuthProof(authProof): %w", err)
+	}
+	return nil
+}
+func (l *LocalSigner) validateAuthProof(proof cashu.AuthProof) error {
+	var keysetToUse cashu.MintKey
+
+	keysets, exists := l.keysets[proof.Id]
+	if !exists {
+		return cashu.ErrKeysetForProofNotFound
+	}
+
+	for _, keyset := range keysets {
+		if keyset.Amount == proof.Amount && keyset.Id == proof.Id {
+			keysetToUse = keyset
+			break
+		}
+	}
+
+	// check if keysetToUse is not assigned
+	if keysetToUse.Id == "" {
+		return cashu.ErrKeysetForProofNotFound
+	}
+
+	parsedBlinding, err := hex.DecodeString(proof.C)
+	if err != nil {
+		return fmt.Errorf("hex.DecodeString: %w %w", err, cashu.ErrInvalidProof)
+	}
+	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
+	if err != nil {
+		return fmt.Errorf("secp256k1.ParsePubKey: %w %w", err, cashu.ErrInvalidProof)
+	}
+	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
+	if !verified {
+		return cashu.ErrInvalidProof
+	}
+
+	return nil
+
+}

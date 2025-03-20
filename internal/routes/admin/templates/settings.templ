@@ -157,4 +157,66 @@ templ Auth(config utils.Config) {
 			/>
 		</label>
 	</div>
+	<div class="form-section">
+        {{urlOptions := []string{"/v1/swap", "/v1/blind/mint", "^/v1/mint/.*",  "^/v1/melt/.*",  "/v1/blind/melt" }}}
+		<label for="MINT_AUTH_CLEAR_AUTH_URLS" class="settings-input">
+            {{clearAuthName := "MINT_AUTH_CLEAR_AUTH_URLS"}}
+            {{clearAuthSelectId := "clearAuthSelect"}}
+            Clear authentification url checks
+            @MultiSelect(clearAuthSelectId,clearAuthName, urlOptions, config.MINT_AUTH_CLEAR_AUTH_URLS )
+		</label>
+		<label for="MINT_AUTH_BLIND_AUTH_URLS" class="settings-input">
+            {{blindAuthName := "MINT_AUTH_BLIND_AUTH_URLS"}}
+            {{blindAuthSelectId := "blindAuthSelect"}}
+            Blind authentification url checks
+            @MultiSelect(blindAuthSelectId,blindAuthName, urlOptions, config.MINT_AUTH_BLIND_AUTH_URLS )
+		</label>
+	</div>
+<script>
+        document.addEventListener('DOMContentLoaded', function() {
+          // Get all multiple select elements on the page
+          const multiSelects = document.querySelectorAll('select[multiple]');
+        
+          // Add event listener to each multiple select element
+          multiSelects.forEach(select => {
+            select.addEventListener('mousedown', function(e) {
+              console.log({event: e})
+              // Only prevent default if clicking on an option
+              if (e.target.nodeName === 'OPTION') {
+                e.preventDefault();
+                
+                // Toggle selection on the clicked option
+                const option = e.target;
+                option.selected = !option.selected;
+                
+                // Trigger change event
+                const event = new Event('change');
+                this.dispatchEvent(event);
+              }
+            });
+          });
+        });
+</script>
+}
+
+templ MultiSelect(id string, name string, options []string, selectedValues []string) {
+    <select id={ id } name={ name } multiple>
+        for _, option := range options {
+            <option 
+                value={ option } 
+                selected?={ isSelected(option, selectedValues) }
+            >
+                { option }
+            </option>
+        }
+    </select>
+}
+
+func isSelected(value string, selectedValues []string) bool {
+    for _, selectedValue := range selectedValues {
+        if selectedValue == value {
+            return true
+        }
+    }
+    return false
 }

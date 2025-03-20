@@ -35,7 +35,11 @@ const (
 
 	ENDPOINT_REQUIRES_CLEAR_AUTH    = 300001
 	CLEAR_AUTH_FAILED               = 300002
-	MAXIMUM_BAT_MINT_LIMIT_EXCEEDED = 300003
+
+	ENDPOINT_REQUIRES_BLIND_AUTH    = 310001
+	BLIND_AUTH_FAILED               = 310002
+	MAXIMUM_BAT_MINT_LIMIT_EXCEEDED = 310003
+	MAXIMUM_BAT_RATE_LIMIT_EXCEEDED = 310004
 
 	UNKNOWN = 99999
 )
@@ -80,8 +84,14 @@ func (e ErrorCode) String() string {
 		error = "Endpoint requires clear auth"
 	case CLEAR_AUTH_FAILED:
 		error = "Clear authentification failed"
+	case ENDPOINT_REQUIRES_BLIND_AUTH:
+		error = "Endpoint requires Blind auth"
+	case BLIND_AUTH_FAILED:
+		error = "Blind authentification failed"
 	case MAXIMUM_BAT_MINT_LIMIT_EXCEEDED:
-		error = "Maximum Blind auth token amount execeeded"
+		error = "Maximum Blind auth token amounts execeeded"
+	case MAXIMUM_BAT_RATE_LIMIT_EXCEEDED:
+		error = "Maximum BAT rate limit execeeded"
 	}
 
 	return error

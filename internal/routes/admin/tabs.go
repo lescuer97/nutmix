@@ -80,6 +80,9 @@ func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
 	rateLimitPerMinuteStr := c.Request.PostFormValue("MINT_AUTH_RATE_LIMIT_PER_MINUTE")
 	maxBlindTokenStr := c.Request.PostFormValue("MINT_AUTH_MAX_BLIND_TOKENS")
 
+	authBlindArray := c.PostFormArray("MINT_AUTH_BLIND_AUTH_URLS")
+	authClearArray := c.PostFormArray("MINT_AUTH_CLEAR_AUTH_URLS")
+
 	rateLimitPerMinute, err := strconv.ParseUint(rateLimitPerMinuteStr, 10, 64)
 	if err != nil {
 		return fmt.Errorf("strconv.ParseUint(rateLimitPerMinuteStr, 10, 64). %w", err)
@@ -105,7 +108,9 @@ func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
 	mint.Config.MINT_AUTH_OICD_DISCOVERY_URL = oicdDiscoveryUrl
 	mint.Config.MINT_AUTH_OICD_CLIENT_ID = oicdClientId
 	mint.Config.MINT_AUTH_RATE_LIMIT_PER_MINUTE = int(rateLimitPerMinute)
-	mint.Config.MINT_AUTH_MAX_BLIND_TOKENS = int32(maxBlindToken)
+	mint.Config.MINT_AUTH_MAX_BLIND_TOKENS = maxBlindToken
+	mint.Config.MINT_AUTH_CLEAR_AUTH_URLS = authClearArray
+	mint.Config.MINT_AUTH_BLIND_AUTH_URLS = authBlindArray
 
 	return nil
 }
