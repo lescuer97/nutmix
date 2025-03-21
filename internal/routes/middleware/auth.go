@@ -20,7 +20,8 @@ func ClearAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
-		log.Printf("requestPath: %v", requestPath)
+		log.Printf("\n MINT_AUTH_CLEAR_AUTH_URLS,%v ", mint.Config.MINT_AUTH_CLEAR_AUTH_URLS )
+		log.Printf("\npath ,%v ", requestPath )
 		// Check if current path matches any of the patterns
 		for _, pattern := range mint.Config.MINT_AUTH_CLEAR_AUTH_URLS {
 			matches, err := matchesPattern(requestPath, pattern)
@@ -33,7 +34,7 @@ func ClearAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 				clearAuth := c.GetHeader("Clear-auth")
 				if clearAuth == "" {
 					logger.Warn(fmt.Errorf("Tried to do a clear auth without token.").Error())
-					c.JSON(400, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
+					c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
 					c.Abort()
 					return
 				}
@@ -64,7 +65,6 @@ func BlindAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
-		log.Printf("requestPath: %v", requestPath)
 		// Check if current path matches any of the patterns
 		for _, pattern := range mint.Config.MINT_AUTH_BLIND_AUTH_URLS {
 			matches, err := matchesPattern(requestPath, pattern)
@@ -77,7 +77,7 @@ func BlindAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 				blindAuth := c.GetHeader("Blind-auth")
 				if blindAuth == "" {
 					logger.Warn(fmt.Errorf("Tried to do a blind auth without token.").Error())
-					c.JSON(400, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
+					c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_BLIND_AUTH, nil))
 					c.Abort()
 					return
 				}

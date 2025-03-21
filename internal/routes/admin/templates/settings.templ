@@ -158,7 +158,7 @@ templ Auth(config utils.Config) {
 		</label>
 	</div>
 	<div class="form-section">
-        {{urlOptions := []string{"/v1/swap", "/v1/blind/mint", "^/v1/mint/.*",  "^/v1/melt/.*",  "/v1/blind/melt" }}}
+        {{urlOptions := []string{"/v1/swap", "/v1/auth/blind/mint", "^/v1/mint/.*",  "^/v1/melt/.*" }}}
 		<label for="MINT_AUTH_CLEAR_AUTH_URLS" class="settings-input">
             {{clearAuthName := "MINT_AUTH_CLEAR_AUTH_URLS"}}
             {{clearAuthSelectId := "clearAuthSelect"}}
