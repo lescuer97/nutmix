@@ -20,13 +20,13 @@ func ClearAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
-        log.Printf("requestPath: %v", requestPath)
+		log.Printf("requestPath: %v", requestPath)
 		// Check if current path matches any of the patterns
 		for _, pattern := range mint.Config.MINT_AUTH_CLEAR_AUTH_URLS {
-            matches, err :=matchesPattern(requestPath, pattern)
-            if err != nil {
-                log.Panicf("This should not happen and something went wrong %+v. Patten: %s",err, pattern )
-            }
+			matches, err := matchesPattern(requestPath, pattern)
+			if err != nil {
+				log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
+			}
 			if matches {
 				logger.Info("Trying to access restricted route")
 				// For paths matching the pattern, check for the "clear auth" header
@@ -64,13 +64,13 @@ func BlindAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
-        log.Printf("requestPath: %v", requestPath)
+		log.Printf("requestPath: %v", requestPath)
 		// Check if current path matches any of the patterns
 		for _, pattern := range mint.Config.MINT_AUTH_BLIND_AUTH_URLS {
-            matches, err :=matchesPattern(requestPath, pattern)
-            if err != nil {
-                log.Panicf("This should not happen and something went wrong %+v. Patten: %s",err, pattern )
-            }
+			matches, err := matchesPattern(requestPath, pattern)
+			if err != nil {
+				log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
+			}
 			if matches {
 				logger.Info("Trying to access restricted route")
 				// For paths matching the pattern, check for the "clear auth" header
@@ -81,14 +81,14 @@ func BlindAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 					c.Abort()
 					return
 				}
-                authProof, err := cashu.DecodeAuthToken(blindAuth)
-                if err != nil {
+				authProof, err := cashu.DecodeAuthToken(blindAuth)
+				if err != nil {
 					logger.Warn(fmt.Errorf("cashu.DecodeAuthToken(blindAuth). ").Error())
 					c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
 					c.Abort()
 					return
 
-                }
+				}
 
 				err = mint.Signer.VerifyAuthProof(authProof)
 				if err != nil {
@@ -109,9 +109,9 @@ func BlindAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 // matchesPattern checks if a path matches a pattern
 // Simple implementation that handles wildcards at the end of paths (e.g., /v1/mint/*)
 func matchesPattern(path, pattern string) (bool, error) {
-    regex, err := regexp.Compile(pattern)
-    if err != nil {
-        return false,  fmt.Errorf("regexp.Compile(pattern). %w", err)
-    }
-    return regex.MatchString(path), nil
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		return false, fmt.Errorf("regexp.Compile(pattern). %w", err)
+	}
+	return regex.MatchString(path), nil
 }

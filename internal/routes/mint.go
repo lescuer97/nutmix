@@ -189,7 +189,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				nuts[nut] = protectedRoutes
 			case "22":
 				protectedRoutes := cashu.Nut22Info{
-					BatMaxMint: mint.Config.MINT_AUTH_MAX_BLIND_TOKENS,
+					BatMaxMint:      mint.Config.MINT_AUTH_MAX_BLIND_TOKENS,
 					ProtectedRoutes: cashu.ConvertRouteListToProtectedRouteList(mint.Config.MINT_AUTH_BLIND_AUTH_URLS),
 				}
 

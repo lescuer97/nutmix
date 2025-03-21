@@ -33,8 +33,8 @@ const (
 	QUOTE_PENDING        = 20005
 	INVOICE_ALREADY_PAID = 20006
 
-	ENDPOINT_REQUIRES_CLEAR_AUTH    = 300001
-	CLEAR_AUTH_FAILED               = 300002
+	ENDPOINT_REQUIRES_CLEAR_AUTH = 300001
+	CLEAR_AUTH_FAILED            = 300002
 
 	ENDPOINT_REQUIRES_BLIND_AUTH    = 310001
 	BLIND_AUTH_FAILED               = 310002
@@ -84,6 +84,7 @@ func (e ErrorCode) String() string {
 		error = "Endpoint requires clear auth"
 	case CLEAR_AUTH_FAILED:
 		error = "Clear authentification failed"
+
 	case ENDPOINT_REQUIRES_BLIND_AUTH:
 		error = "Endpoint requires Blind auth"
 	case BLIND_AUTH_FAILED:

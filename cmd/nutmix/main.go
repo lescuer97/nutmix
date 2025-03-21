@@ -131,7 +131,9 @@ func main() {
 
 	admin.AdminRoutes(ctx, r, mint, logger)
 
-	logger.Info("Nutmix started in port 8080")
+	PORT := fmt.Sprintf(":%v", 8120)
 
-	r.Run(":8120")
+	logger.Info(fmt.Sprintf("Nutmix started in port %v", 8120))
+
+	r.Run(PORT)
 }
