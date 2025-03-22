@@ -31,7 +31,7 @@ type FakeWallet struct {
 
 const mock_preimage = "fakewalletpreimage"
 
-func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
+func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	switch {
 	case slices.Contains(f.UnpurposeErrors, FailPaymentUnknown):
 		return PaymentResponse{
@@ -62,7 +62,7 @@ func (f FakeWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeR
 
 	return PaymentResponse{
 		Preimage:       mock_preimage,
-		PaymentRequest: invoice,
+		PaymentRequest: melt_quote.Request,
 		PaymentState:   SETTLED,
 		Rhash:          "",
 		PaidFeeSat:     0,
@@ -97,16 +97,21 @@ func (f FakeWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (Paymen
 	return SETTLED, mock_preimage, nil
 }
 
-func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
-	fee := GetFeeReserve(amount_sat, f.InvoiceFee)
+func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
+	fee := GetFeeReserve(amount.Amount, f.InvoiceFee)
 	return fee, nil
 }
 
-func (f FakeWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
+func (f FakeWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
 	var response InvoiceResponse
+	supported := f.VerifyUnitSupport(amount.Unit)
+	if !supported {
+		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit). %w", cashu.ErrUnitNotSupported)
+	}
+
 	expireTime := cashu.ExpiryTimeMinUnit(15)
 
-	payReq, err := CreateMockInvoice(amount, "mock invoice", f.Network, expireTime)
+	payReq, err := CreateMockInvoice(int64(amount.Amount), "mock invoice", f.Network, expireTime)
 	if err != nil {
 		return response, fmt.Errorf(`CreateMockInvoice(amount, "mock invoice", f.Network, expireTime). %w`, err)
 	}
@@ -137,4 +142,7 @@ func (f FakeWallet) GetNetwork() *chaincfg.Params {
 
 func (f FakeWallet) ActiveMPP() bool {
 	return false
+}
+func (f FakeWallet) VerifyUnitSupport(unit cashu.Unit) bool {
+	return true
 }

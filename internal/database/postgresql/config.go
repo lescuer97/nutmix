@@ -32,7 +32,8 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
             cln_macaroon,
             peg_out_only,
             peg_out_limit_sats,
-            peg_in_limit_sats
+            peg_in_limit_sats,
+            strike_key
          FROM config WHERE id = 1`)
 	defer rows.Close()
 
@@ -54,7 +55,6 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
 }
 
 func (pql Postgresql) SetConfig(config utils.Config) error {
-
 	tries := 0
 	stmt := `
         INSERT INTO config (
@@ -79,8 +79,9 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
             cln_macaroon,
             peg_out_only,
             peg_out_limit_sats,
-            peg_in_limit_sats
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`
+            peg_in_limit_sats,
+            strike_key
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`
 
 	for {
 		tries += 1
@@ -107,6 +108,7 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
 			config.PEG_OUT_ONLY,
 			config.PEG_OUT_LIMIT_SATS,
 			config.PEG_IN_LIMIT_SATS,
+			config.STRIKE_KEY,
 		)
 
 		switch {
@@ -122,12 +124,9 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
 }
 
 func (pql Postgresql) UpdateConfig(config utils.Config) error {
-
 	tries := 0
-
 	for {
 		tries += 1
-
 		stmt := `
         UPDATE config SET
             name = $1,
@@ -150,7 +149,8 @@ func (pql Postgresql) UpdateConfig(config utils.Config) error {
             cln_macaroon = $18,
             peg_out_only = $19,
             peg_out_limit_sats = $20,
-            peg_in_limit_sats = $21
+            peg_in_limit_sats = $21,
+            strike_key = $22
         WHERE id = 1`
 		_, err := pql.pool.Exec(context.Background(), stmt,
 			config.NAME,
@@ -174,6 +174,7 @@ func (pql Postgresql) UpdateConfig(config utils.Config) error {
 			config.PEG_OUT_ONLY,
 			config.PEG_OUT_LIMIT_SATS,
 			config.PEG_IN_LIMIT_SATS,
+			config.STRIKE_KEY,
 		)
 
 		switch {
