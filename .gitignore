@@ -12,3 +12,8 @@ tmp/
 testnet/ 
 #breez sdk info
 mainnet/
+
+#keycloak
+
+keycloak/keycloak_export
+keycloak/postgres_data

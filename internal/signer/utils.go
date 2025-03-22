@@ -60,7 +60,13 @@ func DeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, error) 
 		return nil, fmt.Errorf("mintKey.NewChildKey(uint32(seed.Version)) %w", err)
 	}
 
-	keyset, err := cashu.GenerateKeysets(versionKey, cashu.GetAmountsForKeysets(), seed.Id, unit, seed.InputFeePpk, seed.Active)
+	amounts := cashu.GetAmountsForKeysets()
+
+	if unit == cashu.AUTH {
+		amounts = []uint64{amounts[0]}
+	}
+
+	keyset, err := cashu.GenerateKeysets(versionKey, amounts, seed.Id, unit, seed.InputFeePpk, seed.Active)
 	if err != nil {
 		return nil, fmt.Errorf(`GenerateKeysets(versionKey,GetAmountsForKeysets(), "", unit, 0) %w`, err)
 	}

@@ -3,13 +3,15 @@ package mint
 import (
 	"context"
 	"fmt"
+	"log"
+
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/signer"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"log"
 )
 
 type Mint struct {
@@ -18,6 +20,7 @@ type Mint struct {
 	MintPubkey       string
 	MintDB           database.MintDB
 	Signer           signer.Signer
+	OICDClient       *oidc.Provider
 	Observer         *Observer
 }
 

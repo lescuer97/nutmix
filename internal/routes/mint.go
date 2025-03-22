@@ -83,6 +83,10 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		if mint.LightningBackend.ActiveMPP() {
 			optionalNuts = append(optionalNuts, "15")
 		}
+		if mint.Config.MINT_REQUIRE_AUTH {
+			optionalNuts = append(optionalNuts, "21")
+			optionalNuts = append(optionalNuts, "22")
+		}
 
 		for _, nut := range baseNuts {
 			b := false
@@ -174,6 +178,23 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 				nuts[nut] = wsMethod
 
+			case "21":
+				formatedDiscoveryUrl := mint.Config.MINT_AUTH_OICD_DISCOVERY_URL + "/.well-known/openid-configuration"
+				protectedRoutes := cashu.Nut21Info{
+					OpenIdDiscovery: formatedDiscoveryUrl,
+					ClientId:        mint.Config.MINT_AUTH_OICD_CLIENT_ID,
+					ProtectedRoutes: cashu.ConvertRouteListToProtectedRouteList(mint.Config.MINT_AUTH_CLEAR_AUTH_URLS),
+				}
+
+				nuts[nut] = protectedRoutes
+			case "22":
+				protectedRoutes := cashu.Nut22Info{
+					BatMaxMint:      mint.Config.MINT_AUTH_MAX_BLIND_TOKENS,
+					ProtectedRoutes: cashu.ConvertRouteListToProtectedRouteList(mint.Config.MINT_AUTH_BLIND_AUTH_URLS),
+				}
+
+				nuts[nut] = protectedRoutes
+
 			default:
 				nuts[nut] = cashu.SwapMintInfo{
 					Supported: &b,
@@ -226,7 +247,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 		keysets, err := mint.Signer.GetKeys()
 		if err != nil {
-			logger.Warn("mint.Signer.GetKeysByUnit(unit)", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Warn("mint.Signer.GetKeys()", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}

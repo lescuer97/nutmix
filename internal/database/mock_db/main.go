@@ -26,6 +26,7 @@ type MockDB struct {
 	LiquiditySwap []utils.LiquiditySwap
 	MeltChange    []cashu.MeltChange
 	Seeds         []cashu.Seed
+	AuthUser      []database.AuthUser
 	Config        utils.Config
 	ErrorToReturn error
 }

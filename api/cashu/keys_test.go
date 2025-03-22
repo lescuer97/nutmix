@@ -7,13 +7,11 @@ import (
 )
 
 func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
-
 	// setup key
 	key, err := bip32.NewMasterKey([]byte("seed"))
 	if err != nil {
 		t.Errorf("could not setup master key %+v", err)
 	}
-
 	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat, 0, true)
 
 	if err != nil {
