@@ -1,17 +1,13 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
-	"log"
-	"log/slog"
-	"regexp"
-	// "strings"
-
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/mint"
+	"log"
+	"log/slog"
+	"regexp"
 )
 
 // ClearAuthMiddleware creates a middleware that checks for the "clear auth" header
@@ -20,8 +16,6 @@ func ClearAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
-		log.Printf("\n MINT_AUTH_CLEAR_AUTH_URLS,%v ", mint.Config.MINT_AUTH_CLEAR_AUTH_URLS )
-		log.Printf("\npath ,%v ", requestPath )
 		// Check if current path matches any of the patterns
 		for _, pattern := range mint.Config.MINT_AUTH_CLEAR_AUTH_URLS {
 			matches, err := matchesPattern(requestPath, pattern)
@@ -38,14 +32,11 @@ func ClearAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 					c.Abort()
 					return
 				}
-				verifier := mint.OICDClient.Verifier(&oidc.Config{ClientID: mint.Config.MINT_AUTH_OICD_CLIENT_ID})
 				// check if it's valid token
 				token := c.GetHeader("Clear-auth")
-
-				ctx := context.Background()
-				_, err := verifier.Verify(ctx, token)
+				err := mint.VerifyAuthClearToken(token)
 				if err != nil {
-					logger.Error(fmt.Errorf("verifier.Verify(ctx,token ). %w", err).Error())
+					logger.Error(fmt.Errorf("mint.VerifyAuthClearToken(token). %w", err).Error())
 					c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
 					return
 				}
@@ -87,13 +78,13 @@ func BlindAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 					c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
 					c.Abort()
 					return
-
 				}
 
-				err = mint.Signer.VerifyAuthProof(authProof)
+				authProof.Amount = 1
+				err = mint.VerifyAuthBlindToken(authProof)
 				if err != nil {
-					logger.Error(fmt.Errorf("mint.Signer.VerifyAuthProof(authProof). %w", err).Error())
-					c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
+					logger.Error(fmt.Errorf("mint.VerifyAuthBlindToken(authProof). %w", err).Error())
+					c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
 					return
 				}
 				// Header exists, continue processing

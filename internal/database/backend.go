@@ -21,11 +21,10 @@ type NostrLoginAuth struct {
 }
 
 type AuthUser struct {
-	Sub string `db:"sub"`
-	Aud *string `db:"aud"`
-	LastLoggedIn uint64 `db:"last_logged_in"`
+	Sub          string  `db:"sub"`
+	Aud          *string `db:"aud"`
+	LastLoggedIn uint64  `db:"last_logged_in"`
 }
-
 
 var DBError = errors.New("ERROR DATABASE")
 
@@ -98,11 +97,10 @@ type MintDB interface {
 	GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error)
 	GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error)
 
-
-	// Mint Auth 
-	GetAuthUser(tx pgx.Tx,sub string) (AuthUser, error)
-	MakeAuthUser(tx pgx.Tx,auth AuthUser)  error
-	UpdateLastLoggedIn(tx pgx.Tx, sub string, lastLoggedIn uint64)  error
+	// Mint Auth
+	GetAuthUser(tx pgx.Tx, sub string) (AuthUser, error)
+	MakeAuthUser(tx pgx.Tx, auth AuthUser) error
+	UpdateLastLoggedIn(tx pgx.Tx, sub string, lastLoggedIn uint64) error
 
 	// liquidity provider state
 }

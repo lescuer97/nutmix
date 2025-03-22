@@ -3,11 +3,12 @@ package routes
 import (
 	"context"
 	"fmt"
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"log/slog"
 )
 
 func v1AuthRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
@@ -39,7 +40,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		c.JSON(200, keysets)
 	})
 
-	auth.GET("/blind/keys/keysets", func(c *gin.Context) {
+	auth.GET("/blind/keysets", func(c *gin.Context) {
 		keys, err := mint.Signer.GetAuthKeys()
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.Signer.GetAuthKeys() %w", err).Error())
@@ -50,7 +51,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		c.JSON(200, keys)
 	})
 
-	auth.GET("/blind/mint", func(c *gin.Context) {
+	auth.POST("/blind/mint", func(c *gin.Context) {
 		var mintRequest cashu.PostMintBolt11Request
 		err := c.BindJSON(&mintRequest)
 		if err != nil {
@@ -97,7 +98,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		if amountBlindMessages > uint64(mint.Config.MINT_AUTH_MAX_BLIND_TOKENS) {
 			logger.Warn(fmt.Errorf("Trying to mint auth tokens over the limit").Error())
-			c.JSON(500, "Opps!, something went wrong")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.MAXIMUM_BAT_MINT_LIMIT_EXCEEDED, nil))
 			return
 		}
 

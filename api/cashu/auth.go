@@ -2,12 +2,19 @@ package cashu
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
+	gonutsCrypto "github.com/elnosh/gonuts/crypto"
 )
 
-var ErrInvalidAuthToken = errors.New("Invalid auth token")
+var (
+	ErrInvalidAuthToken  = errors.New("Invalid auth token")
+	ErrClearTokenExpired = errors.New("Clear to token is expired")
+)
 
 type ProtectedRoute struct {
 	Method string `json:"method"`
@@ -29,6 +36,40 @@ type AuthProof struct {
 	Secret string `json:"secret"`
 	C      string `json:"C" db:"c"`
 	Amount uint64 `json:"amount" db:"amount"`
+}
+
+func (a AuthProof) Y() (string, error) {
+	// Get Hash to curve of secret
+	parsedSecret := []byte(a.Secret)
+
+	y, err := gonutsCrypto.HashToCurve(parsedSecret)
+
+	if err != nil {
+		return "", fmt.Errorf("crypto.HashToCurve: %+v", err)
+	}
+
+	return hex.EncodeToString(y.SerializeCompressed()), nil
+}
+
+// creates a normal proof for storage
+func (a AuthProof) Proof(y string, state ProofState) Proof {
+	var proof Proof
+
+	proof.Amount = a.Amount
+	proof.Id = a.Id
+	proof.Y = y
+	proof.C = a.C
+	proof.Secret = a.Secret
+	proof.SeenAt = time.Now().Unix()
+	proof.State = state
+
+	return proof
+}
+
+type AuthClams struct {
+	Sub string  `json:"sub"`
+	Azp string  `json:"azp"`
+	Aud *string `json:"aud"`
 }
 
 type PostAuthBlindMintResponse struct {

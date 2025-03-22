@@ -16,5 +16,4 @@ type Signer interface {
 
 	SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error)
 	VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage) error
-	VerifyAuthProof(authProof cashu.AuthProof) error
 }

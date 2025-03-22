@@ -2,17 +2,20 @@ package localsigner
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"os"
+	"sort"
+	"time"
+
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/elnosh/gonuts/crypto"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/signer"
 	"github.com/tyler-smith/go-bip32"
-	"os"
-	"sort"
-	"time"
 )
 
 type LocalSigner struct {
@@ -49,7 +52,6 @@ func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
 		if err != nil {
 			return localsigner, fmt.Errorf("db.SaveNewSeeds([]cashu.Seed{newSeed}). %w", err)
 		}
-
 		seeds = append(seeds, newSeed)
 
 	}
@@ -131,6 +133,7 @@ func (l *LocalSigner) getSignerPrivateKey() (*secp256k1.PrivateKey, error) {
 
 	return mintKey, nil
 }
+
 func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, version int, fee uint) (cashu.Seed, error) {
 	// rotate one level up
 	newSeed := cashu.Seed{
@@ -156,12 +159,15 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 }
 
 func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
-	seeds, err := l.db.GetSeedsByUnit(cashu.AUTH)
+	// get current highest seed version
+	var highestSeed cashu.Seed = cashu.Seed{Version: 0}
+	seeds, err := l.db.GetSeedsByUnit(unit)
 	if err != nil {
-		return fmt.Errorf("database.GetSeedsByUnit(pool, cashu.Sat). %w", err)
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("database.GetSeedsByUnit(pool, cashu.Sat). %w", err)
+		}
 	}
 	// get current highest seed version
-	var highestSeed cashu.Seed
 	for i, seed := range seeds {
 		if highestSeed.Version < seed.Version {
 			highestSeed = seed
@@ -418,46 +424,46 @@ func (l *LocalSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	return response, nil
 }
 
-func (l *LocalSigner) VerifyAuthProof(authProof cashu.AuthProof) error {
-	err := l.validateAuthProof(authProof)
-	if err != nil {
-		return fmt.Errorf("l.validateAuthProof(authProof): %w", err)
-	}
-	return nil
-}
-func (l *LocalSigner) validateAuthProof(proof cashu.AuthProof) error {
-	var keysetToUse cashu.MintKey
-
-	keysets, exists := l.keysets[proof.Id]
-	if !exists {
-		return cashu.ErrKeysetForProofNotFound
-	}
-
-	for _, keyset := range keysets {
-		if keyset.Amount == proof.Amount && keyset.Id == proof.Id {
-			keysetToUse = keyset
-			break
-		}
-	}
-
-	// check if keysetToUse is not assigned
-	if keysetToUse.Id == "" {
-		return cashu.ErrKeysetForProofNotFound
-	}
-
-	parsedBlinding, err := hex.DecodeString(proof.C)
-	if err != nil {
-		return fmt.Errorf("hex.DecodeString: %w %w", err, cashu.ErrInvalidProof)
-	}
-	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
-	if err != nil {
-		return fmt.Errorf("secp256k1.ParsePubKey: %w %w", err, cashu.ErrInvalidProof)
-	}
-	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
-	if !verified {
-		return cashu.ErrInvalidProof
-	}
-
-	return nil
-
-}
+// func (l *LocalSigner) VerifyAuthProof(authProof cashu.AuthProof) error {
+// 	err := l.validateAuthProof(authProof)
+// 	if err != nil {
+// 		return fmt.Errorf("l.validateAuthProof(authProof): %w", err)
+// 	}
+// 	return nil
+// }
+// func (l *LocalSigner) validateAuthProof(proof cashu.AuthProof) error {
+// 	var keysetToUse cashu.MintKey
+//
+// 	keysets, exists := l.keysets[proof.Id]
+// 	if !exists {
+// 		return cashu.ErrKeysetForProofNotFound
+// 	}
+//
+// 	for _, keyset := range keysets {
+// 		if keyset.Amount == proof.Amount && keyset.Id == proof.Id {
+// 			keysetToUse = keyset
+// 			break
+// 		}
+// 	}
+//
+// 	// check if keysetToUse is not assigned
+// 	if keysetToUse.Id == "" {
+// 		return cashu.ErrKeysetForProofNotFound
+// 	}
+//
+// 	parsedBlinding, err := hex.DecodeString(proof.C)
+// 	if err != nil {
+// 		return fmt.Errorf("hex.DecodeString: %w %w", err, cashu.ErrInvalidProof)
+// 	}
+// 	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
+// 	if err != nil {
+// 		return fmt.Errorf("secp256k1.ParsePubKey: %w %w", err, cashu.ErrInvalidProof)
+// 	}
+// 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
+// 	if !verified {
+// 		return cashu.ErrInvalidProof
+// 	}
+//
+// 	return nil
+//
+// }
