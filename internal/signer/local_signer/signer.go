@@ -101,36 +101,9 @@ func (l *LocalSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 	}
 	return signer.GetKeysResponse{}, signer.ErrNoKeysetFound
 }
-func (l *LocalSigner) GetKeysByUnit(unit cashu.Unit) ([]cashu.Keyset, error) {
-	var keys []cashu.Keyset
-
-	for _, mintKey := range l.keysets {
-
-		if len(mintKey) > 0 {
-
-			if mintKey[0].Unit == unit.String() {
-
-				keysetResp := cashu.Keyset{
-					Id:          mintKey[0].Id,
-					Unit:        mintKey[0].Unit,
-					InputFeePpk: mintKey[0].InputFeePpk,
-					Keys:        make(map[string]string),
-				}
-
-				for _, keyset := range mintKey {
-					keysetResp.Keys[strconv.FormatUint(keyset.Amount, 10)] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
-				}
-
-				keys = append(keys, keysetResp)
-			}
-
-		}
-	}
-	return keys, nil
-}
 
 // gets all keys from the signer
-func (l *LocalSigner) GetKeys() (signer.GetKeysetsResponse, error) {
+func (l *LocalSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 	var response signer.GetKeysetsResponse
 	seeds, err := l.db.GetAllSeeds()
 	if err != nil {

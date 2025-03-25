@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package proto_signer;
+option go_package = "nutmix_remote_signer/proto_signer";
+
+service Signer {
+  rpc BlindSign (BlindedMessages) returns (BlindSignatures);
+  rpc VerifyProofs (Proofs) returns (Success);
+  rpc ActiveKeys (EmptyRequest) returns (KeysResponse);
+  rpc KeysById (Id) returns (KeysResponse);
+  rpc Keysets (EmptyRequest) returns (KeysetResponse);
+  rpc Pubkey (EmptyRequest) returns (PublicKey);
+  rpc RotateKeyset (RotationRequest) returns (Success);
+}
+message EmptyRequest {}
+
+message Success {
+    bool success  = 1;
+}
+message RotationRequest {
+    string unit  = 1;
+    uint32 fee  = 2;
+}
+message PublicKey {
+    bytes pubkey  = 1;
+}
+
+message Id {
+    string id  = 1;
+}
+
+message Proofs {
+    repeated Proof proof = 1;
+}
+message Proof {
+    uint64 amount = 1;
+    string keyset_id = 2;
+    bytes secret = 3;
+    bytes C = 4;
+    optional Witness witness = 5;
+}
+
+message ProofDLEQ {
+    bytes e = 1;
+    bytes s = 2;
+    bytes r = 3;
+}
+
+message BlindSignatures {
+    repeated BlindSignature blind_signatures = 1;
+}
+message BlindSignature {
+    uint64 amount = 1;
+    string keyset_id = 2;
+    bytes blinded_secret = 3;
+    optional BlindSignatureDLEQ dleq = 4;
+}
+
+message BlindSignatureDLEQ {
+    bytes e = 1;
+    bytes s = 2;
+}
+
+
+message BlindedMessages {
+    repeated BlindedMessage blinded_messages = 1;
+}
+// Represents a blinded message
+message BlindedMessage {
+    uint64 amount = 1;
+    string keyset_id = 2;
+    bytes blinded_secret = 3;
+}
+
+// Witness type
+message Witness {
+    oneof witness_type {
+        P2PKWitness p2pk_witness = 1;
+        HTLCWitness htlc_witness = 2;
+    }
+}
+
+// P2PKWitness type
+message P2PKWitness {
+    // List of signatures
+    repeated string signatures = 1;
+}
+
+// HTLCWitness type
+message HTLCWitness {
+    // Preimage
+    string preimage = 1;
+
+    // List of signatures
+    repeated string signatures = 2;
+}
+
+message KeysResponse {
+  repeated Keys keysets = 1;
+}
+
+message KeysetResponse {
+  repeated Keyset keysets = 1;
+}
+
+message Keys {
+  string id = 1;
+  string unit = 2;
+  map<string, string> keys = 3;
+  uint32 input_fee_ppk = 4;
+}
+
+message Keyset {
+  string id = 1;
+  string unit = 2;
+  bool active = 3;
+  uint32 input_fee_ppk = 4;
+}
+

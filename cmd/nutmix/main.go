@@ -3,6 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
+	"log/slog"
+	"os"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -10,12 +15,9 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
-	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
+	// localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
+	socketremotesigner "github.com/lescuer97/nutmix/internal/signer/socket_remote_signer"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"io"
-	"log"
-	"log/slog"
-	"os"
 )
 
 var (
@@ -92,7 +94,11 @@ func main() {
 		log.Fatalf("mint.SetUpConfigFile(): %+v ", err)
 	}
 
-	signer, err := localsigner.SetupLocalSigner(db)
+	// signer, err := localsigner.SetupLocalSigner(db)
+	// if err != nil {
+	// 	log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
+	// }
+	signer, err := socketremotesigner.SetupSocketSigner()
 	if err != nil {
 		log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
 	}
@@ -122,7 +128,7 @@ func main() {
 
 	admin.AdminRoutes(ctx, r, mint, logger)
 
-	logger.Info("Nutmix started in port 8080")
+	logger.Info("Nutmix started in port 8120")
 
-	r.Run(":8080")
+	r.Run(":8120")
 }

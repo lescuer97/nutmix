@@ -27,7 +27,7 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 		t.Fatalf("localsigner.RotateKeyset(cashu.Sat, uint(100)) %+v", err)
 	}
 
-	keys, err := localsigner.GetKeys()
+	keys, err := localsigner.GetKeysets()
 	if err != nil {
 		t.Fatalf("localsigner.GetKeys() %+v", err)
 

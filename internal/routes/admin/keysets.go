@@ -32,21 +32,21 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			Keysets []KeysetData
 		}{}
 
-		seeds, err := mint.MintDB.GetAllSeeds()
+		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
-			logger.Error("database.GetAllSeeds(pool) %+v", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("mint.Signer.GetKeysets() %+v", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Server side error")
 			return
 		}
 
-		for _, seed := range seeds {
+		for _, seed := range keysets.Keysets {
 			keysetArr.Keysets = append(keysetArr.Keysets, KeysetData{
 				Id:        seed.Id,
 				Active:    seed.Active,
 				Unit:      seed.Unit,
 				Fees:      seed.InputFeePpk,
-				CreatedAt: seed.CreatedAt,
-				Version:   seed.Version,
+				// CreatedAt: seed.CreatedAt,
+				// Version:   seed.Version,
 			})
 		}
 

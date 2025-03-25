@@ -43,7 +43,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	})
 	v1.GET("/keysets", func(c *gin.Context) {
 
-		keys, err := mint.Signer.GetKeys()
+		keys, err := mint.Signer.GetKeysets()
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.Signer.GetKeys() %w", err).Error())
 			c.JSON(500, "Server side error")
@@ -224,7 +224,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		for _, output := range swapRequest.Outputs {
 			AmountSignature += output.Amount
 		}
-		keysets, err := mint.Signer.GetKeys()
+		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
 			logger.Warn("mint.Signer.GetKeysByUnit(unit)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
