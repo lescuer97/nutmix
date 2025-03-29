@@ -11,7 +11,6 @@ import (
 	sig "github.com/lescuer97/nutmix/internal/gen"
 	"github.com/lescuer97/nutmix/internal/signer"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type SocketSigner struct {
@@ -23,8 +22,12 @@ const abstractSocket = "unix:@signer_socket"
 func SetupSocketSigner() (SocketSigner, error) {
 	socketSigner := SocketSigner{}
 
+	certs, err := GetTlsSecurityCredential()
+	if err != nil {
+		return socketSigner, fmt.Errorf("GetTlsSecurityCredential(). %w", err)
+	}
 	conn, err := grpc.NewClient(abstractSocket,
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+		grpc.WithTransportCredentials(certs))
 
 	if err != nil {
 		log.Fatalf("grpc connection failed: %v", err)
