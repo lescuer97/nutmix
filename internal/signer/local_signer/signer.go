@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"

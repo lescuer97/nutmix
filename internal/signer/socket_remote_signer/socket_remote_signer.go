@@ -24,7 +24,7 @@ func SetupSocketSigner() (SocketSigner, error) {
 	socketSigner := SocketSigner{}
 
 	conn, err := grpc.NewClient(abstractSocket,
-	grpc.WithTransportCredentials(insecure.NewCredentials()))
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	if err != nil {
 		log.Fatalf("grpc connection failed: %v", err)
@@ -45,7 +45,6 @@ func (s *SocketSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
 	if err != nil {
 		return signer.GetKeysResponse{}, fmt.Errorf("s.grpcClient.Pubkey(ctx, &emptyRequest). %w", err)
 	}
-	log.Printf("\n keys: %v", keys)
 
 	return ConvertSigKeysToKeysResponse(keys), nil
 }
@@ -79,11 +78,11 @@ func (s *SocketSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 	ctx := context.Background()
 	rotationReq := sig.RotationRequest{
 		Unit: unit.String(),
-		Fee: uint32(fee),
+		Fee:  uint32(fee),
 	}
 	success, err := s.grpcClient.RotateKeyset(ctx, &rotationReq)
 	if err != nil {
-		return  fmt.Errorf("s.grpcClient.BlindSign(ctx, &blindedMessageRequest). %w", err)
+		return fmt.Errorf("s.grpcClient.BlindSign(ctx, &blindedMessageRequest). %w", err)
 	}
 
 	if !success.Success {
@@ -150,21 +149,33 @@ func (s *SocketSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.
 	for i, val := range proofs {
 		C, err := hex.DecodeString(val.C)
 		if err != nil {
-			return  fmt.Errorf("hex.DecodeString(val.C). %w", err)
+			return fmt.Errorf("hex.DecodeString(val.C). %w", err)
+		}
+		checkOutputs := false
+		isProofLocked, spendCondition, witness, err := val.IsProofSpendConditioned(&checkOutputs)
+
+		if err != nil {
+			return fmt.Errorf("proof.IsProofSpendConditioned(): %w %w", err, cashu.ErrInvalidProof)
 		}
 
-		proofsVericationRequest.Proof[i] =  &sig.Proof{
-			Amount:        val.Amount,
-			KeysetId:      val.Id,
-			C: C,
-			Secret: []byte(val.Secret),
-			// Witness: &sig.Witness{} val.Witness,
+		var sigWitness *sig.Witness = nil
+
+		if isProofLocked {
+			sigWitness = ConvertWitnessToGrpc(spendCondition, witness)
+		}
+
+		proofsVericationRequest.Proof[i] = &sig.Proof{
+			Amount:   val.Amount,
+			KeysetId: val.Id,
+			C:        C,
+			Secret:   []byte(val.Secret),
+			Witness:  sigWitness,
 		}
 	}
 
 	success, err := s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest)
 	if err != nil {
-		return  fmt.Errorf("s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest). %w", err)
+		return fmt.Errorf("s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest). %w", err)
 	}
 
 	if !success.Success {

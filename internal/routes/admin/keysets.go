@@ -41,10 +41,10 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		for _, seed := range keysets.Keysets {
 			keysetArr.Keysets = append(keysetArr.Keysets, KeysetData{
-				Id:        seed.Id,
-				Active:    seed.Active,
-				Unit:      seed.Unit,
-				Fees:      seed.InputFeePpk,
+				Id:     seed.Id,
+				Active: seed.Active,
+				Unit:   seed.Unit,
+				Fees:   seed.InputFeePpk,
 				// CreatedAt: seed.CreatedAt,
 				// Version:   seed.Version,
 			})

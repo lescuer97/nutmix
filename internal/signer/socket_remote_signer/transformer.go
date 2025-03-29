@@ -55,12 +55,11 @@ func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignatures) []cash
 			E: secp256k1.PrivKeyFromBytes(val.Dleq.E),
 			S: secp256k1.PrivKeyFromBytes(val.Dleq.S),
 		}
-		blindSigs = append(blindSigs,  cashu.BlindSignature{Amount: val.Amount, C_: hex.EncodeToString(val.BlindedSecret), Id: val.KeysetId, Dleq: &dleq })
+		blindSigs = append(blindSigs, cashu.BlindSignature{Amount: val.Amount, C_: hex.EncodeToString(val.BlindedSecret), Id: val.KeysetId, Dleq: &dleq})
 	}
 
 	return blindSigs
 }
-
 
 func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.BlindedMessages, error) {
 	messagesGrpc := sig.BlindedMessages{
@@ -73,13 +72,52 @@ func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.Blinded
 			return &messagesGrpc, fmt.Errorf("hex.DecodeString(val.B_). %w", err)
 		}
 
-		messagesGrpc.BlindedMessages[i] =  &sig.BlindedMessage{
-			Amount: val.Amount,
-			KeysetId: val.Id,
+		messagesGrpc.BlindedMessages[i] = &sig.BlindedMessage{
+			Amount:        val.Amount,
+			KeysetId:      val.Id,
 			BlindedSecret: B_,
 			// Witness: &sig.Witness{} val.Witness,
 		}
 	}
 
 	return &messagesGrpc, nil
+}
+
+func ConvertWitnessToGrpc(spendCondition *cashu.SpendCondition, witness *cashu.Witness) *sig.Witness {
+	if witness == nil {
+		return nil
+	}
+
+	var sigWitness *sig.Witness = nil
+	stringSignatures := []string{}
+	for i := range witness.Signatures {
+		stringSignatures = append(stringSignatures, hex.EncodeToString(witness.Signatures[i].Serialize()))
+	}
+
+	switch spendCondition.Type {
+	case cashu.P2PK:
+		sigWitness = &sig.Witness{
+			WitnessType: nil,
+		}
+		p2pkWitness := sig.P2PKWitness{
+			Signatures: stringSignatures,
+		}
+
+		sigWitness.WitnessType = &sig.Witness_P2PkWitness{
+			P2PkWitness: &p2pkWitness,
+		}
+	case cashu.HTLC:
+		sigWitness = &sig.Witness{
+			WitnessType: nil,
+		}
+		htlcWitness := sig.HTLCWitness{
+			Signatures: stringSignatures,
+			Preimage:   witness.Preimage,
+		}
+		sigWitness.WitnessType = &sig.Witness_HtlcWitness{
+			HtlcWitness: &htlcWitness,
+		}
+	}
+
+	return sigWitness
 }
