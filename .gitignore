@@ -12,6 +12,7 @@ tmp/
 testnet/ 
 #breez sdk info
 mainnet/
+tls/
 
 #keycloak
 

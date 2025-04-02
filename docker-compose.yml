@@ -26,7 +26,7 @@ services:
     image: postgres:16.2
     restart: always
     ports:
-      - 127.0.0.1:5435:5432
+      - 127.0.0.1:5432:5432
     volumes:
       - db:/var/lib/postgresql/data
     environment:
@@ -75,6 +75,67 @@ services:
     volumes:
       - /var/log/nutmix:/var/log/nutmix
       - ${HOME}/.config/nutmix:/root/.config/nutmix
+
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.6
+    command: start --import-realm
+    volumes:
+      - ./keycloak-export:/opt/keycloak/data/import
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.keycloak.headers.browserXSSFilter=true"
+      - "traefik.http.middlewares.keycloak.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.keycloak.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.keycloak.headers.stsPreload=true"
+      - "traefik.http.middlewares.keycloak.headers.stsSeconds=155520011"
+      - "traefik.http.middlewares.keycloak_redirect.redirectregex.permanent=true"
+      - "traefik.http.middlewares.keycloak_redirect.redirectregex.regex=https://(.*)/.well-known/(card|cal)dav"
+      - "traefik.http.middlewares.keycloak_redirect.redirectregex.replacement=https://$${1}/remote.php/dav/"
+      - "traefik.http.routers.keycloak.entrypoints=websecure"
+      - "traefik.http.routers.keycloak.middlewares=keycloak,keycloak_redirect,mint-https"
+      - "traefik.http.routers.keycloak.rule=Host(`${KEYCLOAK_HOSTNAME}`)"
+      - "traefik.http.routers.keycloak.tls.certresolver=selfhostedservices"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8081"
+      - "traefik.http.middlewares.keycloak.headers.customRequestHeaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.keycloak-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.keycloak-ratelimit1.ratelimit.average=30"
+      - "traefik.http.middlewares.keycloak-ratelimit2.ratelimit.burst=60"
+      - "traefik.http.routers.keycloak-http.entrypoints=web"
+      - "traefik.http.routers.keycloak-http.rule=Host(`${KEYCLOAK_HOSTNAME}`)"
+      - "traefik.http.routers.keycloak-http.middlewares=mint-https@docker"
+    environment:
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME}
+      KC_HOSTNAME_PORT: ${KEYCLOAK_HOSTNAME_PORT}
+      KC_HOSTNAME_STRICT_BACKCHANNEL: false
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT_HTTPS: true
+      KC_HEALTH_ENABLED: true
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: keycloak_postgres
+      KC_DB_URL: jdbc:postgresql://postgres/${KEYCLOAK_POSTGRES_DB}
+      KC_DB_USERNAME: ${KEYCLOAK_POSTGRES_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD}
+    ports:
+      - 8081:8080
+    restart: always
+    depends_on:
+      - keycloak_postgres
+
+  keycloak_postgres:
+    image: postgres:16.4
+    volumes:
+      - ./keycloak_pq_data:/var/lib/postgresql/data
+    ports:
+      - 127.0.0.1:5435:5432
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_POSTGRES_DB}
+      POSTGRES_USER: ${KEYCLOAK_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD}
+
 volumes:
   db:
+    driver: local
+  keycloak_pq_data:
     driver: local
