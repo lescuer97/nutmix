@@ -182,7 +182,7 @@ func (pql Postgresql) UpdateSeedsActiveStatus(seeds []cashu.Seed) error {
 func (pql Postgresql) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error {
 	ctx := context.Background()
 
-	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt)
+	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 
@@ -201,8 +201,7 @@ func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool,
 }
 
 func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintRequestDB, error) {
-
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE quote = $1 FOR UPDATE", id)
+	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount FROM mint_request WHERE quote = $1 FOR UPDATE", id)
 	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -223,7 +222,7 @@ func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintReques
 }
 
 func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error) {
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE request = $1 FOR UPDATE", request)
+	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount FROM mint_request WHERE request = $1 FOR UPDATE", request)
 	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -455,10 +454,9 @@ func (pql Postgresql) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
 	// change the paid status of the quote
 	batch := pgx.Batch{}
 	for _, proof := range proofs {
-
 		batch.Queue(`DELETE FROM proofs WHERE y = $1`, proof.Y)
-
 	}
+
 	results := tx.SendBatch(context.Background(), &batch)
 	defer results.Close()
 

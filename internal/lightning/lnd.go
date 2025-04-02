@@ -359,14 +359,14 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	return fee, nil
 }
 
-func (l LndGrpcWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
+func (l LndGrpcWallet) RequestInvoice(amount uint64) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
 	// Expiry time is 15 minutes
-	res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: amount, Expiry: 900})
+	res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: int64(amount), Expiry: 900})
 
 	if err != nil {
 		return response, err
