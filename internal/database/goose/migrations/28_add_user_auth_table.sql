@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE user_auth (
+CREATE TABLE IF NOT EXISTS user_auth (
 	sub text NOT NULL,
 	aud text,
 	last_logged_in  int4 NOT NULL DEFAULT 0,

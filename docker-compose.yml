@@ -103,7 +103,7 @@ services:
       - "traefik.http.middlewares.keycloak-ratelimit2.ratelimit.burst=60"
       - "traefik.http.routers.keycloak-http.entrypoints=web"
       - "traefik.http.routers.keycloak-http.rule=Host(`${KEYCLOAK_HOSTNAME}`)"
-      - "traefik.http.routers.keycloak-http.middlewares=mint-https@docker"
+      - "traefik.http.routers.keycloak-http.middlewares=keycloak-https@docker"
     environment:
       KC_HOSTNAME: ${KEYCLOAK_HOSTNAME}
       KC_HOSTNAME_PORT: ${KEYCLOAK_HOSTNAME_PORT}
