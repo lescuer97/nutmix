@@ -3,6 +3,7 @@ package localsigner
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -12,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/elnosh/gonuts/crypto"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/signer"
@@ -192,12 +194,15 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 	}
 	defer l.db.Rollback(ctx, tx)
 
-	seeds, err := l.db.GetSeedsByUnit(tx, unit)
-	if err != nil {
-		return fmt.Errorf("database.GetSeedsByUnit(tx, unit). %w", err)
-	}
 	// get current highest seed version
 	var highestSeed cashu.Seed = cashu.Seed{Version: 0}
+	seeds, err := l.db.GetSeedsByUnit(tx, unit)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("database.GetSeedsByUnit(tx, unit). %w", err)
+
+		}
+	}
 	for i, seed := range seeds {
 		if highestSeed.Version < seed.Version {
 			highestSeed = seed
