@@ -28,6 +28,8 @@ var (
 	ErrQuoteNotPaid        = errors.New("Quote not paid")
 	ErrMessageAmountToBig  = errors.New("Message amount is to big")
 	ErrInvalidBlindMessage = errors.New("Invalid blind message")
+
+	ErrPaymentFailed = errors.New("Lightning payment failed")
 )
 
 const (
