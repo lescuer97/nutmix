@@ -1,5 +1,16 @@
 package cashu
 
+import "errors"
+
+var (
+	ErrMeltAlreadyPaid           = errors.New("Melt already Paid")
+	ErrQuoteIsPending            = errors.New("Quote is pending")
+	ErrUnitNotSupported          = errors.New("Unit not supported")
+	ErrNotEnoughtProofs          = errors.New("Not enought proofs")
+	ErrProofSpent                = errors.New("Proof already spent")
+	ErrBlindMessageAlreadySigned = errors.New("Blind message already signed")
+)
+
 type ErrorCode int
 
 const (

@@ -4,19 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http/httptest"
-	"strings"
-	"testing"
-	"time"
-
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
-
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
 )
 
 func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
@@ -50,10 +48,13 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+	}
 
 	// ASK FOR SUCCESSFUL MINTING
-	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, referenceKeyset)
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -116,7 +117,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 
 	mint.LightningBackend = &fakeWallet
 
-	meltProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -138,11 +139,16 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMeltResponse.Paid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
+	if postMeltResponse.Paid {
+		t.Errorf("Expected paid to be false because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+	}
+	defer mint.MintDB.Rollback(ctx, tx)
 
-	proofs, _ := mint.MintDB.GetProofsFromSecret([]string{meltProofs[0].Secret})
+	proofs, _ := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
 
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)
@@ -159,7 +165,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != cashu.QUOTE_PENDING {
+	if errorResponse.Code != cashu.INVOICE_ALREADY_PAID {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 	}
 
@@ -168,7 +174,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		secreList = append(secreList, p.Secret)
 	}
 
-	proofsDB, err := mint.MintDB.GetProofsFromSecret(secreList)
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
 	}
@@ -176,6 +182,11 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		if p.State != cashu.PROOF_PENDING {
 			t.Errorf("Proof is not pending %+v", p)
 		}
+	}
+	err = mint.MintDB.Commit(ctx, tx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.Commit(ctx, tx) %s", err)
+		return
 	}
 
 }
@@ -234,10 +245,13 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+	}
 
 	// ASK FOR SUCCESSFUL MINTING
-	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, referenceKeyset)
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -300,7 +314,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 
 	mint.LightningBackend = &fakeWallet
 
-	meltProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -322,14 +336,24 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMeltResponse.Paid {
+	if postMeltResponse.Paid {
 		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+	}
+	defer mint.MintDB.Rollback(ctx, tx)
 
-	proofs, _ := mint.MintDB.GetProofsFromSecret([]string{meltProofs[0].Secret})
+	proofs, _ := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
 
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)
+	}
+	err = mint.MintDB.Commit(ctx, tx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.Commit(ctx, tx) %s", err)
+		return
 	}
 
 	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
@@ -343,7 +367,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != cashu.QUOTE_PENDING {
+	if errorResponse.Code != cashu.INVOICE_ALREADY_PAID {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 	}
 
@@ -351,8 +375,13 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	for _, p := range meltProofs {
 		secreList = append(secreList, p.Secret)
 	}
+	tx, err = mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+	}
+	defer mint.MintDB.Rollback(ctx, tx)
 
-	proofsDB, err := mint.MintDB.GetProofsFromSecret(secreList)
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
 	}
@@ -360,6 +389,11 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		if p.State != cashu.PROOF_PENDING {
 			t.Errorf("Proof is not pending %+v", p)
 		}
+	}
+	err = mint.MintDB.Commit(ctx, tx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.Commit(ctx, tx) %s", err)
+		return
 	}
 
 }
@@ -395,10 +429,13 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	referenceKeyset := mint.ActiveKeysets[cashu.Sat.String()][1]
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+	}
 
 	// ASK FOR SUCCESSFUL MINTING
-	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, referenceKeyset)
+	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(10000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
@@ -461,7 +498,7 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 
 	mint.LightningBackend = &fakeWallet
 
-	meltProofs, err := GenerateProofs(postMintResponse.Signatures, mint.ActiveKeysets, mintingSecrets, mintingSecretKeys)
+	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -483,16 +520,21 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMeltResponse.Paid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
+	if postMeltResponse.Paid {
+		t.Errorf("Expected paid to be false because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
 
 	secreList := []string{}
 	for _, p := range meltProofs {
 		secreList = append(secreList, p.Secret)
 	}
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+	}
+	defer mint.MintDB.Rollback(ctx, tx)
 
-	proofsDB, err := mint.MintDB.GetProofsFromSecret(secreList)
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
 	}
@@ -500,5 +542,10 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		if p.State != cashu.PROOF_PENDING {
 			t.Errorf("Proof is not pending %+v", p)
 		}
+	}
+	err = mint.MintDB.Commit(ctx, tx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.Commit(ctx, tx) %s", err)
+		return
 	}
 }

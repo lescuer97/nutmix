@@ -195,44 +195,99 @@ func (l LndGrpcWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, f
 	return invoiceRes, nil
 }
 
-func (l LndGrpcWallet) getPaymentStatus(quote string) (*lnrpc.Invoice, error) {
+type LndPayStatus struct {
+	Fee      uint64
+	Status   PaymentStatus
+	Preimage string
+}
+
+func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, error) {
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+
+	routerClient := routerrpc.NewRouterClient(l.grpcClient)
+
+	var payStatus LndPayStatus
+	hash := invoice.PaymentHash[:]
+
+	paymentstatusRequest := routerrpc.TrackPaymentRequest{PaymentHash: hash}
+
+	res, err := routerClient.TrackPaymentV2(ctx, &paymentstatusRequest)
+
+	if err != nil {
+		return payStatus, err
+	}
+
+	for {
+		payment, err := res.Recv()
+		if err != nil {
+			return payStatus, err
+		}
+		payStatus.Fee = uint64(payment.FeeSat)
+		switch payment.Status {
+		case lnrpc.Payment_IN_FLIGHT:
+			payStatus.Status = PENDING
+			return payStatus, nil
+		case lnrpc.Payment_FAILED:
+			payStatus.Status = FAILED
+			return payStatus, nil
+		case lnrpc.Payment_SUCCEEDED:
+			payStatus.Status = SETTLED
+			payStatus.Preimage = payment.PaymentPreimage
+			return payStatus, nil
+		case lnrpc.Payment_UNKNOWN:
+			payStatus.Status = UNKNOWN
+			return payStatus, nil
+		default:
+			continue
+
+		}
+	}
+}
+
+func (l LndGrpcWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
+	payStatus, err := l.getPaymentStatus(invoice)
+	if err != nil {
+		return FAILED, "", 0, fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
+	}
+
+	return payStatus.Status, payStatus.Preimage, payStatus.Fee, nil
+}
+
+func (l LndGrpcWallet) getInvoiceStatus(invoice *zpay32.Invoice) (*lnrpc.Invoice, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
-	decodedHash, err := hex.DecodeString(quote)
-	if err != nil {
-		return nil, fmt.Errorf("hex.DecodeString: %w. hash: %s", err, quote)
-	}
+	hash := invoice.PaymentHash[:]
 
 	rhash := lnrpc.PaymentHash{
-		RHash: decodedHash,
+		RHash: hash,
 	}
 
-	invoice, err := client.LookupInvoice(ctx, &rhash)
+	invoiceStat, err := client.LookupInvoice(ctx, &rhash)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return invoice, nil
+	return invoiceStat, nil
 }
 
-func (l LndGrpcWallet) CheckPayed(quote string) (PaymentStatus, string, error) {
-	invoice, err := l.getPaymentStatus(quote)
+func (l LndGrpcWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
+	invoiceStatus, err := l.getInvoiceStatus(invoice)
 
 	if err != nil {
-		return FAILED, "", fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
+		return FAILED, "", fmt.Errorf(`l.getInvoiceStatus(quote) %w`, err)
 	}
 
 	switch {
-	case invoice.State == lnrpc.Invoice_SETTLED:
-		return SETTLED, hex.EncodeToString(invoice.RPreimage), nil
-	case invoice.State == lnrpc.Invoice_CANCELED:
-		return FAILED, hex.EncodeToString(invoice.RPreimage), nil
+	case invoiceStatus.State == lnrpc.Invoice_SETTLED:
+		return SETTLED, hex.EncodeToString(invoiceStatus.RPreimage), nil
+	case invoiceStatus.State == lnrpc.Invoice_CANCELED:
+		return FAILED, hex.EncodeToString(invoiceStatus.RPreimage), nil
 
-	case invoice.State == lnrpc.Invoice_OPEN:
-		return PENDING, hex.EncodeToString(invoice.RPreimage), nil
+	case invoiceStatus.State == lnrpc.Invoice_OPEN:
+		return PENDING, hex.EncodeToString(invoiceStatus.RPreimage), nil
 
 	}
 	return PENDING, "", nil
@@ -299,17 +354,19 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 	fee := GetAverageRouteFee(res.Routes) / 1000
 
+	fee = GetFeeReserve(amount_sat, fee)
+
 	return fee, nil
 }
 
-func (l LndGrpcWallet) RequestInvoice(amount int64) (InvoiceResponse, error) {
+func (l LndGrpcWallet) RequestInvoice(amount uint64) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
 	// Expiry time is 15 minutes
-	res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: amount, Expiry: 900})
+	res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: int64(amount), Expiry: 900})
 
 	if err != nil {
 		return response, err

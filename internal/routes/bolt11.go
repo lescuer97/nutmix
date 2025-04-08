@@ -1,24 +1,23 @@
 package routes
 
 import (
-	"encoding/hex"
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/lightning"
-	"github.com/lescuer97/nutmix/internal/mint"
+	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/invoices"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log/slog"
-	"slices"
-	"strings"
-	"time"
 )
 
-func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
+func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
 
 	v1.POST("/mint/quote/bolt11", func(c *gin.Context) {
@@ -51,7 +50,7 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		}
 
 		if mint.Config.PEG_IN_LIMIT_SATS != nil {
-			if mintRequest.Amount > int64(*mint.Config.PEG_IN_LIMIT_SATS) {
+			if mintRequest.Amount > uint64(*mint.Config.PEG_IN_LIMIT_SATS) {
 				logger.Info("Mint amount over the limit", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
 
 				c.JSON(400, "Mint amount over the limit")
@@ -72,27 +71,43 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+		quoteId, err := utils.RandomHash()
+		if err != nil {
+			logger.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
+			c.JSON(500, "Opps! there was a problem with the mint")
+			return
+		}
 
 		mintRequestDB = cashu.MintRequestDB{
-			Quote:       resInvoice.Rhash,
+			Quote:       quoteId,
 			Request:     resInvoice.PaymentRequest,
 			RequestPaid: false,
 			Expiry:      expireTime,
 			Unit:        mintRequest.Unit,
 			State:       cashu.UNPAID,
 			SeenAt:      now,
+			Amount:      &mintRequest.Amount,
 		}
 
-		if mint.LightningBackend.LightningType() == lightning.FAKEWALLET {
-			mintRequestDB.RequestPaid = true
-			mintRequestDB.State = cashu.PAID
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			return
 		}
+		defer mint.MintDB.Rollback(ctx, tx)
 
-		err = mint.MintDB.SaveMintRequest(mintRequestDB)
+		err = mint.MintDB.SaveMintRequest(tx, mintRequestDB)
 
 		if err != nil {
 			logger.Error(fmt.Errorf("SaveQuoteRequest: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
+		err = mint.MintDB.Commit(ctx, tx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
@@ -102,30 +117,50 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
 		quoteId := c.Param("quote")
 
-		quote, err := mint.MintDB.GetMintRequestById(quoteId)
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			return
+		}
+		defer mint.MintDB.Rollback(ctx, tx)
+
+		quote, err := mint.MintDB.GetMintRequestById(tx, quoteId)
+
+		if err != nil {
+			logger.Error(fmt.Errorf("mint:quote mint.MintDB.GetMintRequestById(tx, quoteId): %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+
+		}
 
 		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
 			c.JSON(200, quote)
 			return
 		}
+		invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
-			logger.Error(fmt.Errorf("m.CheckMintRequest(pool, mint,quoteId ): %w", err).Error())
+			logger.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+		quote, err = m.CheckMintRequest(mint, quote, invoice)
+		if err != nil {
+			logger.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
-		state, _, err := mint.VerifyLightingPaymentHappened(quote.RequestPaid, quote.Quote, mint.MintDB.ChangeMintRequestState)
-
+		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 		if err != nil {
-			logger.Warn(fmt.Errorf("VerifyLightingPaymentHappened: %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
+			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 		}
 
-		quote.State = state
-
-		if state == cashu.PAID {
-			quote.RequestPaid = true
+		err = mint.MintDB.Commit(ctx, tx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			return
 		}
 
 		c.JSON(200, quote.PostMintQuoteBolt11Response())
@@ -141,26 +176,42 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			c.JSON(400, "Malformed body request")
 			return
 		}
-		err = mint.ActiveQuotes.AddQuote(mintRequest.Quote)
 
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Warn(fmt.Errorf("AddActiveMintQuote: %w", err).Error())
-			c.JSON(400, "Proof already being minted")
+			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
+		defer mint.MintDB.Rollback(ctx, tx)
 
-		defer mint.ActiveQuotes.RemoveQuote(mintRequest.Quote)
-		quote, err := mint.MintDB.GetMintRequestById(mintRequest.Quote)
+		quote, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
 
 		if err != nil {
-			logger.Error(fmt.Errorf("Incorrect body: %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
+			logger.Error(fmt.Errorf(" mint-resquest mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
 		if quote.Minted {
 			logger.Warn("Quote already minted", slog.String(utils.LogExtraInfo, quote.Quote))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_ISSUED, nil))
+			return
+		}
+
+		keysets, err := mint.Signer.GetKeys()
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+		_, err = mint.VerifyOutputs(mintRequest.Outputs, keysets.Keysets)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyOutputs(mintRequest.Outputs). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -171,31 +222,8 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			// check all blind messages have the same unit
 		}
 		blindedSignatures := []cashu.BlindSignature{}
-		recoverySigsDb := []cashu.RecoverSigDB{}
-
-		state, _, err := mint.VerifyLightingPaymentHappened(quote.RequestPaid, quote.Quote, mint.MintDB.ChangeMintRequestState)
-
-		if err != nil {
-			if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
-				c.JSON(200, quote)
-				return
-			}
-			logger.Warn(fmt.Errorf("VerifyLightingPaymentHappened: %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-
-		quote.State = state
-		if quote.State == cashu.PAID {
-			quote.RequestPaid = true
-		} else {
-			logger.Debug("Quote not paid")
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
-			return
-		}
 
 		invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
-
 		if err != nil {
 			logger.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -216,11 +244,34 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			c.JSON(403, "Amounts in outputs are not the same")
 			return
 		}
+		if !quote.RequestPaid && quote.State == cashu.UNPAID {
 
-		blindedSignatures, recoverySigsDb, err = mint.SignBlindedMessages(mintRequest.Outputs, quote.Unit)
+			quote, err = m.CheckMintRequest(mint, quote, invoice)
+			if err != nil {
+				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
+					c.JSON(200, quote)
+					return
+				}
+				logger.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
 
+			err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
+			if err != nil {
+				logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+				return
+			}
+
+			if quote.State != cashu.PAID {
+				c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
+				return
+			}
+		}
+
+		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(mintRequest.Outputs)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.SignBlindedMessages: %w", err).Error())
+			logger.Error(fmt.Errorf("mint.Signer.SignBlindMessages(mintRequest.Outputs): %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -229,18 +280,26 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 		quote.Minted = true
 		quote.State = cashu.ISSUED
 
-		err = mint.MintDB.ChangeMintRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
-
+		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 		if err != nil {
-			logger.Error(fmt.Errorf("ModifyQuoteMintMintedStatus: %w", err).Error())
+			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+			return
 		}
-		err = mint.MintDB.SaveRestoreSigs(recoverySigsDb)
+
+		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 		if err != nil {
-			logger.Error(fmt.Errorf("SetRecoverySigs: %w", err).Error())
+			logger.Error(fmt.Errorf("SetRecoverySigs on minting: %w", err).Error())
 			logger.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
 			return
 		}
 
+		err = mint.MintDB.Commit(ctx, tx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			return
+		}
+
+		mint.Observer.SendMintEvent(quote)
 		// Store BlidedSignature
 		c.JSON(200, cashu.PostMintBolt11Response{
 			Signatures: blindedSignatures,
@@ -281,10 +340,15 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 				c.JSON(400, "Melt amount over the limit")
 				return
 			}
-
 		}
 
-		response := cashu.PostMeltQuoteBolt11Response{}
+		quoteId, err := utils.RandomHash()
+		if err != nil {
+			logger.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(meltRequest.Request)))
+			c.JSON(500, "Opps! there was a problem with the mint")
+			return
+		}
+
 		dbRequest := cashu.MeltRequestDB{}
 
 		expireTime := cashu.ExpiryTimeMinUnit(15)
@@ -306,91 +370,82 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			c.JSON(400, "Sorry! MPP is not available")
 			return
 		}
-		queryFee, err := mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, amount)
 
+		// check if it's internal transaction if it is and it's mpp error out
+
+		isInternal, err := mint.IsInternalTransaction(meltRequest.Request)
 		if err != nil {
-			logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
+			logger.Info(fmt.Errorf("mint.IsInternalTransaction(meltRequest.Request): %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
-		hexHash := hex.EncodeToString(invoice.PaymentHash[:])
-
-		response = cashu.PostMeltQuoteBolt11Response{
-			Paid:            false,
-			Expiry:          expireTime,
-			FeeReserve:      (queryFee + 1),
-			Amount:          amount,
-			Quote:           hexHash,
-			State:           cashu.UNPAID,
-			PaymentPreimage: "",
+		if isMpp && isInternal {
+			logger.Info(fmt.Sprint("Internal MPP not allowed", err))
+			c.JSON(403, "Internal MPP not allowed")
+			return
 		}
-		if mint.LightningBackend.LightningType() == lightning.FAKEWALLET {
-			response.Paid = true
-			response.State = cashu.PAID
+		queryFee := uint64(0)
+		if !isInternal {
+			queryFee, err = mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, amount)
+			if err != nil {
+				logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+
 		}
 
 		dbRequest = cashu.MeltRequestDB{
-			Quote:           response.Quote,
+			Amount:          amount,
+			Quote:           quoteId,
 			Request:         meltRequest.Request,
-			Unit:            cashu.Sat.String(),
-			Expiry:          response.Expiry,
-			Amount:          response.Amount,
-			FeeReserve:      response.FeeReserve,
-			RequestPaid:     response.Paid,
-			State:           response.State,
-			PaymentPreimage: response.PaymentPreimage,
+			Unit:            meltRequest.Unit,
+			Expiry:          expireTime,
+			FeeReserve:      (queryFee + 1),
+			RequestPaid:     false,
+			State:           cashu.UNPAID,
+			PaymentPreimage: "",
 			SeenAt:          now,
 			Mpp:             isMpp,
 		}
 
-		err = mint.MintDB.SaveMeltRequest(dbRequest)
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			logger.Warn(fmt.Sprintf("m.MintDB.GetTx(ctx). %+v", err))
+			return
+		}
+		defer mint.MintDB.Rollback(ctx, tx)
+
+		err = mint.MintDB.SaveMeltRequest(tx, dbRequest)
 
 		if err != nil {
 			logger.Warn(fmt.Errorf("SaveQuoteMeltRequest: %w", err).Error())
 			logger.Warn(fmt.Errorf("dbRequest: %+v", dbRequest).Error())
-			c.JSON(200, response)
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
 
-		c.JSON(200, response)
+		err = mint.MintDB.Commit(ctx, tx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			logger.Warn(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err).Error())
+			return
+		}
+
+		c.JSON(200, dbRequest.GetPostMeltQuoteResponse())
 	})
 
 	v1.GET("/melt/quote/bolt11/:quote", func(c *gin.Context) {
 		quoteId := c.Param("quote")
 
-		quote, err := mint.MintDB.GetMeltRequestById(quoteId)
+		quote, err := mint.CheckMeltQuoteState(quoteId)
 		if err != nil {
-			logger.Error(fmt.Errorf("m.CheckMeltRequest(pool, mint, quoteId): %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-
-		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
-			c.JSON(200, quote.GetPostMeltQuoteResponse())
-			return
-		}
-
-		state, preimage, err := mint.VerifyLightingPaymentHappened(quote.RequestPaid, quote.Quote, mint.MintDB.ChangeMeltRequestState)
-		if err != nil {
-			if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
-				c.JSON(200, quote.GetPostMeltQuoteResponse())
-				return
-			}
-			logger.Warn(fmt.Errorf("VerifyLightingPaymentHappened: %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-		quote.PaymentPreimage = preimage
-		quote.State = state
-		if state == cashu.PAID {
-			quote.RequestPaid = true
-		}
-
-		err = mint.MintDB.AddPreimageMeltRequest(quote.Quote, preimage)
-		if err != nil {
-			logger.Error(fmt.Errorf("database.AddPaymentPreimageToMeltRequest(pool, : %w", err).Error())
-			c.JSON(200, quote.GetPostMeltQuoteResponse())
+			logger.Error(fmt.Errorf("mint.Melt(meltRequest, logger ). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -406,252 +461,14 @@ func v1bolt11Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
 			return
 		}
 
-		if len(meltRequest.Inputs) == 0 {
-			logger.Info("Outputs are empty")
-			c.JSON(400, "Outputs are empty")
-			return
-		}
-		err = mint.AddQuotesAndProofs(meltRequest.Quote, meltRequest.Inputs)
-
+		quote, err := mint.Melt(meltRequest, logger)
 		if err != nil {
-			logger.Warn(fmt.Errorf("mint.AddQuotesAndProofs(quote.Quote, meltRequest.Inputs): %w", err).Error())
-			c.JSON(400, "Quote already being melted")
-			return
-		}
-
-		defer mint.RemoveQuotesAndProofs(meltRequest.Quote, meltRequest.Inputs)
-		quote, err := mint.MintDB.GetMeltRequestById(meltRequest.Quote)
-
-		if err != nil {
-			logger.Info(fmt.Errorf("GetMeltQuoteById: %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-
-		if quote.State == cashu.PENDING {
-			logger.Warn("Quote is pending")
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.QUOTE_PENDING, nil))
-			return
-		}
-
-		if quote.Melted {
-			logger.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.INVOICE_ALREADY_PAID, nil))
-			return
-		}
-
-		unit, err := mint.CheckProofsAreSameUnit(meltRequest.Inputs)
-
-		if err != nil {
-			logger.Info(fmt.Sprintf("CheckProofsAreSameUnit: %+v", err))
-			c.JSON(400, "Proofs are not the same unit")
-			return
-		}
-
-		// TODO - REMOVE this when doing multi denomination tokens with Milisats
-		if unit != cashu.Sat {
-			logger.Info("Incorrect Unit for minting", slog.String(utils.LogExtraInfo, quote.Unit))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
-			return
-		}
-
-		// check for needed amount of fees
-		fee, err := cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()])
-		if err != nil {
-			logger.Info(fmt.Sprintf("cashu.Fees(meltRequest.Inputs, mint.Keysets[unit.String()]): %+v", err))
-			c.JSON(400, "Could not find keyset for proof id")
-			return
-		}
-
-		AmountProofs, SecretsList, err := utils.GetAndCalculateProofsValues(&meltRequest.Inputs)
-		if err != nil {
-			logger.Warn("utils.GetProofsValues(&meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
-			c.JSON(400, "Problem processing proofs")
-			return
-		}
-
-		// change state to pending
-		meltRequest.Inputs.SetPendingAndQuoteRef(quote.Quote)
-		quote.State = cashu.PENDING
-
-		if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
-			logger.Info(fmt.Sprintf("Not enought proofs to expend. Needs: %v", quote.Amount))
-			c.JSON(403, "Not enought proofs to expend. Needs: %v")
-			return
-		}
-
-		// check if we know any of the proofs
-		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(SecretsList)
-
-		if err != nil {
-			logger.Warn(fmt.Sprintf("CheckListOfProofs: %+v", err))
-			c.JSON(500, "Opps! there was an issue")
-			return
-		}
-
-		if len(knownProofs) != 0 {
-			logger.Info("Proofs already used", slog.String(utils.LogExtraInfo, fmt.Sprintf("knownproofs:  %+v", knownProofs)))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
-			return
-		}
-
-		err = mint.VerifyListOfProofs(meltRequest.Inputs, []cashu.BlindedMessage{}, unit)
-
-		if err != nil {
-			logger.Debug("Could not verify Proofs", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error(fmt.Errorf("mint.Melt(meltRequest, logger ). %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
-		invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
-		if err != nil {
-			logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
-
-		var paidLightningFeeSat uint64
-
-		payment, err := mint.LightningBackend.PayInvoice(quote.Request, invoice, quote.FeeReserve, quote.Mpp, quote.Amount)
-
-		// Hardened error handling
-		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN {
-			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
-
-			// if exception of lightning payment says fail do a payment status recheck.
-			status, _, err := mint.LightningBackend.CheckPayed(quote.Quote)
-
-			// if error on checking payement we will save as pending and returns status
-			if err != nil {
-
-				response := quote.GetPostMeltQuoteResponse()
-				err = mint.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted)
-				if err != nil {
-					logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
-				}
-
-				// Save proofs with pending state
-				err = mint.MintDB.SaveProof(meltRequest.Inputs)
-				if err != nil {
-					logger.Error(fmt.Errorf("SaveProofs: %w", err).Error())
-					logger.Error(fmt.Errorf("Proofs: %+v", meltRequest.Inputs).Error())
-					c.JSON(200, response)
-					return
-				}
-
-				c.JSON(200, response)
-				return
-			}
-
-			switch status {
-			// halt transaction and return a pending state
-			case lightning.PENDING, lightning.SETTLED:
-				quote.State = cashu.PENDING
-
-				response := quote.GetPostMeltQuoteResponse()
-				// change melt request state
-				err = mint.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted)
-				if err != nil {
-					logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
-				}
-
-				// Save proofs with pending state
-				err = mint.MintDB.SaveProof(meltRequest.Inputs)
-				if err != nil {
-					logger.Error(fmt.Errorf("SaveProofs: %w", err).Error())
-					logger.Error(fmt.Errorf("Proofs: %+v", meltRequest.Inputs).Error())
-					c.JSON(200, response)
-					return
-				}
-
-				c.JSON(200, response)
-				return
-
-			// finish failure and release the proofs
-			case lightning.FAILED, lightning.UNKNOWN:
-				logger.Info(fmt.Sprintf("mint.LightningComs.PayInvoice %+v", err))
-				c.JSON(400, "could not make payment")
-				return
-			}
-		}
-
-		if payment.PaymentState == lightning.SETTLED {
-			quote.RequestPaid = true
-			quote.State = cashu.PAID
-			quote.PaymentPreimage = payment.Preimage
-		}
-
-		quote.Melted = true
-		response := quote.GetPostMeltQuoteResponse()
-
-		// if fees where lower than expected return sats to the user
-		paidLightningFeeSat = uint64(payment.PaidFeeSat)
-
-		//  if total expent is lower that the amount of proofs that where given
-		//  change is returned
-		totalExpent := quote.Amount + paidLightningFeeSat + uint64(fee)
-		if AmountProofs > totalExpent && len(meltRequest.Outputs) > 0 {
-
-			overpaidFees := AmountProofs - totalExpent
-			change := utils.GetChangeOutput(overpaidFees, meltRequest.Outputs)
-
-			blindSignatures, recoverySigsDb, err := mint.SignBlindedMessages(change, quote.Unit)
-
-			if err != nil {
-				logger.Info("mint.SignBlindedMessages", slog.String(utils.LogExtraInfo, err.Error()))
-				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
-				return
-			}
-
-			err = mint.MintDB.SaveRestoreSigs(recoverySigsDb)
-
-			if err != nil {
-				logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
-				logger.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
-			}
-
-			response.Change = blindSignatures
-		}
-
-		err = mint.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted)
-		if err != nil {
-			logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
-			c.JSON(200, response)
-			return
-		}
-
-		err = mint.MintDB.AddPreimageMeltRequest(quote.Quote, quote.PaymentPreimage)
-		if err != nil {
-			logger.Error(fmt.Errorf("mint.MintDB.AddPreimageMeltRequest(quote.Quote, quote.PaymentPreimage) %+v", err).Error())
-			c.JSON(200, response)
-			return
-		}
-
-		// change proofs to spent
-		meltRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
-
-		// send proofs to database
-		err = mint.MintDB.SaveProof(meltRequest.Inputs)
-
-		if err != nil {
-			logger.Error(fmt.Errorf("SaveProofs: %w", err).Error())
-			logger.Error(fmt.Errorf("Proofs: %+v", meltRequest.Inputs).Error())
-			c.JSON(200, response)
-			return
-		}
-
-		newPendingProofs := []cashu.Proof{}
-		// remove proofs from pending proofs
-		for _, proof := range mint.PendingProofs {
-			if !slices.Contains(meltRequest.Inputs, proof) {
-				newPendingProofs = append(newPendingProofs, proof)
-			}
-		}
-
-		mint.PendingProofs = newPendingProofs
-
-		c.JSON(200, response)
+		c.JSON(200, quote)
 	})
 }
