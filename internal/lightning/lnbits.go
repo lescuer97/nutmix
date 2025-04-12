@@ -26,7 +26,7 @@ type LNBitsDetailErrorData struct {
 	Status string
 }
 type lnbitsInvoiceRequest struct {
-	Amount     int64  `json:"amount"`
+	Amount     uint64 `json:"amount"`
 	Unit       string `json:"unit,omitempty"`
 	CheckingId string `json:"checking_id,omitempty"`
 	Memo       string `json:"memo"`
@@ -120,7 +120,7 @@ func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zp
 	reqInvoice := lnbitsInvoiceRequest{
 		Out:    true,
 		Bolt11: melt_quote.Request,
-		Amount: int64(amount.Amount),
+		Amount: amount.Amount,
 	}
 
 	err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
@@ -208,7 +208,7 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 
 func (l LnbitsWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
 	reqInvoice := lnbitsInvoiceRequest{
-		Amount: int64(amount.Amount),
+		Amount: amount.Amount,
 		Unit:   cashu.Sat.String(),
 		Memo:   "",
 		Out:    false,

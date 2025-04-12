@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/google/uuid"
@@ -17,8 +19,8 @@ import (
 
 type Strike struct {
 	Network  chaincfg.Params
-	Endpoint string
-	Key      string
+	endpoint string
+	key      string
 }
 
 type strikeAccountBalanceResponse struct {
@@ -54,6 +56,8 @@ type strikeAmount struct {
 	Amount   string         `json:"amount"`
 	Currency strikeCurrency `json:"currency"`
 }
+
+// C0B9B39D8A69F62647352D1E048B07E0A788E0FDE77623BFBD31BC97AB743703
 
 func strikeInvoiceStateToCashuState(state strikeInvoiceState) (PaymentStatus, error) {
 	switch state {
@@ -147,22 +151,44 @@ type strikePaymentStatus struct {
 	} `json:"lightning"`
 }
 
+func (l *Strike) Setup(key string, endpoint string) error{
+	if key == "" {
+		return fmt.Errorf("Strike key not available")
+	}
+
+	if endpoint == "" {
+		return fmt.Errorf("STRIKE endpoint not available")
+	}
+	l.key = key
+	l.endpoint = endpoint
+
+	return nil
+}
+
 func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, responseType any) error {
+	// url.URL{}.
 	client := &http.Client{}
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	b := bytes.NewBuffer(jsonBytes)
+	_ = bytes.NewBuffer(jsonBytes)
 
-	req, err := http.NewRequest(method, l.Endpoint+endpoint, b)
+
+	fullUrl := l.endpoint+endpoint
+	fullUrl = strings.TrimSpace(fullUrl)
+	log.Println("fullUrl: ", fullUrl);
+	req, err := http.NewRequest(method, fullUrl, nil)
 	if err != nil {
 		return fmt.Errorf("http.NewRequest: %w", err)
 	}
 	// req.H
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", l.Key))
+
+	log.Println("key: ", l.key);
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", l.key))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("accept", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -174,7 +200,8 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 	if err != nil {
 		return fmt.Errorf("ioutil.ReadAll: %w", err)
 	}
-
+ 
+	log.Printf("\n body: %s \n", body)
 	detailBody := LNBitsDetailErrorData{}
 	err = json.Unmarshal(body, &detailBody)
 	if err != nil {
@@ -241,7 +268,7 @@ func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.I
 	return invoiceRes, nil
 }
 
-func (l Strike) CheckPayed(quote string) (PaymentStatus, string, uint64, error) {
+func (l Strike) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
 	var paymentStatus strikePaymentStatus
 
 	err := l.StrikeRequest("GET", "/v1/payments/"+quote, nil, &paymentStatus)
@@ -260,7 +287,7 @@ func (l Strike) CheckPayed(quote string) (PaymentStatus, string, uint64, error) 
 	}
 	return state, "", lnFee, nil
 }
-func (l Strike) CheckReceived(quote string) (PaymentStatus, string, error) {
+func (l Strike) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	var paymentStatus strikeInvoiceResponse
 
 	err := l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/%s", quote), nil, &paymentStatus)
@@ -350,18 +377,28 @@ func (l Strike) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
 }
 
 func (l Strike) WalletBalance() (uint64, error) {
-	var balance strikeAccountBalanceResponse
+	var balance []strikeAccountBalanceResponse
 	err := l.StrikeRequest("GET", "/v1/balances", nil, &balance)
 	if err != nil {
 		return 0, fmt.Errorf(`l.StrikeRequest("GET", "/v1/balances": %w`, err)
 	}
 
-	currentBalance, err := strconv.ParseUint(balance.Current, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf(`strconv.ParseUint(balance.Current, 10, 64). %w`, err)
+	balanceTotal := uint64(0)
+
+	for _, bal := range balance {
+		if bal.Currency == BTC {
+		currentBalance, err := strconv.ParseUint(bal.Current, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf(`strconv.ParseUint(balance.Current, 10, 64). %w`, err)
+		}
+		balanceTotal += currentBalance
+
+		}
+
 	}
 
-	return currentBalance, nil
+
+	return balanceTotal, nil
 }
 
 func (f Strike) LightningType() Backend {

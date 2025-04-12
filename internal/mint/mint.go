@@ -66,6 +66,8 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKe
 
 func CheckChainParams(network string) (chaincfg.Params, error) {
 	switch network {
+	case "testnet3":
+		return chaincfg.TestNet3Params, nil
 	case "testnet":
 		return chaincfg.TestNet3Params, nil
 	case "mainnet":
@@ -128,6 +130,16 @@ func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig
 			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
 		}
 		mint.LightningBackend = clnWallet
+	case utils.Strike:
+		strikeWallet := lightning.Strike{
+			Network: chainparam,
+		}
+
+		err := strikeWallet.Setup(config.STRIKE_KEY, config.STRIKE_ENDPOINT)
+		if err != nil {
+			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
+		}
+		mint.LightningBackend = strikeWallet
 
 	default:
 		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)

@@ -44,7 +44,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		if mint.Config.PEG_IN_LIMIT_SATS != nil {
-			if mintRequest.Amount > int64(*mint.Config.PEG_IN_LIMIT_SATS) {
+			if mintRequest.Amount > uint64(*mint.Config.PEG_IN_LIMIT_SATS) {
 				logger.Info("Mint amount over the limit", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
 
 				c.JSON(400, "Mint amount over the limit")
@@ -97,6 +97,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			Unit:        unit.String(),
 			State:       cashu.UNPAID,
 			SeenAt:      now,
+			Amount:      &mintRequest.Amount,
 		}
 
 		ctx := context.Background()
@@ -366,7 +367,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		response := cashu.PostMeltQuoteBolt11Response{}
 		dbRequest := cashu.MeltRequestDB{}
 
 		expireTime := cashu.ExpiryTimeMinUnit(15)
@@ -432,26 +432,16 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		}
 
-		response = cashu.PostMeltQuoteBolt11Response{
-			Paid:            false,
-			Expiry:          expireTime,
-			FeeReserve:      (queryFee + 1),
+		dbRequest = cashu.MeltRequestDB{
 			Amount:          cashuAmount.Amount,
 			Quote:           quoteId,
+			Request:         meltRequest.Request,
+			Unit:            meltRequest.Unit,
+			Expiry:          expireTime,
+			FeeReserve:      (queryFee + 1),
+			RequestPaid:     false,
 			State:           cashu.UNPAID,
 			PaymentPreimage: "",
-		}
-
-		dbRequest = cashu.MeltRequestDB{
-			Quote:           response.Quote,
-			Request:         meltRequest.Request,
-			Unit:            cashuAmount.Unit.String(),
-			Expiry:          response.Expiry,
-			Amount:          response.Amount,
-			FeeReserve:      response.FeeReserve,
-			RequestPaid:     response.Paid,
-			State:           response.State,
-			PaymentPreimage: response.PaymentPreimage,
 			SeenAt:          now,
 			Mpp:             isMpp,
 		}
@@ -473,6 +463,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
+
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
 			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
@@ -480,7 +471,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		c.JSON(200, response)
+		c.JSON(200, dbRequest.GetPostMeltQuoteResponse())
 	})
 
 	v1.GET("/melt/quote/bolt11/:quote", func(c *gin.Context) {

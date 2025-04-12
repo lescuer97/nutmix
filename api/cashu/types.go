@@ -416,7 +416,7 @@ type Keyset struct {
 }
 
 type PostMintQuoteBolt11Request struct {
-	Amount int64  `json:"amount"`
+	Amount uint64 `json:"amount"`
 	Unit   string `json:"unit"`
 }
 
@@ -429,6 +429,7 @@ type PostMintQuoteBolt11Response struct {
 	Unit        string       `json:"unit"`
 	Minted      bool         `json:"minted"`
 	State       ACTION_STATE `json:"state"`
+	Amount      *uint64      `json:"amount,omitempty"`
 }
 type MintRequestDB struct {
 	Quote   string `json:"quote"`
@@ -440,6 +441,7 @@ type MintRequestDB struct {
 	Minted      bool         `json:"minted"`
 	State       ACTION_STATE `json:"state"`
 	SeenAt      int64        `json:"seen_at"`
+	Amount      *uint64      `json:"amount"`
 }
 
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
@@ -451,6 +453,11 @@ func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Respons
 		Unit:        m.Unit,
 		Minted:      m.Minted,
 		State:       m.State,
+	}
+
+	if m.Amount != nil {
+		res.Amount = m.Amount
+
 	}
 	return res
 }
@@ -506,6 +513,8 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		Expiry:          meltRequest.Expiry,
 		State:           meltRequest.State,
 		PaymentPreimage: meltRequest.PaymentPreimage,
+		Request:         meltRequest.Request,
+		Unit:            meltRequest.Unit,
 	}
 
 }
@@ -536,6 +545,8 @@ type PostMeltQuoteBolt11Response struct {
 	Expiry          int64            `json:"expiry"`
 	State           ACTION_STATE     `json:"state"`
 	Change          []BlindSignature `json:"change"`
+	Unit            string           `json:"unit"`
+	Request         string           `json:"request"`
 	PaymentPreimage string           `json:"payment_preimage"`
 }
 

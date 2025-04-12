@@ -111,7 +111,7 @@ func (f FakeWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error)
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
 
-	payReq, err := CreateMockInvoice(int64(amount.Amount), "mock invoice", f.Network, expireTime)
+	payReq, err := CreateMockInvoice(amount.Amount, "mock invoice", f.Network, expireTime)
 	if err != nil {
 		return response, fmt.Errorf(`CreateMockInvoice(amount, "mock invoice", f.Network, expireTime). %w`, err)
 	}

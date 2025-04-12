@@ -61,6 +61,7 @@ type Config struct {
 	CLN_MACAROON    string `db:"cln_macaroon"`
 
 	STRIKE_KEY string `db:"strike_key"`
+	STRIKE_ENDPOINT string `db:"strike_endpoint"`
 
 	PEG_OUT_ONLY       bool `db:"peg_out_only"`
 	PEG_OUT_LIMIT_SATS *int `db:"peg_out_limit_sats,omitempty"`

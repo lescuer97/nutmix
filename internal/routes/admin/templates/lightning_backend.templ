@@ -66,7 +66,7 @@ templ SetupForms(lightningBackend string, config utils.Config) {
 		case string(utils.LNBITS):
 			@Lnbits(config.MINT_LNBITS_ENDPOINT, config.MINT_LNBITS_KEY)
 		case string(utils.Strike):
-			@Strike(config.STRIKE_KEY)
+			@Strike(config.STRIKE_KEY, config.STRIKE_ENDPOINT)
 		case string(utils.FAKE_WALLET):
 			@FakeFallet()
 	}
@@ -121,10 +121,14 @@ templ Lnbits(endpoint string, key string) {
 	</label>
 }
 
-templ Strike(key string) {
+templ Strike(key string, endpoint string) {
+	<label for="STRIKE_ENDPOINT" class="settings-input">
+		Strike endpoint
+		<input type="text" required name="STRIKE_ENDPOINT" value={ endpoint }/>
+	</label>
 	<label for="STRIKE_KEY" class="settings-input">
 		Strike key
-		<input type="text" name="STRIKE_KEY" value={ key }/>
+		<input type="text" required name="STRIKE_KEY" value={ key }/>
 	</label>
 }
 
