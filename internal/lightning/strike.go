@@ -150,8 +150,16 @@ type strikePaymentStatus struct {
 		NetworkFee strikeAmount `json:"networkFee"`
 	} `json:"lightning"`
 }
+type strikeErrorStatus struct {
+	TraceId *string `json:"TraceId,omitempty"`
+	Data    struct {
+		Code    string `json:"string"`
+		Message string `json:"message"`
+		Status  uint   `json:"status"`
+	} `json:"data"`
+}
 
-func (l *Strike) Setup(key string, endpoint string) error{
+func (l *Strike) Setup(key string, endpoint string) error {
 	if key == "" {
 		return fmt.Errorf("Strike key not available")
 	}
@@ -166,29 +174,28 @@ func (l *Strike) Setup(key string, endpoint string) error{
 }
 
 func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, responseType any) error {
-	// url.URL{}.
 	client := &http.Client{}
-	jsonBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return fmt.Errorf("json.Marshal: %w", err)
+	marshalledBody := bytes.NewBuffer(nil)
+	log.Printf("\n reqBody: %v", reqBody)
+	if reqBody != nil {
+		log.Println("inside jthe reqbody marshall")
+		jsonBytes, err := json.Marshal(reqBody)
+		if err != nil {
+			return fmt.Errorf("json.Marshal: %w", err)
+		}
+		marshalledBody = bytes.NewBuffer(jsonBytes)
 	}
-
-	_ = bytes.NewBuffer(jsonBytes)
-
-
-	fullUrl := l.endpoint+endpoint
+	fullUrl := l.endpoint + endpoint
 	fullUrl = strings.TrimSpace(fullUrl)
-	log.Println("fullUrl: ", fullUrl);
-	req, err := http.NewRequest(method, fullUrl, nil)
+
+	log.Printf("\n marshalledBody: %v", marshalledBody)
+	req, err := http.NewRequest(method, fullUrl, marshalledBody)
 	if err != nil {
 		return fmt.Errorf("http.NewRequest: %w", err)
 	}
-	// req.H
-
-	log.Println("key: ", l.key);
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", l.key))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("accept", "application/json")
+	// req.Header.Set("accept", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -198,28 +205,37 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
-		return fmt.Errorf("ioutil.ReadAll: %w", err)
-	}
- 
-	log.Printf("\n body: %s \n", body)
-	detailBody := LNBitsDetailErrorData{}
-	err = json.Unmarshal(body, &detailBody)
-	if err != nil {
-		return fmt.Errorf("json.Unmarshal(detailBody): %w", err)
+		return fmt.Errorf("io.ReadAll(resp.Body): %w", err)
 	}
 
-	switch {
-	case detailBody.Status == "failed":
-		return fmt.Errorf("Strike payment failed %+v. Request Body %+v, %w", detailBody, reqBody, ErrLnbitsFailedPayment)
+	log.Printf("\n resp: %+v", resp)
+	log.Printf("\n\n  body: %s", body)
+	switch resp.StatusCode {
+	case 201, 200:
+		err = json.Unmarshal(body, &responseType)
+		if err != nil {
+			return fmt.Errorf("json.Unmarshal(body, &responseType): %w", err)
+		}
 
-	case detailBody.Detail == "Payment does not exist.":
-	case len(detailBody.Detail) > 0:
-		return fmt.Errorf("strike Unknown error %+v. Request Body %+v", detailBody, reqBody)
-	}
+		return nil
 
-	err = json.Unmarshal(body, &responseType)
-	if err != nil {
-		return fmt.Errorf("json.Unmarshal: %w", err)
+	default:
+		errorBody := strikeErrorStatus{}
+		err = json.Unmarshal(body, &errorBody)
+		if err != nil {
+			return fmt.Errorf("json.Unmarshal(errorBody): %w", err)
+		}
+
+		switch errorBody.Data.Status {
+		case 400:
+			return fmt.Errorf("Bad request %+v, %w", errorBody, reqBody, ErrLnbitsFailedPayment)
+		case 401:
+			return fmt.Errorf("Unauthorized %+v", errorBody)
+		default:
+			return fmt.Errorf("Unknown error %+v", errorBody)
+
+		}
+
 	}
 
 	return nil
@@ -387,16 +403,15 @@ func (l Strike) WalletBalance() (uint64, error) {
 
 	for _, bal := range balance {
 		if bal.Currency == BTC {
-		currentBalance, err := strconv.ParseUint(bal.Current, 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf(`strconv.ParseUint(balance.Current, 10, 64). %w`, err)
-		}
-		balanceTotal += currentBalance
+			currentBalance, err := strconv.ParseUint(bal.Current, 10, 64)
+			if err != nil {
+				return 0, fmt.Errorf(`strconv.ParseUint(balance.Current, 10, 64). %w`, err)
+			}
+			balanceTotal += currentBalance
 
 		}
 
 	}
-
 
 	return balanceTotal, nil
 }

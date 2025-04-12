@@ -37,13 +37,19 @@ func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
 				switch {
 				case errors.Is(e, utils.ErrAlreadyLNPaying):
 					message = "Error paying invoice"
-					return
+					break
 				case errors.Is(e, ErrInvalidNostrKey):
 					message = "Nostr npub is not valid"
-					return
+					break
 				case errors.Is(e, ErrUnitNotCorrect):
 					message = "Keyset Unit is not correct"
-					return
+					break
+				case errors.Is(e, ErrInvalidStrikeCheck):
+					message = ErrInvalidStrikeCheck.Error()
+					break
+				case errors.Is(e, ErrInvalidStrikeConfig):
+					message = ErrInvalidStrikeCheck.Error()
+					break
 				}
 			}
 			logger.Error(fmt.Sprintf("Error from calls: %+v", c.Errors.String()))
@@ -91,6 +97,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 
 	}
 
+	adminRoute.Use(ErrorHtmlMessageMiddleware(logger))
 	// I use the first active keyset as secret for jwt token signing
 	adminRoute.Use(AuthMiddleware(logger, loginKey.Serialize()))
 

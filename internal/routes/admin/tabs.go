@@ -17,7 +17,9 @@ import (
 )
 
 var (
-	ErrInvalidNostrKey = errors.New("NOSTR npub is not valid")
+	ErrInvalidNostrKey     = errors.New("NOSTR npub is not valid")
+	ErrInvalidStrikeConfig = errors.New("Invalid strike Config")
+	ErrInvalidStrikeCheck  = errors.New("Could not verify strike configuration")
 )
 
 func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
@@ -266,22 +268,21 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			strikeEndpoint := c.Request.PostFormValue("STRIKE_ENDPOINT")
 
 			strikeWallet := lightning.Strike{
-				Network:  chainparam,
+				Network: chainparam,
 			}
-			
+
 			err := strikeWallet.Setup(strikeKey, strikeEndpoint)
 			if err != nil {
-				c.Error(fmt.Errorf("strikeWallet.Setup(strikeKey, strikeEndpoint) %w", err))
+				c.Error(fmt.Errorf("strikeWallet.Setup(strikeKey, strikeEndpoint) %w %w", err, ErrInvalidStrikeConfig))
 				return
 			}
 			// check connection
 			_, err = strikeWallet.WalletBalance()
 			if err != nil {
-				c.Error(fmt.Errorf("strikeWallet.WalletBalance() %w", err))
+				c.Error(fmt.Errorf("strikeWallet.WalletBalance() %w %w", err, ErrInvalidStrikeCheck))
 				return
 			}
 
-			// TODO ADD strike backend to mint.LightningBackend
 			mint.Config.MINT_LIGHTNING_BACKEND = utils.Strike
 			mint.Config.STRIKE_KEY = strikeKey
 			mint.Config.STRIKE_ENDPOINT = strikeEndpoint
@@ -334,7 +335,6 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			mint.Config.CLN_CLIENT_CERT = clnClientCert
 		}
 
-		logger.Info("strike config: %v",mint.Config.STRIKE_KEY )
 		err = mint.MintDB.UpdateConfig(mint.Config)
 
 		if err != nil {

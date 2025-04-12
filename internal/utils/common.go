@@ -60,7 +60,7 @@ type Config struct {
 	CLN_CLIENT_KEY  string `db:"cln_client_key"`
 	CLN_MACAROON    string `db:"cln_macaroon"`
 
-	STRIKE_KEY string `db:"strike_key"`
+	STRIKE_KEY      string `db:"strike_key"`
 	STRIKE_ENDPOINT string `db:"strike_endpoint"`
 
 	PEG_OUT_ONLY       bool `db:"peg_out_only"`
