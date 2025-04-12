@@ -228,7 +228,7 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 
 		switch errorBody.Data.Status {
 		case 400:
-			return fmt.Errorf("Bad request %+v, %w", errorBody, reqBody, ErrLnbitsFailedPayment)
+			return fmt.Errorf("Bad request %+v, %+v", errorBody, reqBody)
 		case 401:
 			return fmt.Errorf("Unauthorized %+v", errorBody)
 		default:
