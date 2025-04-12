@@ -89,7 +89,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			return quote, fmt.Errorf("zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork()). %w", err)
 		}
 
-		status, preimage, fee, err := m.LightningBackend.CheckPayed(quote.Quote, invoice)
+		status, preimage, fee, err := m.LightningBackend.CheckPayed(quote.Quote, invoice, quote.CheckingId)
 		if err != nil {
 			return quote, fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote). %w", err)
 		}
@@ -369,7 +369,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
 
 			// if exception of lightning payment says fail do a payment status recheck.
-			status, _, fee_paid, err := m.LightningBackend.CheckPayed(quote.Quote, invoice)
+			status, _, fee_paid, err := m.LightningBackend.CheckPayed(quote.Quote, invoice, quote.CheckingId)
 
 			quote.FeePaid = fee_paid
 			// if error on checking payement we will save as pending and returns status

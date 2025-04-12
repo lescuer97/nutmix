@@ -28,7 +28,7 @@ type strikeAccountBalanceResponse struct {
 	Current  string         `json:"current"`
 }
 type strikeInvoiceRequest struct {
-	CorrelationId uuid.UUID    `json:"correlationId"`
+	CorrelationId string       `json:"correlationId"`
 	Description   string       `json:"description"`
 	Amount        strikeAmount `json:"amount"`
 }
@@ -176,9 +176,7 @@ func (l *Strike) Setup(key string, endpoint string) error {
 func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{}
 	marshalledBody := bytes.NewBuffer(nil)
-	log.Printf("\n reqBody: %v", reqBody)
 	if reqBody != nil {
-		log.Println("inside jthe reqbody marshall")
 		jsonBytes, err := json.Marshal(reqBody)
 		if err != nil {
 			return fmt.Errorf("json.Marshal: %w", err)
@@ -188,7 +186,6 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 	fullUrl := l.endpoint + endpoint
 	fullUrl = strings.TrimSpace(fullUrl)
 
-	log.Printf("\n marshalledBody: %v", marshalledBody)
 	req, err := http.NewRequest(method, fullUrl, marshalledBody)
 	if err != nil {
 		return fmt.Errorf("http.NewRequest: %w", err)
@@ -203,20 +200,16 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 	}
 
 	body, err := io.ReadAll(resp.Body)
-
 	if err != nil {
 		return fmt.Errorf("io.ReadAll(resp.Body): %w", err)
 	}
 
-	log.Printf("\n resp: %+v", resp)
-	log.Printf("\n\n  body: %s", body)
 	switch resp.StatusCode {
-	case 201, 200:
+	case 200, 201:
 		err = json.Unmarshal(body, &responseType)
 		if err != nil {
 			return fmt.Errorf("json.Unmarshal(body, &responseType): %w", err)
 		}
-
 		return nil
 
 	default:
@@ -239,11 +232,10 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 	}
 
 	return nil
-
 }
 
-func (l Strike) fee(amount strikeAmount) (uint64, error) {
-	fee, err := strconv.ParseUint(amount.Amount, 10, 64)
+func (l Strike) convertToSatAmount(amount strikeAmount) (uint64, error) {
+	fee, err := strconv.ParseFloat(amount.Amount, 64)
 	if err != nil {
 		return 0, fmt.Errorf("strconv.ParseUint(fee_str, 10, 64): %w", err)
 	}
@@ -254,19 +246,19 @@ func (l Strike) fee(amount strikeAmount) (uint64, error) {
 		fee = fee * 100
 	}
 
-	return fee, nil
+	return uint64(fee), nil
 }
 
 func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var strikePayment strikePaymentStatus
 	var invoiceRes PaymentResponse
 
-	err := l.StrikeRequest("PATCH", fmt.Sprintf("/v1/payment-quotes/%s/execute", melt_quote.Quote), nil, &strikePayment)
+	err := l.StrikeRequest("PATCH", fmt.Sprintf("/v1/payment-quotes/%s/execute", melt_quote.CheckingId), nil, &strikePayment)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
 	}
 
-	fee, err := l.fee(strikePayment.LightningNetworkFee)
+	fee, err := l.convertToSatAmount(strikePayment.LightningNetworkFee)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
 	}
@@ -284,10 +276,10 @@ func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.I
 	return invoiceRes, nil
 }
 
-func (l Strike) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
+func (l Strike) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
 	var paymentStatus strikePaymentStatus
 
-	err := l.StrikeRequest("GET", "/v1/payments/"+quote, nil, &paymentStatus)
+	err := l.StrikeRequest("GET", "/v1/payments/"+checkingId, nil, &paymentStatus)
 	if err != nil {
 		return FAILED, "", uint64(0), fmt.Errorf(`l.StrikeRequest("GET", "/api/v1/payments/"+quote: %w`, err)
 	}
@@ -303,10 +295,11 @@ func (l Strike) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus
 	}
 	return state, "", lnFee, nil
 }
-func (l Strike) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
+func (l Strike) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	var paymentStatus strikeInvoiceResponse
+	log.Printf("receive check %+v", quote)
 
-	err := l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/%s", quote), nil, &paymentStatus)
+	err := l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/%s", quote.CheckingId), nil, &paymentStatus)
 	if err != nil {
 		return FAILED, "", fmt.Errorf(`l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/", quote), nil, &paymentStatus) %w`, err)
 	}
@@ -325,12 +318,12 @@ func (l Strike) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentSta
 	}
 }
 
-func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
+func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
 	var queryResponse strikePaymentQuoteResponse
 
 	strikeAmount, err := CashuAmountToStrikeAmount(amount)
 	if err != nil {
-		return 0, fmt.Errorf(`CashuAmountToStrikeAmount(): %w`, err)
+		return 0, "", fmt.Errorf(`CashuAmountToStrikeAmount(): %w`, err)
 	}
 	strikeQuery := strikePaymentRequest{
 		LnInvoice:      invoice,
@@ -341,21 +334,19 @@ func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool,
 
 	err = l.StrikeRequest("POST", invoiceString, strikeQuery, &queryResponse)
 	if err != nil {
-		return 0, fmt.Errorf(`l.StrikeRequest("GET", invoiceString, nil, &queryResponse): %w`, err)
+		return 0, "", fmt.Errorf(`l.StrikeRequest("GET", invoiceString, nil, &queryResponse): %w`, err)
 	}
 
-	fee, err := l.fee(queryResponse.TotalFee)
+	fee, err := l.convertToSatAmount(queryResponse.TotalFee)
 	if err != nil {
-		return 0, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
+		return 0, "", fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
 	}
 
 	fee = GetFeeReserve(amount.Amount, fee)
-	return fee, nil
+	return fee, queryResponse.PaymentQuoteId.String(), nil
 }
 
-func (l Strike) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
-	uuid := uuid.New()
-
+func (l Strike) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	supported := l.VerifyUnitSupport(amount.Unit)
 	if !supported {
@@ -367,7 +358,7 @@ func (l Strike) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
 		return response, fmt.Errorf("CashuAmountToStrikeAmount(amount): %w", err)
 	}
 	reqInvoice := strikeInvoiceRequest{
-		CorrelationId: uuid,
+		CorrelationId: quote.Quote,
 		Description:   "",
 		Amount:        strikeAmt,
 	}
@@ -378,16 +369,18 @@ func (l Strike) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
 	if err != nil {
 		return response, fmt.Errorf(`l.StrikeRequest("POST", "/v1/invoices", r: %w`, err)
 	}
+	log.Printf("\n strike invoice: %+v", strikeInvoiceResponse)
 
 	// get invoice quote
 	var strikeInvoiceQuoteResponse strikeInvoiceQuoteResponse
-	err = l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/%s", strikeInvoiceResponse.InvoiceId.String()), nil, &strikeInvoiceQuoteResponse)
+	err = l.StrikeRequest("POST", fmt.Sprintf("/v1/invoices/%s/quote", strikeInvoiceResponse.InvoiceId.String()), nil, &strikeInvoiceQuoteResponse)
 	if err != nil {
 		return response, fmt.Errorf(`l.StrikeRequest("GET",fmt.Sprintf("/v1/invoices/", strikeInvoiceResponse.InvoiceId.String()), nil, &strikeInvoiceQuoteResponse): %w`, err)
 	}
 
 	response.PaymentRequest = strikeInvoiceQuoteResponse.LnInvoice
 	response.Rhash = strikeInvoiceQuoteResponse.QuoteId
+	response.CheckingId = strikeInvoiceResponse.InvoiceId.String()
 
 	return response, nil
 }
@@ -403,9 +396,9 @@ func (l Strike) WalletBalance() (uint64, error) {
 
 	for _, bal := range balance {
 		if bal.Currency == BTC {
-			currentBalance, err := strconv.ParseUint(bal.Current, 10, 64)
+			currentBalance, err := l.convertToSatAmount(strikeAmount{Amount: bal.Current, Currency: BTC})
 			if err != nil {
-				return 0, fmt.Errorf(`strconv.ParseUint(balance.Current, 10, 64). %w`, err)
+				return 0, fmt.Errorf(`l.convertToSatAmount(strikeAmount{Amount: bal.Current, Currency: BTC}). %w`, err)
 			}
 			balanceTotal += currentBalance
 
@@ -413,7 +406,7 @@ func (l Strike) WalletBalance() (uint64, error) {
 
 	}
 
-	return balanceTotal, nil
+	return balanceTotal * 1000, nil
 }
 
 func (f Strike) LightningType() Backend {

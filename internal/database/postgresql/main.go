@@ -185,7 +185,7 @@ func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) err
 func (pql Postgresql) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error {
 	ctx := context.Background()
 
-	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount)
+	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 
@@ -204,7 +204,7 @@ func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool,
 }
 
 func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintRequestDB, error) {
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount FROM mint_request WHERE quote = $1 FOR UPDATE", id)
+	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id FROM mint_request WHERE quote = $1 FOR UPDATE", id)
 	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -225,7 +225,7 @@ func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintReques
 }
 
 func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error) {
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount FROM mint_request WHERE request = $1 FOR UPDATE", request)
+	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id FROM mint_request WHERE request = $1 FOR UPDATE", request)
 	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -246,7 +246,7 @@ func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.
 }
 
 func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, error) {
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid  FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
+	rows, err := tx.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
 	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -269,7 +269,7 @@ func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltReques
 
 func (pql Postgresql) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
 
-	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid  FROM melt_request WHERE state = $1", state)
+	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE state = $1", state)
 	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -293,8 +293,8 @@ func (pql Postgresql) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.Me
 func (pql Postgresql) SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error {
 
 	_, err := tx.Exec(context.Background(),
-		"INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp, fee_paid) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
-		request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp, request.FeePaid)
+		"INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp, fee_paid, checking_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+		request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp, request.FeePaid, request.CheckingId)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 	}

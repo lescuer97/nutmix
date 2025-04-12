@@ -1,12 +1,14 @@
 package lightning
 
 import (
+	"encoding/hex"
 	"fmt"
+	"slices"
+
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"slices"
 )
 
 type FakeWalletError int
@@ -69,7 +71,7 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 	}, nil
 }
 
-func (f FakeWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
+func (f FakeWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
 	switch {
 	case slices.Contains(f.UnpurposeErrors, FailQueryUnknown):
 		return UNKNOWN, "", 0, nil
@@ -83,7 +85,7 @@ func (f FakeWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentSt
 	return SETTLED, mock_preimage, uint64(10), nil
 }
 
-func (f FakeWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
+func (f FakeWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	switch {
 	case slices.Contains(f.UnpurposeErrors, FailQueryUnknown):
 		return UNKNOWN, "", nil
@@ -97,12 +99,13 @@ func (f FakeWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (Paymen
 	return SETTLED, mock_preimage, nil
 }
 
-func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
+func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
 	fee := GetFeeReserve(amount.Amount, f.InvoiceFee)
-	return fee, nil
+	hash := zpayInvoice.PaymentHash[:]
+	return fee, hex.EncodeToString(hash), nil
 }
 
-func (f FakeWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
+func (f FakeWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	supported := f.VerifyUnitSupport(amount.Unit)
 	if !supported {
@@ -125,6 +128,7 @@ func (f FakeWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error)
 	return InvoiceResponse{
 		PaymentRequest: payReq,
 		Rhash:          randUuid.String(),
+		CheckingId:     payReq,
 	}, nil
 }
 

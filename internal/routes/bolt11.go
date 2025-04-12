@@ -75,13 +75,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		resInvoice, err := mint.LightningBackend.RequestInvoice(cashu.Amount{Unit: unit, Amount: uint64(mintRequest.Amount)})
-
-		if err != nil {
-			logger.Info(err.Error())
-			c.JSON(500, "Opps!, something went wrong")
-			return
-		}
 		quoteId, err := utils.RandomHash()
 		if err != nil {
 			logger.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
@@ -91,7 +84,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		mintRequestDB = cashu.MintRequestDB{
 			Quote:       quoteId,
-			Request:     resInvoice.PaymentRequest,
 			RequestPaid: false,
 			Expiry:      expireTime,
 			Unit:        unit.String(),
@@ -99,6 +91,16 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			SeenAt:      now,
 			Amount:      &mintRequest.Amount,
 		}
+
+		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: uint64(mintRequest.Amount)})
+
+		if err != nil {
+			logger.Info(err.Error())
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+		mintRequestDB.Request = resInvoice.PaymentRequest
+		mintRequestDB.CheckingId = resInvoice.CheckingId
 
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
@@ -422,8 +424,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 		queryFee := uint64(0)
+		checkingId := quoteId
 		if !isInternal {
-			queryFee, err = mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)
+			queryFee, checkingId, err = mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)
 			if err != nil {
 				logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
@@ -444,6 +447,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			PaymentPreimage: "",
 			SeenAt:          now,
 			Mpp:             isMpp,
+			CheckingId:      checkingId,
 		}
 
 		ctx := context.Background()

@@ -95,13 +95,22 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
+		amount := decodedInvoice.MilliSat.ToSatoshis()
+		_, checkingId, err := mint.LightningBackend.QueryFees(invoice, decodedInvoice, false, cashu.Amount{Unit: cashu.Sat, Amount: uint64(amount)})
+		if err != nil {
+			logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
 		uuid := uuid.New().String()
 		swap := utils.LiquiditySwap{
-			Amount:           uint64(decodedInvoice.MilliSat.ToSatoshis()),
+			Amount:           uint64(amount),
 			LightningInvoice: invoice,
 			State:            utils.WaitingUserConfirmation,
 			Id:               uuid,
 			Type:             utils.LiquidityOut,
+			CheckingId:       checkingId,
 		}
 
 		now := decodedInvoice.Timestamp.Add(decodedInvoice.Expiry()).Unix()
@@ -166,19 +175,20 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			c.Error(fmt.Errorf("strconv.ParseUint(amountStr, 10, 64 ). %w", err))
 			return
 		}
+		uuid := uuid.New().String()
 
-		resp, err := mint.LightningBackend.RequestInvoice(cashu.Amount{Amount: amount, Unit: cashu.Sat})
+		resp, err := mint.LightningBackend.RequestInvoice(cashu.MintRequestDB{Quote: uuid}, cashu.Amount{Amount: amount, Unit: cashu.Sat})
 		if err != nil {
 			c.Error(fmt.Errorf("mint.LightningBackend.RequestInvoice(int64(amount)). %w", err))
 			return
 		}
-		uuid := uuid.New().String()
 		swap := utils.LiquiditySwap{
 			Amount:           amount,
 			LightningInvoice: resp.PaymentRequest,
 			State:            utils.MintWaitingPaymentRecv,
 			Id:               uuid,
 			Type:             utils.LiquidityIn,
+			CheckingId:       resp.CheckingId,
 		}
 
 		decodedInvoice, err := zpay32.Decode(resp.PaymentRequest, mint.LightningBackend.GetNetwork())
@@ -388,7 +398,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
 
 			// if exception of lightning payment says fail do a payment status recheck.
-			status, _, _, err := mint.LightningBackend.CheckPayed(swapRequest.LightningInvoice, decodedInvoice)
+			status, _, _, err := mint.LightningBackend.CheckPayed(swapRequest.LightningInvoice, decodedInvoice, swapRequest.CheckingId)
 
 			// if error on checking payement we will save as pending and returns status
 			if err != nil {

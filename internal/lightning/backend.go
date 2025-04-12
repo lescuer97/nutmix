@@ -22,10 +22,12 @@ const STRIKE Backend = iota + 5
 
 type LightningBackend interface {
 	PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error)
-	CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error)
-	CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error)
-	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error)
-	RequestInvoice(amount cashu.Amount) (InvoiceResponse, error)
+	CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error)
+	CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error)
+	RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error)
+	// returns the amount in sats and the checking_id
+	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error)
+	// returns milisats balance
 	WalletBalance() (uint64, error)
 	LightningType() Backend
 	GetNetwork() *chaincfg.Params
@@ -50,5 +52,6 @@ type PaymentResponse struct {
 
 type InvoiceResponse struct {
 	PaymentRequest string
+	CheckingId     string
 	Rhash          string
 }

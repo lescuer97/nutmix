@@ -148,7 +148,7 @@ func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zp
 	return invoiceRes, nil
 }
 
-func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
+func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	hash := invoice.PaymentHash[:]
@@ -169,7 +169,7 @@ func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (Payment
 	}
 }
 
-func (l LnbitsWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
+func (l LnbitsWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	hash := invoice.PaymentHash[:]
@@ -191,7 +191,7 @@ func (l LnbitsWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (Paym
 	}
 }
 
-func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
+func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
 	var queryResponse lnbitsFeeResponse
 	invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
@@ -199,14 +199,16 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 	queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
 
 	if err != nil {
-		return 0, fmt.Errorf("json.Marshal: %w", err)
+		return 0, "", fmt.Errorf("json.Marshal: %w", err)
 	}
 
 	fee := GetFeeReserve(amount.Amount, queryResponse.FeeReserve)
-	return fee, nil
+	hash := zpayInvoice.PaymentHash[:]
+
+	return fee, hex.EncodeToString(hash), nil
 }
 
-func (l LnbitsWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
+func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
 	reqInvoice := lnbitsInvoiceRequest{
 		Amount: amount.Amount,
 		Unit:   cashu.Sat.String(),
@@ -232,6 +234,7 @@ func (l LnbitsWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, erro
 
 	response.PaymentRequest = lnbitsInvoice.PaymentRequest
 	response.Rhash = lnbitsInvoice.PaymentHash
+	response.CheckingId = lnbitsInvoice.PaymentHash
 
 	return response, nil
 

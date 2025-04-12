@@ -29,7 +29,7 @@ func TestUseMinimumFeeOnInvoice(t *testing.T) {
 
 	sat_amount := uint64(invoice.MilliSat.ToSatoshis())
 
-	fee, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
+	fee, _, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
 	if err != nil {
 		t.Fatalf(`fakeWallet.QueryFees(). %v`, err)
 	}
@@ -61,7 +61,7 @@ func TestUseFeeInvoice(t *testing.T) {
 
 	sat_amount := uint64(invoice.MilliSat.ToSatoshis())
 
-	fee, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
+	fee, _, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
 	if err != nil {
 		t.Fatalf(`fakeWallet.QueryFees(). %v`, err)
 	}

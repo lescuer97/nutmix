@@ -245,7 +245,7 @@ func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, 
 	}
 }
 
-func (l LndGrpcWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
+func (l LndGrpcWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
 	payStatus, err := l.getPaymentStatus(invoice)
 	if err != nil {
 		return FAILED, "", 0, fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
@@ -274,7 +274,7 @@ func (l LndGrpcWallet) getInvoiceStatus(invoice *zpay32.Invoice) (*lnrpc.Invoice
 	return invoiceStat, nil
 }
 
-func (l LndGrpcWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
+func (l LndGrpcWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	invoiceStatus, err := l.getInvoiceStatus(invoice)
 
 	if err != nil {
@@ -327,7 +327,7 @@ func getFeatureBits(features *lnwire.FeatureVector) []lnrpc.FeatureBit {
 	return featureBits
 }
 
-func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
+func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
@@ -347,20 +347,22 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	res, err := client.QueryRoutes(ctx, &queryRoutes)
 
 	if err != nil {
-		return 1, err
+		return 1, "", err
 	}
 	if res == nil {
-		return 1, fmt.Errorf("No routes found")
+		return 1, "", fmt.Errorf("No routes found")
 	}
 
 	fee := GetAverageRouteFee(res.Routes) / 1000
 
 	fee = GetFeeReserve(amount.Amount, fee)
 
-	return fee, nil
+	hash := zpayInvoice.PaymentHash[:]
+
+	return fee, hex.EncodeToString(hash), nil
 }
 
-func (l LndGrpcWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
+func (l LndGrpcWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	supported := l.VerifyUnitSupport(amount.Unit)
 	if !supported {
@@ -384,6 +386,7 @@ func (l LndGrpcWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, err
 
 	response.Rhash = hex.EncodeToString(res.RHash)
 	response.PaymentRequest = res.PaymentRequest
+	response.CheckingId = hex.EncodeToString(res.RHash)
 
 	return response, nil
 }

@@ -177,7 +177,7 @@ func (l CLNGRPCWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 	var invoiceRes PaymentResponse
 
 	// first check if invoice is already paid.
-	status, _, _, err := l.CheckPayed("", zpayInvoice)
+	status, _, _, err := l.CheckPayed(melt_quote.Quote, zpayInvoice, melt_quote.CheckingId)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.CheckPayed(hexHash) %w`, err)
 	}
@@ -200,7 +200,7 @@ func (l CLNGRPCWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 	return invoiceRes, nil
 }
 
-func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
+func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
@@ -231,7 +231,7 @@ func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (Paymen
 	}
 	return PENDING, "", fee, nil
 }
-func (l CLNGRPCWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
+func (l CLNGRPCWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
@@ -260,19 +260,19 @@ func (l CLNGRPCWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (Pay
 	return PENDING, "", nil
 }
 
-func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, error) {
+func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
-	_, _, _, err := l.CheckPayed("", zpayInvoice)
+	_, _, _, err := l.CheckPayed("", zpayInvoice, "")
 
 	if err != nil {
-		return 1, fmt.Errorf(`l.CheckPayed(invoice) %w`, err)
+		return 1, "", fmt.Errorf(`l.CheckPayed(invoice) %w`, err)
 	}
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	err = amount.To(cashu.Msat)
 	if err != nil {
-		return 1, fmt.Errorf(`amount.To(cashu.Msat) %w`, err)
+		return 1, "", fmt.Errorf(`amount.To(cashu.Msat) %w`, err)
 	}
 
 	amountGrpc := cln_grpc.Amount{
@@ -288,14 +288,14 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	res, err := client.GetRoute(ctx, &queryRoutes)
 
 	if err != nil {
-		return 1, err
+		return 1, "", err
 	}
 	if res == nil {
-		return 1, fmt.Errorf("No routes found")
+		return 1, "", fmt.Errorf("No routes found")
 	}
 
 	if len(res.Route) == 0 {
-		return 1, fmt.Errorf("No routes found")
+		return 1, "", fmt.Errorf("No routes found")
 	}
 
 	fee := amountGrpc.Msat - *&res.Route[len(res.Route)-1].AmountMsat.Msat
@@ -305,10 +305,11 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 	fee = GetFeeReserve(amount.Amount, fee)
 
-	return fee, nil
+	hash := zpayInvoice.PaymentHash[:]
+	return fee, hex.EncodeToString(hash), nil
 }
 
-func (l CLNGRPCWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, error) {
+func (l CLNGRPCWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	supported := l.VerifyUnitSupport(amount.Unit)
 	if !supported {
@@ -352,6 +353,7 @@ func (l CLNGRPCWallet) RequestInvoice(amount cashu.Amount) (InvoiceResponse, err
 	}
 
 	response.Rhash = hex.EncodeToString(res.PaymentHash)
+	response.CheckingId = hex.EncodeToString(res.PaymentHash)
 	response.PaymentRequest = res.Bolt11
 
 	return response, nil

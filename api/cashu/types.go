@@ -442,6 +442,7 @@ type MintRequestDB struct {
 	State       ACTION_STATE `json:"state"`
 	SeenAt      int64        `json:"seen_at"`
 	Amount      *uint64      `json:"amount"`
+	CheckingId  string       `json:"checking_id"`
 }
 
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
@@ -502,6 +503,7 @@ type MeltRequestDB struct {
 	PaymentPreimage string       `json:"payment_preimage"`
 	SeenAt          int64        `json:"seen_at"`
 	Mpp             bool         `json:"mpp"`
+	CheckingId      string       `json:"checking_id"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
