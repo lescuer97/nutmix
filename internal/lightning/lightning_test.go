@@ -29,14 +29,14 @@ func TestUseMinimumFeeOnInvoice(t *testing.T) {
 
 	sat_amount := uint64(invoice.MilliSat.ToSatoshis())
 
-	fee, _, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
+	feeRes, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
 	if err != nil {
 		t.Fatalf(`fakeWallet.QueryFees(). %v`, err)
 	}
 
-	if fee != 100 {
+	if feeRes.Fees.Amount != 100 {
 
-		t.Errorf(`Fee is not being set to the correct value. %v`, fee)
+		t.Errorf(`Fee is not being set to the correct value. %v`, feeRes.Fees.Amount)
 	}
 }
 
@@ -61,13 +61,13 @@ func TestUseFeeInvoice(t *testing.T) {
 
 	sat_amount := uint64(invoice.MilliSat.ToSatoshis())
 
-	fee, _, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
+	feeRes, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
 	if err != nil {
 		t.Fatalf(`fakeWallet.QueryFees(). %v`, err)
 	}
 
-	if fee != 150 {
+	if feeRes.Fees.Amount != 150 {
 
-		t.Errorf(`Fee is not being set to the correct value. %v`, fee)
+		t.Errorf(`Fee is not being set to the correct value. %v`, feeRes.Fees)
 	}
 }
