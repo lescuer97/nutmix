@@ -261,7 +261,7 @@ func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.I
 
 	err := l.StrikeRequest("PATCH", fmt.Sprintf("/v1/payment-quotes/%s/execute", melt_quote.CheckingId), nil, &strikePayment)
 	if err != nil {
-		return invoiceRes, fmt.Errorf(`"/v1/payment-quotes/%s/execute", melt_quote.CheckingId), nil, &strikePayment) %w`,melt_quote.CheckingId, err)
+		return invoiceRes, fmt.Errorf(`"/v1/payment-quotes/%s/execute", melt_quote.CheckingId), nil, &strikePayment) %w`, melt_quote.CheckingId, err)
 	}
 
 	fee, err := l.convertStrikeAmountToUInt(strikePayment.LightningNetworkFee)

@@ -42,12 +42,12 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKe
 			units[val.Unit] = true
 		}
 		if len(units) > 1 {
-			return cashu.Sat, fmt.Errorf("Proofs are not the same unit")
+			return cashu.Sat, cashu.ErrNotSameUnits
 		}
 	}
 
 	if len(units) == 0 {
-		return cashu.Sat, fmt.Errorf("No units found")
+		return cashu.Sat, cashu.ErrUnitNotSupported
 	}
 
 	var returnedUnit cashu.Unit

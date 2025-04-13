@@ -6,6 +6,7 @@ var (
 	ErrMeltAlreadyPaid           = errors.New("Melt already Paid")
 	ErrQuoteIsPending            = errors.New("Quote is pending")
 	ErrUnitNotSupported          = errors.New("Unit not supported")
+	ErrDifferentInputOutputUnit  = errors.New("Different input output unit")
 	ErrNotEnoughtProofs          = errors.New("Not enought proofs")
 	ErrProofSpent                = errors.New("Proof already spent")
 	ErrBlindMessageAlreadySigned = errors.New("Blind message already signed")
@@ -22,7 +23,10 @@ const (
 	UNIT_NOT_SUPPORTED       = 11005
 	INSUFICIENT_FEE          = 11006
 	// AMOUNT_OUTSIDE_OF_LIMIT = 11006
-	OVERPAID_FEE = 11007
+	DUPLICATE_INPUTS            = 11007
+	DUPLICATE_OUTPUTS           = 11008
+	MULTIPLE_UNITS_OUTPUT_INPUT = 11009
+	INPUT_OUTPUT_NOT_SAME_UNIT  = 11010
 
 	KEYSET_NOT_KNOW = 12001
 	INACTIVE_KEYSET = 12002
@@ -54,8 +58,14 @@ func (e ErrorCode) String() string {
 		error = "Unit in request is not supported"
 	case INSUFICIENT_FEE:
 		error = "Insufficient fee"
-	case OVERPAID_FEE:
-		error = "Fee over paid"
+	case DUPLICATE_INPUTS:
+		error = "Duplicate inputs provided"
+	case DUPLICATE_OUTPUTS:
+		error = "Duplicate inputs provided"
+	case MULTIPLE_UNITS_OUTPUT_INPUT:
+		error = "Inputs/Outputs of multiple units"
+	case INPUT_OUTPUT_NOT_SAME_UNIT:
+		error = "Inputs/Outputs of multiple units"
 
 	case KEYSET_NOT_KNOW:
 		error = "Keyset is not known"

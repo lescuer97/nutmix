@@ -111,7 +111,6 @@ func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicK
 		return unit, fmt.Errorf("m.checkMessagesAreSameUnit(outputs, keysets.Keysets). %w", err)
 	}
 
-	var AmountSignature uint64
 	outputsMap := make(map[string]bool)
 
 	// Check if there is a repeated output
@@ -119,10 +118,9 @@ func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicK
 		exists, _ := outputsMap[output.B_]
 
 		if exists {
-			return unit, fmt.Errorf("Repeated Blind Message")
+			return unit, cashu.ErrRepeatedOutput
 		}
 		outputsMap[output.B_] = true
-		AmountSignature += output.Amount
 	}
 
 	// check if it has been signed before

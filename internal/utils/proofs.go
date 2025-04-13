@@ -55,10 +55,17 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrUnbalanced):
 		message := cashu.ErrUnbalanced.Error()
 		return cashu.TRANSACTION_NOT_BALANCED, &message
+	case errors.Is(proofError, cashu.ErrRepeatedOutput):
+		message := cashu.ErrRepeatedOutput.Error()
+		return cashu.DUPLICATE_OUTPUTS, &message
 
 	case errors.Is(proofError, cashu.ErrUnitNotSupported):
 		message := cashu.ErrUnitNotSupported.Error()
 		return cashu.UNIT_NOT_SUPPORTED, &message
+
+	case errors.Is(proofError, cashu.ErrDifferentInputOutputUnit):
+		message := cashu.ErrDifferentInputOutputUnit.Error()
+		return cashu.INPUT_OUTPUT_NOT_SAME_UNIT, &message
 
 	case errors.Is(proofError, cashu.ErrInvalidPreimage):
 		message := cashu.ErrInvalidPreimage.Error()

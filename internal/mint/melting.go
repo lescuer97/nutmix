@@ -219,7 +219,6 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("mint.CheckMeltQuoteState(quoteId): %w", err)
 	}
 
-	// TODO ADD error to parse
 	if quote.State != cashu.UNPAID {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w mint.CheckMeltQuoteState(quoteId): %w", cashu.ErrMeltAlreadyPaid, err)
 	}
@@ -256,7 +255,6 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
 	}
-	// TODO - R	// if there are change outputs you need to check if the outputs are valid if they have the correct unit
 	if len(meltRequest.Outputs) > 0 {
 		outputUnit, err := m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets)
 		if err != nil {
@@ -264,7 +262,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		}
 
 		if outputUnit != unit {
-			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. Change output unit is different: ", cashu.ErrUnitNotSupported)
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. Change output unit is different: ", cashu.ErrDifferentInputOutputUnit)
 		}
 	}
 
