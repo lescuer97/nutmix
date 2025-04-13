@@ -416,25 +416,24 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 			// finish failure and release the proofs
 			case lightning.FAILED, lightning.UNKNOWN:
 				quote.State = cashu.UNPAID
-				err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
-				if err != nil {
+				errDb := m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
+				if errDb != nil {
 					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid) %w", err)
 				}
-				err = m.MintDB.DeleteProofs(tx, meltRequest.Inputs)
-				if err != nil {
+				errDb = m.MintDB.DeleteProofs(tx, meltRequest.Inputs)
+				if errDb != nil {
 					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteProofs(tx, meltRequest.Inputs) %w", err)
 				}
-				err = m.MintDB.DeleteChangeByQuote(tx, quote.Quote)
-				if err != nil {
+				errDb = m.MintDB.DeleteChangeByQuote(tx, quote.Quote)
+				if errDb != nil {
 					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteChangeByQuote(tx, quote.Quote) %w", err)
 				}
-				err = m.MintDB.Commit(context.Background(), tx)
-				if err != nil {
+				errDb = m.MintDB.Commit(context.Background(), tx)
+				if errDb != nil {
 					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 				}
 
-				// TODO put payment error here
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("Couldn not pay ")
+				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w %w. DbErr: %w", err, cashu.ErrPaymentFailed, errDb)
 			}
 		}
 		quote.PaymentPreimage = payment.Preimage

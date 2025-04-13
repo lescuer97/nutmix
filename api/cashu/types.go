@@ -29,12 +29,11 @@ var (
 	ErrQuoteNotPaid        = errors.New("Quote not paid")
 	ErrMessageAmountToBig  = errors.New("Message amount is to big")
 	ErrInvalidBlindMessage = errors.New("Invalid blind message")
-
 	ErrCouldNotConvertUnit         = errors.New("Could not convert unit")
 	ErrCouldNotParseAmountToString = errors.New("Could not parse amount to string")
-
 	ErrUnbalanced   = errors.New("Unbalanced transactions")
 	ErrNotSameUnits = errors.New("Not same units")
+	ErrPaymentFailed = errors.New("Lightning payment failed")
 )
 
 const (
