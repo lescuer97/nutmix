@@ -144,6 +144,7 @@ func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zp
 	invoiceRes.Rhash = lnbitsInvoice.PaymentHash
 	invoiceRes.Preimage = paymentStatus.Preimage
 	invoiceRes.PaidFeeSat = int64(math.Abs(float64(paymentStatus.Details.Fee)))
+	invoiceRes.CheckingId = melt_quote.CheckingId
 
 	return invoiceRes, nil
 }
@@ -191,21 +192,26 @@ func (l LnbitsWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.I
 	}
 }
 
-func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
+func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {
 	var queryResponse lnbitsFeeResponse
 	invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
 	err := l.LnbitsRequest("GET", invoiceString, nil, &queryResponse)
 	queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
 
+	feesResponse := FeesResponse{}
 	if err != nil {
-		return 0, "", fmt.Errorf("json.Marshal: %w", err)
+		return feesResponse, fmt.Errorf("json.Marshal: %w", err)
 	}
 
 	fee := GetFeeReserve(amount.Amount, queryResponse.FeeReserve)
 	hash := zpayInvoice.PaymentHash[:]
 
-	return fee, hex.EncodeToString(hash), nil
+	feesResponse.Fees.Amount = fee
+	feesResponse.AmountToSend.Amount = amount.Amount
+	feesResponse.CheckingId = hex.EncodeToString(hash)
+
+	return feesResponse, nil
 }
 
 func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {

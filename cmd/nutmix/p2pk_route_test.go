@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http/httptest"
 	"os"
 	"strconv"
@@ -477,7 +476,6 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	var postSwapResponse cashu.PostSwapResponse
 
-	log.Printf("Body: %+v", string(w.Body.Bytes()))
 	if w.Code != 200 {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
@@ -514,7 +512,6 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	log.Printf("body: %s", w.Body.Bytes())
 	if w.Code != 400 {
 		t.Fatalf("Expected status code 403, got %d", w.Code)
 	}

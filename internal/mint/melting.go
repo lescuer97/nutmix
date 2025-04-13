@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"log/slog"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log/slog"
 )
 
 func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB, logger *slog.Logger) (cashu.MeltRequestDB, error) {
@@ -345,13 +347,11 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.SaveMeltChange(setUpTx, meltRequest.Outputs, quote.Quote) %w", err)
 	}
-
 	err = m.MintDB.Commit(context.Background(), setUpTx)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 
-	// NOTE: Checks if the request is internal to the mint
 	quote, err = m.settleIfInternalMelt(tx, quote, logger)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
@@ -362,21 +362,39 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		Unit:   unit,
 		Amount: quote.Amount,
 	}
+
+	log.Printf("\n amount: %+v", amount)
+
 	if !quote.RequestPaid {
+
 		payment, err := m.LightningBackend.PayInvoice(quote, invoice, quote.FeeReserve, quote.Mpp, amount)
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {
 			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
 
+			logger.Debug("changing checking Id to payment checking Id", slog.String("quote.CheckingId", quote.CheckingId), slog.String("payment.CheckingId", payment.CheckingId))
+			quote.CheckingId = payment.CheckingId
+			err = m.MintDB.ChangeCheckingId(tx, quote.Quote, quote.CheckingId)
+			if err != nil {
+				logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
+			}
+
 			// if exception of lightning payment says fail do a payment status recheck.
 			status, _, fee_paid, err := m.LightningBackend.CheckPayed(quote.Quote, invoice, quote.CheckingId)
 
-			quote.FeePaid = fee_paid
 			// if error on checking payement we will save as pending and returns status
 			if err != nil {
+				logger.Warn("Something happened while paying the invoice. Keeping proofs and quote as pending ")
+				// keeps the proofs and quotes as pending in the database
+				err = m.MintDB.Commit(context.Background(), tx)
+				if err != nil {
+					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
+				}
 				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote) %w", err)
-
 			}
+
+			logger.Info("after check payed verification")
+			quote.FeePaid = fee_paid
 
 			switch status {
 			// halt transaction and return a pending state

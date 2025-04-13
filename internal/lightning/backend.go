@@ -26,7 +26,7 @@ type LightningBackend interface {
 	CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error)
 	RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error)
 	// returns the amount in sats and the checking_id
-	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error)
+	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error)
 	// returns milisats balance
 	WalletBalance() (uint64, error)
 	LightningType() Backend
@@ -48,6 +48,12 @@ type PaymentResponse struct {
 	PaymentState   PaymentStatus
 	Rhash          string
 	PaidFeeSat     int64
+	CheckingId     string
+}
+type FeesResponse struct {
+	Fees         cashu.Amount
+	AmountToSend cashu.Amount
+	CheckingId   string
 }
 
 type InvoiceResponse struct {

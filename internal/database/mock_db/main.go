@@ -193,7 +193,15 @@ func (m *MockDB) ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool, stat
 
 	}
 	return nil
+}
+func (m *MockDB) ChangeCheckingId(tx pgx.Tx, quote string, checking_id string) error {
+	for i := 0; i < len(m.MeltRequest); i++ {
+		if m.MeltRequest[i].Quote == quote {
+			m.MeltRequest[i].CheckingId = checking_id
+		}
 
+	}
+	return nil
 }
 
 func (m *MockDB) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu.Proofs, error) {

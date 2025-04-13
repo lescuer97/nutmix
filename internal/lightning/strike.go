@@ -6,13 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
@@ -111,7 +109,7 @@ func CashuAmountToStrikeAmount(amount cashu.Amount) (strikeAmount, error) {
 }
 
 type strikeInvoiceResponse struct {
-	InvoiceId   uuid.UUID          `json:"invoiceId"`
+	InvoiceId   string             `json:"invoiceId"`
 	Description string             `json:"description"`
 	Amount      strikeAmount       `json:"amount"`
 	State       strikeInvoiceState `json:"state"`
@@ -128,11 +126,10 @@ type strikeInvoiceQuoteResponse struct {
 type strikePaymentRequest struct {
 	LnInvoice      string         `json:"lnInvoice"`
 	SourceCurrency strikeCurrency `json:"sourceCurrency"`
-	Amount         strikeAmount   `json:"amount"`
 }
 
 type strikePaymentQuoteResponse struct {
-	PaymentQuoteId      uuid.UUID    `json:"paymentQuoteId"`
+	PaymentQuoteId      string       `json:"paymentQuoteId"`
 	LightningNetworkFee strikeAmount `json:"lightningNetworkFee"`
 	Amount              strikeAmount `json:"amount"`
 	TotalFee            strikeAmount `json:"totalFee"`
@@ -142,14 +139,16 @@ type strikePaymentQuoteResponse struct {
 type strikePaymentStatus struct {
 	PaymentId           string             `json:"paymentId"`
 	State               strikePaymentState `json:"state"`
-	Completed           uint64             `json:"completed"`
+	Completed           string             `json:"completed"`
 	Amount              strikeAmount       `json:"amount"`
 	TotalFee            strikeAmount       `json:"totalFee"`
 	LightningNetworkFee strikeAmount       `json:"lightningNetworkFee"`
+	TotalAmount         strikeAmount       `json:"totalAmount"`
 	Lightning           struct {
 		NetworkFee strikeAmount `json:"networkFee"`
 	} `json:"lightning"`
 }
+
 type strikeErrorStatus struct {
 	TraceId *string `json:"TraceId,omitempty"`
 	Data    struct {
@@ -192,7 +191,6 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", l.key))
 	req.Header.Set("Content-Type", "application/json")
-	// req.Header.Set("accept", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -205,7 +203,7 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 	}
 
 	switch resp.StatusCode {
-	case 200, 201:
+	case 200, 201, 202:
 		err = json.Unmarshal(body, &responseType)
 		if err != nil {
 			return fmt.Errorf("json.Unmarshal(body, &responseType): %w", err)
@@ -234,19 +232,27 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 	return nil
 }
 
-func (l Strike) convertToSatAmount(amount strikeAmount) (uint64, error) {
-	fee, err := strconv.ParseFloat(amount.Amount, 64)
+func (l Strike) convertStrikeAmountToUInt(amount strikeAmount) (cashu.Amount, error) {
+	cashuAmount := cashu.Amount{}
+	val, err := strconv.ParseFloat(amount.Amount, 64)
 	if err != nil {
-		return 0, fmt.Errorf("strconv.ParseUint(fee_str, 10, 64): %w", err)
+		return cashuAmount, fmt.Errorf("strconv.ParseUint(fee_str, 10, 64): %w", err)
+	}
+	var unit cashu.Unit
+	switch amount.Currency {
+	case BTC:
+		val = val * 1e8
+		unit = cashu.Sat
+	case EUR:
+		val = val * 100
+		unit = cashu.EUR
+	default:
+		return cashuAmount, fmt.Errorf("Could not get the correct unit")
 	}
 
-	if amount.Currency == BTC {
-		fee = fee * 1e8
-	} else if amount.Currency == EUR {
-		fee = fee * 100
-	}
-
-	return uint64(fee), nil
+	cashuAmount.Amount = uint64(val)
+	cashuAmount.Unit = unit
+	return cashuAmount, nil
 }
 
 func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
@@ -255,10 +261,10 @@ func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.I
 
 	err := l.StrikeRequest("PATCH", fmt.Sprintf("/v1/payment-quotes/%s/execute", melt_quote.CheckingId), nil, &strikePayment)
 	if err != nil {
-		return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
+		return invoiceRes, fmt.Errorf(`"/v1/payment-quotes/%s/execute", melt_quote.CheckingId), nil, &strikePayment) %w`, err)
 	}
 
-	fee, err := l.convertToSatAmount(strikePayment.LightningNetworkFee)
+	fee, err := l.convertStrikeAmountToUInt(strikePayment.LightningNetworkFee)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
 	}
@@ -268,10 +274,11 @@ func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.I
 		return invoiceRes, fmt.Errorf(`strikeStateToCashuState(strikePayment.State) %w`, err)
 	}
 	payHash := *zpayInvoice.PaymentHash
-	invoiceRes.PaidFeeSat = int64(fee)
+	invoiceRes.PaidFeeSat = int64(fee.Amount)
 	invoiceRes.PaymentState = state
 	invoiceRes.PaymentRequest = melt_quote.Request
 	invoiceRes.Rhash = hex.EncodeToString(payHash[:])
+	invoiceRes.CheckingId = strikePayment.PaymentId
 
 	return invoiceRes, nil
 }
@@ -281,23 +288,22 @@ func (l Strike) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId str
 
 	err := l.StrikeRequest("GET", "/v1/payments/"+checkingId, nil, &paymentStatus)
 	if err != nil {
-		return FAILED, "", uint64(0), fmt.Errorf(`l.StrikeRequest("GET", "/api/v1/payments/"+quote: %w`, err)
+		return FAILED, "", uint64(0), fmt.Errorf(`l.StrikeRequest("GET", "/v1/payments/"+checkingId: %w`, err)
 	}
 
-	lnFee, err := strconv.ParseUint(paymentStatus.LightningNetworkFee.Amount, 10, 64)
+	lnFee, err := l.convertStrikeAmountToUInt(paymentStatus.LightningNetworkFee)
 	if err != nil {
 		return FAILED, "", uint64(0), fmt.Errorf(`strconv.ParseUint(paymentStatus.LightningNetworkFee, 10, 64): %w`, err)
 	}
 
 	state, err := strikePaymentStateToCashuState(paymentStatus.State)
 	if err != nil {
-		return PENDING, "", lnFee, fmt.Errorf("strikePaymentStateToCashuState(strikePayment.State): %w", err)
+		return PENDING, "", lnFee.Amount, fmt.Errorf("strikePaymentStateToCashuState(strikePayment.State): %w", err)
 	}
-	return state, "", lnFee, nil
+	return state, "", lnFee.Amount, nil
 }
 func (l Strike) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	var paymentStatus strikeInvoiceResponse
-	log.Printf("receive check %+v", quote)
 
 	err := l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/%s", quote.CheckingId), nil, &paymentStatus)
 	if err != nil {
@@ -318,12 +324,13 @@ func (l Strike) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice
 	}
 }
 
-func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
+func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {
 	var queryResponse strikePaymentQuoteResponse
 
+	var FeesResponse FeesResponse
 	strikeAmount, err := CashuAmountToStrikeAmount(amount)
 	if err != nil {
-		return 0, "", fmt.Errorf(`CashuAmountToStrikeAmount(): %w`, err)
+		return FeesResponse, fmt.Errorf(`CashuAmountToStrikeAmount(): %w`, err)
 	}
 	strikeQuery := strikePaymentRequest{
 		LnInvoice:      invoice,
@@ -334,16 +341,24 @@ func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool,
 
 	err = l.StrikeRequest("POST", invoiceString, strikeQuery, &queryResponse)
 	if err != nil {
-		return 0, "", fmt.Errorf(`l.StrikeRequest("GET", invoiceString, nil, &queryResponse): %w`, err)
+		return FeesResponse, fmt.Errorf(`l.StrikeRequest("GET", invoiceString, nil, &queryResponse): %w`, err)
 	}
 
-	fee, err := l.convertToSatAmount(queryResponse.TotalFee)
+	feeAmount, err := l.convertStrikeAmountToUInt(queryResponse.TotalFee)
 	if err != nil {
-		return 0, "", fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
+		return FeesResponse, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
+	}
+	amountSend, err := l.convertStrikeAmountToUInt(queryResponse.Amount)
+	if err != nil {
+		return FeesResponse, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
 	}
 
-	fee = GetFeeReserve(amount.Amount, fee)
-	return fee, queryResponse.PaymentQuoteId.String(), nil
+	feeAmount.Amount = GetFeeReserve(amount.Amount, feeAmount.Amount)
+	FeesResponse.Fees = feeAmount
+
+	FeesResponse.AmountToSend = amountSend
+	FeesResponse.CheckingId = queryResponse.PaymentQuoteId
+	return FeesResponse, nil
 }
 
 func (l Strike) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
@@ -369,18 +384,16 @@ func (l Strike) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (
 	if err != nil {
 		return response, fmt.Errorf(`l.StrikeRequest("POST", "/v1/invoices", r: %w`, err)
 	}
-	log.Printf("\n strike invoice: %+v", strikeInvoiceResponse)
-
 	// get invoice quote
 	var strikeInvoiceQuoteResponse strikeInvoiceQuoteResponse
-	err = l.StrikeRequest("POST", fmt.Sprintf("/v1/invoices/%s/quote", strikeInvoiceResponse.InvoiceId.String()), nil, &strikeInvoiceQuoteResponse)
+	err = l.StrikeRequest("POST", fmt.Sprintf("/v1/invoices/%s/quote", strikeInvoiceResponse.InvoiceId), nil, &strikeInvoiceQuoteResponse)
 	if err != nil {
 		return response, fmt.Errorf(`l.StrikeRequest("GET",fmt.Sprintf("/v1/invoices/", strikeInvoiceResponse.InvoiceId.String()), nil, &strikeInvoiceQuoteResponse): %w`, err)
 	}
 
 	response.PaymentRequest = strikeInvoiceQuoteResponse.LnInvoice
 	response.Rhash = strikeInvoiceQuoteResponse.QuoteId
-	response.CheckingId = strikeInvoiceResponse.InvoiceId.String()
+	response.CheckingId = strikeInvoiceResponse.InvoiceId
 
 	return response, nil
 }
@@ -396,12 +409,11 @@ func (l Strike) WalletBalance() (uint64, error) {
 
 	for _, bal := range balance {
 		if bal.Currency == BTC {
-			currentBalance, err := l.convertToSatAmount(strikeAmount{Amount: bal.Current, Currency: BTC})
+			currentBalance, err := l.convertStrikeAmountToUInt(strikeAmount{Amount: bal.Current, Currency: BTC})
 			if err != nil {
 				return 0, fmt.Errorf(`l.convertToSatAmount(strikeAmount{Amount: bal.Current, Currency: BTC}). %w`, err)
 			}
-			balanceTotal += currentBalance
-
+			balanceTotal += currentBalance.Amount
 		}
 
 	}

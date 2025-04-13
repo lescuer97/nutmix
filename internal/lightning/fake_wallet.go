@@ -68,6 +68,7 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 		PaymentState:   SETTLED,
 		Rhash:          "",
 		PaidFeeSat:     0,
+		CheckingId:     melt_quote.CheckingId,
 	}, nil
 }
 
@@ -99,10 +100,15 @@ func (f FakeWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Inv
 	return SETTLED, mock_preimage, nil
 }
 
-func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
+func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {
 	fee := GetFeeReserve(amount.Amount, f.InvoiceFee)
 	hash := zpayInvoice.PaymentHash[:]
-	return fee, hex.EncodeToString(hash), nil
+	feesResponse := FeesResponse{}
+	feesResponse.Fees.Amount = fee
+	feesResponse.AmountToSend.Amount = amount.Amount
+	feesResponse.CheckingId = hex.EncodeToString(hash)
+
+	return feesResponse, nil
 }
 
 func (f FakeWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {

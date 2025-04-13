@@ -192,6 +192,7 @@ func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 			return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
 		}
 	}
+	invoiceRes.CheckingId = melt_quote.CheckingId
 
 	return invoiceRes, nil
 }
@@ -327,7 +328,7 @@ func getFeatureBits(features *lnwire.FeatureVector) []lnrpc.FeatureBit {
 	return featureBits
 }
 
-func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
+func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
@@ -346,11 +347,13 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 	res, err := client.QueryRoutes(ctx, &queryRoutes)
 
+	feesResponse := FeesResponse{}
+
 	if err != nil {
-		return 1, "", err
+		return feesResponse, err
 	}
 	if res == nil {
-		return 1, "", fmt.Errorf("No routes found")
+		return feesResponse, fmt.Errorf("No routes found")
 	}
 
 	fee := GetAverageRouteFee(res.Routes) / 1000
@@ -359,7 +362,10 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 	hash := zpayInvoice.PaymentHash[:]
 
-	return fee, hex.EncodeToString(hash), nil
+	feesResponse.Fees.Amount = fee
+	feesResponse.AmountToSend.Amount = amount.Amount
+	feesResponse.CheckingId = hex.EncodeToString(hash)
+	return feesResponse, nil
 }
 
 func (l LndGrpcWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {

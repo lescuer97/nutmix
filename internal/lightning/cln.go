@@ -196,6 +196,7 @@ func (l CLNGRPCWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 			return invoiceRes, fmt.Errorf(`l.clnGrpcPayInvoice(invoice, feeReserve, &invoiceRes) %w`, err)
 		}
 	}
+	invoiceRes.CheckingId = melt_quote.CheckingId
 
 	return invoiceRes, nil
 }
@@ -260,19 +261,20 @@ func (l CLNGRPCWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 	return PENDING, "", nil
 }
 
-func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (uint64, string, error) {
+func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
+	feesResponse := FeesResponse{}
 	_, _, _, err := l.CheckPayed("", zpayInvoice, "")
 
 	if err != nil {
-		return 1, "", fmt.Errorf(`l.CheckPayed(invoice) %w`, err)
+		return feesResponse, fmt.Errorf(`l.CheckPayed(invoice) %w`, err)
 	}
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	err = amount.To(cashu.Msat)
 	if err != nil {
-		return 1, "", fmt.Errorf(`amount.To(cashu.Msat) %w`, err)
+		return feesResponse, fmt.Errorf(`amount.To(cashu.Msat) %w`, err)
 	}
 
 	amountGrpc := cln_grpc.Amount{
@@ -288,14 +290,14 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	res, err := client.GetRoute(ctx, &queryRoutes)
 
 	if err != nil {
-		return 1, "", err
+		return feesResponse, err
 	}
 	if res == nil {
-		return 1, "", fmt.Errorf("No routes found")
+		return feesResponse, fmt.Errorf("No routes found")
 	}
 
 	if len(res.Route) == 0 {
-		return 1, "", fmt.Errorf("No routes found")
+		return feesResponse, fmt.Errorf("No routes found")
 	}
 
 	fee := amountGrpc.Msat - *&res.Route[len(res.Route)-1].AmountMsat.Msat
@@ -306,7 +308,12 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	fee = GetFeeReserve(amount.Amount, fee)
 
 	hash := zpayInvoice.PaymentHash[:]
-	return fee, hex.EncodeToString(hash), nil
+
+	feesResponse.Fees.Amount = fee
+	feesResponse.AmountToSend.Amount = amount.Amount
+	feesResponse.CheckingId = hex.EncodeToString(hash)
+
+	return feesResponse, nil
 }
 
 func (l CLNGRPCWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {

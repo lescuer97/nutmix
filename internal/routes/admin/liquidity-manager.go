@@ -96,7 +96,7 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		}
 
 		amount := decodedInvoice.MilliSat.ToSatoshis()
-		_, checkingId, err := mint.LightningBackend.QueryFees(invoice, decodedInvoice, false, cashu.Amount{Unit: cashu.Sat, Amount: uint64(amount)})
+		feesResponse, err := mint.LightningBackend.QueryFees(invoice, decodedInvoice, false, cashu.Amount{Unit: cashu.Sat, Amount: uint64(amount)})
 		if err != nil {
 			logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -110,7 +110,7 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 			State:            utils.WaitingUserConfirmation,
 			Id:               uuid,
 			Type:             utils.LiquidityOut,
-			CheckingId:       checkingId,
+			CheckingId:       feesResponse.CheckingId,
 		}
 
 		now := decodedInvoice.Timestamp.Add(decodedInvoice.Expiry()).Unix()

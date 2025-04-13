@@ -258,7 +258,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		// check the amount in outputs are the same as the quote
-		if int32(*invoice.MilliSat) != int32(amountMilsats) {
+		if int32(*invoice.MilliSat) < int32(amountMilsats) {
 			logger.Info(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)).Error())
 			c.JSON(403, "Amounts in outputs are not the same")
 			return
@@ -384,15 +384,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		amount := invoice.MilliSat.ToSatoshis()
-		cashuAmount := cashu.Amount{Unit: cashu.Sat, Amount: uint64(amount)}
-
-		err = cashuAmount.To(unit)
-		if err != nil {
-			logger.Error(fmt.Errorf("cashuAmount.To(unit). %w. %w", err, cashu.ErrUnitNotSupported).Error())
-			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
-			return
-		}
+		cashuAmount := cashu.Amount{Unit: unit, Amount: uint64(amount)}
 
 		isMpp := false
 		mppAmount := meltRequest.IsMpp()
@@ -425,21 +417,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 		queryFee := uint64(0)
 		checkingId := quoteId
-		if !isInternal {
-			queryFee, checkingId, err = mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)
-			if err != nil {
-				logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
-				c.JSON(500, "Opps!, something went wrong")
-				return
-			}
-
-		}
-
 		dbRequest = cashu.MeltRequestDB{
 			Amount:          cashuAmount.Amount,
 			Quote:           quoteId,
 			Request:         meltRequest.Request,
-			Unit:            meltRequest.Unit,
+			Unit:            unit.String(),
 			Expiry:          expireTime,
 			FeeReserve:      (queryFee + 1),
 			RequestPaid:     false,
@@ -448,6 +430,18 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			SeenAt:          now,
 			Mpp:             isMpp,
 			CheckingId:      checkingId,
+		}
+
+		if !isInternal {
+			feesResponse, err := mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)
+			if err != nil {
+				logger.Info(fmt.Errorf("mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount): %w", err).Error())
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+			dbRequest.CheckingId = feesResponse.CheckingId
+			dbRequest.FeeReserve = feesResponse.Fees.Amount
+			dbRequest.Amount = feesResponse.AmountToSend.Amount
 		}
 
 		ctx := context.Background()

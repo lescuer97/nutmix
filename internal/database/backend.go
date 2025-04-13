@@ -52,6 +52,7 @@ type MintDB interface {
 	SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error
 	ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
 	AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage string) error
+	ChangeCheckingId(tx pgx.Tx, quote string, checking_id string) error
 
 	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error)
 

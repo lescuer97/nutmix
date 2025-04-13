@@ -319,6 +319,15 @@ func (pql Postgresql) ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool,
 	}
 	return nil
 }
+func (pql Postgresql) ChangeCheckingId(tx pgx.Tx, quote string, checking_id string) error {
+	// change the paid status of the quote
+	_, err := tx.Exec(context.Background(), "UPDATE melt_request SET checking_id = $1 WHERE quote = $2", checking_id, quote)
+	if err != nil {
+		return databaseError(fmt.Errorf("updating mint_request: %w", err))
+
+	}
+	return nil
+}
 
 func (pql Postgresql) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu.Proofs, error) {
 

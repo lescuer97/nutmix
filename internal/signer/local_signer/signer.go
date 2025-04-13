@@ -242,16 +242,18 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 		}
 	}
 
-	seeds = append(seeds, newSeed)
+	err = l.db.Commit(ctx, tx)
+	if err != nil {
+		return fmt.Errorf(`l.db.Commit(ctx, tx). %w`, err)
+	}
+	seeds, err = l.db.GetAllSeeds()
+	if err != nil {
+		return fmt.Errorf("signer.db.GetAllSeeds(). %w", err)
+	}
 
 	keysets, activeKeysets, err := signer.GetKeysetsFromSeeds(seeds, signerMasterKey)
 	if err != nil {
 		return fmt.Errorf(`m.DeriveKeysetFromSeeds(seeds, parsedPrivateKey). %w`, err)
-	}
-
-	err = l.db.Commit(ctx, tx)
-	if err != nil {
-		return fmt.Errorf(`l.db.Commit(ctx, tx). %w`, err)
 	}
 
 	l.keysets = keysets
