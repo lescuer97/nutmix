@@ -61,6 +61,10 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := "Transaction is already pending"
 		return cashu.QUOTE_PENDING, &message
 
+	case errors.Is(proofError, cashu.ErrPaymentFailed):
+		message := cashu.ErrNotEnoughtProofs.Error()
+		return cashu.LIGHTNING_PAYMENT_FAILED, &message
+
 	}
 
 	return cashu.UNKNOWN, nil
