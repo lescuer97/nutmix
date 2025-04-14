@@ -65,7 +65,7 @@ func (e ErrorCode) String() string {
 	case MULTIPLE_UNITS_OUTPUT_INPUT:
 		error = "Inputs/Outputs of multiple units"
 	case INPUT_OUTPUT_NOT_SAME_UNIT:
-		error = "Inputs/Outputs of multiple units"
+		error = "Inputs and outputs are not same unit"
 
 	case KEYSET_NOT_KNOW:
 		error = "Keyset is not known"
