@@ -14,7 +14,7 @@ import (
 
 func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB, invoice *zpay32.Invoice) (cashu.MintRequestDB, error) {
 
-	status, _, err := mint.LightningBackend.CheckReceived(quote.Quote, invoice)
+	status, _, err := mint.LightningBackend.CheckReceived(quote, invoice)
 	if err != nil {
 		return quote, fmt.Errorf("mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid. %w", err)
 	}
@@ -55,7 +55,7 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork()). %w", err)
 	}
 
-	status, preimage, fees, err := mint.LightningBackend.CheckPayed(quote.Quote, invoice)
+	status, preimage, fees, err := mint.LightningBackend.CheckPayed(quote.Quote, invoice, quote.CheckingId)
 	if err != nil {
 		if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 			return quote.GetPostMeltQuoteResponse(), nil

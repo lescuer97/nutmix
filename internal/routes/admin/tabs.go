@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,13 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
 var (
-	ErrInvalidNostrKey = errors.New("NOSTR npub is not valid")
+	ErrInvalidNostrKey     = errors.New("NOSTR npub is not valid")
+	ErrInvalidStrikeConfig = errors.New("Invalid strike Config")
+	ErrInvalidStrikeCheck  = errors.New("Could not verify strike configuration")
 )
 
 func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
@@ -154,7 +158,13 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.HTML(200, "bolt11.html", mint.Config)
+		ctx := context.Background()
+		err := templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer)
+
+		if err != nil {
+			c.Error(fmt.Errorf("templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer). %w", err))
+			return
+		}
 	}
 }
 
@@ -253,6 +263,30 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			mint.Config.MINT_LIGHTNING_BACKEND = utils.LNBITS
 			mint.Config.MINT_LNBITS_KEY = lnbitsKey
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
+		case string(utils.Strike):
+			strikeKey := c.Request.PostFormValue("STRIKE_KEY")
+			strikeEndpoint := c.Request.PostFormValue("STRIKE_ENDPOINT")
+
+			strikeWallet := lightning.Strike{
+				Network: chainparam,
+			}
+
+			err := strikeWallet.Setup(strikeKey, strikeEndpoint)
+			if err != nil {
+				c.Error(fmt.Errorf("strikeWallet.Setup(strikeKey, strikeEndpoint) %w %w", err, ErrInvalidStrikeConfig))
+				return
+			}
+			// check connection
+			_, err = strikeWallet.WalletBalance()
+			if err != nil {
+				c.Error(fmt.Errorf("strikeWallet.WalletBalance() %w %w", err, ErrInvalidStrikeCheck))
+				return
+			}
+
+			mint.Config.MINT_LIGHTNING_BACKEND = utils.Strike
+			mint.Config.STRIKE_KEY = strikeKey
+			mint.Config.STRIKE_ENDPOINT = strikeEndpoint
+			mint.LightningBackend = strikeWallet
 		case string(utils.CLNGRPC):
 			clnHost := c.Request.PostFormValue("CLN_GRPC_HOST")
 			clnCaCert := c.Request.PostFormValue("CLN_CA_CERT")

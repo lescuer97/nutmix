@@ -23,6 +23,15 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		return cashu.TOKEN_NOT_VERIFIED, nil
 	case errors.Is(proofError, cashu.ErrNotEnoughSignatures):
 		return cashu.TOKEN_NOT_VERIFIED, nil
+	case errors.Is(proofError, cashu.ErrInvalidProof):
+		message := cashu.ErrInvalidProof.Error()
+		return cashu.TOKEN_NOT_VERIFIED, &message
+	case errors.Is(proofError, cashu.ErrInvalidBlindMessage):
+		message := cashu.ErrInvalidBlindMessage.Error()
+		return cashu.TOKEN_NOT_VERIFIED, &message
+	case errors.Is(proofError, cashu.ErrInvalidPreimage):
+		message := cashu.ErrInvalidPreimage.Error()
+		return cashu.TOKEN_NOT_VERIFIED, &message
 
 	case errors.Is(proofError, cashu.ErrLocktimePassed):
 		message := cashu.ErrLocktimePassed.Error()
@@ -33,29 +42,38 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrMeltAlreadyPaid.Error()
 		return cashu.INVOICE_ALREADY_PAID, &message
 
-	case errors.Is(proofError, cashu.ErrInvalidProof):
-		message := cashu.ErrInvalidProof.Error()
-		return cashu.TOKEN_NOT_VERIFIED, &message
-
-	case errors.Is(proofError, cashu.ErrInvalidBlindMessage):
-		message := cashu.ErrInvalidBlindMessage.Error()
-		return cashu.TOKEN_NOT_VERIFIED, &message
-
 	case errors.Is(proofError, cashu.ErrProofSpent):
 		message := cashu.ErrProofSpent.Error()
 		return cashu.TOKEN_ALREADY_SPENT, &message
 
+	case errors.Is(proofError, cashu.ErrNotSameUnits):
+		message := cashu.ErrNotSameUnits.Error()
+		return cashu.TRANSACTION_NOT_BALANCED, &message
 	case errors.Is(proofError, cashu.ErrNotEnoughtProofs):
 		message := cashu.ErrNotEnoughtProofs.Error()
 		return cashu.TRANSACTION_NOT_BALANCED, &message
+	case errors.Is(proofError, cashu.ErrUnbalanced):
+		message := cashu.ErrUnbalanced.Error()
+		return cashu.TRANSACTION_NOT_BALANCED, &message
+	case errors.Is(proofError, cashu.ErrRepeatedOutput):
+		message := cashu.ErrRepeatedOutput.Error()
+		return cashu.DUPLICATE_OUTPUTS, &message
 
 	case errors.Is(proofError, cashu.ErrUnitNotSupported):
 		message := cashu.ErrUnitNotSupported.Error()
 		return cashu.UNIT_NOT_SUPPORTED, &message
 
+	case errors.Is(proofError, cashu.ErrDifferentInputOutputUnit):
+		message := cashu.ErrDifferentInputOutputUnit.Error()
+		return cashu.INPUT_OUTPUT_NOT_SAME_UNIT, &message
+
 	case errors.Is(proofError, cashu.ErrInvalidPreimage):
 		message := cashu.ErrInvalidPreimage.Error()
 		return cashu.TOKEN_NOT_VERIFIED, &message
+
+	case errors.Is(proofError, cashu.ErrBlindMessageAlreadySigned):
+		message := cashu.ErrBlindMessageAlreadySigned.Error()
+		return cashu.OUTPUT_BLINDED_MESSAGE_ALREADY_SIGNED, &message
 
 	case strings.Contains(proofError.Error(), "could not obtain lock"):
 		message := "Transaction is already pending"

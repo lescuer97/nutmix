@@ -113,18 +113,20 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 	return nil
 }
 
-func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount_sat uint64) (PaymentResponse, error) {
+func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 
 	var lnbitsInvoice struct {
 		PaymentHash    string `json:"payment_hash"`
 		PaymentRequest string `json:"payment_request"`
 	}
+
 	reqInvoice := lnbitsInvoiceRequest{
 		Out:    true,
-		Bolt11: invoice,
-		Amount: amount_sat,
+		Bolt11: melt_quote.Request,
+		Amount: amount.Amount,
 	}
+
 	err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
@@ -146,11 +148,12 @@ func (l LnbitsWallet) PayInvoice(invoice string, zpayInvoice *zpay32.Invoice, fe
 	invoiceRes.Rhash = lnbitsInvoice.PaymentHash
 	invoiceRes.Preimage = paymentStatus.Preimage
 	invoiceRes.PaidFeeSat = int64(math.Abs(float64(paymentStatus.Details.Fee)))
+	invoiceRes.CheckingId = melt_quote.CheckingId
 
 	return invoiceRes, nil
 }
 
-func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, uint64, error) {
+func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	hash := invoice.PaymentHash[:]
@@ -171,7 +174,7 @@ func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice) (Payment
 	}
 }
 
-func (l LnbitsWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
+func (l LnbitsWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	var paymentStatus LNBitsPaymentStatus
 
 	hash := invoice.PaymentHash[:]
@@ -193,30 +196,43 @@ func (l LnbitsWallet) CheckReceived(quote string, invoice *zpay32.Invoice) (Paym
 	}
 }
 
-func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount_sat uint64) (uint64, error) {
+func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {
 	var queryResponse lnbitsFeeResponse
 	invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
 	err := l.LnbitsRequest("GET", invoiceString, nil, &queryResponse)
 	queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
 
+	feesResponse := FeesResponse{}
 	if err != nil {
-		return 0, fmt.Errorf("json.Marshal: %w", err)
+		return feesResponse, fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	fee := GetFeeReserve(amount_sat, queryResponse.FeeReserve)
-	return fee, nil
+	fee := GetFeeReserve(amount.Amount, queryResponse.FeeReserve)
+	hash := zpayInvoice.PaymentHash[:]
+
+	feesResponse.Fees.Amount = fee
+	feesResponse.AmountToSend.Amount = amount.Amount
+	feesResponse.CheckingId = hex.EncodeToString(hash)
+
+	return feesResponse, nil
 }
 
-func (l LnbitsWallet) RequestInvoice(amount uint64) (InvoiceResponse, error) {
+func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
 	reqInvoice := lnbitsInvoiceRequest{
-		Amount: amount,
+		Amount: amount.Amount,
 		Unit:   cashu.Sat.String(),
 		Memo:   "",
 		Out:    false,
 		Expiry: 900,
 	}
 	var response InvoiceResponse
+
+	supported := l.VerifyUnitSupport(amount.Unit)
+	if !supported {
+		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit). %w", cashu.ErrUnitNotSupported)
+	}
+
 	var lnbitsInvoice struct {
 		PaymentHash    string `json:"payment_hash"`
 		PaymentRequest string `json:"payment_request"`
@@ -228,6 +244,7 @@ func (l LnbitsWallet) RequestInvoice(amount uint64) (InvoiceResponse, error) {
 
 	response.PaymentRequest = lnbitsInvoice.PaymentRequest
 	response.Rhash = lnbitsInvoice.PaymentHash
+	response.CheckingId = lnbitsInvoice.PaymentHash
 
 	return response, nil
 
@@ -256,4 +273,11 @@ func (f LnbitsWallet) GetNetwork() *chaincfg.Params {
 }
 func (f LnbitsWallet) ActiveMPP() bool {
 	return false
+}
+func (f LnbitsWallet) VerifyUnitSupport(unit cashu.Unit) bool {
+	if unit == cashu.Sat {
+		return true
+	} else {
+		return false
+	}
 }

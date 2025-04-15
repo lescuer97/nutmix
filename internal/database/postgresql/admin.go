@@ -51,8 +51,8 @@ func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBal
 	var mintMeltBalance database.MintMeltBalance
 	// change the paid status of the quote
 	batch := pgx.Batch{}
-	batch.Queue("SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at FROM mint_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID') ", time)
-	batch.Queue("SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid FROM melt_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID')", time)
+	batch.Queue("SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at,amount, checking_id FROM mint_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID') ", time)
+	batch.Queue("SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID')", time)
 
 	results := pql.pool.SendBatch(context.Background(), &batch)
 
@@ -101,7 +101,7 @@ func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBal
 }
 
 func (pql Postgresql) AddLiquiditySwap(tx pgx.Tx, swap utils.LiquiditySwap) error {
-	_, err := tx.Exec(context.Background(), "INSERT INTO liquidity_swaps (amount, id , lightning_invoice, state, type, expiration) VALUES ($1, $2, $3, $4, $5, $6)", swap.Amount, swap.Id, swap.LightningInvoice, swap.State, swap.Type, swap.Expiration)
+	_, err := tx.Exec(context.Background(), "INSERT INTO liquidity_swaps (amount, id , lightning_invoice, state, type, expiration, checking_id) VALUES ($1, $2, $3, $4, $5, $6, $7)", swap.Amount, swap.Id, swap.LightningInvoice, swap.State, swap.Type, swap.Expiration, swap.CheckingId)
 
 	if err != nil {
 		return databaseError(fmt.Errorf("INSERT INTO swap_request: %w", err))
@@ -122,7 +122,7 @@ func (pql Postgresql) ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils
 func (pql Postgresql) GetLiquiditySwaps(swap utils.LiquiditySwap) ([]utils.LiquiditySwap, error) {
 
 	var swaps []utils.LiquiditySwap
-	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration FROM liquidity_swaps ")
+	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration, checking_id FROM liquidity_swaps ")
 	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
@@ -140,7 +140,7 @@ func (pql Postgresql) GetLiquiditySwaps(swap utils.LiquiditySwap) ([]utils.Liqui
 func (pql Postgresql) GetLiquiditySwapById(tx pgx.Tx, id string) (utils.LiquiditySwap, error) {
 
 	var swaps utils.LiquiditySwap
-	rows, err := tx.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration FROM liquidity_swaps WHERE id = $1 FOR SHARE", id)
+	rows, err := tx.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration, checking_id FROM liquidity_swaps WHERE id = $1 FOR SHARE", id)
 	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
@@ -158,7 +158,7 @@ func (pql Postgresql) GetLiquiditySwapById(tx pgx.Tx, id string) (utils.Liquidit
 func (pql Postgresql) GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error) {
 
 	var swaps []utils.LiquiditySwap
-	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type,expiration FROM liquidity_swaps ORDER BY expiration DESC")
+	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type,expiration, checking_id FROM liquidity_swaps ORDER BY expiration DESC")
 	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
@@ -176,7 +176,7 @@ func (pql Postgresql) GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error) {
 func (pql Postgresql) GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error) {
 
 	var swaps []utils.LiquiditySwap
-	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type,expiration FROM liquidity_swaps WHERE state = ANY($1) ORDER BY expiration DESC FOR UPDATE NOWAIT", states)
+	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type,expiration, checking_id FROM liquidity_swaps WHERE state = ANY($1) ORDER BY expiration DESC FOR UPDATE NOWAIT", states)
 	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
