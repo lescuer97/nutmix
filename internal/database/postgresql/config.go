@@ -39,7 +39,7 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
             mint_auth_rate_limit_per_minute,
             mint_auth_max_blind_tokens,
             mint_auth_clear_auth_urls,
-            mint_auth_blind_auth_urls
+            mint_auth_blind_auth_urls,
             strike_key,
             strike_endpoint
          FROM config WHERE id = 1`)
