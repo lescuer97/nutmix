@@ -51,7 +51,7 @@ func (m *MockDB) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
-func (m *MockDB) GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error) {
+func (m *MockDB) GetSeedsByUnit(tx pgx.Tx, unit cashu.Unit) ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 	for i := 0; i < len(m.Seeds); i++ {
 
@@ -64,7 +64,7 @@ func (m *MockDB) GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error) {
 	return seeds, nil
 }
 
-func (m *MockDB) SaveNewSeed(seed cashu.Seed) error {
+func (m *MockDB) SaveNewSeed(tx pgx.Tx, seed cashu.Seed) error {
 	m.Seeds = append(m.Seeds, seed)
 	return nil
 }
@@ -74,7 +74,7 @@ func (m *MockDB) SaveNewSeeds(seeds []cashu.Seed) error {
 	return nil
 }
 
-func (m *MockDB) UpdateSeedsActiveStatus(seeds []cashu.Seed) error {
+func (m *MockDB) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) error {
 	for i := 0; i < len(m.Seeds); i++ {
 		for j := 0; j < len(seeds); j++ {
 			if m.Seeds[i].Id == seeds[j].Id {
@@ -194,7 +194,15 @@ func (m *MockDB) ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool, stat
 
 	}
 	return nil
+}
+func (m *MockDB) ChangeCheckingId(tx pgx.Tx, quote string, checking_id string) error {
+	for i := 0; i < len(m.MeltRequest); i++ {
+		if m.MeltRequest[i].Quote == quote {
+			m.MeltRequest[i].CheckingId = checking_id
+		}
 
+	}
+	return nil
 }
 
 func (m *MockDB) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu.Proofs, error) {

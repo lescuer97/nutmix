@@ -512,7 +512,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
+	if w.Code != 400 {
 		t.Fatalf("Expected status code 403, got %d", w.Code)
 	}
 

@@ -44,6 +44,15 @@ func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
 				case errors.Is(e, ErrInvalidOICDURL):
 					message = ErrInvalidOICDURL.Error()
 					break
+				case errors.Is(e, ErrUnitNotCorrect):
+					message = "Keyset Unit is not correct"
+					break
+				case errors.Is(e, ErrInvalidStrikeCheck):
+					message = ErrInvalidStrikeCheck.Error()
+					break
+				case errors.Is(e, ErrInvalidStrikeConfig):
+					message = ErrInvalidStrikeCheck.Error()
+					break
 				}
 			}
 			logger.Error(fmt.Sprintf("Error from calls: %+v", c.Errors.String()))

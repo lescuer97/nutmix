@@ -1,6 +1,7 @@
 package localsigner
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -159,19 +160,29 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 }
 
 func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
+	ctx := context.Background()
+	tx, err := l.db.GetTx(ctx)
+	if err != nil {
+		return fmt.Errorf("l.db.GetTx(ctx). %w", err)
+	}
+	defer l.db.Rollback(ctx, tx)
+
 	// get current highest seed version
 	var highestSeed cashu.Seed = cashu.Seed{Version: 0}
-	seeds, err := l.db.GetSeedsByUnit(unit)
+	seeds, err := l.db.GetSeedsByUnit(tx, unit)
 	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("database.GetSeedsByUnit(pool, cashu.Sat). %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("database.GetSeedsByUnit(tx, unit). %w", err)
+
 		}
 	}
+
 	// get current highest seed version
 	for i, seed := range seeds {
 		if highestSeed.Version < seed.Version {
 			highestSeed = seed
 		}
+
 		seeds[i].Active = false
 	}
 
@@ -193,16 +204,27 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 	}
 
 	// add new key to db
-	err = l.db.SaveNewSeed(newSeed)
+	err = l.db.SaveNewSeed(tx, newSeed)
 	if err != nil {
-		return fmt.Errorf(`database.SaveNewSeed(pool, &generatedSeed). %w`, err)
-	}
-	err = l.db.UpdateSeedsActiveStatus(seeds)
-	if err != nil {
-		return fmt.Errorf(`database.UpdateActiveStatusSeeds(pool, seeds). %w`, err)
+		return fmt.Errorf(`l.db.SaveNewSeed(tx, newSeed). %w`, err)
 	}
 
-	seeds = append(seeds, newSeed)
+	// only need to update if there are any previous seeds
+	if len(seeds) > 0 {
+		err = l.db.UpdateSeedsActiveStatus(tx, seeds)
+		if err != nil {
+			return fmt.Errorf(`l.db.UpdateSeedsActiveStatus(tx, seeds). %w`, err)
+		}
+	}
+
+	err = l.db.Commit(ctx, tx)
+	if err != nil {
+		return fmt.Errorf(`l.db.Commit(ctx, tx). %w`, err)
+	}
+	seeds, err = l.db.GetAllSeeds()
+	if err != nil {
+		return fmt.Errorf("signer.db.GetAllSeeds(). %w", err)
+	}
 
 	keysets, activeKeysets, err := signer.GetKeysetsFromSeeds(seeds, signerMasterKey)
 	if err != nil {

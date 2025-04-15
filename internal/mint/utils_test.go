@@ -2,6 +2,7 @@ package mint
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -76,4 +77,73 @@ func TestIsInternalTransactionFail(t *testing.T) {
 		t.Error("should be external transaction")
 	}
 
+}
+
+func TestVerifyUnitOfProofFail(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+
+	err := mint.Signer.RotateKeyset(cashu.EUR, 0)
+	if err != nil {
+		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
+	}
+
+	keysets, err := mint.Signer.GetKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
+	}
+	proofs := cashu.Proofs{cashu.Proof{Id: "00bfa73302d12ffd"}, cashu.Proof{Id: "00bfa73302d12ffd"}, cashu.Proof{Id: "0061287798d19b10"}}
+
+	_, err = mint.CheckProofsAreSameUnit(proofs, keysets.Keysets)
+	if err == nil {
+		t.Errorf("should have failed because of there are different units: %+v ", err)
+	}
+	if !errors.Is(err, cashu.ErrNotSameUnits) {
+		t.Errorf("Error should be Not Same units. %v", err)
+	}
+}
+func TestVerifyUnitOfProofPass(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+
+	err := mint.Signer.RotateKeyset(cashu.EUR, 0)
+	if err != nil {
+		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
+	}
+
+	keysets, err := mint.Signer.GetKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
+	}
+	proofs := cashu.Proofs{cashu.Proof{Id: "00bfa73302d12ffd"}, cashu.Proof{Id: "00bfa73302d12ffd"}, cashu.Proof{Id: "00bfa73302d12ffd"}}
+
+	unit, err := mint.CheckProofsAreSameUnit(proofs, keysets.Keysets)
+	if err != nil {
+		t.Errorf("There should not be and error. %v", err)
+	}
+	if unit != cashu.Sat {
+		t.Errorf("Unit should be Sat. %v", err)
+	}
+
+}
+
+func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+
+	err := mint.Signer.RotateKeyset(cashu.EUR, 0)
+	if err != nil {
+		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
+	}
+
+	keysets, err := mint.Signer.GetKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
+	}
+	outputs := []cashu.BlindedMessage{{Id: "00bfa73302d12ffd", B_: "blind1"}, {Id: "00bfa73302d12ffd", B_: "blind2"}, {Id: "00bfa73302d12ffd", B_: "blind2"}}
+
+	_, err = mint.VerifyOutputs(outputs, keysets.Keysets)
+	if err == nil {
+		t.Errorf("should have failed because of there are repeated outputs: %+v ", err)
+	}
+	if !errors.Is(err, cashu.ErrRepeatedOutput) {
+		t.Errorf("Error there should be a repeated output. %v", err)
+	}
 }

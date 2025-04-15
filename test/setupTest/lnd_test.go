@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
@@ -32,7 +33,7 @@ func TestSetupLightingCommsLND(t *testing.T) {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
 	}
 
-	invoice, err := lndWallet.RequestInvoice(1000)
+	invoice, err := lndWallet.RequestInvoice(cashu.MintRequestDB{}, cashu.Amount{Amount: 1000, Unit: cashu.Sat})
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)
 	}
@@ -61,7 +62,7 @@ func TestSetupLightingCommsLnBits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
 	}
-	invoice, err := lnbitsWallet.RequestInvoice(1000)
+	invoice, err := lnbitsWallet.RequestInvoice(cashu.MintRequestDB{}, cashu.Amount{Amount: 1000, Unit: cashu.Sat})
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)
 	}

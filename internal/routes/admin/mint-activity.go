@@ -188,7 +188,7 @@ func SwapsList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		if err != nil {
 			logger.Error(
-				"database.GetMintMeltBalanceByTime(pool",
+				"mint.MintDB.GetAllLiquiditySwaps()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
 			errorMessage := ErrorNotif{

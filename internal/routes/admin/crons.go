@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
-	"log/slog"
-	"time"
 )
 
 func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
@@ -90,7 +92,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 				switch swap.Type {
 				case utils.LiquidityIn:
-					status, _, err := mint.LightningBackend.CheckReceived(payHash, decodedInvoice)
+					status, _, err := mint.LightningBackend.CheckReceived(cashu.MintRequestDB{Quote: payHash}, decodedInvoice)
 					if err != nil {
 						logger.Warn(
 							"mint.LightningBackend.CheckReceived(payHash)",
@@ -110,7 +112,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 					}
 
 				case utils.LiquidityOut:
-					status, _, _, err := mint.LightningBackend.CheckPayed(payHash, decodedInvoice)
+					status, _, _, err := mint.LightningBackend.CheckPayed(payHash, decodedInvoice, swap.CheckingId)
 					if err != nil {
 						logger.Warn(
 							"mint.LightningBackend.CheckPayed(payHash)",

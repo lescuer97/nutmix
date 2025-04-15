@@ -1,0 +1,137 @@
+package templates 
+
+import "github.com/lescuer97/nutmix/internal/utils"
+
+templ LightningBackendPage(config utils.Config) {
+	@Layout() {
+		<main class="bolt11">
+			<form class=".form" hx-post="/admin/bolt11" hx-target="#notifications" hx-swap="innerHTML">
+				<h2>Lightning Node info</h2>
+				<label for="NETWORK" class="settings-input">
+					Network Type
+					<select name="NETWORK">
+						<option value="mainnet">Mainnet</option>
+						<option value="testnet">Testnet</option>
+						<option value="signet">Signet</option>
+						<option value="regtest">Regtest</option>
+					</select>
+				</label>
+				<label for="MINT_LIGHTNING_BACKEND" class="settings-input">
+					Lightning Node Backend
+					<select hx-trigger="change, load" hx-get="/admin/lightningdata" hx-target="#lightning-data" name="MINT_LIGHTNING_BACKEND">
+						<option value="FakeWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" selected?={ config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET }>Fake Wallet</option>
+						<option
+							value="LndGrpcWallet"
+							hx-trigger="selected"
+							hx-get="/admin/lightningdata"
+							hx-target="#lightning-data"
+							selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNDGRPC }
+						>LND Grpc wallet</option>
+						<option
+							value="ClnGrpcWallet"
+							hx-trigger="selected"
+							hx-get="/admin/lightningdata"
+							hx-target="#lightning-data"
+							selected?={ config.MINT_LIGHTNING_BACKEND == utils.CLNGRPC }
+						>Core-Lightning Grpc wallet</option>
+						<option
+							value="LNbitsWallet"
+							hx-trigger="selected"
+							hx-get="/admin/lightningdata"
+							hx-target="#lightning-data"
+							selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNBITS }
+						>LNBITS wallet</option>
+						<option
+							value="Strike"
+							hx-trigger="selected"
+							hx-get="/admin/lightningdata"
+							hx-target="#lightning-data"
+							selected?={ config.MINT_LIGHTNING_BACKEND == utils.Strike }
+						>Strike</option>
+					</select>
+				</label>
+				<div id="lightning-data"></div>
+				<button class="md-button" type="submit">Save Settings</button>
+			</form>
+		</main>
+	}
+}
+
+templ SetupForms(lightningBackend string, config utils.Config) {
+	switch lightningBackend {
+		case string(utils.LNDGRPC):
+			@LndGrpc(config.LND_GRPC_HOST, config.LND_TLS_CERT, config.LND_MACAROON)
+		case string(utils.CLNGRPC):
+			@ClnGrpc(config.CLN_GRPC_HOST, config.CLN_CA_CERT, config.CLN_CLIENT_CERT, config.CLN_CLIENT_KEY, config.CLN_MACAROON)
+		case string(utils.LNBITS):
+			@Lnbits(config.MINT_LNBITS_ENDPOINT, config.MINT_LNBITS_KEY)
+		case string(utils.Strike):
+			@Strike(config.STRIKE_KEY, config.STRIKE_ENDPOINT)
+		case string(utils.FAKE_WALLET):
+			@FakeFallet()
+	}
+}
+
+templ LndGrpc(host string, tls string, macaroon string) {
+	<label for="LND_GRPC_HOST" class="settings-input">
+		LND GRPC Host
+		<input type="text" name="LND_GRPC_HOST" value={ host }/>
+	</label>
+	<label for="LND_TLS_CERT" class="settings-input">
+		LND TLS Certificate
+		<textarea name="LND_TLS_CERT" type="password">{ tls }</textarea>
+	</label>
+	<label for="LND_MACAROON" class="settings-input">
+		LND Macaroon (HEX)
+		<input type="password" name="LND_MACAROON" value={ macaroon }/>
+	</label>
+}
+
+templ ClnGrpc(host string, ca_cer string, client_cert string, client_key string, macaroon string) {
+	<label for="CLN_GRPC_HOST" class="settings-input">
+		Core-Lightning GRPC Host
+		<input type="text" name="CLN_GRPC_HOST" value={ host }/>
+	</label>
+	<label for="CLN_CA_CERT" class="settings-input">
+		Core-Lightning CA Certificate
+		<textarea name="CLN_CA_CERT" type="password">{ ca_cer }</textarea>
+	</label>
+	<label for="CLN_CLIENT_CERT" class="settings-input">
+		Core-Lightning Client Certificate
+		<textarea name="CLN_CLIENT_CERT" type="password">{ client_cert }</textarea>
+	</label>
+	<label for="CLN_CLIENT_KEY" class="settings-input">
+		Core-Lightning Client KEY
+		<textarea name="CLN_CLIENT_KEY" type="password">{ client_key }</textarea>
+	</label>
+	<label for="CLN_MACAROON" class="settings-input">
+		Core-Lightning Rune (HEX)
+		<input type="password" name="CLN_MACAROON" value={ macaroon }/>
+	</label>
+}
+
+templ Lnbits(endpoint string, key string) {
+	<label for="MINT_LNBITS_ENDPOINT" class="settings-input">
+		LNBITS endpoint
+		<input type="text" name="MINT_LNBITS_ENDPOINT" value={ endpoint }/>
+	</label>
+	<label for="MINT_LNBITS_KEY" class="settings-input">
+		LNBITS Key
+		<input type="password" name="MINT_LNBITS_KEY" value={ key }/>
+	</label>
+}
+
+templ Strike(key string, endpoint string) {
+	<label for="STRIKE_ENDPOINT" class="settings-input">
+		Strike endpoint
+		<input type="text" required name="STRIKE_ENDPOINT" value={ endpoint }/>
+	</label>
+	<label for="STRIKE_KEY" class="settings-input">
+		Strike key
+		<input type="password" required name="STRIKE_KEY" value={ key }/>
+	</label>
+}
+
+templ FakeFallet() {
+	It's a fake lightning wallet so you don't have to set anything up
+}

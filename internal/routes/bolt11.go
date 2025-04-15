@@ -29,12 +29,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, "Malformed body request")
 			return
 		}
-		// TODO - REMOVE this when doing multi denomination tokens with Milisats
-		if mintRequest.Unit != cashu.Sat.String() {
-			logger.Warn("Incorrect Unit for minting: %+v", slog.String(utils.LogExtraInfo, mintRequest.Unit))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
-			return
-		}
 
 		if mintRequest.Amount == 0 {
 			logger.Info("Amount missing")
@@ -59,18 +53,28 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		}
 
+		err = mint.VerifyUnitSupport(mintRequest.Unit)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(mintRequest.Unit). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 		now := time.Now().Unix()
 
 		logger.Debug(fmt.Sprintf("Requesting invoice for amount: %v. backend: %v", mintRequest.Amount, mint.LightningBackend.LightningType()))
 
-		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequest.Amount)
+		unit, err := cashu.UnitFromString(mintRequest.Unit)
 
 		if err != nil {
-			logger.Info(err.Error())
-			c.JSON(500, "Opps!, something went wrong")
+			logger.Error(fmt.Errorf("cashu.UnitFromString(mintRequest.Unit). %w. %w", err, cashu.ErrUnitNotSupported).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
+
 		quoteId, err := utils.RandomHash()
 		if err != nil {
 			logger.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
@@ -80,14 +84,23 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		mintRequestDB = cashu.MintRequestDB{
 			Quote:       quoteId,
-			Request:     resInvoice.PaymentRequest,
 			RequestPaid: false,
 			Expiry:      expireTime,
-			Unit:        mintRequest.Unit,
+			Unit:        unit.String(),
 			State:       cashu.UNPAID,
 			SeenAt:      now,
 			Amount:      &mintRequest.Amount,
 		}
+
+		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: uint64(mintRequest.Amount)})
+
+		if err != nil {
+			logger.Info(err.Error())
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+		mintRequestDB.Request = resInvoice.PaymentRequest
+		mintRequestDB.CheckingId = resInvoice.CheckingId
 
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
@@ -200,6 +213,13 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
+		err = mint.VerifyUnitSupport(quote.Unit)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(quote.Unit). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
 		keysets, err := mint.Signer.GetKeys()
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
@@ -229,7 +249,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
-
 		if err != nil {
 			logger.Info(fmt.Errorf("UnmarshallAmt: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -237,7 +256,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		// check the amount in outputs are the same as the quote
-		if int32(*invoice.MilliSat) != int32(amountMilsats) {
+		if int32(*invoice.MilliSat) < int32(amountMilsats) {
 			logger.Info(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)).Error())
 			c.JSON(403, "Amounts in outputs are not the same")
 			return
@@ -314,10 +333,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		// TODO - REMOVE this when doing multi denomination tokens with Milisats
-		if meltRequest.Unit != cashu.Sat.String() {
-			logger.Info("Incorrect Unit for minting", slog.String(utils.LogExtraInfo, meltRequest.Unit))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, nil))
+		err = mint.VerifyUnitSupport(meltRequest.Unit)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(quote.Unit). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -352,7 +372,17 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 		now := time.Now().Unix()
 
-		amount := uint64(*invoice.MilliSat) / 1000
+		unit, err := cashu.UnitFromString(meltRequest.Unit)
+
+		if err != nil {
+			logger.Error(fmt.Errorf("cashu.UnitFromString(meltRequest.Unit). %w. %w", err, cashu.ErrUnitNotSupported).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+
+		amount := invoice.MilliSat.ToSatoshis()
+		cashuAmount := cashu.Amount{Unit: unit, Amount: uint64(amount)}
 
 		isMpp := false
 		mppAmount := meltRequest.IsMpp()
@@ -360,7 +390,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		// if mpp is valid than change amount to mpp amount
 		if mppAmount != 0 {
 			isMpp = true
-			amount = mppAmount
+			cashuAmount.Amount = mppAmount
 		}
 
 		if isMpp && !mint.LightningBackend.ActiveMPP() {
@@ -384,21 +414,12 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 		queryFee := uint64(0)
-		if !isInternal {
-			queryFee, err = mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, amount)
-			if err != nil {
-				logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
-				c.JSON(500, "Opps!, something went wrong")
-				return
-			}
-
-		}
-
+		checkingId := quoteId
 		dbRequest = cashu.MeltRequestDB{
-			Amount:          amount,
+			Amount:          cashuAmount.Amount,
 			Quote:           quoteId,
 			Request:         meltRequest.Request,
-			Unit:            meltRequest.Unit,
+			Unit:            unit.String(),
 			Expiry:          expireTime,
 			FeeReserve:      (queryFee + 1),
 			RequestPaid:     false,
@@ -406,6 +427,19 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			PaymentPreimage: "",
 			SeenAt:          now,
 			Mpp:             isMpp,
+			CheckingId:      checkingId,
+		}
+
+		if !isInternal {
+			feesResponse, err := mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)
+			if err != nil {
+				logger.Info(fmt.Errorf("mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount): %w", err).Error())
+				c.JSON(500, "Opps!, something went wrong")
+				return
+			}
+			dbRequest.CheckingId = feesResponse.CheckingId
+			dbRequest.FeeReserve = feesResponse.Fees.Amount
+			dbRequest.Amount = feesResponse.AmountToSend.Amount
 		}
 
 		ctx := context.Background()

@@ -17,6 +17,7 @@ const FAKE_WALLET LightningBackend = "FakeWallet"
 const LNDGRPC LightningBackend = "LndGrpcWallet"
 const LNBITS LightningBackend = "LNbitsWallet"
 const CLNGRPC LightningBackend = "ClnGrpcWallet"
+const Strike LightningBackend = "Strike"
 
 func StringToLightningBackend(text string) LightningBackend {
 
@@ -27,11 +28,12 @@ func StringToLightningBackend(text string) LightningBackend {
 		return LNDGRPC
 	case string(LNBITS):
 		return LNBITS
+	case string(Strike):
+		return Strike
 	default:
 		return FAKE_WALLET
 
 	}
-
 }
 
 type Config struct {
@@ -57,6 +59,9 @@ type Config struct {
 	CLN_CLIENT_CERT string `db:"cln_client_cert"`
 	CLN_CLIENT_KEY  string `db:"cln_client_key"`
 	CLN_MACAROON    string `db:"cln_macaroon"`
+
+	STRIKE_KEY      string `db:"strike_key"`
+	STRIKE_ENDPOINT string `db:"strike_endpoint"`
 
 	PEG_OUT_ONLY       bool `db:"peg_out_only"`
 	PEG_OUT_LIMIT_SATS *int `db:"peg_out_limit_sats,omitempty"`
@@ -96,14 +101,13 @@ func (c *Config) Default() {
 	c.PEG_IN_LIMIT_SATS = nil
 
 	c.MINT_REQUIRE_AUTH = false
-
-	c.MINT_REQUIRE_AUTH = false
 	c.MINT_AUTH_OICD_CLIENT_ID = ""
 	c.MINT_AUTH_MAX_BLIND_TOKENS = 100
 	c.MINT_AUTH_OICD_DISCOVERY_URL = ""
 	c.MINT_AUTH_RATE_LIMIT_PER_MINUTE = 5
 	c.MINT_AUTH_CLEAR_AUTH_URLS = []string{}
 	c.MINT_AUTH_BLIND_AUTH_URLS = []string{}
+	c.STRIKE_KEY = ""
 }
 
 func (c *Config) UseEnviromentVars() {
