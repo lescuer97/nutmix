@@ -179,7 +179,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				nuts[nut] = wsMethod
 
 			case "21":
-				formatedDiscoveryUrl := mint.Config.MINT_AUTH_OICD_DISCOVERY_URL + "/.well-known/openid-configuration"
+				formatedDiscoveryUrl := mint.Config.MINT_AUTH_OICD_URL + "/.well-known/openid-configuration"
 				protectedRoutes := cashu.Nut21Info{
 					OpenIdDiscovery: formatedDiscoveryUrl,
 					ClientId:        mint.Config.MINT_AUTH_OICD_CLIENT_ID,

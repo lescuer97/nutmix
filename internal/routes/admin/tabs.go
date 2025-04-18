@@ -77,7 +77,7 @@ func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
 		activateAuth = false
 	}
 
-	oicdDiscoveryUrl := c.Request.PostFormValue("MINT_AUTH_OICD_DISCOVERY_URL")
+	oicdDiscoveryUrl := c.Request.PostFormValue("MINT_AUTH_OICD_URL")
 	oicdClientId := c.Request.PostFormValue("MINT_AUTH_OICD_CLIENT_ID")
 	rateLimitPerMinuteStr := c.Request.PostFormValue("MINT_AUTH_RATE_LIMIT_PER_MINUTE")
 	maxBlindTokenStr := c.Request.PostFormValue("MINT_AUTH_MAX_BLIND_TOKENS")
@@ -102,12 +102,12 @@ func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
 
 		oidcClient, err := oidc.NewProvider(context.Background(), oicdDiscoveryUrl)
 		if err != nil {
-			return fmt.Errorf("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_DISCOVERY_URL): %w %w", err, ErrInvalidOICDURL)
+			return fmt.Errorf("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL): %w %w", err, ErrInvalidOICDURL)
 		}
 		mint.OICDClient = oidcClient
 	}
 	mint.Config.MINT_REQUIRE_AUTH = activateAuth
-	mint.Config.MINT_AUTH_OICD_DISCOVERY_URL = oicdDiscoveryUrl
+	mint.Config.MINT_AUTH_OICD_URL = oicdDiscoveryUrl
 	mint.Config.MINT_AUTH_OICD_CLIENT_ID = oicdClientId
 	mint.Config.MINT_AUTH_RATE_LIMIT_PER_MINUTE = int(rateLimitPerMinute)
 	mint.Config.MINT_AUTH_MAX_BLIND_TOKENS = maxBlindToken

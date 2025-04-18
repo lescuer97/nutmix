@@ -120,11 +120,11 @@ templ Auth(config utils.Config) {
 				checked?={ config.MINT_REQUIRE_AUTH }
 			/>
 		</label>
-		<label for="MINT_AUTH_OICD_DISCOVERY_URL" class="settings-input">
-			Discovery OICD discovery url
+		<label for="MINT_AUTH_OICD_URL" class="settings-input">
+			OICD Realm URL
 			<input
-				name="MINT_AUTH_OICD_DISCOVERY_URL"
-				value={ config.MINT_AUTH_OICD_DISCOVERY_URL }
+				name="MINT_AUTH_OICD_URL"
+				value={ config.MINT_AUTH_OICD_URL }
 				type="string"
 			/>
 		</label>
@@ -148,7 +148,7 @@ templ Auth(config utils.Config) {
 			/>
 		</label>
 		<label for="MINT_AUTH_MAX_BLIND_TOKENS" class="settings-input">
-			OICD Client ID
+			Max amount blind auth tokens
 			{{ maxBlindTokens := strconv.FormatInt(int64(config.MINT_AUTH_MAX_BLIND_TOKENS), 10) }}
 			<input
 				name="MINT_AUTH_MAX_BLIND_TOKENS"
