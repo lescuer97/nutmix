@@ -8,13 +8,7 @@ tmp/
 *_templ.txt
 *_gen.go
 
-#breez sdk info
-testnet/ 
-#breez sdk info
-mainnet/
 tls/
-
-#keycloak
 
 keycloak/keycloak_export
 keycloak/postgres_data
