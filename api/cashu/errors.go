@@ -38,6 +38,14 @@ const (
 	QUOTE_PENDING            = 20005
 	INVOICE_ALREADY_PAID     = 20006
 
+	ENDPOINT_REQUIRES_CLEAR_AUTH = 30001
+	CLEAR_AUTH_FAILED            = 30002
+
+	ENDPOINT_REQUIRES_BLIND_AUTH    = 31001
+	BLIND_AUTH_FAILED               = 31002
+	MAXIMUM_BAT_MINT_LIMIT_EXCEEDED = 31003
+	MAXIMUM_BAT_RATE_LIMIT_EXCEEDED = 31004
+
 	UNKNOWN = 99999
 )
 
@@ -82,6 +90,20 @@ func (e ErrorCode) String() string {
 		error = "Quote is pending"
 	case INVOICE_ALREADY_PAID:
 		error = "Invoice already paid"
+
+	case ENDPOINT_REQUIRES_CLEAR_AUTH:
+		error = "Endpoint requires clear auth"
+	case CLEAR_AUTH_FAILED:
+		error = "Clear authentification failed"
+
+	case ENDPOINT_REQUIRES_BLIND_AUTH:
+		error = "Endpoint requires blind auth"
+	case BLIND_AUTH_FAILED:
+		error = "Blind authentification failed"
+	case MAXIMUM_BAT_MINT_LIMIT_EXCEEDED:
+		error = "Maximum Blind auth token amounts execeeded"
+	case MAXIMUM_BAT_RATE_LIMIT_EXCEEDED:
+		error = "Maximum BAT rate limit execeeded"
 	}
 
 	return error

@@ -66,6 +66,15 @@ type Config struct {
 	PEG_OUT_ONLY       bool `db:"peg_out_only"`
 	PEG_OUT_LIMIT_SATS *int `db:"peg_out_limit_sats,omitempty"`
 	PEG_IN_LIMIT_SATS  *int `db:"peg_in_limit_sats,omitempty"`
+
+	MINT_REQUIRE_AUTH               bool   `db:"mint_require_auth,omitempty"`
+	MINT_AUTH_OICD_URL              string `db:"mint_auth_oicd_url,omitempty"`
+	MINT_AUTH_OICD_CLIENT_ID        string `db:"mint_auth_oicd_client_id,omitempty"`
+	MINT_AUTH_RATE_LIMIT_PER_MINUTE int    `db:"mint_auth_rate_limit_per_minute,omitempty"`
+	MINT_AUTH_MAX_BLIND_TOKENS      uint64 `db:"mint_auth_max_blind_tokens,omitempty"`
+
+	MINT_AUTH_CLEAR_AUTH_URLS []string `db:"mint_auth_clear_auth_urls,omitempty"`
+	MINT_AUTH_BLIND_AUTH_URLS []string `db:"mint_auth_blind_auth_urls,omitempty"`
 }
 
 func (c *Config) Default() {
@@ -91,8 +100,16 @@ func (c *Config) Default() {
 	c.PEG_OUT_LIMIT_SATS = nil
 	c.PEG_IN_LIMIT_SATS = nil
 
+	c.MINT_REQUIRE_AUTH = false
+	c.MINT_AUTH_OICD_CLIENT_ID = ""
+	c.MINT_AUTH_MAX_BLIND_TOKENS = 100
+	c.MINT_AUTH_OICD_URL = ""
+	c.MINT_AUTH_RATE_LIMIT_PER_MINUTE = 5
+	c.MINT_AUTH_CLEAR_AUTH_URLS = []string{}
+	c.MINT_AUTH_BLIND_AUTH_URLS = []string{}
 	c.STRIKE_KEY = ""
 }
+
 func (c *Config) UseEnviromentVars() {
 	c.NAME = os.Getenv("NAME")
 	c.DESCRIPTION = os.Getenv("DESCRIPTION")

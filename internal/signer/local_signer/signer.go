@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -21,11 +20,9 @@ import (
 )
 
 type LocalSigner struct {
-	// activeKeysets map[id]cashu.MintKeysMap
 	activeKeysets map[string]cashu.MintKeysMap
-	// keyests map[id]cashu.MintKeysMap
-	keysets map[string]cashu.MintKeysMap
-	db      database.MintDB
+	keysets       map[string]cashu.MintKeysMap
+	db            database.MintDB
 }
 
 func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
@@ -56,7 +53,6 @@ func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
 		if err != nil {
 			return localsigner, fmt.Errorf("db.SaveNewSeeds([]cashu.Seed{newSeed}). %w", err)
 		}
-
 		seeds = append(seeds, newSeed)
 
 	}
@@ -79,7 +75,9 @@ func (l *LocalSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
 	var keys []cashu.MintKey
 	for _, keyset := range l.activeKeysets {
 		for _, key := range keyset {
-			keys = append(keys, key)
+			if key.Unit != cashu.AUTH.String() {
+				keys = append(keys, key)
+			}
 		}
 	}
 
@@ -96,40 +94,15 @@ func (l *LocalSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 	if exists {
 		var keys []cashu.MintKey
 		for _, key := range val {
-			keys = append(keys, key)
+			if key.Unit != cashu.AUTH.String() {
+				keys = append(keys, key)
+			}
 		}
 
 		return signer.OrderKeysetByUnit(keys), nil
 
 	}
 	return signer.GetKeysResponse{}, signer.ErrNoKeysetFound
-}
-func (l *LocalSigner) GetKeysByUnit(unit cashu.Unit) ([]cashu.Keyset, error) {
-	var keys []cashu.Keyset
-
-	for _, mintKey := range l.keysets {
-
-		if len(mintKey) > 0 {
-
-			if mintKey[0].Unit == unit.String() {
-
-				keysetResp := cashu.Keyset{
-					Id:          mintKey[0].Id,
-					Unit:        mintKey[0].Unit,
-					InputFeePpk: mintKey[0].InputFeePpk,
-					Keys:        make(map[string]string),
-				}
-
-				for _, keyset := range mintKey {
-					keysetResp.Keys[strconv.FormatUint(keyset.Amount, 10)] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
-				}
-
-				keys = append(keys, keysetResp)
-			}
-
-		}
-	}
-	return keys, nil
 }
 
 // gets all keys from the signer
@@ -140,7 +113,9 @@ func (l *LocalSigner) GetKeys() (signer.GetKeysetsResponse, error) {
 		return response, fmt.Errorf(" l.db.GetAllSeeds(). %w", err)
 	}
 	for _, seed := range seeds {
-		response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+		if seed.Unit != cashu.AUTH.String() {
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+		}
 	}
 	return response, nil
 }
@@ -159,6 +134,7 @@ func (l *LocalSigner) getSignerPrivateKey() (*secp256k1.PrivateKey, error) {
 
 	return mintKey, nil
 }
+
 func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, version int, fee uint) (cashu.Seed, error) {
 	// rotate one level up
 	newSeed := cashu.Seed{
@@ -169,13 +145,11 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 		InputFeePpk: fee,
 	}
 
-	keyset, err := signer.DeriveKeyset(mintPrivateKey, newSeed)
-
+	keysets, err := signer.DeriveKeyset(mintPrivateKey, newSeed)
 	if err != nil {
 		return newSeed, fmt.Errorf("DeriveKeyset(mintPrivateKey, newSeed) %w", err)
 	}
-
-	newSeedId, err := cashu.DeriveKeysetId(keyset)
+	newSeedId, err := cashu.DeriveKeysetId(keysets)
 	if err != nil {
 		return newSeed, fmt.Errorf("cashu.DeriveKeysetId(keyset) %w", err)
 	}
@@ -186,7 +160,6 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 }
 
 func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
-
 	ctx := context.Background()
 	tx, err := l.db.GetTx(ctx)
 	if err != nil {
@@ -203,6 +176,8 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 
 		}
 	}
+
+	// get current highest seed version
 	for i, seed := range seeds {
 		if highestSeed.Version < seed.Version {
 			highestSeed = seed
@@ -418,4 +393,55 @@ func (l *LocalSigner) GetSignerPubkey() (string, error) {
 	}
 
 	return hex.EncodeToString(mintPrivateKey.PubKey().SerializeCompressed()), nil
+}
+
+// gets all active keys
+func (l *LocalSigner) GetAuthActiveKeys() (signer.GetKeysResponse, error) {
+	// convert map to slice
+	var keys []cashu.MintKey
+	for _, keyset := range l.activeKeysets {
+		for _, key := range keyset {
+			if key.Unit == cashu.AUTH.String() {
+				keys = append(keys, key)
+			}
+		}
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].Amount < keys[j].Amount
+	})
+
+	return signer.OrderKeysetByUnit(keys), nil
+}
+
+func (l *LocalSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error) {
+
+	val, exists := l.keysets[id]
+	if exists {
+		var keys []cashu.MintKey
+		for _, key := range val {
+			if key.Unit == cashu.AUTH.String() {
+				keys = append(keys, key)
+			}
+		}
+
+		return signer.OrderKeysetByUnit(keys), nil
+
+	}
+	return signer.GetKeysResponse{}, signer.ErrNoKeysetFound
+}
+
+// gets all keys from the signer
+func (l *LocalSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
+	var response signer.GetKeysetsResponse
+	seeds, err := l.db.GetAllSeeds()
+	if err != nil {
+		return response, fmt.Errorf(" l.db.GetAllSeeds(). %w", err)
+	}
+	for _, seed := range seeds {
+		if seed.Unit == cashu.AUTH.String() {
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+		}
+	}
+	return response, nil
 }

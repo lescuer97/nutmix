@@ -33,6 +33,13 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
             peg_out_only,
             peg_out_limit_sats,
             peg_in_limit_sats,
+            mint_require_auth,
+            mint_auth_oicd_url,
+            mint_auth_oicd_client_id,
+            mint_auth_rate_limit_per_minute,
+            mint_auth_max_blind_tokens,
+            mint_auth_clear_auth_urls,
+            mint_auth_blind_auth_urls,
             strike_key,
             strike_endpoint
          FROM config WHERE id = 1`)
@@ -81,9 +88,16 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
             peg_out_only,
             peg_out_limit_sats,
             peg_in_limit_sats,
-            strike_key,
+            mint_require_auth,
+            mint_auth_oicd_url,
+            mint_auth_oicd_client_id,
+            mint_auth_rate_limit_per_minute,
+            mint_auth_max_blind_tokens,
+            mint_auth_clear_auth_urls,
+            mint_auth_blind_auth_urls,
+			strike_key,
 			strike_endpoint
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,$26,$27, $28, $29,$30,$31)`
 
 	for {
 		tries += 1
@@ -110,6 +124,13 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
 			config.PEG_OUT_ONLY,
 			config.PEG_OUT_LIMIT_SATS,
 			config.PEG_IN_LIMIT_SATS,
+			config.MINT_REQUIRE_AUTH,
+			config.MINT_AUTH_OICD_URL,
+			config.MINT_AUTH_OICD_CLIENT_ID,
+			config.MINT_AUTH_RATE_LIMIT_PER_MINUTE,
+			config.MINT_AUTH_MAX_BLIND_TOKENS,
+			config.MINT_AUTH_CLEAR_AUTH_URLS,
+			config.MINT_AUTH_BLIND_AUTH_URLS,
 			config.STRIKE_KEY,
 			config.STRIKE_ENDPOINT,
 		)
@@ -153,8 +174,15 @@ func (pql Postgresql) UpdateConfig(config utils.Config) error {
             peg_out_only = $19,
             peg_out_limit_sats = $20,
             peg_in_limit_sats = $21,
-            strike_key = $22,
-            strike_endpoint = $23
+            mint_require_auth = $22,
+            mint_auth_oicd_url = $23,
+            mint_auth_oicd_client_id = $24,
+            mint_auth_rate_limit_per_minute = $25,
+            mint_auth_max_blind_tokens = $26,
+            mint_auth_clear_auth_urls = $27,
+            mint_auth_blind_auth_urls = $28,
+            strike_key = $29,
+            strike_endpoint = $30
         WHERE id = 1`
 		_, err := pql.pool.Exec(context.Background(), stmt,
 			config.NAME,
@@ -178,6 +206,13 @@ func (pql Postgresql) UpdateConfig(config utils.Config) error {
 			config.PEG_OUT_ONLY,
 			config.PEG_OUT_LIMIT_SATS,
 			config.PEG_IN_LIMIT_SATS,
+			config.MINT_REQUIRE_AUTH,
+			config.MINT_AUTH_OICD_URL,
+			config.MINT_AUTH_OICD_CLIENT_ID,
+			config.MINT_AUTH_RATE_LIMIT_PER_MINUTE,
+			config.MINT_AUTH_MAX_BLIND_TOKENS,
+			config.MINT_AUTH_CLEAR_AUTH_URLS,
+			config.MINT_AUTH_BLIND_AUTH_URLS,
 			config.STRIKE_KEY,
 			config.STRIKE_ENDPOINT,
 		)

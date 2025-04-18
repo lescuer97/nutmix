@@ -241,8 +241,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			amountBlindMessages += blindMessage.Amount
 			// check all blind messages have the same unit
 		}
-		blindedSignatures := []cashu.BlindSignature{}
-
 		invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
 			logger.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())

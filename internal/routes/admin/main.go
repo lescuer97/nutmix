@@ -41,6 +41,9 @@ func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
 				case errors.Is(e, ErrInvalidNostrKey):
 					message = "Nostr npub is not valid"
 					break
+				case errors.Is(e, ErrInvalidOICDURL):
+					message = ErrInvalidOICDURL.Error()
+					break
 				case errors.Is(e, ErrUnitNotCorrect):
 					message = "Keyset Unit is not correct"
 					break
