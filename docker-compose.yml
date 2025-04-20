@@ -62,7 +62,7 @@ services:
       - "traefik.http.routers.mint.middlewares=mint,mint_redirect,mint-https"
       - "traefik.http.routers.mint.rule=Host(`${MINT_HOSTNAME}`)"
       - "traefik.http.routers.mint.tls.certresolver=selfhostedservices"
-      - "traefik.http.services.mint.loadbalancer.server.port=8080"
+      - "traefik.http.services.mint.loadbalancer.server.port=8081"
       - "traefik.http.middlewares.mint.headers.customRequestHeaders.X-Forwarded-Proto=https"
       - "traefik.http.middlewares.mint-https.redirectscheme.scheme=https"
       - "traefik.http.middlewares.mint-ratelimit1.ratelimit.average=30"
@@ -85,13 +85,11 @@ services:
   #     - "traefik.http.middlewares.keycloak.headers.stsPreload=true"
   #     - "traefik.http.middlewares.keycloak.headers.stsSeconds=155520011"
   #     - "traefik.http.middlewares.keycloak_redirect.redirectregex.permanent=true"
-  #     - "traefik.http.middlewares.keycloak_redirect.redirectregex.regex=https://(.*)/.well-known/(card|cal)dav"
-  #     - "traefik.http.middlewares.keycloak_redirect.redirectregex.replacement=https://$${1}/remote.php/dav/"
   #     - "traefik.http.routers.keycloak.entrypoints=websecure"
   #     - "traefik.http.routers.keycloak.middlewares=keycloak,keycloak_redirect,mint-https"
   #     - "traefik.http.routers.keycloak.rule=Host(`${KEYCLOAK_HOSTNAME}`)"
   #     - "traefik.http.routers.keycloak.tls.certresolver=selfhostedservices"
-  #     - "traefik.http.services.keycloak.loadbalancer.server.port=8081"
+  #     - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
   #     - "traefik.http.middlewares.keycloak.headers.customRequestHeaders.X-Forwarded-Proto=https"
   #     - "traefik.http.middlewares.keycloak-https.redirectscheme.scheme=https"
   #     - "traefik.http.middlewares.keycloak-ratelimit1.ratelimit.average=30"
@@ -104,8 +102,9 @@ services:
   #     KC_HOSTNAME_PORT: ${KEYCLOAK_HOSTNAME_PORT}
   #     KC_HOSTNAME_STRICT_BACKCHANNEL: false
   #     KC_HTTP_ENABLED: true
-  #     KC_HOSTNAME_STRICT_HTTPS: true
+  #     KC_HOSTNAME_STRICT_HTTPS: false
   #     KC_HEALTH_ENABLED: true
+  #     KC_PROXY: "edge"
   #     KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
   #     KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
   #     KC_DB: postgres
@@ -119,7 +118,7 @@ services:
   # keycloak_postgres:
   #   image: postgres:16.8
   #   volumes:
-  #     - ./keycloak_pq_data:/var/lib/postgresql/data
+  #     - ${HOME}/.config/nutmix/keycloak_pq_data:/var/lib/postgresql/data
   #   environment:
   #     POSTGRES_DB: ${KEYCLOAK_POSTGRES_DB}
   #     POSTGRES_USER: ${KEYCLOAK_POSTGRES_USER}
