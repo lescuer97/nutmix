@@ -158,21 +158,21 @@ templ Auth(config utils.Config) {
 		</label>
 	</div>
 	<div class="form-section">
-        {{urlOptions := []string{"/v1/swap", "/v1/auth/blind/mint", "^/v1/mint/.*",  "^/v1/melt/.*" }}}
+		{{ urlOptions := []string{"/v1/swap", "/v1/auth/blind/mint", "^/v1/mint/.*", "^/v1/melt/.*"} }}
 		<label for="MINT_AUTH_CLEAR_AUTH_URLS" class="settings-input">
-            {{clearAuthName := "MINT_AUTH_CLEAR_AUTH_URLS"}}
-            {{clearAuthSelectId := "clearAuthSelect"}}
-            Clear authentification url checks
-            @MultiSelect(clearAuthSelectId,clearAuthName, urlOptions, config.MINT_AUTH_CLEAR_AUTH_URLS )
+			{{ clearAuthName := "MINT_AUTH_CLEAR_AUTH_URLS" }}
+			{{ clearAuthSelectId := "clearAuthSelect" }}
+			Clear authentification url checks
+			@MultiSelect(clearAuthSelectId, clearAuthName, urlOptions, config.MINT_AUTH_CLEAR_AUTH_URLS)
 		</label>
 		<label for="MINT_AUTH_BLIND_AUTH_URLS" class="settings-input">
-            {{blindAuthName := "MINT_AUTH_BLIND_AUTH_URLS"}}
-            {{blindAuthSelectId := "blindAuthSelect"}}
-            Blind authentification url checks
-            @MultiSelect(blindAuthSelectId,blindAuthName, urlOptions, config.MINT_AUTH_BLIND_AUTH_URLS )
+			{{ blindAuthName := "MINT_AUTH_BLIND_AUTH_URLS" }}
+			{{ blindAuthSelectId := "blindAuthSelect" }}
+			Blind authentification url checks
+			@MultiSelect(blindAuthSelectId, blindAuthName, urlOptions, config.MINT_AUTH_BLIND_AUTH_URLS)
 		</label>
 	</div>
-<script>
+	<script>
         document.addEventListener('DOMContentLoaded', function() {
           // Get all multiple select elements on the page
           const multiSelects = document.querySelectorAll('select[multiple]');
@@ -200,23 +200,23 @@ templ Auth(config utils.Config) {
 }
 
 templ MultiSelect(id string, name string, options []string, selectedValues []string) {
-    <select id={ id } name={ name } multiple>
-        for _, option := range options {
-            <option 
-                value={ option } 
-                selected?={ isSelected(option, selectedValues) }
-            >
-                { option }
-            </option>
-        }
-    </select>
+	<select id={ id } name={ name } multiple>
+		for _, option := range options {
+			<option
+				value={ option }
+				selected?={ isSelected(option, selectedValues) }
+			>
+				{ option }
+			</option>
+		}
+	</select>
 }
 
 func isSelected(value string, selectedValues []string) bool {
-    for _, selectedValue := range selectedValues {
-        if selectedValue == value {
-            return true
-        }
-    }
-    return false
+	for _, selectedValue := range selectedValues {
+		if selectedValue == value {
+			return true
+		}
+	}
+	return false
 }

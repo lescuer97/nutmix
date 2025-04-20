@@ -1,6 +1,9 @@
 package templates 
 
-import "github.com/lescuer97/nutmix/internal/utils"
+import (
+	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lescuer97/nutmix/internal/utils"
+)
 
 templ LightningBackendPage(config utils.Config) {
 	@Layout() {
@@ -10,10 +13,10 @@ templ LightningBackendPage(config utils.Config) {
 				<label for="NETWORK" class="settings-input">
 					Network Type
 					<select name="NETWORK">
-						<option value="mainnet">Mainnet</option>
-						<option value="testnet">Testnet</option>
-						<option value="signet">Signet</option>
-						<option value="regtest">Regtest</option>
+						<option selected?={ config.NETWORK == lightning.MAINNET } value="mainnet">Mainnet</option>
+						<option selected?={ config.NETWORK == lightning.TESTNET || config.NETWORK == lightning.TESTNET3 } value="testnet">Testnet</option>
+						<option selected?={ config.NETWORK == lightning.SIGNET } value="signet">Signet</option>
+						<option selected?={ config.NETWORK == lightning.REGTEST } value="regtest">Regtest</option>
 					</select>
 				</label>
 				<label for="MINT_LIGHTNING_BACKEND" class="settings-input">
