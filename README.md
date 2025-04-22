@@ -76,6 +76,10 @@ I have a special development docker compose called: `docker-compose-dev.yml`. Th
 
 ``` # build the project go run cmd/nutmix/*.go ```
 
+#### Generate remote-signer proto code
+
+
+
 ## Supported NUTs
 
 Implemented [NUTs](https://github.com/cashubtc/nuts/):

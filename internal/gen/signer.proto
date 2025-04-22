@@ -3,35 +3,96 @@ syntax = "proto3";
 package proto_signer;
 option go_package = "nutmix_remote_signer/proto_signer";
 
-service Signer {
-  rpc BlindSign (BlindedMessages) returns (BlindSignatures);
-  rpc VerifyProofs (Proofs) returns (Success);
-  rpc ActiveKeys (EmptyRequest) returns (KeysResponse);
-  rpc KeysById (Id) returns (KeysResponse);
-  rpc Keysets (EmptyRequest) returns (KeysetResponse);
-  rpc Pubkey (EmptyRequest) returns (PublicKey);
-  rpc RotateKeyset (RotationRequest) returns (Success);
+service SignerService {
+  rpc BlindSign (BlindedMessages) returns (BlindSignResponse);
+  rpc VerifyProofs (Proofs) returns (BooleanResponse);
+  // returns all the keysets for the mint
+  rpc Keysets (EmptyRequest) returns (KeysResponse);
+  // rotates the keysets 
+  rpc RotateKeyset (RotationRequest) returns (KeyRotationResponse);
 }
-message EmptyRequest {}
 
-message Success {
-    bool success  = 1;
+message BlindSignResponse {
+    oneof result {
+        BlindSignatures sigs  = 1;
+        Error error = 2;
+    }
 }
+
+message BlindedMessages {
+    repeated BlindedMessage blinded_messages = 1;
+}
+
+// Represents a blinded message
+message BlindedMessage {
+    uint64 amount = 1;
+    string keyset_id = 2;
+    bytes blinded_secret = 3;
+}
+
+message BooleanResponse {
+    oneof result {
+        bool success  = 1;
+        Error error = 2;
+    }
+}
+
+message KeyRotationResponse {
+    oneof result {
+        KeySet keyset  = 1;
+        Error error = 2;
+    }
+}
+
+message KeysResponse {
+    oneof result {
+        SignatoryKeysets keysets = 1;
+        Error error = 2;
+    }
+}
+
+message SignatoryKeysets {
+    bytes pubkey = 1;
+    repeated KeySet keysets = 2;
+}
+
+message KeySet {
+    string id = 1;
+    CurrencyUnit unit = 2;
+    bool active = 3;
+    uint64 input_fee_ppk = 4;
+    Keys keys = 5;
+}
+
+message Keys {
+    map<uint64, bytes> keys = 1;
+}
+
 message RotationRequest {
-    string unit  = 1;
-    uint32 fee  = 2;
-}
-message PublicKey {
-    bytes pubkey  = 1;
+    CurrencyUnit unit  = 1;
+    uint64 input_fee_ppk  = 2;
+    uint64 max_order = 3;
 }
 
-message Id {
-    string id  = 1;
+enum CurrencyUnitType {
+    SAT = 0;
+    MSAT = 1;
+    USD = 2;
+    EUR = 3;
+    AUTH = 4;
+}
+
+message CurrencyUnit {
+    oneof currency_unit {
+        CurrencyUnitType unit = 1;
+        string custom_unit = 2;
+    }
 }
 
 message Proofs {
     repeated Proof proof = 1;
 }
+
 message Proof {
     uint64 amount = 1;
     string keyset_id = 2;
@@ -46,9 +107,16 @@ message ProofDLEQ {
     bytes r = 3;
 }
 
+message SigningResponse {
+    oneof result {
+        BlindSignatures blind_signatures = 1;
+        Error error = 2;
+    }
+}
 message BlindSignatures {
     repeated BlindSignature blind_signatures = 1;
 }
+
 message BlindSignature {
     uint64 amount = 1;
     string keyset_id = 2;
@@ -59,17 +127,6 @@ message BlindSignature {
 message BlindSignatureDLEQ {
     bytes e = 1;
     bytes s = 2;
-}
-
-
-message BlindedMessages {
-    repeated BlindedMessage blinded_messages = 1;
-}
-// Represents a blinded message
-message BlindedMessage {
-    uint64 amount = 1;
-    string keyset_id = 2;
-    bytes blinded_secret = 3;
 }
 
 // Witness type
@@ -90,30 +147,29 @@ message P2PKWitness {
 message HTLCWitness {
     // Preimage
     string preimage = 1;
-
     // List of signatures
     repeated string signatures = 2;
 }
 
-message KeysResponse {
-  repeated Keys keysets = 1;
+
+
+enum ErrorCode {
+    UNKNOWN = 0;
+    AMOUNT_OUTSIDE_LIMIT = 1;
+    DUPLICATE_INPUTS_PROVIDED = 2;
+    DUPLICATE_OUTPUTS_PROVIDED = 3;
+    KEYSET_NOT_KNOWN = 4;
+    KEYSET_INACTIVE = 5;
+    MINTING_DISABLED = 6;
+    COULD_NOT_ROTATE_KEYSET = 7;
+    INVALID_PROOF = 8;
+    INVALID_BLIND_MESSAGE = 9;
+    UNIT_NOT_SUPPORTED = 10;
 }
 
-message KeysetResponse {
-  repeated Keyset keysets = 1;
+message Error {
+  ErrorCode code = 1;
+  string detail = 2;
 }
 
-message Keys {
-  string id = 1;
-  string unit = 2;
-  map<string, string> keys = 3;
-  uint32 input_fee_ppk = 4;
-}
-
-message Keyset {
-  string id = 1;
-  string unit = 2;
-  bool active = 3;
-  uint32 input_fee_ppk = 4;
-}
-
+message EmptyRequest {}
