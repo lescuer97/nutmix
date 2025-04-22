@@ -83,6 +83,10 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		if mint.LightningBackend.ActiveMPP() {
 			optionalNuts = append(optionalNuts, "15")
 		}
+		if mint.Config.MINT_REQUIRE_AUTH {
+			optionalNuts = append(optionalNuts, "21")
+			optionalNuts = append(optionalNuts, "22")
+		}
 
 		for _, nut := range baseNuts {
 			b := false
@@ -174,6 +178,23 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 				nuts[nut] = wsMethod
 
+			case "21":
+				formatedDiscoveryUrl := mint.Config.MINT_AUTH_OICD_URL + "/.well-known/openid-configuration"
+				protectedRoutes := cashu.Nut21Info{
+					OpenIdDiscovery: formatedDiscoveryUrl,
+					ClientId:        mint.Config.MINT_AUTH_OICD_CLIENT_ID,
+					ProtectedRoutes: cashu.ConvertRouteListToProtectedRouteList(mint.Config.MINT_AUTH_CLEAR_AUTH_URLS),
+				}
+
+				nuts[nut] = protectedRoutes
+			case "22":
+				protectedRoutes := cashu.Nut22Info{
+					BatMaxMint:      mint.Config.MINT_AUTH_MAX_BLIND_TOKENS,
+					ProtectedRoutes: cashu.ConvertRouteListToProtectedRouteList(mint.Config.MINT_AUTH_BLIND_AUTH_URLS),
+				}
+
+				nuts[nut] = protectedRoutes
+
 			default:
 				nuts[nut] = cashu.SwapMintInfo{
 					Supported: &b,
@@ -206,51 +227,24 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		var AmountSignature uint64
-
 		if len(swapRequest.Inputs) == 0 || len(swapRequest.Outputs) == 0 {
 			logger.Info("Inputs or Outputs are empty")
 			c.JSON(400, "Inputs or Outputs are empty")
 			return
 		}
 
-		AmountProofs, SecretsList, err := utils.GetAndCalculateProofsValues(&swapRequest.Inputs)
+		_, SecretsList, err := utils.GetAndCalculateProofsValues(&swapRequest.Inputs)
 		if err != nil {
-			logger.Warn("utils.GetProofsValues(&swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Warn("utils.GetAndCalculateProofsValues(&swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, "Problem processing proofs")
 			return
 		}
 
-		for _, output := range swapRequest.Outputs {
-			AmountSignature += output.Amount
-		}
-		keysets, err := mint.Signer.GetKeysets()
+		err = mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs)
 		if err != nil {
-			logger.Warn("mint.Signer.GetKeysByUnit(unit)", slog.String(utils.LogExtraInfo, err.Error()))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
-			return
-		}
-
-		_, err = mint.CheckProofsAreSameUnit(swapRequest.Inputs, keysets.Keysets)
-
-		if err != nil {
-			logger.Warn("CheckProofsAreSameUnit", slog.String(utils.LogExtraInfo, err.Error()))
-			detail := "Proofs are not the same unit"
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, &detail))
-			return
-		}
-
-		// check for needed amount of fees
-		fee, err := cashu.Fees(swapRequest.Inputs, keysets.Keysets)
-		if err != nil {
-			logger.Warn("cashu.Fees(swapRequest.Inputs, mint.Keysets[unit.String()])", slog.String(utils.LogExtraInfo, err.Error()))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
-			return
-		}
-
-		if AmountProofs < (uint64(fee) + AmountSignature) {
-			logger.Info(fmt.Sprintf("didn't provide enough fees. ProofAmount: %v, needed Proofs: %v", AmountProofs, (uint64(fee) + AmountSignature)))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TRANSACTION_NOT_BALANCED, nil))
+			logger.Error(fmt.Errorf("mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -289,20 +283,11 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs)
-
-		if err != nil {
-			logger.Warn(" mint.Signer.VerifyProofs(swapRequest.Inputs, swapRequest.Outputs, unit)", slog.String(utils.LogExtraInfo, err.Error()))
-			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
-			return
-		}
-
 		// sign the outputs
 		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(swapRequest.Outputs)
 
 		if err != nil {
-			logger.Error("mint.Signer.SignBlindMessages(swapRequest.Outputs, cashu.Sat)", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("mint.Signer.SignBlindMessages(swapRequest.Outputs)", slog.String(utils.LogExtraInfo, err.Error()))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return

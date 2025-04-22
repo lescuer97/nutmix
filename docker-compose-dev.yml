@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16.2
+    image: postgres:16.8
     restart: always
     ports:
       - 127.0.0.1:5432:5432
@@ -30,6 +30,48 @@ services:
     volumes:
       - /var/log/nutmix:/var/log/nutmix
       - ${HOME}/.config/nutmix:/root/.config/nutmix
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.6
+    command: start
+    environment:
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME}
+      KC_HOSTNAME_PORT: ${KEYCLOAK_HOSTNAME_PORT}
+      KC_HOSTNAME_STRICT_BACKCHANNEL: false
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT_HTTPS: true
+      KC_HEALTH_ENABLED: true
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak_postgres/${KEYCLOAK_POSTGRES_DB}
+      KC_DB_USERNAME: ${KEYCLOAK_POSTGRES_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD}
+    ports:
+      - 8081:8080
+    restart: always
+    depends_on:
+      - keycloak_postgres
+
+  keycloak_postgres:
+    image: postgres:16.8
+    volumes:
+      - ./keycloak_pq_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_POSTGRES_DB}
+      POSTGRES_USER: ${KEYCLOAK_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${KEYCLOAK_POSTGRES_USER} -d ${KEYCLOAK_POSTGRES_DB}",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 10
 volumes:
   db:
+    driver: local
+  keycloak_pq_data:
     driver: local

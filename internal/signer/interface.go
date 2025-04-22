@@ -6,6 +6,11 @@ type Signer interface {
 	GetKeysets() (GetKeysetsResponse, error)
 	GetKeysById(id string) (GetKeysResponse, error)
 	GetActiveKeys() (GetKeysResponse, error)
+
+	GetAuthKeys() (GetKeysetsResponse, error)
+	GetAuthKeysById(id string) (GetKeysResponse, error)
+	GetAuthActiveKeys() (GetKeysResponse, error)
+
 	RotateKeyset(unit cashu.Unit, fee uint) error
 	GetSignerPubkey() (string, error)
 

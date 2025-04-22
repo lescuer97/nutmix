@@ -7,10 +7,11 @@ import (
 )
 
 const (
-	MAINNET = "mainnet"
-	REGTEST = "regtest"
-	TESTNET = "testnet"
-	SIGNET  = "signet"
+	MAINNET  = "mainnet"
+	REGTEST  = "regtest"
+	TESTNET  = "testnet"
+	TESTNET3 = "testnet3"
+	SIGNET   = "signet"
 )
 
 const MinimumLightningFee float64 = 0.01

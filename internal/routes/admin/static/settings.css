@@ -5,3 +5,25 @@
 .settings h2 {
   text-align: center;
 }
+
+select[multiple] {
+  min-height: 150px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+select[multiple] option {
+  padding: 8px;
+  margin-bottom: 3px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+select[multiple] option:checked {
+  border: 1px solid var(--white);
+}
+
+select[multiple] option:hover:not(:checked) {
+  border: 1px solid var(--white);
+}

@@ -270,22 +270,25 @@ func (sc *SpendCondition) VerifySignatures(witness *Witness, message string) (bo
 
 	hashMessage := sha256.Sum256([]byte(message))
 
-	signaturesToTry := sc.Data.Tags.Pubkeys
+	pubkeys := make(map[*btcec.PublicKey]bool)
+	pubkeysFromProofs := sc.Data.Tags.Pubkeys
+	for _, pubkey := range sc.Data.Tags.Pubkeys {
+		pubkeys[pubkey] = true
+	}
 
 	if sc.Type == P2PK {
-
 		pubkey, err := hex.DecodeString(sc.Data.Data)
 
 		if err != nil {
 			return false, sc.Data.Tags.Pubkeys, ErrNoValidSignatures
 		}
-		//
 		parsedPubkey, err := btcec.ParsePubKey(pubkey)
 		if err != nil {
 			return false, sc.Data.Tags.Pubkeys, ErrNoValidSignatures
 		}
 
-		signaturesToTry = append(signaturesToTry, parsedPubkey)
+		pubkeys[parsedPubkey] = true
+		pubkeysFromProofs = append(pubkeysFromProofs, parsedPubkey)
 	}
 
 	// check if locktime has passed and if there are refund keys
@@ -293,20 +296,22 @@ func (sc *SpendCondition) VerifySignatures(witness *Witness, message string) (bo
 		for _, sig := range witness.Signatures {
 			for _, pubkey := range sc.Data.Tags.Refund {
 				if sig.Verify(hashMessage[:], pubkey) {
-					return true, signaturesToTry, nil
+					return true, pubkeysFromProofs, nil
 				}
 			}
 		}
-		return false, signaturesToTry, ErrLocktimePassed
+		return false, pubkeysFromProofs, ErrLocktimePassed
 	}
 
 	// append all posibles keys for signing
 	amountValidSigs := 0
 
 	for _, sig := range witness.Signatures {
-		for _, pubkey := range signaturesToTry {
+		for pubkey, _ := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {
 				amountValidSigs += 1
+				delete(pubkeys, pubkey)
+				continue
 			}
 		}
 	}
@@ -315,19 +320,19 @@ func (sc *SpendCondition) VerifySignatures(witness *Witness, message string) (bo
 	switch {
 
 	case amountValidSigs == 0:
-		return false, signaturesToTry, ErrNoValidSignatures
+		return false, pubkeysFromProofs, ErrNoValidSignatures
 
 	case sc.Data.Tags.NSigs > 0 && amountValidSigs < sc.Data.Tags.NSigs:
-		return false, signaturesToTry, ErrNotEnoughSignatures
+		return false, pubkeysFromProofs, ErrNotEnoughSignatures
 
 	case sc.Data.Tags.NSigs > 0 && amountValidSigs >= sc.Data.Tags.NSigs:
-		return true, signaturesToTry, nil
+		return true, pubkeysFromProofs, nil
 
 	case amountValidSigs >= 1:
-		return true, signaturesToTry, nil
+		return true, pubkeysFromProofs, nil
 
 	default:
-		return false, signaturesToTry, nil
+		return false, pubkeysFromProofs, nil
 
 	}
 }

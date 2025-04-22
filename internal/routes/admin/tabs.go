@@ -1,26 +1,41 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"strconv"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
 var (
-	ErrInvalidNostrKey = errors.New("NOSTR npub is not valid")
+	ErrInvalidOICDURL      = errors.New("Invalid OICD Discovery URL")
+	ErrInvalidNostrKey     = errors.New("NOSTR npub is not valid")
+	ErrInvalidStrikeConfig = errors.New("Invalid strike Config")
+	ErrInvalidStrikeCheck  = errors.New("Could not verify strike configuration")
 )
 
 func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.HTML(200, "settings.html", mint.Config)
+		ctx := context.Background()
+
+		err := templates.MintSettings(mint.Config).Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(err)
+			c.Status(400)
+			return
+		}
+		return
 	}
 }
 
@@ -54,6 +69,54 @@ func isNostrKeyValid(nostrKey string) (bool, error) {
 
 }
 
+func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
+	activateAuthStr := c.Request.PostFormValue("MINT_REQUIRE_AUTH")
+	activateAuth := false
+	if activateAuthStr == "on" {
+		activateAuth = true
+	} else {
+		activateAuth = false
+	}
+
+	oicdDiscoveryUrl := c.Request.PostFormValue("MINT_AUTH_OICD_URL")
+	oicdClientId := c.Request.PostFormValue("MINT_AUTH_OICD_CLIENT_ID")
+	rateLimitPerMinuteStr := c.Request.PostFormValue("MINT_AUTH_RATE_LIMIT_PER_MINUTE")
+	maxBlindTokenStr := c.Request.PostFormValue("MINT_AUTH_MAX_BLIND_TOKENS")
+
+	authBlindArray := c.PostFormArray("MINT_AUTH_BLIND_AUTH_URLS")
+	authClearArray := c.PostFormArray("MINT_AUTH_CLEAR_AUTH_URLS")
+
+	rateLimitPerMinute, err := strconv.ParseUint(rateLimitPerMinuteStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("strconv.ParseUint(rateLimitPerMinuteStr, 10, 64). %w", err)
+	}
+	maxBlindToken, err := strconv.ParseUint(maxBlindTokenStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("strconv.ParseUint(rateLimitPerMinuteStr, 10, 64). %w", err)
+	}
+
+	if activateAuth {
+		if oicdDiscoveryUrl == "" {
+			return ErrInvalidOICDURL
+
+		}
+
+		oidcClient, err := oidc.NewProvider(context.Background(), oicdDiscoveryUrl)
+		if err != nil {
+			return fmt.Errorf("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL): %w %w", err, ErrInvalidOICDURL)
+		}
+		mint.OICDClient = oidcClient
+	}
+	mint.Config.MINT_REQUIRE_AUTH = activateAuth
+	mint.Config.MINT_AUTH_OICD_URL = oicdDiscoveryUrl
+	mint.Config.MINT_AUTH_OICD_CLIENT_ID = oicdClientId
+	mint.Config.MINT_AUTH_RATE_LIMIT_PER_MINUTE = int(rateLimitPerMinute)
+	mint.Config.MINT_AUTH_MAX_BLIND_TOKENS = maxBlindToken
+	mint.Config.MINT_AUTH_CLEAR_AUTH_URLS = authClearArray
+	mint.Config.MINT_AUTH_BLIND_AUTH_URLS = authBlindArray
+
+	return nil
+}
 func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
@@ -126,18 +189,22 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			mint.Config.NOSTR = ""
 		}
 
+		err = changeAuthSettings(mint, c)
+		if err != nil {
+			c.Error(fmt.Errorf("changeAuthSettings(mint, c). %w", err))
+			logger.Warn(
+				`fmt.Errorf("changeAuthSettings(mint, c). %w", err)`,
+				slog.String(utils.LogExtraInfo, err.Error()))
+			return
+		}
 		err = mint.MintDB.UpdateConfig(mint.Config)
 
 		if err != nil {
 			logger.Error(
-				"mint.MintDB.SetConfig(mint.Config)",
+				"mint.MintDB.UpdateConfig(mint.Config)",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			errorMessage := ErrorNotif{
-				Error: "there was a problem in the server",
-			}
 
-			c.HTML(200, "settings-error", errorMessage)
-
+			c.Error(fmt.Errorf("mint.MintDB.UpdateConfig(mint.Config). %w", err))
 			return
 
 		}
@@ -154,7 +221,14 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.HTML(200, "bolt11.html", mint.Config)
+		ctx := context.Background()
+		log.Println("network:", mint.Config.NETWORK)
+		err := templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer)
+
+		if err != nil {
+			c.Error(fmt.Errorf("templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer). %w", err))
+			return
+		}
 	}
 }
 
@@ -253,6 +327,30 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			mint.Config.MINT_LIGHTNING_BACKEND = utils.LNBITS
 			mint.Config.MINT_LNBITS_KEY = lnbitsKey
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
+		case string(utils.Strike):
+			strikeKey := c.Request.PostFormValue("STRIKE_KEY")
+			strikeEndpoint := c.Request.PostFormValue("STRIKE_ENDPOINT")
+
+			strikeWallet := lightning.Strike{
+				Network: chainparam,
+			}
+
+			err := strikeWallet.Setup(strikeKey, strikeEndpoint)
+			if err != nil {
+				c.Error(fmt.Errorf("strikeWallet.Setup(strikeKey, strikeEndpoint) %w %w", err, ErrInvalidStrikeConfig))
+				return
+			}
+			// check connection
+			_, err = strikeWallet.WalletBalance()
+			if err != nil {
+				c.Error(fmt.Errorf("strikeWallet.WalletBalance() %w %w", err, ErrInvalidStrikeCheck))
+				return
+			}
+
+			mint.Config.MINT_LIGHTNING_BACKEND = utils.Strike
+			mint.Config.STRIKE_KEY = strikeKey
+			mint.Config.STRIKE_ENDPOINT = strikeEndpoint
+			mint.LightningBackend = strikeWallet
 		case string(utils.CLNGRPC):
 			clnHost := c.Request.PostFormValue("CLN_GRPC_HOST")
 			clnCaCert := c.Request.PostFormValue("CLN_CA_CERT")

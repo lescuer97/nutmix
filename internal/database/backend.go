@@ -20,6 +20,12 @@ type NostrLoginAuth struct {
 	Expiry    int
 }
 
+type AuthUser struct {
+	Sub          string  `db:"sub"`
+	Aud          *string `db:"aud"`
+	LastLoggedIn uint64  `db:"last_logged_in"`
+}
+
 var DBError = errors.New("ERROR DATABASE")
 
 var DATABASE_URL_ENV = "DATABASE_URL"
@@ -37,11 +43,11 @@ type MintDB interface {
 
 	/// Calls for the Functioning of the mint
 	GetAllSeeds() ([]cashu.Seed, error)
-	GetSeedsByUnit(unit cashu.Unit) ([]cashu.Seed, error)
-	SaveNewSeed(seed cashu.Seed) error
+	GetSeedsByUnit(tx pgx.Tx, unit cashu.Unit) ([]cashu.Seed, error)
+	SaveNewSeed(tx pgx.Tx, seed cashu.Seed) error
 	SaveNewSeeds(seeds []cashu.Seed) error
 	// This should be used to only update the Active Status of seed on the db
-	UpdateSeedsActiveStatus(seeds []cashu.Seed) error
+	UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) error
 
 	SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error
 	ChangeMintRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, minted bool) error
@@ -52,6 +58,7 @@ type MintDB interface {
 	SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error
 	ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
 	AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage string) error
+	ChangeCheckingId(tx pgx.Tx, quote string, checking_id string) error
 
 	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error)
 
@@ -90,6 +97,11 @@ type MintDB interface {
 	ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.SwapState) error
 	GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error)
 	GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error)
+
+	// Mint Auth
+	GetAuthUser(tx pgx.Tx, sub string) (AuthUser, error)
+	MakeAuthUser(tx pgx.Tx, auth AuthUser) error
+	UpdateLastLoggedIn(tx pgx.Tx, sub string, lastLoggedIn uint64) error
 
 	// liquidity provider state
 }

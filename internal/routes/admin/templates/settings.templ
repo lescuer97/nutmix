@@ -1,0 +1,222 @@
+package templates
+
+import (
+	"github.com/lescuer97/nutmix/internal/utils"
+	"strconv"
+)
+
+templ MintSettings(config utils.Config) {
+	@Layout() {
+		<main>
+			<form
+				class="settings form"
+				hx-post="/admin/mintsettings"
+				hx-target="#notifications"
+				hx-swap="innerHTML"
+			>
+				@General(config)
+				@Lightning(config)
+				@Auth(config)
+				<button class="md-button" type="submit">Save Settings</button>
+			</form>
+		</main>
+	}
+}
+
+templ General(config utils.Config) {
+	<h2>Mint Settings</h2>
+	<div class="form-section">
+		<label for="MOTD" class="settings-input">
+			Mint Notifications (MOTD)
+			<input name="MOTD" value={ config.MOTD } type="text"/>
+		</label>
+		<label for="NAME" class="settings-input">
+			Name
+			<input name="NAME" value={ config.NAME } type="text"/>
+		</label>
+		<label for="DESCRIPTION" class="settings-input">
+			Description
+			<input name="DESCRIPTION" value={ config.DESCRIPTION } type="text"/>
+		</label>
+	</div>
+	<div class="form-section">
+		<label for="DESCRIPTION_LONG" class="settings-input">
+			Long Description
+			<textarea name="DESCRIPTION_LONG" type="text">
+				{ config.DESCRIPTION_LONG }
+			</textarea>
+		</label>
+	</div>
+	<div class="form-section">
+		<label for="EMAIL" class="settings-input">
+			Contact email
+			<input name="EMAIL" value={ config.EMAIL } type="email"/>
+		</label>
+		<label for="NOSTR" class="settings-input">
+			Nostr contact info (NPUB)
+			<input name="NOSTR" value={ config.NOSTR } type="text"/>
+		</label>
+	</div>
+}
+
+templ Lightning(config utils.Config) {
+	<h2>Lightning Options</h2>
+	<div class="form-section">
+		<label for="PEG_OUT_ONLY" class="settings-input-checkbox">
+			ONLY PEG OUT SATS
+			<input
+				name="PEG_OUT_ONLY"
+				type="checkbox"
+				checked?={ config.PEG_OUT_ONLY }
+			/>
+		</label>
+		<label for="PEG_IN_LIMIT_SATS" class="settings-input">
+			PEG IN LIMIT (SATS)
+			if config.PEG_IN_LIMIT_SATS == nil {
+				<input
+					name="PEG_IN_LIMIT_SATS"
+					type="number"
+					step="1"
+				/>
+			} else {
+				{{ peginLimit := strconv.FormatInt(int64(*config.PEG_IN_LIMIT_SATS), 10) }}
+				<input
+					name="PEG_IN_LIMIT_SATS"
+					value={ peginLimit }
+					type="number"
+					step="1"
+				/>
+			}
+		</label>
+		<label for="PEG_OUT_LIMIT_SATS" class="settings-input">
+			PEG OUT LIMIT (SATS)
+			if config.PEG_OUT_LIMIT_SATS == nil {
+				<input
+					name="PEG_OUT_LIMIT_SATS"
+					type="number"
+					step="1"
+				/>
+			} else {
+				{{ pegOutLimit := strconv.FormatInt(int64(*config.PEG_OUT_LIMIT_SATS), 10) }}
+				<input
+					name="PEG_OUT_LIMIT_SATS"
+					value={ pegOutLimit }
+					type="number"
+					step="1"
+				/>
+			}
+		</label>
+	</div>
+}
+
+templ Auth(config utils.Config) {
+	<h2>Authentification</h2>
+	<div class="form-section">
+		<label for="MINT_REQUIRE_AUTH" class="settings-input-checkbox">
+			Mint Authentification
+			<input
+				name="MINT_REQUIRE_AUTH"
+				type="checkbox"
+				checked?={ config.MINT_REQUIRE_AUTH }
+			/>
+		</label>
+		<label for="MINT_AUTH_OICD_URL" class="settings-input">
+			OICD Realm URL
+			<input
+				name="MINT_AUTH_OICD_URL"
+				value={ config.MINT_AUTH_OICD_URL }
+				type="string"
+			/>
+		</label>
+	</div>
+	<div class="form-section">
+		<label for="MINT_AUTH_OICD_CLIENT_ID" class="settings-input">
+			OICD Client ID
+			<input
+				name="MINT_AUTH_OICD_CLIENT_ID"
+				value={ config.MINT_AUTH_OICD_CLIENT_ID }
+				type="text"
+			/>
+		</label>
+		<label for="MINT_AUTH_RATE_LIMIT_PER_MINUTE" class="settings-input">
+			Rate limit of auth
+			{{ rateLimit := strconv.FormatInt(int64(config.MINT_AUTH_RATE_LIMIT_PER_MINUTE), 10) }}
+			<input
+				name="MINT_AUTH_RATE_LIMIT_PER_MINUTE"
+				value={ rateLimit }
+				type="number"
+			/>
+		</label>
+		<label for="MINT_AUTH_MAX_BLIND_TOKENS" class="settings-input">
+			Max amount blind auth tokens
+			{{ maxBlindTokens := strconv.FormatInt(int64(config.MINT_AUTH_MAX_BLIND_TOKENS), 10) }}
+			<input
+				name="MINT_AUTH_MAX_BLIND_TOKENS"
+				value={ maxBlindTokens }
+				type="number"
+			/>
+		</label>
+	</div>
+	<div class="form-section">
+		{{ urlOptions := []string{"/v1/swap", "/v1/auth/blind/mint", "^/v1/mint/.*", "^/v1/melt/.*"} }}
+		<label for="MINT_AUTH_CLEAR_AUTH_URLS" class="settings-input">
+			{{ clearAuthName := "MINT_AUTH_CLEAR_AUTH_URLS" }}
+			{{ clearAuthSelectId := "clearAuthSelect" }}
+			Clear authentification url checks
+			@MultiSelect(clearAuthSelectId, clearAuthName, urlOptions, config.MINT_AUTH_CLEAR_AUTH_URLS)
+		</label>
+		<label for="MINT_AUTH_BLIND_AUTH_URLS" class="settings-input">
+			{{ blindAuthName := "MINT_AUTH_BLIND_AUTH_URLS" }}
+			{{ blindAuthSelectId := "blindAuthSelect" }}
+			Blind authentification url checks
+			@MultiSelect(blindAuthSelectId, blindAuthName, urlOptions, config.MINT_AUTH_BLIND_AUTH_URLS)
+		</label>
+	</div>
+	<script>
+        document.addEventListener('DOMContentLoaded', function() {
+          // Get all multiple select elements on the page
+          const multiSelects = document.querySelectorAll('select[multiple]');
+        
+          // Add event listener to each multiple select element
+          multiSelects.forEach(select => {
+            select.addEventListener('mousedown', function(e) {
+              console.log({event: e})
+              // Only prevent default if clicking on an option
+              if (e.target.nodeName === 'OPTION') {
+                e.preventDefault();
+                
+                // Toggle selection on the clicked option
+                const option = e.target;
+                option.selected = !option.selected;
+                
+                // Trigger change event
+                const event = new Event('change');
+                this.dispatchEvent(event);
+              }
+            });
+          });
+        });
+</script>
+}
+
+templ MultiSelect(id string, name string, options []string, selectedValues []string) {
+	<select id={ id } name={ name } multiple>
+		for _, option := range options {
+			<option
+				value={ option }
+				selected?={ isSelected(option, selectedValues) }
+			>
+				{ option }
+			</option>
+		}
+	</select>
+}
+
+func isSelected(value string, selectedValues []string) bool {
+	for _, selectedValue := range selectedValues {
+		if selectedValue == value {
+			return true
+		}
+	}
+	return false
+}
