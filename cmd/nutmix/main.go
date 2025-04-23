@@ -16,8 +16,8 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
-	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
-	// socketremotesigner "github.com/lescuer97/nutmix/internal/signer/socket_remote_signer"
+	// localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
+	socketremotesigner "github.com/lescuer97/nutmix/internal/signer/socket_remote_signer"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -98,15 +98,15 @@ func main() {
 		log.Fatalf("mint.SetUpConfigDB(db): %+v ", err)
 	}
 
-	signer, err := localsigner.SetupLocalSigner(db)
-	if err != nil {
-		log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
-	}
-	
-	// signer, err := socketremotesigner.SetupSocketSigner()
+	// signer, err := localsigner.SetupLocalSigner(db)
 	// if err != nil {
 	// 	log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
 	// }
+
+	signer, err := socketremotesigner.SetupSocketSigner()
+	if err != nil {
+		log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
+	}
 
 	// remove mint private key from variable
 	mint, err := mint.SetUpMint(ctx, config, db, &signer)

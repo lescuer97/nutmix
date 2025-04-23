@@ -78,6 +78,9 @@ I have a special development docker compose called: `docker-compose-dev.yml`. Th
 
 #### Generate remote-signer proto code
 
+```
+protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
+```
 
 
 ## Supported NUTs

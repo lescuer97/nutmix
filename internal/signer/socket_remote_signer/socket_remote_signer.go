@@ -13,8 +13,19 @@ import (
 	"google.golang.org/grpc"
 )
 
+type MintPublicKeyset struct {
+	Id          string
+	Unit        string
+	Active      bool
+	Keys        map[uint64]string
+	InputFeePpk uint
+}
+
 type SocketSigner struct {
-	grpcClient sig.SignerClient
+	grpcClient    sig.SignerServiceClient
+	activeKeysets map[string]MintPublicKeyset
+	keysets       map[string]MintPublicKeyset
+	pubkey        []byte
 }
 
 const abstractSocket = "unix:@signer_socket"
@@ -33,64 +44,132 @@ func SetupSocketSigner() (SocketSigner, error) {
 		log.Fatalf("grpc connection failed: %v", err)
 	}
 
-	client := sig.NewSignerClient(conn)
+	client := sig.NewSignerServiceClient(conn)
 
 	socketSigner.grpcClient = client
+	socketSigner.keysets = make(map[string]MintPublicKeyset)
+	socketSigner.activeKeysets = make(map[string]MintPublicKeyset)
+
+	err = socketSigner.setupSignerPubkeys()
+	if err != nil {
+		log.Fatalf("socketSigner.setupSignerPubkeys(): %v", err)
+	}
+
 	return socketSigner, nil
 }
 
 // gets all active keys
-func (s *SocketSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
+func (s *SocketSigner) setupSignerPubkeys() error {
 
-	ctx := context.Background()
-	emptyRequest := sig.EmptyRequest{}
-	keys, err := s.grpcClient.ActiveKeys(ctx, &emptyRequest)
-	if err != nil {
-		return signer.GetKeysResponse{}, fmt.Errorf("s.grpcClient.Pubkey(ctx, &emptyRequest). %w", err)
-	}
-
-	return ConvertSigKeysToKeysResponse(keys), nil
-}
-
-func (s *SocketSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
-
-	ctx := context.Background()
-	requestId := sig.Id{Id: id}
-	keys, err := s.grpcClient.KeysById(ctx, &requestId)
-	if err != nil {
-		return signer.GetKeysResponse{}, fmt.Errorf("s.grpcClient.KeysById(ctx, &requestId). %w", err)
-	}
-
-	return ConvertSigKeysToKeysResponse(keys), nil
-}
-
-// gets all keys from the signer
-func (s *SocketSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 	ctx := context.Background()
 	emptyRequest := sig.EmptyRequest{}
 	keys, err := s.grpcClient.Keysets(ctx, &emptyRequest)
 	if err != nil {
-		return signer.GetKeysetsResponse{}, fmt.Errorf("s.grpcClient.Keysets(ctx, &emptyRequest). %w", err)
+		return fmt.Errorf("s.grpcClient.Pubkey(ctx, &emptyRequest). %w", err)
 	}
 
-	return ConvertSigKeysetsToKeysResponse(keys), nil
+	err = CheckIfSignerErrorExists(keys.GetError())
+	if err != nil {
+		return fmt.Errorf("CheckIfSignerErrorExists(keys.GetError()). %w", err)
+	}
+
+	if keys.GetKeysets() == nil {
+		return fmt.Errorf("No keysets on the signer. %w", err)
+	}
+
+	s.pubkey = keys.GetKeysets().Pubkey
+
+	for i, key := range keys.GetKeysets().Keysets {
+		if key == nil {
+			return fmt.Errorf("There was a nil key. index: %v", i)
+		}
+
+		if key.Keys == nil {
+			return fmt.Errorf("No keys on keyset. Id: %v", key.Id)
+		}
+
+		unit, err := ConvertSigUnitToCashuUnit(key.Unit)
+		if err != nil {
+			return fmt.Errorf("ConvertSigUnitToCashuUnit(key.Unit). %w", err)
+		}
+		mintKeyset := MintPublicKeyset{
+			Id:          key.Id,
+			Unit:        unit.String(),
+			Active:      key.Active,
+			InputFeePpk: uint(key.InputFeePpk),
+		}
+
+		stringKeys := make(map[uint64]string)
+
+		for key, val := range key.GetKeys().GetKeys() {
+			stringKeys[key] = hex.EncodeToString(val)
+		}
+		mintKeyset.Keys = stringKeys
+
+		if mintKeyset.Active {
+			s.activeKeysets[mintKeyset.Id] = mintKeyset
+		}
+
+		s.keysets[mintKeyset.Id] = mintKeyset
+	}
+	return nil
+}
+
+// gets all active keys
+func (s *SocketSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
+	var keys []MintPublicKeyset
+	for _, keyset := range s.activeKeysets {
+		keys = append(keys, keyset)
+	}
+	return OrderKeysetByUnit(keys), nil
+}
+
+func (s *SocketSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
+	val, exists := s.keysets[id]
+	if exists {
+		return OrderKeysetByUnit([]MintPublicKeyset{val}), nil
+	}
+	return signer.GetKeysResponse{}, cashu.ErrKeysetNotFound
+}
+
+// gets all keys from the signer
+func (s *SocketSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
+
+	var response signer.GetKeysetsResponse
+	for _, seed := range s.keysets {
+		response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+	}
+	return response, nil
 }
 
 func (s *SocketSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 
 	ctx := context.Background()
-	rotationReq := sig.RotationRequest{
-		Unit: unit.String(),
-		Fee:  uint32(fee),
+
+	unitSig, err := ConvertCashuUnitToSignature(unit)
+	if err != nil {
+		return fmt.Errorf("ConvertCashuUnitToSignature(unit). %w", err)
 	}
-	success, err := s.grpcClient.RotateKeyset(ctx, &rotationReq)
+
+	rotationReq := sig.RotationRequest{
+		Unit:        unitSig,
+		InputFeePpk: uint64(fee),
+		MaxOrder:    32,
+	}
+	rotationResponse, err := s.grpcClient.RotateKeyset(ctx, &rotationReq)
 	if err != nil {
 		return fmt.Errorf("s.grpcClient.BlindSign(ctx, &blindedMessageRequest). %w", err)
 	}
-
-	if !success.Success {
-		return fmt.Errorf("Unsuccessful Rotation. %w", cashu.ErrInvalidProof)
+	err = CheckIfSignerErrorExists(rotationResponse.GetError())
+	if err != nil {
+		return fmt.Errorf("CheckIfSignerErrorExists(rotationResponse.GetError()). %w", err)
 	}
+
+	err = s.setupSignerPubkeys()
+	if err != nil {
+		return fmt.Errorf("s.setupSignerPubkeys(). %w", err)
+	}
+
 	return nil
 }
 
@@ -114,12 +193,16 @@ func (s *SocketSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 		})
 	}
 
-	blindSigsGrpc, err := s.grpcClient.BlindSign(ctx, &blindedMessageRequest)
+	blindSigsResponse, err := s.grpcClient.BlindSign(ctx, &blindedMessageRequest)
 	if err != nil {
 		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("s.grpcClient.BlindSign(ctx, &blindedMessageRequest). %w", err)
 	}
+	err = CheckIfSignerErrorExists(blindSigsResponse.GetError())
+	if err != nil {
+		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("CheckIfSignerErrorExists(blindSigsResponse.GetError()). %w", err)
+	}
 
-	blindSigs := ConvertSigBlindSignaturesToCashuBlindSigs(blindSigsGrpc)
+	blindSigs := ConvertSigBlindSignaturesToCashuBlindSigs(blindSigsResponse)
 	// verify we have the same amount of blindedmessages than BlindSignatures
 	if len(blindSigs) != len(messages) {
 		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("Not the correct amount of blind signatures")
@@ -176,25 +259,61 @@ func (s *SocketSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.
 		}
 	}
 
-	success, err := s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest)
+	boolResponse, err := s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest)
 	if err != nil {
 		return fmt.Errorf("s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest). %w", err)
 	}
 
-	if !success.Success {
+	err = CheckIfSignerErrorExists(boolResponse.GetError())
+	if err != nil {
+		return fmt.Errorf("CheckIfSignerErrorExists(boolResponse.GetError()). %w", err)
+	}
+
+	if !boolResponse.GetSuccess() {
 		return fmt.Errorf("Invalid proofs. %w", cashu.ErrInvalidProof)
 	}
 	return nil
 }
 
 func (s *SocketSigner) GetSignerPubkey() (string, error) {
-	ctx := context.Background()
-	emptyRequest := sig.EmptyRequest{}
-	pubkey, err := s.grpcClient.Pubkey(ctx, &emptyRequest)
 
-	if err != nil {
-		return "", fmt.Errorf("s.grpcClient.Pubkey(ctx, &emptyRequest). %w", err)
+	return hex.EncodeToString(s.pubkey), nil
+}
+
+// gets all active keys
+func (l *SocketSigner) GetAuthActiveKeys() (signer.GetKeysResponse, error) {
+	var keys []MintPublicKeyset
+	for _, keyset := range l.activeKeysets {
+		if keyset.Unit == cashu.AUTH.String() {
+			keys = append(keys, keyset)
+		}
 	}
 
-	return hex.EncodeToString(pubkey.Pubkey), nil
+	if len(keys) == 0 {
+		return signer.GetKeysResponse{}, cashu.ErrKeysetNotFound
+	}
+
+	return OrderKeysetByUnit(keys), nil
+}
+
+func (s *SocketSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error) {
+
+	val, exists := s.keysets[id]
+	if exists {
+		if val.Unit == cashu.AUTH.String() {
+			return OrderKeysetByUnit([]MintPublicKeyset{val}), nil
+		}
+	}
+	return signer.GetKeysResponse{}, cashu.ErrKeysetNotFound
+}
+
+// gets all keys from the signer
+func (l *SocketSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
+	var response signer.GetKeysetsResponse
+	for _, key := range l.keysets {
+		if key.Unit == cashu.AUTH.String() {
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: key.Id, Unit: key.Unit, Active: key.Active, InputFeePpk: key.InputFeePpk})
+		}
+	}
+	return response, nil
 }

@@ -33,7 +33,7 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		seeds, err := mint.MintDB.GetAllSeeds()
+		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
 			logger.Error("mint.Signer.GetKeysets() %+v", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Server side error")
@@ -41,30 +41,27 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		}
 
 		keysetMap := make(map[string][]templates.KeysetData)
-		for _, seed := range seeds {
+		for _, seed := range keysets.Keysets {
 			val, exits := keysetMap[seed.Unit]
 			if exits {
 				val = append(val, templates.KeysetData{
-					Id:        seed.Id,
-					Active:    seed.Active,
-					Unit:      seed.Unit,
-					Fees:      seed.InputFeePpk,
-					CreatedAt: seed.CreatedAt,
-					Version:   seed.Version,
+					Id:     seed.Id,
+					Active: seed.Active,
+					Unit:   seed.Unit,
+					Fees:   seed.InputFeePpk,
+
 				})
 
 				keysetMap[seed.Unit] = val
 
 			} else {
 				keysetMap[seed.Unit] = []templates.KeysetData{
-
 					{
-						Id:        seed.Id,
-						Active:    seed.Active,
-						Unit:      seed.Unit,
-						Fees:      seed.InputFeePpk,
-						CreatedAt: seed.CreatedAt,
-						Version:   seed.Version,
+						Id:     seed.Id,
+						Active: seed.Active,
+						Unit:   seed.Unit,
+						Fees:   seed.InputFeePpk,
+
 					},
 				}
 			}

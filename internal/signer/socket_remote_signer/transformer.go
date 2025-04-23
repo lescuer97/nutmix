@@ -3,45 +3,14 @@ package socketremotesigner
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
 	sig "github.com/lescuer97/nutmix/internal/gen"
-	"github.com/lescuer97/nutmix/internal/signer"
 )
 
-func ConvertSigKeysToKeysResponse(keys *sig.KeysResponse) signer.GetKeysResponse {
-	sigs := signer.GetKeysResponse{}
-
-	if keys == nil {
-		return sigs
-	}
-
-	sigs.Keysets = make([]signer.KeysetResponse, len(keys.Keysets))
-	for i, val := range keys.Keysets {
-		sigs.Keysets[i] = signer.KeysetResponse{Id: val.Id, Unit: val.Unit, Keys: val.Keys, InputFeePpk: uint(val.InputFeePpk)}
-	}
-
-	return sigs
-}
-
-func ConvertSigKeysetsToKeysResponse(keys *sig.KeysetResponse) signer.GetKeysetsResponse {
-	keysets := signer.GetKeysetsResponse{}
-
-	if keys == nil {
-		keysets.Keysets = make([]cashu.BasicKeysetResponse, 0)
-		return keysets
-	}
-
-	keysets.Keysets = make([]cashu.BasicKeysetResponse, len(keys.Keysets))
-
-	for i, val := range keys.Keysets {
-		keysets.Keysets[i] = cashu.BasicKeysetResponse{Id: val.Id, Unit: val.Unit, Active: val.Active, InputFeePpk: uint(val.InputFeePpk)}
-	}
-
-	return keysets
-}
-func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignatures) []cashu.BlindSignature {
+func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) []cashu.BlindSignature {
 	blindSigs := []cashu.BlindSignature{}
 
 	if sigs == nil {
@@ -50,7 +19,7 @@ func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignatures) []cash
 
 	blindSigs = []cashu.BlindSignature{}
 
-	for _, val := range sigs.BlindSignatures {
+	for _, val := range sigs.GetSigs().BlindSignatures {
 		dleq := cashu.BlindSignatureDLEQ{
 			E: secp256k1.PrivKeyFromBytes(val.Dleq.E),
 			S: secp256k1.PrivKeyFromBytes(val.Dleq.S),
@@ -81,6 +50,58 @@ func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.Blinded
 	}
 
 	return &messagesGrpc, nil
+}
+
+func ConvertCashuUnitToSignature(unit cashu.Unit) (*sig.CurrencyUnit, error) {
+	switch unit {
+	case cashu.Sat:
+		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_SAT}}, nil
+	case cashu.Msat:
+		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_MSAT}}, nil
+	case cashu.EUR:
+		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_EUR}}, nil
+	case cashu.AUTH:
+		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_AUTH}}, nil
+
+	default:
+		return nil, fmt.Errorf("No available unit.")
+	}
+}
+
+func ConvertSigUnitToCashuUnit(sigUnit *sig.CurrencyUnit) (cashu.Unit, error) {
+	switch sigUnit.GetUnit().Number() {
+	case sig.CurrencyUnitType_SAT.Enum().Number():
+		return cashu.Sat, nil
+	case sig.CurrencyUnitType_MSAT.Enum().Number():
+		return cashu.Msat, nil
+	case sig.CurrencyUnitType_EUR.Enum().Number():
+		return cashu.EUR, nil
+	case sig.CurrencyUnitType_USD.Enum().Number():
+		return cashu.USD, nil
+	case sig.CurrencyUnitType_AUTH.Enum().Number():
+		return cashu.AUTH, nil
+
+	default:
+		unit, err := cashu.UnitFromString(strings.ToLower(sigUnit.GetCustomUnit()))
+
+		if err != nil {
+			return cashu.Sat, fmt.Errorf("cashu.UnitFromString(strings.ToLower(req.Unit.String())). %w", err)
+		}
+		return unit, nil
+
+	}
+
+}
+
+func CheckIfSignerErrorExists(err *sig.Error) error {
+	if err == nil {
+		return nil
+	}
+
+	switch err.Code {
+	default:
+		return fmt.Errorf("Unknown error happened with the signer")
+	}
 }
 
 func ConvertWitnessToGrpc(spendCondition *cashu.SpendCondition, witness *cashu.Witness) *sig.Witness {

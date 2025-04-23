@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/lescuer97/nutmix/internal/signer"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -39,4 +40,27 @@ func GetTlsSecurityCredential() (credentials.TransportCredentials, error) {
 	creds := credentials.NewTLS(tlsConfig)
 	return creds, nil
 
+}
+func OrderKeysetByUnit(keysets []MintPublicKeyset) signer.GetKeysResponse {
+	var typesOfUnits = make(map[string][]MintPublicKeyset)
+	for _, keyset := range keysets {
+		if len(typesOfUnits[keyset.Unit]) == 0 {
+			typesOfUnits[keyset.Unit] = append(typesOfUnits[keyset.Unit], keyset)
+			continue
+		} else {
+			typesOfUnits[keyset.Unit] = append(typesOfUnits[keyset.Unit], keyset)
+		}
+	}
+	res := signer.GetKeysResponse{}
+	res.Keysets = []signer.KeysetResponse{}
+	for _, unitKeysets := range typesOfUnits {
+		for _, mintKey := range unitKeysets {
+			keyset := signer.KeysetResponse{}
+			keyset.Id = mintKey.Id
+			keyset.Unit = mintKey.Unit
+			keyset.Keys = mintKey.Keys
+			res.Keysets = append(res.Keysets, keyset)
+		}
+	}
+	return res
 }
