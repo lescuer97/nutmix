@@ -2,6 +2,7 @@ package socketremotesigner
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -88,20 +89,59 @@ func ConvertSigUnitToCashuUnit(sigUnit *sig.CurrencyUnit) (cashu.Unit, error) {
 			return cashu.Sat, fmt.Errorf("cashu.UnitFromString(strings.ToLower(req.Unit.String())). %w", err)
 		}
 		return unit, nil
-
 	}
-
 }
 
+// CheckIfSignerErrorExists maps gRPC error codes to application-specific errors
 func CheckIfSignerErrorExists(err *sig.Error) error {
 	if err == nil {
 		return nil
 	}
 
+	var errResult error
+
 	switch err.Code {
+	case sig.ErrorCode_AMOUNT_OUTSIDE_LIMIT:
+		errResult = fmt.Errorf("%w: %s", cashu.ErrMessageAmountToBig, err.Detail)
+	case sig.ErrorCode_DUPLICATE_INPUTS_PROVIDED:
+		errResult = fmt.Errorf("%w: %s", cashu.ErrRepeatedInput, err.Detail)
+	case sig.ErrorCode_DUPLICATE_OUTPUTS_PROVIDED:
+		errResult = fmt.Errorf("%w: %s", cashu.ErrRepeatedOutput, err.Detail)
+	case sig.ErrorCode_KEYSET_NOT_KNOWN:
+		errResult = fmt.Errorf("%w: %s", cashu.ErrKeysetNotFound, err.Detail)
+	case sig.ErrorCode_KEYSET_INACTIVE:
+		errResult = fmt.Errorf("%w: %s", cashu.UsingInactiveKeyset, err.Detail)
+	case sig.ErrorCode_MINTING_DISABLED:
+		detail := err.Detail
+		if detail == "" {
+			detail = "Minting is disabled for this keyset"
+		}
+		// Using a custom error since there's no established error for this in the cashu package
+		mintingDisabledErr := errors.New("Minting disabled")
+		errResult = fmt.Errorf("%w: %s", mintingDisabledErr, detail)
+	case sig.ErrorCode_COULD_NOT_ROTATE_KEYSET:
+		errResult = fmt.Errorf("Could not rotate keyset: %s", err.Detail)
+	case sig.ErrorCode_INVALID_PROOF:
+		errResult = fmt.Errorf("%w: %s", cashu.ErrInvalidProof, err.Detail)
+	case sig.ErrorCode_INVALID_BLIND_MESSAGE:
+		errResult = fmt.Errorf("%w: %s", cashu.ErrInvalidBlindMessage, err.Detail)
+	case sig.ErrorCode_UNIT_NOT_SUPPORTED:
+		errResult = cashu.ErrUnitNotSupported
+	case sig.ErrorCode_UNKNOWN:
+		detail := err.Detail
+		if detail == "" {
+			detail = "Unknown error occurred with the signer"
+		}
+		errResult = fmt.Errorf("%w, Unknown error occurred with the signer", cashu.ErrUnknown)
 	default:
-		return fmt.Errorf("Unknown error happened with the signer")
+		detail := err.Detail
+		if detail == "" {
+			detail = "Unspecified error happened with the signer"
+		}
+		errResult = fmt.Errorf("%w %s", cashu.ErrUnknown, detail)
 	}
+	
+	return errResult
 }
 
 func ConvertWitnessToGrpc(spendCondition *cashu.SpendCondition, witness *cashu.Witness) *sig.Witness {

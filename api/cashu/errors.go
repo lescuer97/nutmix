@@ -10,6 +10,7 @@ var (
 	ErrNotEnoughtProofs          = errors.New("Not enought proofs")
 	ErrProofSpent                = errors.New("Proof already spent")
 	ErrBlindMessageAlreadySigned = errors.New("Blind message already signed")
+	ErrUnknown = errors.New("Unknown error")
 )
 
 type ErrorCode int
