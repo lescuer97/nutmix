@@ -35,7 +35,7 @@ jobs:
           tag: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           draft: false
-          prerelease: false
+          prerelease: ${{ endsWith(github.ref_name, '-prelease') }}
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: |
             ./nutmix
