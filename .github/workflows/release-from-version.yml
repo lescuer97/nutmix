@@ -1,12 +1,12 @@
-name: Release from Version File
+name: Release on Tag Push
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*" # Trigger on any tag push
 
 permissions:
-  contents: write # Required to create tags and releases
+  contents: write # Needed to create releases and upload artifacts
 
 jobs:
   release:
@@ -15,59 +15,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read version
-        id: get_version
-        run: |
-          VERSION=$(cat VERSION)
-          echo "Version is $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.23.5"
 
-      - name: install templ
-        run: |
-          go install github.com/a-h/templ/cmd/templ@latest
+      - name: Install templ
+        run: go install github.com/a-h/templ/cmd/templ@latest
 
-      - name: run templ build
-        run: |
-          templ generate .
+      - name: Run templ build
+        run: templ generate .
 
       - name: Build Linux binary
-        run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o nutmix ./cmd/nutmix/main.go
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: nutmix-linux-$VERSION
-          path: ./nutmix
-
-      - name: Check if Tag Exists
-        id: check_tag
-        env:
-          VERSION: ${{ steps.get_version.outputs.version }}
-        run: |
-          if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
-            echo "Tag $VERSION already exists. Updating release."
-            echo "tag_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "tag_exists=false" >> $GITHUB_OUTPUT
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag $VERSION
-            git push origin $VERSION
-          fi
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o nutmix ./cmd/nutmix/main.go
 
       - name: Create or Update GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ steps.get_version.outputs.version }}
-          name: Release ${{ steps.get_version.outputs.version }}
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           draft: false
-          prerelease: false
+          prerelease: ${{ endsWith(github.ref_name, '-prelease') }}
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: |
             ./nutmix
