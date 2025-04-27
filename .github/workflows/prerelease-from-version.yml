@@ -69,3 +69,5 @@ jobs:
           draft: false
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
+          assets: |
+            ./nutmix
