@@ -45,22 +45,23 @@ jobs:
           name: nutmix-linux-$VERSION
           path: ./nutmix
 
-      - name: Create Git Tag
+      - name: Check if Tag Exists
+        id: check_tag
         env:
           VERSION: ${{ steps.get_version.outputs.version }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Check if tag exists
           if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
-            echo "Tag $VERSION already exists - skipping tag creation"
+            echo "Tag $VERSION already exists. Updating release."
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
           else
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
             git tag $VERSION
             git push origin $VERSION
           fi
 
-      - name: Create GitHub Release
+      - name: Create or Update GitHub Release
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.get_version.outputs.version }}
@@ -68,5 +69,6 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
-          assets: |
+          artifacts: |
             ./nutmix
+          allowUpdates: true
