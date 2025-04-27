@@ -32,7 +32,6 @@ jobs:
         run: |
           go install github.com/a-h/templ/cmd/templ@latest
 
-
       - name: Build Linux binary
         run: |
           templ generate .
