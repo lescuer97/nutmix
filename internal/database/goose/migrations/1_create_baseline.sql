@@ -1,4 +1,3 @@
-
 -- +goose Up
 CREATE TABLE "seeds" (
 	seed bytea NOT NULL,

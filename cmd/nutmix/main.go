@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -89,7 +90,7 @@ func main() {
 
 	config, err := mint.SetUpConfigDB(db)
 	if err != nil {
-		log.Fatalf("mint.SetUpConfigFile(): %+v ", err)
+		log.Fatalf("mint.SetUpConfigDB(db): %+v ", err)
 	}
 
 	signer, err := localsigner.SetupLocalSigner(db)
@@ -103,6 +104,14 @@ func main() {
 	if err != nil {
 		logger.Warn(fmt.Sprintf("SetUpMint: %+v ", err))
 		return
+	}
+	if config.MINT_REQUIRE_AUTH {
+		oidcClient, err := oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL)
+		if err != nil {
+			logger.Warn(fmt.Sprintf("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL): %+v ", err))
+			return
+		}
+		mint.OICDClient = oidcClient
 	}
 
 	r := gin.Default()
@@ -122,7 +131,9 @@ func main() {
 
 	admin.AdminRoutes(ctx, r, mint, logger)
 
-	logger.Info("Nutmix started in port 8080")
+	PORT := fmt.Sprintf(":%v", 8081)
 
-	r.Run(":8080")
+	logger.Info(fmt.Sprintf("Nutmix started in port %v", 8081))
+
+	r.Run(PORT)
 }

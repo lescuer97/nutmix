@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
+	"math"
 	"time"
 )
 
@@ -21,13 +22,19 @@ var (
 	ErrKeysetNotFound          = errors.New("Keyset not found")
 	ErrKeysetForProofNotFound  = errors.New("Keyset for proof not found")
 
-	AlreadyActiveProof     = errors.New("Proof already being spent")
-	AlreadyActiveQuote     = errors.New("Quote already being spent")
-	UsingInactiveKeyset    = errors.New("Trying to use an inactive keyset")
-	ErrInvalidProof        = errors.New("Invalid proof")
-	ErrQuoteNotPaid        = errors.New("Quote not paid")
-	ErrMessageAmountToBig  = errors.New("Message amount is to big")
-	ErrInvalidBlindMessage = errors.New("Invalid blind message")
+	AlreadyActiveProof             = errors.New("Proof already being spent")
+	AlreadyActiveQuote             = errors.New("Quote already being spent")
+	UsingInactiveKeyset            = errors.New("Trying to use an inactive keyset")
+	ErrInvalidProof                = errors.New("Invalid proof")
+	ErrQuoteNotPaid                = errors.New("Quote not paid")
+	ErrMessageAmountToBig          = errors.New("Message amount is to big")
+	ErrInvalidBlindMessage         = errors.New("Invalid blind message")
+	ErrCouldNotConvertUnit         = errors.New("Could not convert unit")
+	ErrCouldNotParseAmountToString = errors.New("Could not parse amount to string")
+	ErrUnbalanced                  = errors.New("Unbalanced transactions")
+	ErrNotSameUnits                = errors.New("Not same units")
+	ErrRepeatedOutput              = errors.New("Repeated output")
+	ErrPaymentFailed               = errors.New("Lightning payment failed")
 )
 
 const (
@@ -221,7 +228,6 @@ func (p Proof) VerifyWitness(spendCondition *SpendCondition, witness *Witness, p
 	}
 
 	return ok, nil
-
 }
 
 func (p Proof) parseWitnessAndSecret() (*SpendCondition, *Witness, error) {
@@ -409,7 +415,7 @@ type Keyset struct {
 }
 
 type PostMintQuoteBolt11Request struct {
-	Amount int64  `json:"amount"`
+	Amount uint64 `json:"amount"`
 	Unit   string `json:"unit"`
 }
 
@@ -422,6 +428,7 @@ type PostMintQuoteBolt11Response struct {
 	Unit        string       `json:"unit"`
 	Minted      bool         `json:"minted"`
 	State       ACTION_STATE `json:"state"`
+	Amount      *uint64      `json:"amount,omitempty"`
 }
 type MintRequestDB struct {
 	Quote   string `json:"quote"`
@@ -433,6 +440,8 @@ type MintRequestDB struct {
 	Minted      bool         `json:"minted"`
 	State       ACTION_STATE `json:"state"`
 	SeenAt      int64        `json:"seen_at"`
+	Amount      *uint64      `json:"amount"`
+	CheckingId  string       `json:"checking_id"`
 }
 
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
@@ -444,6 +453,11 @@ func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Respons
 		Unit:        m.Unit,
 		Minted:      m.Minted,
 		State:       m.State,
+	}
+
+	if m.Amount != nil {
+		res.Amount = m.Amount
+
 	}
 	return res
 }
@@ -488,6 +502,7 @@ type MeltRequestDB struct {
 	PaymentPreimage string       `json:"payment_preimage"`
 	SeenAt          int64        `json:"seen_at"`
 	Mpp             bool         `json:"mpp"`
+	CheckingId      string       `json:"checking_id"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
@@ -499,6 +514,8 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		Expiry:          meltRequest.Expiry,
 		State:           meltRequest.State,
 		PaymentPreimage: meltRequest.PaymentPreimage,
+		Request:         meltRequest.Request,
+		Unit:            meltRequest.Unit,
 	}
 
 }
@@ -529,6 +546,8 @@ type PostMeltQuoteBolt11Response struct {
 	Expiry          int64            `json:"expiry"`
 	State           ACTION_STATE     `json:"state"`
 	Change          []BlindSignature `json:"change"`
+	Unit            string           `json:"unit"`
+	Request         string           `json:"request"`
 	PaymentPreimage string           `json:"payment_preimage"`
 }
 
@@ -787,4 +806,59 @@ type MeltChange struct {
 	Id        string `db:"id"`
 	Quote     string `db:"quote"`
 	CreatedAt int64  `json:"created_at" db:"created_at"`
+}
+
+type Amount struct {
+	Unit   Unit
+	Amount uint64
+}
+
+func (a *Amount) To(toUnit Unit) error {
+	if a.Unit == toUnit {
+		return nil
+	}
+	switch toUnit {
+	case Msat:
+		if a.Unit == Sat {
+			a.Unit = toUnit
+			a.Amount = a.Amount * 1000
+			return nil
+		}
+	case Sat:
+		if a.Unit == Msat {
+			a.Unit = toUnit
+			amount := float64(a.Amount) / 1000
+			amount = math.Floor(amount)
+			a.Amount = uint64(amount)
+			return nil
+		}
+	default:
+		return ErrCouldNotConvertUnit
+	}
+	return nil
+}
+func (a *Amount) ToFloatString() (string, error) {
+	if a.Unit == USD || a.Unit == EUR {
+		return a.CentsToUSD()
+	} else if a.Unit == Sat {
+		return a.SatToBTC()
+	} else {
+		return "", fmt.Errorf("Amount must be in satoshis or cents")
+	}
+}
+
+func (a *Amount) SatToBTC() (string, error) {
+	if a.Unit != Sat {
+		return "", ErrCouldNotParseAmountToString
+	}
+	btc := float64(a.Amount) / 1e8
+	return fmt.Sprintf("%.8f", btc), nil
+}
+
+func (a *Amount) CentsToUSD() (string, error) {
+	if a.Unit != USD && a.Unit != EUR {
+		return "", ErrCouldNotParseAmountToString
+	}
+	dollars := float64(a.Amount) / 100
+	return fmt.Sprintf("%.2f", dollars), nil
 }

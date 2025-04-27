@@ -26,8 +26,22 @@ func (m *Mint) GetChangeOutput(messages []cashu.BlindedMessage, overPaidFees uin
 
 	}
 	return []cashu.RecoverSigDB{}, nil
-
 }
+
+func (m *Mint) VerifyUnitSupport(unitStr string) error {
+	unit, err := cashu.UnitFromString(unitStr)
+	if err != nil {
+		return fmt.Errorf(" cashu.UnitFromString(unitStr). %w. %w", err, cashu.ErrUnitNotSupported)
+	}
+
+	supported := m.LightningBackend.VerifyUnitSupport(unit)
+
+	if !supported {
+		return fmt.Errorf(" m.LightningBackend.VerifyUnitSupport(unit). %w. %w", err, cashu.ErrUnitNotSupported)
+	}
+	return nil
+}
+
 func (m *Mint) checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
 
 	units := make(map[string]bool)
@@ -97,7 +111,6 @@ func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicK
 		return unit, fmt.Errorf("m.checkMessagesAreSameUnit(outputs, keysets.Keysets). %w", err)
 	}
 
-	var AmountSignature uint64
 	outputsMap := make(map[string]bool)
 
 	// Check if there is a repeated output
@@ -105,10 +118,9 @@ func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicK
 		exists, _ := outputsMap[output.B_]
 
 		if exists {
-			return unit, fmt.Errorf("Repeated Blind Message")
+			return unit, cashu.ErrRepeatedOutput
 		}
 		outputsMap[output.B_] = true
-		AmountSignature += output.Amount
 	}
 
 	// check if it has been signed before
@@ -127,6 +139,52 @@ func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicK
 	return unit, nil
 }
 
+func (m *Mint) VerifyInputsAndOutputs(proofs cashu.Proofs, outputs []cashu.BlindedMessage) error {
+	keysets, err := m.Signer.GetKeys()
+	if err != nil {
+		return fmt.Errorf("m.Signer.GetKeys(). %w", err)
+	}
+
+	// get unit from proofs
+	proofUnit, err := m.CheckProofsAreSameUnit(proofs, keysets.Keysets)
+	if err != nil {
+		return fmt.Errorf("m.CheckProofsAreSameUnit(proofs, keysets.Keysets). %w", err)
+	}
+
+	outputUnit, err := m.VerifyOutputs(outputs, keysets.Keysets)
+	if err != nil {
+		return fmt.Errorf("m.VerifyOutputs(outputs). %w", err)
+	}
+
+	if proofUnit != outputUnit {
+		return fmt.Errorf("proofUnit != messageUnit. %w", cashu.ErrNotSameUnits)
+	}
+
+	// check for needed amount of fees
+	fee, err := cashu.Fees(proofs, keysets.Keysets)
+	if err != nil {
+		return fmt.Errorf("cashu.Fees(proofs, keysets.Keysets). %w", err)
+	}
+
+	var AmountSignature uint64
+	// Check out amount signature
+	for _, output := range outputs {
+		AmountSignature += output.Amount
+	}
+
+	balance := (proofs.Amount() - (uint64(fee) + AmountSignature))
+	if balance != 0 {
+		return fmt.Errorf("(proofs.Amount() - (uint64(fee) + AmountSignature)). %w %w", err, cashu.ErrUnbalanced)
+	}
+
+	err = m.Signer.VerifyProofs(proofs, outputs)
+
+	if err != nil {
+		return fmt.Errorf("m.Signer.VerifyProofs(proofs, outputs). %w", err)
+	}
+
+	return nil
+}
 func (m *Mint) IsInternalTransaction(request string) (bool, error) {
 	ctx := context.Background()
 	tx, err := m.MintDB.GetTx(context.Background())

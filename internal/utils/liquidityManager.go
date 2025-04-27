@@ -73,4 +73,5 @@ type LiquiditySwap struct {
 	Type             SwapType  `json"type"`
 	Expiration       uint64    `json"expiration"`
 	LightningInvoice string    `db:"lightning_invoice"`
+	CheckingId       string    `db:"checking_id"`
 }
