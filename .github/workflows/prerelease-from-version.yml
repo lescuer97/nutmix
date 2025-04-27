@@ -32,10 +32,13 @@ jobs:
         run: |
           go install github.com/a-h/templ/cmd/templ@latest
 
-      - name: Build Linux binary
+      - name: run templ build
         run: |
           templ generate .
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o nutmix
+
+      - name: Build Linux binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o nutmix ./cmd/nutmix/main.go
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
