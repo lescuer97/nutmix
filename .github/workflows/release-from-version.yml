@@ -1,0 +1,63 @@
+name: Release from Version File
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write # Required to create tags and releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Read version
+        id: get_version
+        run: |
+          VERSION=$(cat VERSION)
+          echo "Version is $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.23.5"
+
+      - name: Build Linux binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o nutmix
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: nutmix-linux-$VERSION
+          path: ./nutmix
+
+      - name: Create Git Tag
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Check if tag exists
+          if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists - skipping tag creation"
+          else
+            git tag $VERSION
+            git push origin $VERSION
+          fi
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.get_version.outputs.version }}
+          name: Release ${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
