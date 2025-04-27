@@ -24,16 +24,22 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: "1.23.5"
 
+      - name: install templ
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+
+
       - name: Build Linux binary
         run: |
+          templ generate .
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o nutmix
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: nutmix-linux-$VERSION
           path: ./nutmix
