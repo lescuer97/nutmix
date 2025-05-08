@@ -31,7 +31,6 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 	}
 }
 func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
-
 	return func(c *gin.Context) {
 		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
@@ -49,7 +48,6 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 					Active: seed.Active,
 					Unit:   seed.Unit,
 					Fees:   seed.InputFeePpk,
-
 				})
 
 				keysetMap[seed.Unit] = val
@@ -61,7 +59,6 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 						Active: seed.Active,
 						Unit:   seed.Unit,
 						Fees:   seed.InputFeePpk,
-
 					},
 				}
 			}

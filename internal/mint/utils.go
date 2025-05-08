@@ -42,7 +42,6 @@ func (m *Mint) VerifyUnitSupport(unitStr string) error {
 }
 
 func (m *Mint) checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
-
 	units := make(map[string]bool)
 
 	seenKeys := make(map[string]cashu.BasicKeysetResponse)

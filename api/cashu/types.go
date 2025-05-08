@@ -34,7 +34,7 @@ var (
 	ErrUnbalanced                  = errors.New("Unbalanced transactions")
 	ErrNotSameUnits                = errors.New("Not same units")
 	ErrRepeatedOutput              = errors.New("Duplicate outputs provided")
-	ErrRepeatedInput              = errors.New("Duplicate inputs provided")
+	ErrRepeatedInput               = errors.New("Duplicate inputs provided")
 	ErrPaymentFailed               = errors.New("Lightning payment failed")
 )
 

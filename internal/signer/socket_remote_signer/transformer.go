@@ -140,7 +140,7 @@ func CheckIfSignerErrorExists(err *sig.Error) error {
 		}
 		errResult = fmt.Errorf("%w %s", cashu.ErrUnknown, detail)
 	}
-	
+
 	return errResult
 }
 
