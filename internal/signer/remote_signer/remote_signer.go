@@ -1,4 +1,4 @@
-package socketremotesigner
+package remotesigner
 
 import (
 	"context"
@@ -31,14 +31,21 @@ type SocketSigner struct {
 
 const abstractSocket = "unix:@signer_socket"
 
-func SetupSocketSigner() (SocketSigner, error) {
+func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (SocketSigner, error) {
 	socketSigner := SocketSigner{}
 
 	certs, err := GetTlsSecurityCredential()
 	if err != nil {
 		return socketSigner, fmt.Errorf("GetTlsSecurityCredential(). %w", err)
 	}
-	conn, err := grpc.NewClient(abstractSocket,
+
+
+	target := abstractSocket
+	if connectToNetwork {
+		target = networkAddress
+	}
+
+	conn, err := grpc.NewClient(target,
 		grpc.WithTransportCredentials(certs))
 
 	if err != nil {

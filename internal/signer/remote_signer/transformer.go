@@ -1,4 +1,4 @@
-package socketremotesigner
+package remotesigner
 
 import (
 	"encoding/hex"

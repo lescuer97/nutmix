@@ -20,7 +20,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/signer"
 
 	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
-	socketremotesigner "github.com/lescuer97/nutmix/internal/signer/socket_remote_signer"
+	remoteSigner "github.com/lescuer97/nutmix/internal/signer/remote_signer"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -157,13 +157,18 @@ func GetSignerFromValue(signerType string, db database.MintDB) (signer.Signer, e
 		}
 		return &signer, nil
 	case AbstractSocketSigner:
-		signer, err := socketremotesigner.SetupSocketSigner()
+		signer, err := remoteSigner.SetupRemoteSigner(false, os.Getenv("NETWORK_SIGNER_ADDRESS"))
 		if err != nil {
 			return &signer, fmt.Errorf("socketremotesigner.SetupSocketSigner(): %+v ", err)
 		}
 		return &signer, nil
 
-	// case NetworkSigner:
+	case NetworkSigner:
+		signer, err := remoteSigner.SetupRemoteSigner(true, os.Getenv("NETWORK_SIGNER_ADDRESS"))
+		if err != nil {
+			return &signer, fmt.Errorf("socketremotesigner.SetupSocketSigner(): %+v ", err)
+		}
+		return &signer, nil
 
 	default:
 		return nil, fmt.Errorf("No signer type has been selected")
