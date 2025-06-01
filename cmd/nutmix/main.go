@@ -12,11 +12,14 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/database/postgresql"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
-	// localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
+	"github.com/lescuer97/nutmix/internal/signer"
+
+	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
 	socketremotesigner "github.com/lescuer97/nutmix/internal/signer/socket_remote_signer"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
@@ -30,13 +33,11 @@ var (
 func main() {
 
 	logsdir, err := utils.GetLogsDirectory()
-
 	if err != nil {
 		log.Panicln("Could not get Logs directory")
 	}
 
 	err = utils.CreateDirectoryAndPath(logsdir, mint.LogFileName)
-
 	if err != nil {
 		log.Panicf("utils.CreateDirectoryAndPath(pathToProjectDir, logFileName ) %+v", err)
 	}
@@ -98,18 +99,13 @@ func main() {
 		log.Fatalf("mint.SetUpConfigDB(db): %+v ", err)
 	}
 
-	// signer, err := localsigner.SetupLocalSigner(db)
-	// if err != nil {
-	// 	log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
-	// }
-
-	signer, err := socketremotesigner.SetupSocketSigner()
+	signer, err := GetSignerFromValue(os.Getenv("SIGNER_TYPE"), db)
 	if err != nil {
-		log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
+		log.Fatalf("signer.GetSignerFromValue(os.Getenv(), db): %+v ", err)
 	}
 
 	// remove mint private key from variable
-	mint, err := mint.SetUpMint(ctx, config, db, &signer)
+	mint, err := mint.SetUpMint(ctx, config, db, signer)
 
 	if err != nil {
 		logger.Warn(fmt.Sprintf("SetUpMint: %+v ", err))
@@ -146,4 +142,31 @@ func main() {
 	logger.Info(fmt.Sprintf("Nutmix started in port %v", 8081))
 
 	r.Run(PORT)
+}
+
+const MemorySigner = "memory"
+const AbstractSocketSigner = "abstract_socket"
+const NetworkSigner = "network"
+
+func GetSignerFromValue(signerType string, db database.MintDB) (signer.Signer, error) {
+	switch signerType {
+	case MemorySigner:
+		signer, err := localsigner.SetupLocalSigner(db)
+		if err != nil {
+			return &signer, fmt.Errorf("localsigner.SetupLocalSigner(db): %+v ", err)
+		}
+		return &signer, nil
+	case AbstractSocketSigner:
+		signer, err := socketremotesigner.SetupSocketSigner()
+		if err != nil {
+			return &signer, fmt.Errorf("socketremotesigner.SetupSocketSigner(): %+v ", err)
+		}
+		return &signer, nil
+
+	// case NetworkSigner:
+
+	default:
+		return nil, fmt.Errorf("No signer type has been selected")
+	}
+
 }

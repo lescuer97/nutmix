@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -14,7 +15,7 @@ import (
 )
 
 type MintPublicKeyset struct {
-	Id          string
+	Id          []byte
 	Unit        string
 	Active      bool
 	Keys        map[uint64]string
@@ -107,10 +108,10 @@ func (s *SocketSigner) setupSignerPubkeys() error {
 		mintKeyset.Keys = stringKeys
 
 		if mintKeyset.Active {
-			s.activeKeysets[mintKeyset.Id] = mintKeyset
+			s.activeKeysets[hex.EncodeToString(mintKeyset.Id)] = mintKeyset
 		}
 
-		s.keysets[mintKeyset.Id] = mintKeyset
+		s.keysets[hex.EncodeToString(mintKeyset.Id)] = mintKeyset
 	}
 	return nil
 }
@@ -137,7 +138,7 @@ func (s *SocketSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 
 	var response signer.GetKeysetsResponse
 	for _, seed := range s.keysets {
-		response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+		response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(seed.Id), Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
 	}
 	return response, nil
 }
@@ -151,10 +152,11 @@ func (s *SocketSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 		return fmt.Errorf("ConvertCashuUnitToSignature(unit). %w", err)
 	}
 
+	amounts := GetAmountsFromMaxOrder(32)
 	rotationReq := sig.RotationRequest{
 		Unit:        unitSig,
 		InputFeePpk: uint64(fee),
-		MaxOrder:    32,
+		Amounts:     amounts,
 	}
 	rotationResponse, err := s.grpcClient.RotateKeyset(ctx, &rotationReq)
 	if err != nil {
@@ -184,10 +186,14 @@ func (s *SocketSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 		if err != nil {
 			return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("hex.DecodeString(val.B_). %w", err)
 		}
+		bytesId, err := hex.DecodeString(val.Id)
+		if err != nil {
+			return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("hex.DecodeString(val.Id). %w", err)
+		}
 
 		blindedMessageRequest.BlindedMessages = append(blindedMessageRequest.BlindedMessages, &sig.BlindedMessage{
 			Amount:        val.Amount,
-			KeysetId:      val.Id,
+			KeysetId:      bytesId,
 			BlindedSecret: B_,
 			// Witness: &sig.Witness{} val.Witness,
 		})
@@ -237,25 +243,29 @@ func (s *SocketSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.
 		if err != nil {
 			return fmt.Errorf("hex.DecodeString(val.C). %w", err)
 		}
-		checkOutputs := false
-		isProofLocked, spendCondition, witness, err := val.IsProofSpendConditioned(&checkOutputs)
+		// checkOutputs := false
+		// isProofLocked, spendCondition, witness, err := val.IsProofSpendConditioned(&checkOutputs)
 
 		if err != nil {
 			return fmt.Errorf("proof.IsProofSpendConditioned(): %w %w", err, cashu.ErrInvalidProof)
 		}
 
-		var sigWitness *sig.Witness = nil
-
-		if isProofLocked {
-			sigWitness = ConvertWitnessToGrpc(spendCondition, witness)
+		bytesId, err := hex.DecodeString(val.Id)
+		if err != nil {
+			return fmt.Errorf("hex.DecodeString(val.Id). %w", err)
 		}
+
+		// var sigWitness *sig.Witness = nil
+		//
+		// if isProofLocked {
+		// 	sigWitness = ConvertWitnessToGrpc(spendCondition, witness)
+		// }
 
 		proofsVericationRequest.Proof[i] = &sig.Proof{
 			Amount:   val.Amount,
-			KeysetId: val.Id,
+			KeysetId: bytesId,
 			C:        C,
 			Secret:   []byte(val.Secret),
-			Witness:  sigWitness,
 		}
 	}
 
@@ -312,8 +322,17 @@ func (l *SocketSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	var response signer.GetKeysetsResponse
 	for _, key := range l.keysets {
 		if key.Unit == cashu.AUTH.String() {
-			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: key.Id, Unit: key.Unit, Active: key.Active, InputFeePpk: key.InputFeePpk})
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(key.Id), Unit: key.Unit, Active: key.Active, InputFeePpk: key.InputFeePpk})
 		}
 	}
 	return response, nil
+}
+
+func GetAmountsFromMaxOrder(max_order uint32) []uint64 {
+	keys := make([]uint64, 0)
+
+	for i := 0; i < int(max_order); i++ {
+		keys = append(keys, uint64(math.Pow(2, float64(i))))
+	}
+	return keys
 }

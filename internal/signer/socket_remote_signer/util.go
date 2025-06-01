@@ -3,6 +3,7 @@ package socketremotesigner
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"log"
 	"os"
 
@@ -56,7 +57,7 @@ func OrderKeysetByUnit(keysets []MintPublicKeyset) signer.GetKeysResponse {
 	for _, unitKeysets := range typesOfUnits {
 		for _, mintKey := range unitKeysets {
 			keyset := signer.KeysetResponse{}
-			keyset.Id = mintKey.Id
+			keyset.Id = hex.EncodeToString(mintKey.Id)
 			keyset.Unit = mintKey.Unit
 			keyset.Keys = mintKey.Keys
 			res.Keysets = append(res.Keysets, keyset)

@@ -25,7 +25,7 @@ func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) []ca
 			E: secp256k1.PrivKeyFromBytes(val.Dleq.E),
 			S: secp256k1.PrivKeyFromBytes(val.Dleq.S),
 		}
-		blindSigs = append(blindSigs, cashu.BlindSignature{Amount: val.Amount, C_: hex.EncodeToString(val.BlindedSecret), Id: val.KeysetId, Dleq: &dleq})
+		blindSigs = append(blindSigs, cashu.BlindSignature{Amount: val.Amount, C_: hex.EncodeToString(val.BlindedSecret), Id: hex.EncodeToString(val.KeysetId), Dleq: &dleq})
 	}
 
 	return blindSigs
@@ -41,10 +41,14 @@ func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.Blinded
 		if err != nil {
 			return &messagesGrpc, fmt.Errorf("hex.DecodeString(val.B_). %w", err)
 		}
+		idBytes, err := hex.DecodeString(val.Id)
+		if err != nil {
+			return &messagesGrpc, fmt.Errorf("hex.DecodeString(val.Id). %w", err)
+		}
 
 		messagesGrpc.BlindedMessages[i] = &sig.BlindedMessage{
 			Amount:        val.Amount,
-			KeysetId:      val.Id,
+			KeysetId:      idBytes,
 			BlindedSecret: B_,
 			// Witness: &sig.Witness{} val.Witness,
 		}
@@ -56,13 +60,13 @@ func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.Blinded
 func ConvertCashuUnitToSignature(unit cashu.Unit) (*sig.CurrencyUnit, error) {
 	switch unit {
 	case cashu.Sat:
-		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_SAT}}, nil
+		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_SAT}}, nil
 	case cashu.Msat:
-		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_MSAT}}, nil
+		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_MSAT}}, nil
 	case cashu.EUR:
-		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_EUR}}, nil
+		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_EUR}}, nil
 	case cashu.AUTH:
-		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_AUTH}}, nil
+		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_AUTH}}, nil
 
 	default:
 		return nil, fmt.Errorf("No available unit.")
@@ -71,15 +75,15 @@ func ConvertCashuUnitToSignature(unit cashu.Unit) (*sig.CurrencyUnit, error) {
 
 func ConvertSigUnitToCashuUnit(sigUnit *sig.CurrencyUnit) (cashu.Unit, error) {
 	switch sigUnit.GetUnit().Number() {
-	case sig.CurrencyUnitType_SAT.Enum().Number():
+	case sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_SAT.Enum().Number():
 		return cashu.Sat, nil
-	case sig.CurrencyUnitType_MSAT.Enum().Number():
+	case sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_MSAT.Enum().Number():
 		return cashu.Msat, nil
-	case sig.CurrencyUnitType_EUR.Enum().Number():
+	case sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_EUR.Enum().Number():
 		return cashu.EUR, nil
-	case sig.CurrencyUnitType_USD.Enum().Number():
+	case sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_USD.Enum().Number():
 		return cashu.USD, nil
-	case sig.CurrencyUnitType_AUTH.Enum().Number():
+	case sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_AUTH.Enum().Number():
 		return cashu.AUTH, nil
 
 	default:
@@ -101,17 +105,17 @@ func CheckIfSignerErrorExists(err *sig.Error) error {
 	var errResult error
 
 	switch err.Code {
-	case sig.ErrorCode_AMOUNT_OUTSIDE_LIMIT:
+	case sig.ErrorCode_ERROR_CODE_AMOUNT_OUTSIDE_LIMIT:
 		errResult = fmt.Errorf("%w: %s", cashu.ErrMessageAmountToBig, err.Detail)
-	case sig.ErrorCode_DUPLICATE_INPUTS_PROVIDED:
+	case sig.ErrorCode_ERROR_CODE_DUPLICATE_INPUTS_PROVIDED:
 		errResult = fmt.Errorf("%w: %s", cashu.ErrRepeatedInput, err.Detail)
-	case sig.ErrorCode_DUPLICATE_OUTPUTS_PROVIDED:
+	case sig.ErrorCode_ERROR_CODE_DUPLICATE_OUTPUTS_PROVIDED:
 		errResult = fmt.Errorf("%w: %s", cashu.ErrRepeatedOutput, err.Detail)
-	case sig.ErrorCode_KEYSET_NOT_KNOWN:
+	case sig.ErrorCode_ERROR_CODE_KEYSET_NOT_KNOWN:
 		errResult = fmt.Errorf("%w: %s", cashu.ErrKeysetNotFound, err.Detail)
-	case sig.ErrorCode_KEYSET_INACTIVE:
+	case sig.ErrorCode_ERROR_CODE_KEYSET_INACTIVE:
 		errResult = fmt.Errorf("%w: %s", cashu.UsingInactiveKeyset, err.Detail)
-	case sig.ErrorCode_MINTING_DISABLED:
+	case sig.ErrorCode_ERROR_CODE_MINTING_DISABLED:
 		detail := err.Detail
 		if detail == "" {
 			detail = "Minting is disabled for this keyset"
@@ -119,15 +123,15 @@ func CheckIfSignerErrorExists(err *sig.Error) error {
 		// Using a custom error since there's no established error for this in the cashu package
 		mintingDisabledErr := errors.New("Minting disabled")
 		errResult = fmt.Errorf("%w: %s", mintingDisabledErr, detail)
-	case sig.ErrorCode_COULD_NOT_ROTATE_KEYSET:
+	case sig.ErrorCode_ERROR_CODE_COULD_NOT_ROTATE_KEYSET:
 		errResult = fmt.Errorf("Could not rotate keyset: %s", err.Detail)
-	case sig.ErrorCode_INVALID_PROOF:
+	case sig.ErrorCode_ERROR_CODE_INVALID_PROOF:
 		errResult = fmt.Errorf("%w: %s", cashu.ErrInvalidProof, err.Detail)
-	case sig.ErrorCode_INVALID_BLIND_MESSAGE:
+	case sig.ErrorCode_ERROR_CODE_INVALID_BLIND_MESSAGE:
 		errResult = fmt.Errorf("%w: %s", cashu.ErrInvalidBlindMessage, err.Detail)
-	case sig.ErrorCode_UNIT_NOT_SUPPORTED:
+	case sig.ErrorCode_ERROR_CODE_UNIT_NOT_SUPPORTED:
 		errResult = cashu.ErrUnitNotSupported
-	case sig.ErrorCode_UNKNOWN:
+	case sig.ErrorCode_ERROR_CODE_UNSPECIFIED:
 		detail := err.Detail
 		if detail == "" {
 			detail = "Unknown error occurred with the signer"
