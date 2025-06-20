@@ -1,14 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
@@ -21,6 +18,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
+	"github.com/lescuer97/nutmix/internal/routes/middleware"
 	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
@@ -31,17 +29,6 @@ var (
 	MINT_PRIVATE_KEY_ENV = "MINT_PRIVATE_KEY"
 )
 
-// responseWriter is a custom response writer that captures the response body
-// shameless copy from https://stackoverflow.com/questions/61337843/how-to-read-the-post-request-body-in-a-gin-middleware-without-breaking-the-app
-type responseWriter struct {
-	gin.ResponseWriter
-	body *bytes.Buffer
-}
-
-func (w responseWriter) Write(b []byte) (int, error) {
-	w.body.Write(b)
-	return w.ResponseWriter.Write(b)
-}
 
 func main() {
 
@@ -141,49 +128,8 @@ func main() {
 	r.Use(cors.Default())
 
 	store := persistence.NewInMemoryStore(45 * time.Minute)
-	cachedPaths := map[string]bool{
-		"/v1/bolt11/mint": true,
-		"/v1/bolt11/melt": true,
-		"/v1/swap":        true,
-	}
 
-	r.Use(func(c *gin.Context) {
-		if !cachedPaths[c.Request.URL.Path] {
-			c.Next()
-			return
-		}
-
-		// Read the request body
-		body, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			c.Next()
-			return
-		}
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
-
-		// Create a cache key that includes the request body
-		hash := sha256.Sum256(body)
-		cacheKey := c.Request.URL.Path + "-" + fmt.Sprintf("%x", hash)
-
-		// Check if the response is in the cache
-		var cachedResponse []byte
-		if err := store.Get(cacheKey, &cachedResponse); err == nil {
-			c.Data(http.StatusOK, "application/json; charset=utf-8", cachedResponse)
-			c.Abort()
-			return
-		}
-
-		// a custom response writer to capture the response
-		w := &responseWriter{body: &bytes.Buffer{}, ResponseWriter: c.Writer}
-		c.Writer = w
-
-		c.Next()
-
-		// Cache the response only if the status is 200
-		if c.Writer.Status() == http.StatusOK {
-			store.Set(cacheKey, w.body.Bytes(), 45*time.Minute)
-		}
-	})
+	r.Use(middleware.CacheMiddleware(store))
 
 	err = mint.CheckPendingQuoteAndProofs(logger)
 	if err != nil {
