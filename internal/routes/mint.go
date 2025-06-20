@@ -3,21 +3,15 @@ package routes
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"time"
-
-	nutmixcache "github.com/lescuer97/nutmix/caching-middleware"
-	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"log/slog"
 )
 
 func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
-
-	store := persistence.NewInMemoryStore(45 * time.Minute)
 
 	v1.GET("/keys", func(c *gin.Context) {
 
@@ -223,7 +217,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		c.JSON(200, response)
 	})
 
-	v1.GET("/swap", nutmixcache.Cache200(store, 45*time.Minute, func(c *gin.Context) {
+	v1.POST("/swap", func(c *gin.Context) {
 		var swapRequest cashu.PostSwapRequest
 
 		err := c.BindJSON(&swapRequest)
@@ -328,7 +322,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		mint.Observer.SendProofsEvent(swapRequest.Inputs)
 		c.JSON(200, response)
-	}))
+	})
 
 	v1.POST("/checkstate", func(c *gin.Context) {
 		var checkStateRequest cashu.PostCheckStateRequest

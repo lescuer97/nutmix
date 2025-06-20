@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	nutmixcache "github.com/lescuer97/nutmix/caching-middleware"
-	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
@@ -21,8 +19,6 @@ import (
 
 func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
-
-	store := persistence.NewInMemoryStore(45 * time.Minute)
 
 	v1.POST("/mint/quote/bolt11", func(c *gin.Context) {
 		var mintRequest cashu.PostMintQuoteBolt11Request
@@ -183,7 +179,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		c.JSON(200, quote.PostMintQuoteBolt11Response())
 	})
 
-	v1.POST("/mint/bolt11", nutmixcache.Cache200(store, 45*time.Minute, func(c *gin.Context) {
+	v1.POST("/mint/bolt11", func(c *gin.Context) {
 		var mintRequest cashu.PostMintBolt11Request
 
 		err := c.BindJSON(&mintRequest)
@@ -325,7 +321,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		c.JSON(200, cashu.PostMintBolt11Response{
 			Signatures: blindedSignatures,
 		})
-	}))
+	})
 
 	v1.POST("/melt/quote/bolt11", func(c *gin.Context) {
 		var meltRequest cashu.PostMeltQuoteBolt11Request
@@ -488,7 +484,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		c.JSON(200, quote.GetPostMeltQuoteResponse())
 	})
 
-	v1.POST("/melt/bolt11", nutmixcache.Cache200(store, 45*time.Minute, func(c *gin.Context) {
+	v1.POST("/melt/bolt11", func(c *gin.Context) {
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
 		if err != nil {
@@ -506,5 +502,5 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		c.JSON(200, quote)
-	}))
+	})
 }
