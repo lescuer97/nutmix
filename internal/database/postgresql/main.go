@@ -220,13 +220,13 @@ func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintReques
 	var mintRequest cashu.MintRequestDB
 	for rows.Next() {
 		var pubkeyBytes []byte
-		var amount uint64
+		var amount *uint64
 		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &pubkeyBytes)
 		if err != nil {
 			return mintRequest, databaseError(fmt.Errorf("rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, pubkeyBytes ): %w", err))
 		}
 
-		mintRequest.Amount = &amount
+		mintRequest.Amount = amount
 
 		if pubkeyBytes != nil || len(pubkeyBytes) > 0 {
 			pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
@@ -253,13 +253,13 @@ func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.
 	var mintRequest cashu.MintRequestDB
 	for rows.Next() {
 		var pubkeyBytes []byte
-		var amount uint64
+		var amount *uint64
 		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &pubkeyBytes)
 		if err != nil {
 			return mintRequest, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
 		}
 
-		mintRequest.Amount = &amount
+		mintRequest.Amount = amount
 
 		if pubkeyBytes != nil {
 			pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
