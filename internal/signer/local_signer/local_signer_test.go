@@ -116,7 +116,7 @@ func TestRotateAuthSeedUnit(t *testing.T) {
 		t.Errorf("Should be Auth key: it is %v", keys.Keysets[0].Unit)
 	}
 
-	_, ok := keys.Keysets[0].Keys["1"]
+	_, ok := keys.Keysets[0].Keys[1]
 	if !ok {
 		t.Errorf("We should have a keysey of value 1. %+v", keys.Keysets[0])
 	}
