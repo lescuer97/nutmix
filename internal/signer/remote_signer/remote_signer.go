@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/lescuer97/nutmix/api/cashu"
 	sig "github.com/lescuer97/nutmix/internal/gen"
 	"github.com/lescuer97/nutmix/internal/signer"
@@ -238,20 +239,48 @@ func (s *SocketSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 
 	return blindSigs, recoverySigs, nil
 }
+func (l *SocketSigner) validateIfLockedProof(proof cashu.Proof, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
+
+	// check if a proof is locked to a spend condition and verifies it
+	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
+
+	if err != nil {
+		return fmt.Errorf("proof.IsProofSpendConditioned(): %w %w", err, cashu.ErrInvalidProof)
+	}
+
+	if isProofLocked {
+		ok, err := proof.VerifyWitness(spendCondition, witness, pubkeysFromProofs)
+
+		if err != nil {
+			return fmt.Errorf("proof.VerifyWitnessSig(): %w", err)
+		}
+
+		if !ok {
+			return cashu.ErrInvalidProof
+		}
+	}
+	return nil
+}
 
 func (s *SocketSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage) error {
 
 	ctx := context.Background()
+	// INFO: we verify locally if the proofs are locked and valid before sending to the crypto signer
 	proofsVericationRequest := sig.Proofs{}
 
 	proofsVericationRequest.Proof = make([]*sig.Proof, len(proofs))
+	pubkeysFromProofs := make(map[*btcec.PublicKey]bool)
+	verifyOutputs := false
 	for i, val := range proofs {
+		err := s.validateIfLockedProof(val, &verifyOutputs, &pubkeysFromProofs)
+		if err != nil {
+			return fmt.Errorf("s.validateIfLockedProof(val, &verifyOutputs, &pubkeysFromProofs). %w", err)
+		}
+
 		C, err := hex.DecodeString(val.C)
 		if err != nil {
 			return fmt.Errorf("hex.DecodeString(val.C). %w", err)
 		}
-		// checkOutputs := false
-		// isProofLocked, spendCondition, witness, err := val.IsProofSpendConditioned(&checkOutputs)
 
 		if err != nil {
 			return fmt.Errorf("proof.IsProofSpendConditioned(): %w %w", err, cashu.ErrInvalidProof)
@@ -261,12 +290,6 @@ func (s *SocketSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.
 		if err != nil {
 			return fmt.Errorf("hex.DecodeString(val.Id). %w", err)
 		}
-
-		// var sigWitness *sig.Witness = nil
-		//
-		// if isProofLocked {
-		// 	sigWitness = ConvertWitnessToGrpc(spendCondition, witness)
-		// }
 
 		proofsVericationRequest.Proof[i] = &sig.Proof{
 			Amount:   val.Amount,
