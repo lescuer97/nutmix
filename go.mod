@@ -6,7 +6,7 @@ toolchain go1.24.3
 
 require (
 	github.com/BurntSushi/toml v1.4.0
-	github.com/a-h/templ v0.3.819
+	github.com/a-h/templ v0.3.898
 	github.com/btcsuite/btcd v0.24.2-beta.rc1.0.20240403021926-ae5533602c46
 	github.com/btcsuite/btcd/btcec/v2 v2.3.3
 	github.com/btcsuite/btcd/btcutil v1.1.5
@@ -226,7 +226,7 @@ require (
 	golang.org/x/arch v0.17.0 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8 // indirect
-	golang.org/x/mod v0.20.0 // indirect
+	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
@@ -234,7 +234,7 @@ require (
 	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.24.0 // indirect
+	golang.org/x/tools v0.32.0 // indirect
 	google.golang.org/genproto v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
