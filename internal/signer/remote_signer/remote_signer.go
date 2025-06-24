@@ -23,7 +23,7 @@ type MintPublicKeyset struct {
 	InputFeePpk uint
 }
 
-type SocketSigner struct {
+type RemoteSigner struct {
 	grpcClient    sig.SignerServiceClient
 	activeKeysets map[string]MintPublicKeyset
 	keysets       map[string]MintPublicKeyset
@@ -32,14 +32,13 @@ type SocketSigner struct {
 
 const abstractSocket = "unix:@signer_socket"
 
-func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (SocketSigner, error) {
-	socketSigner := SocketSigner{}
+func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (RemoteSigner, error) {
+	socketSigner := RemoteSigner{}
 
 	certs, err := GetTlsSecurityCredential()
 	if err != nil {
 		return socketSigner, fmt.Errorf("GetTlsSecurityCredential(). %w", err)
 	}
-
 
 	target := abstractSocket
 	if connectToNetwork {
@@ -68,13 +67,15 @@ func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (SocketSign
 }
 
 // gets all active keys
-func (s *SocketSigner) setupSignerPubkeys() error {
+func (s *RemoteSigner) setupSignerPubkeys() error {
 
 	ctx := context.Background()
 	emptyRequest := sig.EmptyRequest{}
+
 	keys, err := s.grpcClient.Keysets(ctx, &emptyRequest)
+	// log.Printf("keys: %+v", keys)
 	if err != nil {
-		return fmt.Errorf("s.grpcClient.Pubkey(ctx, &emptyRequest). %w", err)
+		return fmt.Errorf("s.grpcClient.Keysets(ctx, &emptyRequest). %w", err)
 	}
 
 	err = CheckIfSignerErrorExists(keys.GetError())
@@ -125,7 +126,7 @@ func (s *SocketSigner) setupSignerPubkeys() error {
 }
 
 // gets all active keys
-func (s *SocketSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
+func (s *RemoteSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
 	var keys []MintPublicKeyset
 	for _, keyset := range s.activeKeysets {
 		keys = append(keys, keyset)
@@ -133,7 +134,7 @@ func (s *SocketSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
 	return OrderKeysetByUnit(keys), nil
 }
 
-func (s *SocketSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
+func (s *RemoteSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 	val, exists := s.keysets[id]
 	if exists {
 		return OrderKeysetByUnit([]MintPublicKeyset{val}), nil
@@ -142,7 +143,7 @@ func (s *SocketSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 }
 
 // gets all keys from the signer
-func (s *SocketSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
+func (s *RemoteSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 
 	var response signer.GetKeysetsResponse
 	for _, seed := range s.keysets {
@@ -151,7 +152,7 @@ func (s *SocketSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 	return response, nil
 }
 
-func (s *SocketSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
+func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 
 	ctx := context.Background()
 
@@ -183,7 +184,7 @@ func (s *SocketSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 	return nil
 }
 
-func (s *SocketSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
+func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
 
 	ctx := context.Background()
 	blindedMessageRequest := sig.BlindedMessages{}
@@ -239,7 +240,7 @@ func (s *SocketSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 
 	return blindSigs, recoverySigs, nil
 }
-func (l *SocketSigner) validateIfLockedProof(proof cashu.Proof, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
+func (l *RemoteSigner) validateIfLockedProof(proof cashu.Proof, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
 
 	// check if a proof is locked to a spend condition and verifies it
 	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
@@ -262,7 +263,7 @@ func (l *SocketSigner) validateIfLockedProof(proof cashu.Proof, checkOutputs *bo
 	return nil
 }
 
-func (s *SocketSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage) error {
+func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage) error {
 
 	ctx := context.Background()
 	// INFO: we verify locally if the proofs are locked and valid before sending to the crypto signer
@@ -315,13 +316,13 @@ func (s *SocketSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.
 	return nil
 }
 
-func (s *SocketSigner) GetSignerPubkey() (string, error) {
+func (s *RemoteSigner) GetSignerPubkey() (string, error) {
 
 	return hex.EncodeToString(s.pubkey), nil
 }
 
 // gets all active keys
-func (l *SocketSigner) GetAuthActiveKeys() (signer.GetKeysResponse, error) {
+func (l *RemoteSigner) GetAuthActiveKeys() (signer.GetKeysResponse, error) {
 	var keys []MintPublicKeyset
 	for _, keyset := range l.activeKeysets {
 		if keyset.Unit == cashu.AUTH.String() {
@@ -336,7 +337,7 @@ func (l *SocketSigner) GetAuthActiveKeys() (signer.GetKeysResponse, error) {
 	return OrderKeysetByUnit(keys), nil
 }
 
-func (s *SocketSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error) {
+func (s *RemoteSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error) {
 
 	val, exists := s.keysets[id]
 	if exists {
@@ -348,7 +349,7 @@ func (s *SocketSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error
 }
 
 // gets all keys from the signer
-func (l *SocketSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
+func (l *RemoteSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	var response signer.GetKeysetsResponse
 	for _, key := range l.keysets {
 		if key.Unit == cashu.AUTH.String() {

@@ -12,14 +12,27 @@ import (
 )
 
 func GetTlsSecurityCredential() (credentials.TransportCredentials, error) {
+
+	tlsCertPath := os.Getenv("SIGNER_CLIENT_TLS_KEY")
+	if tlsCertPath == "" {
+		log.Panic("SIGNER_CLIENT_TLS_KEY path not available.")
+	}
+	tlsKeyPath := os.Getenv("SIGNER_CLIENT_TLS_CERT")
+	if tlsKeyPath == "" {
+		log.Panic("SIGNER_CLIENT_TLS_CERT path not available.")
+	}
+	caCertPath := os.Getenv("SIGNER_CA_CERT")
+	if caCertPath == "" {
+		log.Panic("SIGNER_CA_CERT path not available.")
+	}
 	// Load server certificate and key
-	serverCert, err := tls.LoadX509KeyPair("tls/client-cert.pem", "tls/client-key.pem")
+	serverCert, err := tls.LoadX509KeyPair(tlsCertPath, tlsKeyPath)
 	if err != nil {
 		log.Fatalf("Failed to load server cert: %v", err)
 	}
 
 	// Load CA certificate
-	caCert, err := os.ReadFile("tls/ca-cert.pem")
+	caCert, err := os.ReadFile(caCertPath)
 	if err != nil {
 		log.Fatalf("Failed to load CA cert: %v", err)
 	}
