@@ -479,26 +479,26 @@ func (r *PostMintQuoteBolt11Request) MarshalJSON() ([]byte, error) {
 }
 
 type PostMintQuoteBolt11Response struct {
-	Quote   string `json:"quote"`
-	Request string `json:"request"`
-	Expiry      int64                `json:"expiry"`
-	Unit        string               `json:"unit"`
-	Minted      bool                 `json:"minted"`
-	State       ACTION_STATE         `json:"state"`
-	Amount      *uint64              `json:"amount,omitempty"`
-	Pubkey      *secp256k1.PublicKey `json:"pubkey,omitempty"`
+	Quote   string               `json:"quote"`
+	Request string               `json:"request"`
+	Expiry  int64                `json:"expiry"`
+	Unit    string               `json:"unit"`
+	Minted  bool                 `json:"minted"`
+	State   ACTION_STATE         `json:"state"`
+	Amount  *uint64              `json:"amount,omitempty"`
+	Pubkey  *secp256k1.PublicKey `json:"pubkey,omitempty"`
 }
 
 func (r PostMintQuoteBolt11Response) MarshalJSON() ([]byte, error) {
 	type Alias struct {
-		Pubkey  *string `json:"pubkey,omitempty"`
-		Quote   string  `json:"quote"`
-		Request string  `json:"request"`
-		Expiry      int64        `json:"expiry"`
-		Unit        string       `json:"unit"`
-		Minted      bool         `json:"minted"`
-		State       ACTION_STATE `json:"state"`
-		Amount      *uint64      `json:"amount,omitempty"`
+		Pubkey  *string      `json:"pubkey,omitempty"`
+		Quote   string       `json:"quote"`
+		Request string       `json:"request"`
+		Expiry  int64        `json:"expiry"`
+		Unit    string       `json:"unit"`
+		Minted  bool         `json:"minted"`
+		State   ACTION_STATE `json:"state"`
+		Amount  *uint64      `json:"amount,omitempty"`
 	}
 
 	var alias Alias
@@ -535,13 +535,13 @@ type MintRequestDB struct {
 
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
 	res := PostMintQuoteBolt11Response{
-		Quote:       m.Quote,
-		Request:     m.Request,
-		Expiry:      m.Expiry,
-		Unit:        m.Unit,
-		Minted:      m.Minted,
-		State:       m.State,
-		Pubkey:      m.Pubkey,
+		Quote:   m.Quote,
+		Request: m.Request,
+		Expiry:  m.Expiry,
+		Unit:    m.Unit,
+		Minted:  m.Minted,
+		State:   m.State,
+		Pubkey:  m.Pubkey,
 	}
 
 	if m.Amount != nil {
