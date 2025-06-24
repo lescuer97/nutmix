@@ -38,6 +38,9 @@ const (
 	QUOTE_PENDING            = 20005
 	INVOICE_ALREADY_PAID     = 20006
 
+	MINT_QUOTE_INVALID_SIG     = 20008
+	MINT_QUOTE_INVALID_PUB_KEY = 20009
+
 	ENDPOINT_REQUIRES_CLEAR_AUTH = 30001
 	CLEAR_AUTH_FAILED            = 30002
 
@@ -79,6 +82,10 @@ func (e ErrorCode) String() string {
 		error = "Keyset is not known"
 	case INACTIVE_KEYSET:
 		error = "Keyset is inactive, cannot sign messages"
+	case MINT_QUOTE_INVALID_SIG:
+		error = "No valid signature was provided"
+	case MINT_QUOTE_INVALID_PUB_KEY:
+		error = "No public key for mint quote"
 
 	case REQUEST_NOT_PAID:
 		error = "Quote request is not paid"
