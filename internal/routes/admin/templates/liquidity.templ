@@ -89,7 +89,7 @@ templ ListItem(swap utils.LiquiditySwap) {
 		<td class="request-row">{ liquidityType }</td>
 		<td class="time">{ formattedDate }</td>
 		<td class="request-row">{ state }</td>
-		<td class="request-row"><a href={ templ.URL(url) }>INFO</a></td>
+		<td class="request-row"><a href={ templ.SafeURL(url) }>INFO</a></td>
 	</tr>
 }
 
