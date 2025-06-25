@@ -103,13 +103,18 @@ Implemented [NUTs](https://github.com/cashubtc/nuts/):
 - [x] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
 - [x] [NUT-15](https://github.com/cashubtc/nuts/blob/main/15.md)
 
-## pluging in to the remote signer
+## Setting up a remote signer.
+
+Right now there are two remote signer implementations. 
+
+- [Nutvault](https://github.com/lescuer97/nutvault)
+- [cdk-signatory](https://github.com/cashubtc/cdk/tree/main/crates/cdk-signatory)
 
 There is a new enviroment variable called `SIGNER_TYPE`. If you want to use the remote signer you need to set the
-options `abstract_socket` or `network`. This will then will look for the signer to connect. 
+options `abstract_socket` or `network`. This will then will look for the signer to connect.  If you pick network you
+will also need to set the `NETWORK_SIGNER_ADDRESS` env variable.
 
 ### setup mTLS for signer
-
 You will need to set enviroment variables for signaling the routes for mTLS.
 
 ```
@@ -117,6 +122,7 @@ SIGNER_CLIENT_TLS_KEY=<route to file>
 SIGNER_CLIENT_TLS_CERT=<route to file>
 SIGNER_CA_CERT=<route to file>
 ``` 
+
 
 ## Roadmap
 At this moment NUTS are up to P2PK (NUT-11) are implemented and working. I plan to keep going until all NUTS are done.
