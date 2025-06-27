@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 
 	"github.com/jackc/pgx/v5"
@@ -360,8 +359,6 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		Unit:   unit,
 		Amount: quote.Amount,
 	}
-
-	log.Printf("\n amount: %+v", amount)
 
 	if !quote.RequestPaid {
 
