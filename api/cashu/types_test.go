@@ -2,6 +2,7 @@ package cashu
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -255,4 +256,148 @@ func TestCashuAmountConvertEURStrError(t *testing.T) {
 	if err != ErrCouldNotParseAmountToString {
 		t.Errorf("err != ErrCouldNotParseAmountToString. %v", err)
 	}
+}
+
+// TEST VECTORS NUT 20 - Signature on Mint Quote
+// https://github.com/cashubtc/nuts/blob/main/20.md#
+
+func TestNut20SuccessfulSignature(t *testing.T) {
+	jsonStr := `{
+  "quote": "9d745270-1405-46de-b5c5-e2762b4f5e00",
+  "outputs": [
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834"
+    },
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "032fd3c4dc49a2844a89998d5e9d5b0f0b00dde9310063acb8a92e2fdafa4126d4"
+    },
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "033b6fde50b6a0dfe61ad148fff167ad9cf8308ded5f6f6b2fe000a036c464c311"
+    },
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "02be5a55f03e5c0aaea77595d574bce92c6d57a2a0fb2b5955c0b87e4520e06b53"
+    },
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79"
+    }
+  ],
+  "signature": "d4b386f21f7aa7172f0994ee6e4dd966539484247ea71c99b81b8e09b1bb2acbc0026a43c221fd773471dc30d6a32b04692e6837ddaccf0830a63128308e4ee0"
+}`
+	bytes := []byte(jsonStr)
+
+	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
+	pubkeyBytes, err := hex.DecodeString(pubkeyStr)
+	if err != nil {
+		t.Fatalf("could not decode hex string. %v", err)
+	}
+
+	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
+	if err != nil {
+		t.Fatalf("could not parse pubkey bytes correctly. %v", err)
+	}
+
+	var request PostMintBolt11Request
+	err = json.Unmarshal(bytes, &request)
+	if err != nil {
+		t.Fatalf("could not marshal to correct PostMintBolt11Request struct. %v", err)
+	}
+
+	if request.Quote != "9d745270-1405-46de-b5c5-e2762b4f5e00" {
+		t.Errorf("quote not parsed correctly")
+	}
+	if request.Outputs[0].B_ != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
+		t.Errorf("First output not parsed correctly")
+	}
+	if request.Outputs[len(request.Outputs)-1].B_ != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
+		t.Errorf("last output not parsed correctly")
+	}
+
+	valid, err := request.VerifyPubkey(pubkey)
+	if err != nil {
+		t.Fatalf("Something happened while verifying. %v", err)
+	}
+	if !valid {
+		t.Error("signature should be valid")
+	}
+
+}
+func TestNut20FailureSignature(t *testing.T) {
+	jsonStr := `{
+  "quote": "9d745270-1405-46de-b5c5-e2762b4f5e00",
+  "outputs": [
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834"
+    },
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "032fd3c4dc49a2844a89998d5e9d5b0f0b00dde9310063acb8a92e2fdafa4126d4"
+    },
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "033b6fde50b6a0dfe61ad148fff167ad9cf8308ded5f6f6b2fe000a036c464c311"
+    },
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "02be5a55f03e5c0aaea77595d574bce92c6d57a2a0fb2b5955c0b87e4520e06b53"
+    },
+    {
+      "amount": 1,
+      "id": "00456a94ab4e1c46",
+      "B_": "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79"
+    }
+  ],
+  "signature": "cb2b8e7ea69362dfe2a07093f2bbc319226db33db2ef686c940b5ec976bcbfc78df0cd35b3e998adf437b09ee2c950bd66dfe9eb64abd706e43ebc7c669c36c3"
+}`
+	bytes := []byte(jsonStr)
+
+	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
+	pubkeyBytes, err := hex.DecodeString(pubkeyStr)
+	if err != nil {
+		t.Fatalf("could not decode hex string. %v", err)
+	}
+
+	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
+	if err != nil {
+		t.Fatalf("could not parse pubkey bytes correctly. %v", err)
+	}
+
+	var request PostMintBolt11Request
+	err = json.Unmarshal(bytes, &request)
+	if err != nil {
+		t.Fatalf("could not marshal to correct PostMintBolt11Request struct. %v", err)
+	}
+
+	if request.Quote != "9d745270-1405-46de-b5c5-e2762b4f5e00" {
+		t.Errorf("quote not parsed correctly")
+	}
+	if request.Outputs[0].B_ != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
+		t.Errorf("First output not parsed correctly")
+	}
+	if request.Outputs[len(request.Outputs)-1].B_ != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
+		t.Errorf("last output not parsed correctly")
+	}
+
+	valid, err := request.VerifyPubkey(pubkey)
+	if err != nil {
+		t.Fatalf("Something happened while verifying. %v", err)
+	}
+	if valid {
+		t.Error("signature should be valid")
+	}
+
 }
