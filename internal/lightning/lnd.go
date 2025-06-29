@@ -174,6 +174,7 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(invoice string,
 					failedSource := routes[0].Hops[failureIndex-1].PubKey
 					failedDestination := routes[0].Hops[failureIndex].PubKey
 
+					// TODO: change to use slog when refactor for slog
 					log.Printf("partial payment attempt failed from %s to %s", failedSource, failedDestination)
 
 					continue
