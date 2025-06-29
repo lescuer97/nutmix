@@ -19,6 +19,10 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 
 		message := "Empty Witness"
 		return cashu.UNKNOWN, &message
+
+	case errors.Is(proofError, cashu.ErrPaymentNoRoute):
+		message := "No route found for payment"
+		return cashu.LIGHTNING_PAYMENT_FAILED, &message
 	case errors.Is(proofError, cashu.ErrNoValidSignatures):
 		return cashu.TOKEN_NOT_VERIFIED, nil
 	case errors.Is(proofError, cashu.ErrNotEnoughSignatures):

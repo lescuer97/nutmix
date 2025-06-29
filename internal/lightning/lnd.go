@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"log"
 
 	"crypto/x509"
 
@@ -101,6 +102,9 @@ func (l *LndGrpcWallet) lndGrpcPayInvoice(invoice string, feeReserve uint64, lig
 	return nil
 
 }
+
+const MAX_AMOUNT_RETRIES = 50
+
 func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(invoice string,
 	zpayInvoice *zpay32.Invoice,
 	feeReserve uint64,
@@ -117,65 +121,79 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(invoice string,
 	feeLimit := lnrpc.FeeLimit{
 		Limit: &fixedLimit,
 	}
-	queryRoutes := lnrpc.QueryRoutesRequest{
-		PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
-		UseMissionControl: true,
-		Amt:               int64(amount_sat),
-		FeeLimit:          &feeLimit,
-	}
+	totalAttempts := 50
+	var routes []*lnrpc.Route
+	for i := 0; i < totalAttempts; i++ {
 
-	// check for query hops
-	queryResponse, err := client.QueryRoutes(ctx, &queryRoutes)
-	if err != nil {
-		return fmt.Errorf("client.QueryRoutes(ctx, &queryRoutes) %w", err)
-	}
+		queryRoutes := lnrpc.QueryRoutesRequest{
+			PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
+			UseMissionControl: true,
+			Amt:               int64(amount_sat),
+			FeeLimit:          &feeLimit,
+		}
 
-	firstRoute := queryResponse.Routes[0]
+		// check for query hops
+		queryResponse, err := client.QueryRoutes(ctx, &queryRoutes)
+		if err != nil {
+			return fmt.Errorf("client.QueryRoutes(ctx, &queryRoutes) %w", err)
+		}
 
-	if firstRoute == nil {
-		return fmt.Errorf("No Route found %w", err)
-	}
+		routes = queryResponse.Routes
 
-	lastHop := firstRoute.Hops[len(firstRoute.Hops)-1]
-
-	totalMilisats := int64(*zpayInvoice.MilliSat)
-
-	mppRecord := lnrpc.MPPRecord{
-		TotalAmtMsat: totalMilisats,
-		PaymentAddr:  zpayInvoice.PaymentAddr[:],
-	}
-	lastHop.MppRecord = &mppRecord
-	firstRoute.Hops[len(firstRoute.Hops)-1] = lastHop
-
-	streamerClient := routerrpc.NewRouterClient(l.grpcClient)
-
-	sendRequest := routerrpc.SendToRouteRequest{PaymentHash: zpayInvoice.PaymentHash[:], Route: firstRoute, SkipTempErr: true}
-
-	res, err := streamerClient.SendToRouteV2(ctx, &sendRequest)
-
-	if err != nil {
-		return fmt.Errorf("client.SendPaymentV2(ctx, &sendRequest) %w", err)
-	}
-
-	for {
-		switch res.Status {
-		case lnrpc.HTLCAttempt_IN_FLIGHT:
-			lightningResponse.PaymentState = PENDING
-		case lnrpc.HTLCAttempt_FAILED:
-			lightningResponse.PaymentState = FAILED
-			return fmt.Errorf("PaymentFailed  %+v", res.GetFailure())
-		case lnrpc.HTLCAttempt_SUCCEEDED:
-			lightningResponse.PaymentRequest = invoice
-			lightningResponse.PaymentState = SETTLED
-			lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
-			lightningResponse.PaidFeeSat = res.Route.TotalAmt
-			lightningResponse.PaymentState = SETTLED
-			return nil
-		default:
+		if routes[0] == nil {
+			log.Printf("No route found for lnd partial payment. Retrying")
 			continue
+		}
 
+		totalMilisats := int64(*zpayInvoice.MilliSat)
+
+		mppRecord := lnrpc.MPPRecord{
+			TotalAmtMsat: totalMilisats,
+			PaymentAddr:  zpayInvoice.PaymentAddr[:],
+		}
+
+		routes[0].Hops[len(routes[0].Hops)-1].MppRecord = &mppRecord
+
+		streamerClient := routerrpc.NewRouterClient(l.grpcClient)
+
+		sendRequest := routerrpc.SendToRouteRequest{PaymentHash: zpayInvoice.PaymentHash[:], Route: routes[0], SkipTempErr: true}
+
+		res, err := streamerClient.SendToRouteV2(ctx, &sendRequest)
+
+		if err != nil {
+			return fmt.Errorf("client.SendPaymentV2(ctx, &sendRequest) %w", err)
+		}
+
+		for {
+			switch res.Status {
+			case lnrpc.HTLCAttempt_IN_FLIGHT:
+				lightningResponse.PaymentState = PENDING
+			case lnrpc.HTLCAttempt_FAILED:
+				if res.Failure.GetCode() == lnrpc.Failure_TEMPORARY_CHANNEL_FAILURE {
+					failureIndex := res.Failure.GetFailureSourceIndex()
+					failedSource := routes[0].Hops[failureIndex-1].PubKey
+					failedDestination := routes[0].Hops[failureIndex].PubKey
+
+					log.Printf("partial payment attempt failed from %s to %s", failedSource, failedDestination)
+
+					continue
+				}
+				lightningResponse.PaymentState = FAILED
+				return fmt.Errorf("PaymentFailed  %+v", res.GetFailure())
+			case lnrpc.HTLCAttempt_SUCCEEDED:
+				lightningResponse.PaymentRequest = invoice
+				lightningResponse.PaymentState = SETTLED
+				lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
+				lightningResponse.PaidFeeSat = res.Route.TotalAmt
+				lightningResponse.PaymentState = SETTLED
+				return nil
+			default:
+				continue
+
+			}
 		}
 	}
+	return fmt.Errorf("multi nut no route. %w", cashu.ErrPaymentNoRoute)
 
 }
 
