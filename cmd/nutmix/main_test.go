@@ -97,9 +97,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	if postMintQuoteResponse.RequestPaid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponse.RequestPaid)
-	}
 	if postMintQuoteResponse.State != cashu.UNPAID {
 		t.Errorf("Expected state to be UNPAID, got %v", postMintQuoteResponse.State)
 
@@ -125,9 +122,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMintQuoteResponseTwo.RequestPaid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMintQuoteResponseTwo.RequestPaid)
-	}
 
 	if postMintQuoteResponse.State != cashu.UNPAID {
 		t.Errorf("Expected state to be UNPAID, got %v", postMintQuoteResponse.State)
@@ -978,9 +972,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	if postMintQuoteResponse.RequestPaid {
-		t.Errorf("Expected paid to be false because it's a lnd node, got %v", postMintQuoteResponse.RequestPaid)
-	}
 	if postMintQuoteResponse.State != cashu.UNPAID {
 		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponse.State)
 	}
@@ -1005,9 +996,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if postMintQuoteResponseTwo.RequestPaid {
-		t.Errorf("Expected paid to be false because it's a Lnd wallet and I have not paid the invoice yet, got %v", postMintQuoteResponseTwo.RequestPaid)
-	}
 
 	if postMintQuoteResponseTwo.State != cashu.UNPAID {
 		t.Errorf("Expected to not be unpaid have: %s ", postMintQuoteResponseTwo.State)

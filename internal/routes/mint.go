@@ -78,7 +78,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		nuts := make(map[string]any)
 		var baseNuts []string = []string{"1", "2", "3", "4", "5", "6"}
 
-		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12", "17"}
+		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12", "17", "20"}
 
 		if mint.LightningBackend.ActiveMPP() {
 			optionalNuts = append(optionalNuts, "15")
@@ -175,6 +175,13 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 					},
 				}
 				wsMethod["supported"] = []cashu.SwapMintMethod{bolt11Method}
+
+				nuts[nut] = wsMethod
+
+			case "20":
+				wsMethod := make(map[string]bool)
+
+				wsMethod["supported"] = true
 
 				nuts[nut] = wsMethod
 
