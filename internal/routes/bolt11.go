@@ -90,10 +90,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			State:       cashu.UNPAID,
 			SeenAt:      now,
 			Amount:      &mintRequest.Amount,
+			Pubkey:      mintRequest.Pubkey,
 		}
 
 		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: uint64(mintRequest.Amount)})
-
 		if err != nil {
 			logger.Info(err.Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -124,7 +124,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		c.JSON(200, mintRequestDB.PostMintQuoteBolt11Response())
+		res := mintRequestDB.PostMintQuoteBolt11Response()
+		c.JSON(200, res)
 	})
 
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
@@ -176,7 +177,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		c.JSON(200, quote.PostMintQuoteBolt11Response())
+		res := quote.PostMintQuoteBolt11Response()
+		c.JSON(200, res)
 	})
 
 	v1.POST("/mint/bolt11", func(c *gin.Context) {
@@ -198,7 +200,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 		defer mint.MintDB.Rollback(ctx, tx)
 
-		quote, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
+		mintRequestDB, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
 
 		if err != nil {
 			logger.Error(fmt.Errorf(" mint-resquest mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %w", err).Error())
@@ -207,13 +209,30 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		if quote.Minted {
-			logger.Warn("Quote already minted", slog.String(utils.LogExtraInfo, quote.Quote))
+		if mintRequestDB.Minted {
+			logger.Warn("Quote already minted", slog.String(utils.LogExtraInfo, mintRequestDB.Quote))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_ISSUED, nil))
 			return
 		}
 
-		err = mint.VerifyUnitSupport(quote.Unit)
+		if mintRequestDB.Pubkey != nil {
+			valid, err := mintRequest.VerifyPubkey(mintRequestDB.Pubkey)
+			if err != nil {
+				logger.Error(fmt.Errorf("Cold not verify signature: %w", err).Error())
+				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+				return
+			}
+
+			if !valid {
+				logger.Error(fmt.Errorf("Invalid signature: %w", err).Error())
+				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+				return
+			}
+		}
+
+		err = mint.VerifyUnitSupport(mintRequestDB.Unit)
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(quote.Unit). %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -241,7 +260,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			amountBlindMessages += blindMessage.Amount
 			// check all blind messages have the same unit
 		}
-		invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
+		invoice, err := zpay32.Decode(mintRequestDB.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
 			logger.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -261,12 +280,12 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(403, "Amounts in outputs are not the same")
 			return
 		}
-		if !quote.RequestPaid && quote.State == cashu.UNPAID {
+		if !mintRequestDB.RequestPaid && mintRequestDB.State == cashu.UNPAID {
 
-			quote, err = m.CheckMintRequest(mint, quote, invoice)
+			mintRequestDB, err = m.CheckMintRequest(mint, mintRequestDB, invoice)
 			if err != nil {
 				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
-					c.JSON(200, quote)
+					c.JSON(200, mintRequestDB)
 					return
 				}
 				logger.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
@@ -274,13 +293,13 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				return
 			}
 
-			err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
+			err = mint.MintDB.ChangeMintRequestState(tx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
 			if err != nil {
 				logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 				return
 			}
 
-			if quote.State != cashu.PAID {
+			if mintRequestDB.State != cashu.PAID {
 				c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
 				return
 			}
@@ -294,10 +313,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		quote.Minted = true
-		quote.State = cashu.ISSUED
+		mintRequestDB.Minted = true
+		mintRequestDB.State = cashu.ISSUED
 
-		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
+		err = mint.MintDB.ChangeMintRequestState(tx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 			return
@@ -316,7 +335,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		mint.Observer.SendMintEvent(quote)
+		mint.Observer.SendMintEvent(mintRequestDB)
 		// Store BlidedSignature
 		c.JSON(200, cashu.PostMintBolt11Response{
 			Signatures: blindedSignatures,

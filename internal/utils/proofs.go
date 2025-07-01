@@ -86,6 +86,11 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrNotEnoughtProofs.Error()
 		return cashu.LIGHTNING_PAYMENT_FAILED, &message
 
+	case errors.Is(proofError, cashu.ErrMintQuoteNoPublicKey):
+		return cashu.MINT_QUOTE_INVALID_PUB_KEY, nil
+
+	case errors.Is(proofError, cashu.ErrMintQuoteNoValidSignature):
+		return cashu.MINT_QUOTE_INVALID_SIG, nil
 	}
 
 	return cashu.UNKNOWN, nil

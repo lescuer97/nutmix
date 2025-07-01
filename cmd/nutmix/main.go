@@ -7,8 +7,10 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -17,6 +19,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
+	"github.com/lescuer97/nutmix/internal/routes/middleware"
 	"github.com/lescuer97/nutmix/internal/signer"
 
 	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
@@ -127,6 +130,10 @@ func main() {
 	corsConfig.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
 
 	r.Use(cors.Default())
+
+	store := persistence.NewInMemoryStore(45 * time.Minute)
+
+	r.Use(middleware.CacheMiddleware(store))
 
 	err = mint.CheckPendingQuoteAndProofs(logger)
 	if err != nil {
