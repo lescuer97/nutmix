@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -13,6 +14,7 @@ import (
 	sig "github.com/lescuer97/nutmix/internal/gen"
 	"github.com/lescuer97/nutmix/internal/signer"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type MintPublicKeyset struct {
@@ -30,7 +32,10 @@ type RemoteSigner struct {
 	pubkey        []byte
 }
 
-const abstractSocket = "unix:@signer_socket"
+const (
+	abstractSocket                  = "unix:@signer_socket"
+	REMOTE_SIGNER_CONNECTION_SECRET = "REMOTE_SIGNER_CONNECTION_SECRET"
+)
 
 func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (RemoteSigner, error) {
 	socketSigner := RemoteSigner{}
@@ -72,6 +77,10 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 	ctx := context.Background()
 	emptyRequest := sig.EmptyRequest{}
 
+	md := metadata.New(map[string]string{
+		"auth-token": os.Getenv(REMOTE_SIGNER_CONNECTION_SECRET),
+	})
+	ctx = metadata.NewOutgoingContext(ctx, md)
 	keys, err := s.grpcClient.Keysets(ctx, &emptyRequest)
 	// log.Printf("keys: %+v", keys)
 	if err != nil {
@@ -167,6 +176,11 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 		InputFeePpk: uint64(fee),
 		Amounts:     amounts,
 	}
+
+	md := metadata.New(map[string]string{
+		"auth-token": os.Getenv(REMOTE_SIGNER_CONNECTION_SECRET),
+	})
+	ctx = metadata.NewOutgoingContext(ctx, md)
 	rotationResponse, err := s.grpcClient.RotateKeyset(ctx, &rotationReq)
 	if err != nil {
 		return fmt.Errorf("s.grpcClient.BlindSign(ctx, &blindedMessageRequest). %w", err)
@@ -207,6 +221,10 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 			// Witness: &sig.Witness{} val.Witness,
 		})
 	}
+	md := metadata.New(map[string]string{
+		"auth-token": os.Getenv(REMOTE_SIGNER_CONNECTION_SECRET),
+	})
+	ctx = metadata.NewOutgoingContext(ctx, md)
 
 	blindSigsResponse, err := s.grpcClient.BlindSign(ctx, &blindedMessageRequest)
 	if err != nil {
@@ -300,6 +318,11 @@ func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.
 		}
 	}
 
+	md := metadata.New(map[string]string{
+		"auth-token": os.Getenv(REMOTE_SIGNER_CONNECTION_SECRET),
+	})
+
+	ctx = metadata.NewOutgoingContext(ctx, md)
 	boolResponse, err := s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest)
 	if err != nil {
 		return fmt.Errorf("s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest). %w", err)
