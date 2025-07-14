@@ -29,7 +29,6 @@ var (
 	MINT_PRIVATE_KEY_ENV = "MINT_PRIVATE_KEY"
 )
 
-
 func main() {
 
 	logsdir, err := utils.GetLogsDirectory()
