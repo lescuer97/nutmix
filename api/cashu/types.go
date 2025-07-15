@@ -7,12 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"time"
+
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/pkg/crypto"
-	"math"
-	"time"
 )
 
 var (
@@ -35,6 +36,10 @@ var (
 	ErrNotSameUnits                = errors.New("Not same units")
 	ErrRepeatedOutput              = errors.New("Repeated output")
 	ErrPaymentFailed               = errors.New("Lightning payment failed")
+	ErrPaymentNoRoute              = errors.New("No route found for lightning payment")
+
+	ErrMintQuoteNoPublicKey      = errors.New("No valid pubkey for mint quote")
+	ErrMintQuoteNoValidSignature = errors.New("No valid signature for mint quote")
 )
 
 const (
@@ -377,10 +382,14 @@ type Seed struct {
 type SwapMintMethod struct {
 	Method    string             `json:"method"`
 	Unit      string             `json:"unit"`
-	MinAmount int                `json:"min_amount"`
-	MaxAmount int                `json:"max_amount"`
-	Mpp       bool               `json:"mpp,omitempty"`
+	MinAmount int                `json:"min_amount,omitempty"`
+	MaxAmount int                `json:"max_amount,omitempty"`
 	Commands  []SubscriptionKind `json:"commands,omitempty"`
+}
+
+type MultipathPaymentSetting struct {
+	Method string `json:"method"`
+	Unit   string `json:"unit"`
 }
 
 type SwapMintInfo struct {
@@ -415,44 +424,129 @@ type Keyset struct {
 }
 
 type PostMintQuoteBolt11Request struct {
-	Amount uint64 `json:"amount"`
-	Unit   string `json:"unit"`
+	Amount      uint64               `json:"amount"`
+	Unit        string               `json:"unit"`
+	Description *string              `json:"description,omitempty"`
+	Pubkey      *secp256k1.PublicKey `json:"pubkey,omitempty"`
+}
+
+func (r *PostMintQuoteBolt11Request) UnmarshalJSON(data []byte) error {
+	type Alias struct {
+		Amount      uint64  `json:"amount"`
+		Unit        string  `json:"unit"`
+		Description *string `json:"description,omitempty"`
+		Pubkey      *string `json:"pubkey,omitempty"`
+	}
+
+	var alias Alias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+	r.Amount = alias.Amount
+	r.Unit = alias.Unit
+	r.Description = alias.Description
+
+	if alias.Pubkey != nil {
+		pubkeyBytes, err := hex.DecodeString(*alias.Pubkey)
+		if err != nil {
+			return fmt.Errorf("invalid pubkey hex string: %w", err)
+		}
+		pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
+		if err != nil {
+			return fmt.Errorf("invalid pubkey: %w", err)
+		}
+
+		r.Pubkey = pubkey
+	}
+
+	return nil
+}
+
+func (r *PostMintQuoteBolt11Request) MarshalJSON() ([]byte, error) {
+	type Alias struct {
+		Amount      uint64  `json:"amount"`
+		Unit        string  `json:"unit"`
+		Description *string `json:"description,omitempty"`
+		Pubkey      *string `json:"pubkey,omitempty"`
+	}
+
+	var alias Alias
+	alias.Amount = r.Amount
+	alias.Unit = r.Unit
+	alias.Description = r.Description
+
+	if r.Pubkey != nil {
+		hexStr := hex.EncodeToString(r.Pubkey.SerializeCompressed())
+		alias.Pubkey = &hexStr
+	}
+
+	return json.Marshal(alias)
 }
 
 type PostMintQuoteBolt11Response struct {
-	Quote   string `json:"quote"`
-	Request string `json:"request"`
-	// Deprecated: Should be removed after all main wallets change to the new State format
-	RequestPaid bool         `json:"paid" db:"request_paid"`
-	Expiry      int64        `json:"expiry"`
-	Unit        string       `json:"unit"`
-	Minted      bool         `json:"minted"`
-	State       ACTION_STATE `json:"state"`
-	Amount      *uint64      `json:"amount,omitempty"`
+	Quote   string               `json:"quote"`
+	Request string               `json:"request"`
+	Expiry  int64                `json:"expiry"`
+	Unit    string               `json:"unit"`
+	Minted  bool                 `json:"minted"`
+	State   ACTION_STATE         `json:"state"`
+	Amount  *uint64              `json:"amount,omitempty"`
+	Pubkey  *secp256k1.PublicKey `json:"pubkey,omitempty"`
 }
+
+func (r PostMintQuoteBolt11Response) MarshalJSON() ([]byte, error) {
+	type Alias struct {
+		Pubkey  *string      `json:"pubkey,omitempty"`
+		Quote   string       `json:"quote"`
+		Request string       `json:"request"`
+		Expiry  int64        `json:"expiry"`
+		Unit    string       `json:"unit"`
+		Minted  bool         `json:"minted"`
+		State   ACTION_STATE `json:"state"`
+		Amount  *uint64      `json:"amount,omitempty"`
+	}
+
+	var alias Alias
+	alias.Quote = r.Quote
+	alias.Request = r.Request
+	alias.Expiry = r.Expiry
+	alias.Unit = r.Unit
+	alias.Minted = r.Minted
+	alias.State = r.State
+	alias.Amount = r.Amount
+
+	if r.Pubkey != nil {
+		hexStr := hex.EncodeToString(r.Pubkey.SerializeCompressed())
+		alias.Pubkey = &hexStr
+	}
+
+	return json.Marshal(&alias)
+}
+
 type MintRequestDB struct {
 	Quote   string `json:"quote"`
 	Request string `json:"request"`
 	// Deprecated: Should be removed after all main wallets change to the new State format
-	RequestPaid bool         `json:"paid" db:"request_paid"`
-	Expiry      int64        `json:"expiry"`
-	Unit        string       `json:"unit"`
-	Minted      bool         `json:"minted"`
-	State       ACTION_STATE `json:"state"`
-	SeenAt      int64        `json:"seen_at"`
-	Amount      *uint64      `json:"amount"`
-	CheckingId  string       `json:"checking_id"`
+	RequestPaid bool                 `json:"paid" db:"request_paid"`
+	Expiry      int64                `json:"expiry"`
+	Unit        string               `json:"unit"`
+	Minted      bool                 `json:"minted"`
+	State       ACTION_STATE         `json:"state"`
+	SeenAt      int64                `json:"seen_at"`
+	Amount      *uint64              `json:"amount"`
+	CheckingId  string               `json:"checking_id"`
+	Pubkey      *secp256k1.PublicKey `json:"pubkey"`
 }
 
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
 	res := PostMintQuoteBolt11Response{
-		Quote:       m.Quote,
-		Request:     m.Request,
-		RequestPaid: m.RequestPaid,
-		Expiry:      m.Expiry,
-		Unit:        m.Unit,
-		Minted:      m.Minted,
-		State:       m.State,
+		Quote:   m.Quote,
+		Request: m.Request,
+		Expiry:  m.Expiry,
+		Unit:    m.Unit,
+		Minted:  m.Minted,
+		State:   m.State,
+		Pubkey:  m.Pubkey,
 	}
 
 	if m.Amount != nil {
@@ -463,8 +557,80 @@ func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Respons
 }
 
 type PostMintBolt11Request struct {
-	Quote   string           `json:"quote"`
-	Outputs []BlindedMessage `json:"outputs"`
+	Quote     string             `json:"quote"`
+	Outputs   []BlindedMessage   `json:"outputs"`
+	Signature *schnorr.Signature `json:"signature,omitempty"`
+}
+
+func (p *PostMintBolt11Request) UnmarshalJSON(data []byte) error {
+	var aux struct {
+		Quote     string           `json:"quote"`
+		Outputs   []BlindedMessage `json:"outputs"`
+		Signature *string          `json:"signature,omitempty"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return fmt.Errorf("could not marshall into aux struc for PostMintBolt11Request: %w", err)
+	}
+
+	p.Outputs = aux.Outputs
+	p.Quote = aux.Quote
+
+	if aux.Signature != nil && *aux.Signature != "" {
+		sig, err := parseBIP340SignatureString(*aux.Signature)
+		if err != nil {
+			return fmt.Errorf("failed to parse signature: %w", err)
+		}
+
+		p.Signature = sig
+	} else {
+		p.Signature = nil
+	}
+
+	return nil
+}
+func (p *PostMintBolt11Request) VerifyPubkey(pubkey *secp256k1.PublicKey) (bool, error) {
+	if pubkey == nil {
+		return false, fmt.Errorf("pubkey is nil. %w", ErrMintQuoteNoPublicKey)
+	}
+
+	if p.Signature == nil {
+		return false, fmt.Errorf("signature not available for verification. %w", ErrMintQuoteNoValidSignature)
+	}
+
+	msg := p.Quote
+	for _, output := range p.Outputs {
+		msg += output.B_
+	}
+	hash := sha256.Sum256([]byte(msg))
+
+	return p.Signature.Verify(hash[:], pubkey), nil
+}
+
+// parseBIP340SignatureString converts a BIP-340 Schnorr signature hex string to schnorr.Signature
+func parseBIP340SignatureString(sigStr string) (*schnorr.Signature, error) {
+	// Remove "0x" prefix if present
+	if len(sigStr) >= 2 && sigStr[:2] == "0x" {
+		sigStr = sigStr[2:]
+	}
+
+	// BIP-340 signatures are exactly 64 bytes (128 hex characters)
+	if len(sigStr) != 128 {
+		return nil, fmt.Errorf("invalid BIP-340 signature length: expected 128 hex characters, got %d", len(sigStr))
+	}
+
+	// Decode hex string to bytes
+	sigBytes, err := hex.DecodeString(sigStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode hex signature: %w", err)
+	}
+
+	// Parse the signature bytes into a schnorr.Signature
+	signature, err := schnorr.ParseSignature(sigBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse schnorr signature: %w", err)
+	}
+
+	return signature, nil
 }
 
 type PostMintBolt11Response struct {

@@ -197,7 +197,7 @@ func (m *Mint) IsInternalTransaction(request string) (bool, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
 		}
-		return false, fmt.Errorf("m.MintDB.GetMintRequestById() %w", err)
+		return false, fmt.Errorf("m.MintDB.GetMintRequestByRequest() %w", err)
 	}
 
 	err = m.MintDB.Commit(ctx, tx)
