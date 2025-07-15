@@ -100,6 +100,13 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+
+		if resInvoice.PaymentRequest == "" {
+			logger.Error("The lightning backend is not returning an invoice.")
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
 		mintRequestDB.Request = resInvoice.PaymentRequest
 		mintRequestDB.CheckingId = resInvoice.CheckingId
 
@@ -112,7 +119,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		defer mint.MintDB.Rollback(ctx, tx)
 
 		err = mint.MintDB.SaveMintRequest(tx, mintRequestDB)
-
 		if err != nil {
 			logger.Error(fmt.Errorf("SaveQuoteRequest: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
