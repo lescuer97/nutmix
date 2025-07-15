@@ -16,8 +16,15 @@ func ClearAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
+		if !mint.Config.MINT_REQUIRE_AUTH {
+			c.Next()
+		}
 		// Check if current path matches any of the patterns
 		for _, pattern := range mint.Config.MINT_AUTH_CLEAR_AUTH_URLS {
+			if !mint.Config.MINT_REQUIRE_AUTH {
+				log.Panicf("mint require auth should always be on when using the middleware")
+			}
+
 			matches, err := matchesPattern(requestPath, pattern)
 			if err != nil {
 				log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
@@ -56,8 +63,14 @@ func BlindAuthMiddleware(mint *mint.Mint, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
+		if !mint.Config.MINT_REQUIRE_AUTH {
+			c.Next()
+		}
 		// Check if current path matches any of the patterns
 		for _, pattern := range mint.Config.MINT_AUTH_BLIND_AUTH_URLS {
+			if !mint.Config.MINT_REQUIRE_AUTH {
+				log.Panicf("mint require auth should always be on when using the middleware")
+			}
 			matches, err := matchesPattern(requestPath, pattern)
 			if err != nil {
 				log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
