@@ -122,7 +122,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-
 	if postMintQuoteResponse.State != cashu.UNPAID {
 		t.Errorf("Expected state to be UNPAID, got %v", postMintQuoteResponse.State)
 
@@ -995,7 +994,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
-
 
 	if postMintQuoteResponseTwo.State != cashu.UNPAID {
 		t.Errorf("Expected to not be unpaid have: %s ", postMintQuoteResponseTwo.State)
