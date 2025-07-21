@@ -638,6 +638,7 @@ type BasicKeysetResponse struct {
 	Unit        string `json:"unit"`
 	Active      bool   `json:"active"`
 	InputFeePpk uint   `json:"input_fee_ppk"`
+	Version     uint64
 }
 
 type ACTION_STATE string

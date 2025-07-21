@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -44,10 +45,11 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			val, exits := keysetMap[seed.Unit]
 			if exits {
 				val = append(val, templates.KeysetData{
-					Id:     seed.Id,
-					Active: seed.Active,
-					Unit:   seed.Unit,
-					Fees:   seed.InputFeePpk,
+					Id:      seed.Id,
+					Active:  seed.Active,
+					Unit:    seed.Unit,
+					Fees:    seed.InputFeePpk,
+					Version: seed.Version,
 				})
 
 				keysetMap[seed.Unit] = val
@@ -55,14 +57,22 @@ func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			} else {
 				keysetMap[seed.Unit] = []templates.KeysetData{
 					{
-						Id:     seed.Id,
-						Active: seed.Active,
-						Unit:   seed.Unit,
-						Fees:   seed.InputFeePpk,
+						Id:      seed.Id,
+						Active:  seed.Active,
+						Unit:    seed.Unit,
+						Fees:    seed.InputFeePpk,
+						Version: seed.Version,
 					},
 				}
 			}
 		}
+
+		// order the keysets by version
+		for unit, ranges := range keysetMap {
+			sort.Slice(ranges, func(i, j int) bool { return ranges[i].Version > ranges[j].Version })
+			keysetMap[unit] = ranges
+		}
+
 		ctx := context.Background()
 		err = templates.KeysetsList(keysetMap).Render(ctx, c.Writer)
 

@@ -21,6 +21,7 @@ type MintPublicKeyset struct {
 	Active      bool
 	Keys        map[uint64]string
 	InputFeePpk uint
+	Version     uint64
 }
 
 type RemoteSigner struct {
@@ -107,6 +108,7 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 			Unit:        unit.String(),
 			Active:      key.Active,
 			InputFeePpk: uint(key.InputFeePpk),
+			Version:     key.Version,
 		}
 
 		stringKeys := make(map[uint64]string)
@@ -147,7 +149,7 @@ func (s *RemoteSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 
 	var response signer.GetKeysetsResponse
 	for _, seed := range s.keysets {
-		response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(seed.Id), Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+		response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(seed.Id), Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: seed.Version})
 	}
 	return response, nil
 }
@@ -353,7 +355,7 @@ func (l *RemoteSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	var response signer.GetKeysetsResponse
 	for _, key := range l.keysets {
 		if key.Unit == cashu.AUTH.String() {
-			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(key.Id), Unit: key.Unit, Active: key.Active, InputFeePpk: key.InputFeePpk})
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(key.Id), Unit: key.Unit, Active: key.Active, InputFeePpk: key.InputFeePpk, Version: key.Version})
 		}
 	}
 	return response, nil
