@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"strings"
 	"time"
@@ -99,6 +100,13 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+
+		if resInvoice.PaymentRequest == "" {
+			logger.Error("The lightning backend is not returning an invoice.")
+			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+
 		mintRequestDB.Request = resInvoice.PaymentRequest
 		mintRequestDB.CheckingId = resInvoice.CheckingId
 
@@ -111,7 +119,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		defer mint.MintDB.Rollback(ctx, tx)
 
 		err = mint.MintDB.SaveMintRequest(tx, mintRequestDB)
-
 		if err != nil {
 			logger.Error(fmt.Errorf("SaveQuoteRequest: %w", err).Error())
 			c.JSON(500, "Opps!, something went wrong")
@@ -404,12 +411,22 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		cashuAmount := cashu.Amount{Unit: unit, Amount: uint64(amount)}
 
 		isMpp := false
-		mppAmount := meltRequest.IsMpp()
+		mppAmount := cashu.Amount{Unit: cashu.Msat, Amount: uint64(meltRequest.IsMpp())}
 
 		// if mpp is valid than change amount to mpp amount
-		if mppAmount != 0 {
+		if mppAmount.Amount != 0 {
 			isMpp = true
-			cashuAmount.Amount = mppAmount
+			if unit == cashu.Sat {
+				err = mppAmount.To(cashu.Sat)
+				if err != nil {
+					logger.Error(fmt.Errorf("mppAmount.To(cashu.Sat). %w. %w", err, cashu.ErrUnitNotSupported).Error())
+					errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+					c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+					return
+				}
+
+			}
+			cashuAmount = mppAmount
 		}
 
 		if isMpp && !mint.LightningBackend.ActiveMPP() {
@@ -470,6 +487,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 		defer mint.MintDB.Rollback(ctx, tx)
 
+		log.Printf("dbRequest: %+v", dbRequest)
 		err = mint.MintDB.SaveMeltRequest(tx, dbRequest)
 
 		if err != nil {
@@ -504,6 +522,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	})
 
 	v1.POST("/melt/bolt11", func(c *gin.Context) {
+		log.Printf("\n\n melt Tryy")
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
 		if err != nil {

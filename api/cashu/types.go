@@ -37,6 +37,7 @@ var (
 	ErrRepeatedOutput              = errors.New("Duplicate outputs provided")
 	ErrRepeatedInput               = errors.New("Duplicate inputs provided")
 	ErrPaymentFailed               = errors.New("Lightning payment failed")
+	ErrPaymentNoRoute              = errors.New("No route found for lightning payment")
 
 	ErrMintQuoteNoPublicKey      = errors.New("No valid pubkey for mint quote")
 	ErrMintQuoteNoValidSignature = errors.New("No valid signature for mint quote")
@@ -382,10 +383,14 @@ type Seed struct {
 type SwapMintMethod struct {
 	Method    string             `json:"method"`
 	Unit      string             `json:"unit"`
-	MinAmount int                `json:"min_amount"`
-	MaxAmount int                `json:"max_amount"`
-	Mpp       bool               `json:"mpp,omitempty"`
+	MinAmount int                `json:"min_amount,omitempty"`
+	MaxAmount int                `json:"max_amount,omitempty"`
 	Commands  []SubscriptionKind `json:"commands,omitempty"`
+}
+
+type MultipathPaymentSetting struct {
+	Method string `json:"method"`
+	Unit   string `json:"unit"`
 }
 
 type SwapMintInfo struct {
