@@ -34,7 +34,8 @@ var (
 	ErrCouldNotParseAmountToString = errors.New("Could not parse amount to string")
 	ErrUnbalanced                  = errors.New("Unbalanced transactions")
 	ErrNotSameUnits                = errors.New("Not same units")
-	ErrRepeatedOutput              = errors.New("Repeated output")
+	ErrRepeatedOutput              = errors.New("Duplicate outputs provided")
+	ErrRepeatedInput               = errors.New("Duplicate inputs provided")
 	ErrPaymentFailed               = errors.New("Lightning payment failed")
 	ErrPaymentNoRoute              = errors.New("No route found for lightning payment")
 
@@ -642,6 +643,7 @@ type BasicKeysetResponse struct {
 	Unit        string `json:"unit"`
 	Active      bool   `json:"active"`
 	InputFeePpk uint   `json:"input_fee_ppk"`
+	Version     uint64
 }
 
 type ACTION_STATE string

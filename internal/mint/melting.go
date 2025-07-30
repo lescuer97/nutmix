@@ -105,7 +105,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				return quote, fmt.Errorf("m.MintDB.GetMeltChangeByQuote(tx, quote.Quote). %w", err)
 			}
 
-			keysets, err := m.Signer.GetKeys()
+			keysets, err := m.Signer.GetKeysets()
 			if err != nil {
 				return quote, fmt.Errorf("m.Signer.GetKeys(). %w", err)
 			}
@@ -244,7 +244,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		logger.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w quote.Melted: %w", cashu.ErrMeltAlreadyPaid, err)
 	}
-	keysets, err := m.Signer.GetKeys()
+	keysets, err := m.Signer.GetKeysets()
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.Signer.GetKeys(). %w", err)
 	}

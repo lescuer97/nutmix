@@ -44,7 +44,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	})
 	v1.GET("/keysets", func(c *gin.Context) {
 
-		keys, err := mint.Signer.GetKeys()
+		keys, err := mint.Signer.GetKeysets()
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.Signer.GetKeys() %w", err).Error())
 			c.JSON(500, "Server side error")

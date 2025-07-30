@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http/httptest"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -922,8 +921,7 @@ func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResp
 			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
-		amountStr := strconv.FormatUint(output.Amount, 10)
-		pubkeyStr := keyset.Keysets[0].Keys[amountStr]
+		pubkeyStr := keyset.Keysets[0].Keys[output.Amount]
 		pubkeyBytes, err := hex.DecodeString(pubkeyStr)
 		if err != nil {
 			return nil, fmt.Errorf("hex.DecodeString(pubkeyStr): %w", err)

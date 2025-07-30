@@ -393,27 +393,17 @@ func (pql Postgresql) SaveProof(tx pgx.Tx, proofs []cashu.Proof) error {
 	columns := []string{"c", "secret", "amount", "id", "y", "witness", "seen_at", "state", "quote"}
 	tableName := "proofs"
 
-	tries := 0
-
 	for _, proof := range proofs {
 		entries = append(entries, []any{proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness, proof.SeenAt, proof.State, proof.Quote})
 	}
 
-	for {
-		tries += 1
-		_, err := tx.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
+	_, err := tx.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
 
-		switch {
-		case err != nil && tries < 3:
-			continue
-		case err != nil && tries >= 3:
-			return databaseError(fmt.Errorf("inserting to DB: %w", err))
-		case err == nil:
-			return nil
-		}
+	if err != nil {
 
+		return databaseError(fmt.Errorf("inserting to DB: %w", err))
 	}
-
+	return nil
 }
 
 func (pql Postgresql) GetProofsFromSecretCurve(tx pgx.Tx, Ys []string) (cashu.Proofs, error) {

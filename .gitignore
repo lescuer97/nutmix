@@ -7,6 +7,7 @@ tmp/
 *_templ.go
 *_templ.txt
 *_gen.go
+*.pb.go
 
 tls/
 

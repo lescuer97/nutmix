@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -31,44 +32,47 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 	}
 }
 func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
-
 	return func(c *gin.Context) {
-		seeds, err := mint.MintDB.GetAllSeeds()
+		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
-			logger.Error("database.GetAllSeeds(pool) %+v", slog.String(utils.LogExtraInfo, err.Error()))
+			logger.Error("mint.Signer.GetKeysets() %+v", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Server side error")
 			return
 		}
 
 		keysetMap := make(map[string][]templates.KeysetData)
-		for _, seed := range seeds {
+		for _, seed := range keysets.Keysets {
 			val, exits := keysetMap[seed.Unit]
 			if exits {
 				val = append(val, templates.KeysetData{
-					Id:        seed.Id,
-					Active:    seed.Active,
-					Unit:      seed.Unit,
-					Fees:      seed.InputFeePpk,
-					CreatedAt: seed.CreatedAt,
-					Version:   seed.Version,
+					Id:      seed.Id,
+					Active:  seed.Active,
+					Unit:    seed.Unit,
+					Fees:    seed.InputFeePpk,
+					Version: seed.Version,
 				})
 
 				keysetMap[seed.Unit] = val
 
 			} else {
 				keysetMap[seed.Unit] = []templates.KeysetData{
-
 					{
-						Id:        seed.Id,
-						Active:    seed.Active,
-						Unit:      seed.Unit,
-						Fees:      seed.InputFeePpk,
-						CreatedAt: seed.CreatedAt,
-						Version:   seed.Version,
+						Id:      seed.Id,
+						Active:  seed.Active,
+						Unit:    seed.Unit,
+						Fees:    seed.InputFeePpk,
+						Version: seed.Version,
 					},
 				}
 			}
 		}
+
+		// order the keysets by version
+		for unit, ranges := range keysetMap {
+			sort.Slice(ranges, func(i, j int) bool { return ranges[i].Version > ranges[j].Version })
+			keysetMap[unit] = ranges
+		}
+
 		ctx := context.Background()
 		err = templates.KeysetsList(keysetMap).Render(ctx, c.Writer)
 

@@ -106,7 +106,7 @@ func (l *LocalSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 }
 
 // gets all keys from the signer
-func (l *LocalSigner) GetKeys() (signer.GetKeysetsResponse, error) {
+func (l *LocalSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 	var response signer.GetKeysetsResponse
 	seeds, err := l.db.GetAllSeeds()
 	if err != nil {
@@ -114,7 +114,7 @@ func (l *LocalSigner) GetKeys() (signer.GetKeysetsResponse, error) {
 	}
 	for _, seed := range seeds {
 		if seed.Unit != cashu.AUTH.String() {
-			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: uint64(seed.Version)})
 		}
 	}
 	return response, nil
@@ -440,7 +440,7 @@ func (l *LocalSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	}
 	for _, seed := range seeds {
 		if seed.Unit == cashu.AUTH.String() {
-			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk})
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: uint64(seed.Version)})
 		}
 	}
 	return response, nil

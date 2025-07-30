@@ -246,7 +246,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
-		keysets, err := mint.Signer.GetKeys()
+		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
