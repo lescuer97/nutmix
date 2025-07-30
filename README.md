@@ -65,6 +65,7 @@ SIGNER_CLIENT_TLS_CERT=<route to file>
 SIGNER_CA_CERT=<route to file>
 ```
 
+## Video Walkthrough
 #### Video on .env setup
 [![Video on .env setup](https://cdn.hzrd149.com/0930b6e46cfe03a70345930d55b2eff51b0eb39d6e6eb4305b42b7736398f49c.png)](https://cdn.hzrd149.com/0ef3cb33401dbdd002039d01c0f749491c26720a80b23b885ae0f569ebd9f7b3.mp4)
 
@@ -78,24 +79,27 @@ SIGNER_CA_CERT=<route to file>
 ## Supported NUTs
 [NUTs REPO](https://github.com/cashubtc/nuts/):
 
-- [x] [NUT-00](https://github.com/cashubtc/nuts/blob/main/00.md)
-- [x] [NUT-01](https://github.com/cashubtc/nuts/blob/main/01.md)
-- [x] [NUT-02](https://github.com/cashubtc/nuts/blob/main/02.md)
-- [x] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md)
-- [x] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md)
-- [x] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
-- [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md)
-- [x] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md)
-- [x] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
-- [x] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md)
-- [x] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
-- [x] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
-- [x] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
-- [x] [NUT-15](https://github.com/cashubtc/nuts/blob/main/15.md)
-- [x] [NUT-19](https://github.com/cashubtc/nuts/blob/main/19.md)
-- [x] [NUT-20](https://github.com/cashubtc/nuts/blob/main/20.md)
-- [x] [NUT-21](https://github.com/cashubtc/nuts/blob/main/21.md)
-- [x] [NUT-22](https://github.com/cashubtc/nuts/blob/main/22.md)
+- [x] [NUT-00](https://github.com/cashubtc/nuts/blob/main/00.md) - Cryptography and Models
+- [x] [NUT-01](https://github.com/cashubtc/nuts/blob/main/01.md) - Mint public keys
+- [x] [NUT-02](https://github.com/cashubtc/nuts/blob/main/02.md) - Keysets and fees
+- [x] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md) - Swapping tokens
+- [x] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md) - Minting tokens
+- [x] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md) - Melting tokens
+- [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md) - Mint info
+- [x] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md) - Token state check
+- [x] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md) - Overpaid Lightning fees
+- [x] [NUT-09](https://github.com/cashubtc/nuts/blob/main/09.md) - Signature restore
+- [x] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md) - Spending conditions
+- [x] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md) - Pay-To-Pubkey (P2PK)
+- [x] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md) - DLEQ proofs
+- [x] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md) - Hashed Timelock Contracts (HTLCs)
+- [x] [NUT-15](https://github.com/cashubtc/nuts/blob/main/15.md) - Partial multi-path payments (MPP)
+- [x] [NUT-17](https://github.com/cashubtc/nuts/blob/main/17.md) - WebSocket subscriptions
+- [x] [NUT-19](https://github.com/cashubtc/nuts/blob/main/19.md) - Cached Responses
+- [x] [NUT-20](https://github.com/cashubtc/nuts/blob/main/20.md) - Signature on Mint Quote
+- [x] [NUT-21](https://github.com/cashubtc/nuts/blob/main/21.md) - Clear authentication
+- [x] [NUT-22](https://github.com/cashubtc/nuts/blob/main/22.md) - Blind authentication
+
 Non official NUT:
 - [x] [NUT-XX](https://github.com/cashubtc/nuts/blob/main/22.md)
 
