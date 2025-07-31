@@ -12,17 +12,10 @@ Cashu protocol mint focused on ease of use and feature completeness.
 
 Please test in Mutinynet at: *https://mutinynet.nutmix.cash*
 
-## Purpose of this project
-
-I saw the work made by calle on the Cashu protocol and was fascinated by the awesomeness of the project. So I decided to make an implementation of the mint in Go. 
-
-I'm also attempting to make all NUTs available as well as some other ideas such as: Monero and FIAT ecash.
-
-
+This is an alternative Cashu mint written in go. It's specifically just a mint with the objective to minimize the code
+and complexity.  
 ## Objective
-Build the fastest and most secure implementation of an ecash mint possible. This would include and admin dashboard to be
-able to monitor and control de behaviour of the mint.
-
+The mint includes it's proper dashboard to manage administration and logs. 
 
 ### Run the Mint
 
@@ -36,21 +29,45 @@ You'll need  the correct variables in an `.env` file first. Use the env.example 
 - You need to make sure to use a strong `POSTGRES_PASSWORD` and make user the username and password are the same in the
 `DATABASE_URL`
 
-- Add you mint in: MINT_PRIVATE_KEY. Please use a secure Private key.
+- Add private key using the `MINT_PRIVATE_KEY` enviroment variable or pick connect to a remote signer. 
 
-- To login into the admin dashboard and change the rest of settings add your npub to ADMIN_NOSTR_NPUB. 
+- To login into the admin dashboard and change the rest of settings add your npub to `ADMIN_NOSTR_NPUB` enviroment variable. 
 
-The mint will fail and Print out what you are missing if you don't have this 4 Items setup.
+The mint will stop and Print out what you are missing if you don't have this 4 Items setup.
 
 
-if you want to run with docker traefik and you also need to fill variables below `HOSTING` for your domains.
-
+### Running docker 
+In case you want to run the docker compose file using traefik and you also need to fill variables below `HOSTING` for your domains.
 If you have this correctly setup it should be as easy as running a simple docker command on linux:
 
-``` docker compose up -d ```
+```bash 
+docker compose up -d 
+```
 
-#### Video on .evn setup
-[![Video on .evn setup](https://cdn.hzrd149.com/0930b6e46cfe03a70345930d55b2eff51b0eb39d6e6eb4305b42b7736398f49c.png)](https://cdn.hzrd149.com/0ef3cb33401dbdd002039d01c0f749491c26720a80b23b885ae0f569ebd9f7b3.mp4)
+## Setting up a remote signer.
+
+Right now there are two remote signer implementations. 
+
+- [Nutvault](https://github.com/lescuer97/nutvault)
+- [cdk-signatory](https://github.com/cashubtc/cdk/tree/main/crates/cdk-signatory)
+
+There is a new enviroment variable called `SIGNER_TYPE`. If you want to use the remote signer you need to set the
+options `abstract_socket` or `network`. This will then will look for the signer to connect.  If you pick network you
+will also need to set the `NETWORK_SIGNER_ADDRESS` env variable.
+
+### Setup mTLS for signer
+The mint communicates with the remote signer using mTLS.
+You will need to set environment variables for signaling the routes for mTLS.
+
+```bash
+SIGNER_CLIENT_TLS_KEY=<route to file>
+SIGNER_CLIENT_TLS_CERT=<route to file>
+SIGNER_CA_CERT=<route to file>
+```
+
+## Video Walkthrough
+#### Video on .env setup
+[![Video on .env setup](https://cdn.hzrd149.com/0930b6e46cfe03a70345930d55b2eff51b0eb39d6e6eb4305b42b7736398f49c.png)](https://cdn.hzrd149.com/0ef3cb33401dbdd002039d01c0f749491c26720a80b23b885ae0f569ebd9f7b3.mp4)
 
 #### Setup Lightning node
 [![Setup Lightning node](https://cdn.hzrd149.com/c2175c7a310026f0450f98146f9dd180979909aaa464aa4376a75eb25b013b10.png)](https://cdn.hzrd149.com/905025ea49d48e36890f87ab05a7be75b141331e25ec8a326a29adfc9cb4cd0a.mp4)
@@ -58,11 +75,36 @@ If you have this correctly setup it should be as easy as running a simple docker
 #### Walkthrough of dashboard
 [![Walkthrough of dashboard](https://cdn.hzrd149.com/9f967999398e74ffb5ae079bb7e06b58ef8470204b05a21647c5b4e18c71c8d9.png)](https://cdn.hzrd149.com/72a5a65e027370084d45586084098f97ae3631f86bad932656b5c9532be7ba93.mp4)
 
-#### How to rotate a keyset up
 
-Login to the admin dashboard and click the rotate button on the keyset sections.
+## Supported NUTs
+[NUTs REPO](https://github.com/cashubtc/nuts/):
 
-### Development
+- [x] [NUT-00](https://github.com/cashubtc/nuts/blob/main/00.md) - Cryptography and Models
+- [x] [NUT-01](https://github.com/cashubtc/nuts/blob/main/01.md) - Mint public keys
+- [x] [NUT-02](https://github.com/cashubtc/nuts/blob/main/02.md) - Keysets and fees
+- [x] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md) - Swapping tokens
+- [x] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md) - Minting tokens
+- [x] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md) - Melting tokens
+- [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md) - Mint info
+- [x] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md) - Token state check
+- [x] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md) - Overpaid Lightning fees
+- [x] [NUT-09](https://github.com/cashubtc/nuts/blob/main/09.md) - Signature restore
+- [x] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md) - Spending conditions
+- [x] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md) - Pay-To-Pubkey (P2PK)
+- [x] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md) - DLEQ proofs
+- [x] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md) - Hashed Timelock Contracts (HTLCs)
+- [x] [NUT-15](https://github.com/cashubtc/nuts/blob/main/15.md) - Partial multi-path payments (MPP)
+- [x] [NUT-17](https://github.com/cashubtc/nuts/blob/main/17.md) - WebSocket subscriptions
+- [x] [NUT-19](https://github.com/cashubtc/nuts/blob/main/19.md) - Cached Responses
+- [x] [NUT-20](https://github.com/cashubtc/nuts/blob/main/20.md) - Signature on Mint Quote
+- [x] [NUT-21](https://github.com/cashubtc/nuts/blob/main/21.md) - Clear authentication
+- [x] [NUT-22](https://github.com/cashubtc/nuts/blob/main/22.md) - Blind authentication
+
+Non official NUT:
+- [x] [NUT-XX](https://github.com/cashubtc/nuts/blob/main/22.md)
+
+
+## Development
 
 If you want to develop for the project I personally run a hybrid setup. I run the mint locally and the db on docker. 
 
@@ -76,46 +118,11 @@ I have a special development docker compose called: `docker-compose-dev.yml`. Th
 
 ``` # build the project go run cmd/nutmix/*.go ```
 
-## Supported NUTs
+#### Generate remote-signer proto code
 
-Implemented [NUTs](https://github.com/cashubtc/nuts/):
-
-- [x] [NUT-00](https://github.com/cashubtc/nuts/blob/main/00.md)
-- [x] [NUT-01](https://github.com/cashubtc/nuts/blob/main/01.md)
-- [x] [NUT-02](https://github.com/cashubtc/nuts/blob/main/02.md)
-- [x] [NUT-03](https://github.com/cashubtc/nuts/blob/main/03.md)
-- [x] [NUT-04](https://github.com/cashubtc/nuts/blob/main/04.md)
-- [x] [NUT-05](https://github.com/cashubtc/nuts/blob/main/05.md)
-- [x] [NUT-06](https://github.com/cashubtc/nuts/blob/main/06.md)
-- [x] [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md)
-- [x] [NUT-08](https://github.com/cashubtc/nuts/blob/main/08.md)
-- [x] [NUT-10](https://github.com/cashubtc/nuts/blob/main/10.md)
-- [x] [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md)
-- [x] [NUT-12](https://github.com/cashubtc/nuts/blob/main/12.md)
-- [ ] [NUT-13](https://github.com/cashubtc/nuts/blob/main/13.md)
-- [x] [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md)
-- [x] [NUT-15](https://github.com/cashubtc/nuts/blob/main/15.md)
-
-## Roadmap
-At this moment NUTS are up to P2PK (NUT-11) are implemented and working. I plan to keep going until all NUTS are done.
-
-1. ~~Finish Milestones for [V1](https://github.com/lescuer97/nutmix/milestone/1).~~
-2. ~~Finish NUTS until NUT-15.~~ 
-3. Add dashboard for controlling aspects of the mint.
-    - ~~Nostr Login~~
-    - ~~Rotate keysets.~~
-    - ~~Monitor Mint activity~~.
-    - Emmit blind signatures for certain users.
-    - Activate Nostr only mode.
-    - ~~Change mint messages~~
-5. Add support for other lightning nodes. Ex: ~~core-lighting~~, Strike, Greenlight.
-4. Add Monero Support this would probably include a way to exchange in between Bitcoin and Monero.
-5. Tor only mode
-6. Nostr only Mode.
-7. Remote signing. This would leave the mint in a highly available server but the lightning transactions and tokens
-   would be signed and verified on a secure enclave. This could be something like a hardware device or AWS Nitro. I
-   would probably take inspiration or directly use something like [VLS](https://vls.tech/)
-
+```
+protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
+```
 ### Support 
 
 Pull requests and suggestions are always welcomed. The more people have eyes on this the better.

@@ -62,6 +62,9 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrRepeatedOutput):
 		message := cashu.ErrRepeatedOutput.Error()
 		return cashu.DUPLICATE_OUTPUTS, &message
+	case errors.Is(proofError, cashu.ErrRepeatedInput):
+		message := cashu.ErrRepeatedInput.Error()
+		return cashu.DUPLICATE_INPUTS, &message
 
 	case errors.Is(proofError, cashu.ErrUnitNotSupported):
 		message := cashu.ErrUnitNotSupported.Error()
@@ -87,6 +90,11 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrNotEnoughtProofs.Error()
 		return cashu.LIGHTNING_PAYMENT_FAILED, &message
 
+	case errors.Is(proofError, cashu.ErrMintQuoteNoPublicKey):
+		return cashu.MINT_QUOTE_INVALID_PUB_KEY, nil
+
+	case errors.Is(proofError, cashu.ErrMintQuoteNoValidSignature):
+		return cashu.MINT_QUOTE_INVALID_SIG, nil
 	}
 
 	return cashu.UNKNOWN, nil

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -297,9 +296,7 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keyset signer.GetKeys
 			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
-		amountStr := strconv.FormatUint(output.Amount, 10)
-
-		pubkeyStr := keyset.Keysets[0].Keys[amountStr]
+		pubkeyStr := keyset.Keysets[0].Keys[output.Amount]
 		pubkeyBytes, err := hex.DecodeString(pubkeyStr)
 		if err != nil {
 			return nil, fmt.Errorf("hex.DecodeString(pubkeyStr): %w", err)

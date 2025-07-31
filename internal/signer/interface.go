@@ -3,7 +3,7 @@ package signer
 import "github.com/lescuer97/nutmix/api/cashu"
 
 type Signer interface {
-	GetKeys() (GetKeysetsResponse, error)
+	GetKeysets() (GetKeysetsResponse, error)
 	GetKeysById(id string) (GetKeysResponse, error)
 	GetActiveKeys() (GetKeysResponse, error)
 

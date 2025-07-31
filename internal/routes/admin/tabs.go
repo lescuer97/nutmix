@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"strconv"
 
@@ -222,7 +221,6 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
-		log.Println("network:", mint.Config.NETWORK)
 		err := templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer)
 
 		if err != nil {

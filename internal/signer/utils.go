@@ -3,7 +3,6 @@ package signer
 import (
 	"encoding/hex"
 	"fmt"
-	"strconv"
 
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/tyler-smith/go-bip32"
@@ -29,12 +28,12 @@ func OrderKeysetByUnit(keysets []cashu.MintKey) GetKeysResponse {
 		var keysetResponse KeysetResponse
 		keysetResponse.Id = value[0].Id
 		keysetResponse.Unit = value[0].Unit
-		keysetResponse.Keys = make(map[string]string)
+		keysetResponse.Keys = make(map[uint64]string)
 		keysetResponse.InputFeePpk = value[0].InputFeePpk
 
 		for _, keyset := range value {
 
-			keysetResponse.Keys[strconv.FormatUint(keyset.Amount, 10)] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
+			keysetResponse.Keys[keyset.Amount] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
 		}
 
 		res.Keysets = append(res.Keysets, keysetResponse)

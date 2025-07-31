@@ -87,7 +87,7 @@ func TestVerifyUnitOfProofFail(t *testing.T) {
 		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
 	}
 
-	keysets, err := mint.Signer.GetKeys()
+	keysets, err := mint.Signer.GetKeysets()
 	if err != nil {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}
@@ -109,7 +109,7 @@ func TestVerifyUnitOfProofPass(t *testing.T) {
 		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
 	}
 
-	keysets, err := mint.Signer.GetKeys()
+	keysets, err := mint.Signer.GetKeysets()
 	if err != nil {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}
@@ -133,7 +133,7 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
 	}
 
-	keysets, err := mint.Signer.GetKeys()
+	keysets, err := mint.Signer.GetKeysets()
 	if err != nil {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}

@@ -39,6 +39,7 @@ type LNBitsPaymentStatusDetail struct {
 	Memo    string
 	Fee     int64
 	Pending bool
+	Status  string
 }
 type LNBitsPaymentStatus struct {
 	Paid     bool   `json:"paid"`
@@ -74,6 +75,7 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 	}
 
 	body, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
 
 	if err != nil {
 		return fmt.Errorf("ioutil.ReadAll: %w", err)
@@ -165,8 +167,12 @@ func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checking
 	switch {
 	case paymentStatus.Paid:
 		return SETTLED, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+	case paymentStatus.Details.Status == "pending":
+		return PENDING, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
 	case paymentStatus.Details.Pending:
 		return PENDING, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+	case !paymentStatus.Paid && paymentStatus.Details.Status == "failed":
+		return FAILED, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
 	case !paymentStatus.Paid && !paymentStatus.Details.Pending:
 		return FAILED, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
 	default:
@@ -236,13 +242,20 @@ func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amo
 	var lnbitsInvoice struct {
 		PaymentHash    string `json:"payment_hash"`
 		PaymentRequest string `json:"payment_request"`
+		Bolt11         string `json:"bolt11"`
 	}
 	err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 	if err != nil {
 		return response, fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	response.PaymentRequest = lnbitsInvoice.PaymentRequest
+	if lnbitsInvoice.Bolt11 != "" {
+
+		response.PaymentRequest = lnbitsInvoice.Bolt11
+	} else {
+		response.PaymentRequest = lnbitsInvoice.PaymentRequest
+	}
+
 	response.Rhash = lnbitsInvoice.PaymentHash
 	response.CheckingId = lnbitsInvoice.PaymentHash
 

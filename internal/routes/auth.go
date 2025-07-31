@@ -11,9 +11,23 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
+func AuthActivatedMiddleware(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		if !mint.Config.MINT_REQUIRE_AUTH {
+			logger.Warn(fmt.Errorf("Tried using route that does not exists because auth not being active").Error())
+			c.JSON(404, "route does not exists")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func v1AuthRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1 := r.Group("/v1")
 	auth := v1.Group("/auth")
+	auth.Use(AuthActivatedMiddleware(mint, logger))
 
 	auth.GET("/blind/keys", func(c *gin.Context) {
 		keys, err := mint.Signer.GetAuthActiveKeys()
