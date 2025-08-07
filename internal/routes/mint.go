@@ -211,7 +211,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		response := cashu.GetInfoResponse{
 			Name:            mint.Config.NAME,
-			Version:         "nutmix/0.3.6",
+			Version:         "nutmix/0.3.7",
 			Pubkey:          mint.MintPubkey,
 			Description:     mint.Config.DESCRIPTION,
 			DescriptionLong: mint.Config.DESCRIPTION_LONG,
