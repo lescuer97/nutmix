@@ -147,7 +147,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		defer mint.MintDB.Rollback(ctx, tx)
 
 		quote, err := mint.MintDB.GetMintRequestById(tx, quoteId)
-
 		if err != nil {
 			logger.Error(fmt.Errorf("mint:quote mint.MintDB.GetMintRequestById(tx, quoteId): %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
