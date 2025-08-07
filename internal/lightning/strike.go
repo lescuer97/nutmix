@@ -228,8 +228,6 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 		}
 
 	}
-
-	return nil
 }
 
 func (l Strike) convertStrikeAmountToUInt(amount strikeAmount) (cashu.Amount, error) {

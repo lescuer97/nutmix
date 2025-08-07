@@ -67,11 +67,11 @@ func CanUseLiquidityManager(backend LightningBackend) bool {
 }
 
 type LiquiditySwap struct {
-	Amount           uint64    `json"amount"`
-	Id               string    `json"id"`
-	State            SwapState `json"state"`
-	Type             SwapType  `json"type"`
-	Expiration       uint64    `json"expiration"`
+	Amount           uint64    `json:"amount"`
+	Id               string    `json:"id"`
+	State            SwapState `json:"state"`
+	Type             SwapType  `json:"type"`
+	Expiration       uint64    `json:"expiration"`
 	LightningInvoice string    `db:"lightning_invoice"`
 	CheckingId       string    `db:"checking_id"`
 }
