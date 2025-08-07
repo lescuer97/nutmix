@@ -71,7 +71,7 @@ func TestMintInfo(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	if mintInfo.Version != "NutMix/0.3.4" {
+	if mintInfo.Version != "NutMix/0.3.6" {
 		t.Errorf("Incorrect version  %v", mintInfo.Version)
 	}
 
