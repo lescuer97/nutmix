@@ -42,14 +42,13 @@ func (pql Postgresql) GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.Mel
 	var meltChangeList []cashu.MeltChange
 
 	rows, err := tx.Query(context.Background(), `SELECT "B_", id, quote, created_at FROM melt_change_message WHERE quote = $1 FOR UPDATE NOWAIT`, quote)
-	defer rows.Close()
 
 	if err != nil {
-
 		if err == pgx.ErrNoRows {
 			return meltChangeList, nil
 		}
 	}
+	defer rows.Close()
 
 	meltChange, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MeltChange])
 

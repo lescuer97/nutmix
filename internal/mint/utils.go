@@ -102,7 +102,6 @@ func (m *Mint) GetRestorySigsFromBlindFactor(blindingFactors []string) ([]cashu.
 }
 
 func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
-
 	// check output have the correct unit
 	unit, err := m.checkMessagesAreSameUnit(outputs, keys)
 	if err != nil {

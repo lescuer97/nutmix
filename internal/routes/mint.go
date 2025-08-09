@@ -291,7 +291,6 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		// sign the outputs
 		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(swapRequest.Outputs)
-
 		if err != nil {
 			logger.Error("mint.Signer.SignBlindMessages(swapRequest.Outputs)", slog.String(utils.LogExtraInfo, err.Error()))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
