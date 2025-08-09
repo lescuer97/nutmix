@@ -46,14 +46,9 @@ func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB, lo
 	mintRequest.RequestPaid = true
 
 	logger.Info(fmt.Sprintf("Settling bolt11 payment internally: %v. mintRequest: %v, %v, %v", meltQuote.Quote, mintRequest.Quote, meltQuote.Amount, meltQuote.Unit))
-
 	err = m.MintDB.ChangeMeltRequestState(tx, meltQuote.Quote, meltQuote.RequestPaid, meltQuote.State, meltQuote.Melted, meltQuote.FeePaid)
 	if err != nil {
 		return meltQuote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(tx, meltQuote.Quote, meltQuote.RequestPaid, meltQuote.State, meltQuote.Melted, meltQuote.FeePaid) %w", err)
-	}
-	err = m.MintDB.ChangeMintRequestState(tx, mintRequest.Quote, mintRequest.RequestPaid, mintRequest.State, mintRequest.Minted)
-	if err != nil {
-		return meltQuote, fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, mintRequest.Quote, mintRequest.RequestPaid, mintRequest.State, mintRequest.Minted): %w", err)
 	}
 
 	return meltQuote, nil
@@ -255,25 +250,13 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
 	}
 	if len(meltRequest.Outputs) > 0 {
-		outputUnit, err := m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets)
+		outputUnit, err := m.VerifyOutputs(tx, meltRequest.Outputs, keysets.Keysets)
 		if err != nil {
 			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.VerifyOutputs(meltRequest.Outputs): %w", cashu.ErrUnitNotSupported, err)
 		}
 
 		if outputUnit != unit {
 			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. Change output unit is different: ", cashu.ErrDifferentInputOutputUnit)
-		}
-	}
-
-	// if there are change outputs you need to check if the outputs are valid if they have the correct unit
-	if len(meltRequest.Outputs) > 0 {
-		outputUnit, err := m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets)
-		if err != nil {
-			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.VerifyOutputs(meltRequest.Outputs): %w", cashu.ErrUnitNotSupported, err)
-		}
-
-		if outputUnit != unit {
-			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. Change output unit is different: ", cashu.ErrUnitNotSupported)
 		}
 	}
 

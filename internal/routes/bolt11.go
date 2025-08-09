@@ -206,7 +206,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		defer mint.MintDB.Rollback(ctx, tx)
 
 		mintRequestDB, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
-
 		if err != nil {
 			logger.Error(fmt.Errorf(" mint-resquest mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -251,9 +250,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
+		// quote
 
 		logger.Debug(fmt.Sprintf("before verifying outputs  for keysets %+v and mint quote id: %v. ", keysets.Keysets, mintRequestDB.Quote))
-		_, err = mint.VerifyOutputs(mintRequest.Outputs, keysets.Keysets)
+		_, err = mint.VerifyOutputs(tx, mintRequest.Outputs, keysets.Keysets)
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.VerifyOutputs(mintRequest.Outputs). %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)

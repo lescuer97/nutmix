@@ -246,14 +246,6 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		err = mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs)
-		if err != nil {
-			logger.Error(fmt.Errorf("mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs). %w", err).Error())
-			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
-			return
-		}
-
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
@@ -261,6 +253,14 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 		defer mint.MintDB.Rollback(ctx, tx)
+
+		err = mint.VerifyInputsAndOutputs(tx, swapRequest.Inputs, swapRequest.Outputs)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
 
 		// check if we know any of the proofs
 		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)
@@ -364,10 +364,21 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			blindingFactors = append(blindingFactors, output.B_)
 		}
 
-		blindRecoverySigs, err := mint.GetRestorySigsFromBlindFactor(blindingFactors)
+		ctx := context.Background()
+		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Error("mint.GetRestorySigsFromBlindFactor(blindingFactors)", slog.String(utils.LogExtraInfo, err.Error()))
+			c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
+			return
+		}
+		blindRecoverySigs, err := mint.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)
+		if err != nil {
+			logger.Error("mint.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+		err = mint.MintDB.Commit(ctx, tx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
