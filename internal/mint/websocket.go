@@ -71,13 +71,15 @@ func (o *Observer) AddMeltWatch(quote string, meltChan MeltQuoteChannel) {
 
 func (o *Observer) RemoveWatch(subId string) {
 	o.Lock()
-	defer o.Unlock()
+	proofChans := []chan cashu.Proof{}
+	mintRequestChans := []chan cashu.MintRequestDB{}
+	meltRequestChans := []chan cashu.MeltRequestDB{}
 	for key, proofWatchArray := range o.Proofs {
 		for i, proofWatch := range proofWatchArray {
 			if proofWatch.SubId == subId {
 				newArray := slices.Delete(proofWatchArray, i, i+1)
 				o.Proofs[key] = newArray
-				close(proofWatch.Channel)
+				proofChans = append(proofChans, proofWatch.Channel)
 			}
 		}
 	}
@@ -86,7 +88,7 @@ func (o *Observer) RemoveWatch(subId string) {
 			if mintWatch.SubId == subId {
 				newArray := slices.Delete(mintWatchArray, i, i+1)
 				o.MintQuote[key] = newArray
-				close(mintWatch.Channel)
+				mintRequestChans = append(mintRequestChans, mintWatch.Channel)
 			}
 		}
 	}
@@ -95,15 +97,26 @@ func (o *Observer) RemoveWatch(subId string) {
 			if meltWatch.SubId == subId {
 				newArray := slices.Delete(meltWatchArray, i, i+1)
 				o.MeltQuote[key] = newArray
-				close(meltWatch.Channel)
+				meltRequestChans = append(meltRequestChans, meltWatch.Channel)
 			}
 		}
+	}
+	o.Unlock()
+	for i := range proofChans{
+		close(proofChans[i])
+	}
+	for i := range mintRequestChans{
+		close(mintRequestChans[i])
+	}
+	for i := range meltRequestChans{
+		close(meltRequestChans[i])
 	}
 }
 
 func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 	o.Lock()
 	defer o.Unlock()
+
 
 	for _, proof := range proofs {
 		watchArray, exists := o.Proofs[proof.Y]
@@ -117,8 +130,8 @@ func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 
 func (o *Observer) SendMeltEvent(melt cashu.MeltRequestDB) {
 	o.Lock()
-	defer o.Unlock()
 	watchArray, exists := o.MeltQuote[melt.Quote]
+	 o.Unlock()
 	if exists {
 		for _, v := range watchArray {
 			v.Channel <- melt
@@ -128,8 +141,8 @@ func (o *Observer) SendMeltEvent(melt cashu.MeltRequestDB) {
 
 func (o *Observer) SendMintEvent(mint cashu.MintRequestDB) {
 	o.Lock()
-	defer o.Unlock()
 	watchArray, exists := o.MintQuote[mint.Quote]
+	 o.Unlock()
 	if exists {
 		for _, v := range watchArray {
 			v.Channel <- mint
