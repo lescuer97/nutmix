@@ -102,13 +102,13 @@ func (o *Observer) RemoveWatch(subId string) {
 		}
 	}
 	o.Unlock()
-	for i := range proofChans{
+	for i := range proofChans {
 		close(proofChans[i])
 	}
-	for i := range mintRequestChans{
+	for i := range mintRequestChans {
 		close(mintRequestChans[i])
 	}
-	for i := range meltRequestChans{
+	for i := range meltRequestChans {
 		close(meltRequestChans[i])
 	}
 }
@@ -116,7 +116,6 @@ func (o *Observer) RemoveWatch(subId string) {
 func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 	o.Lock()
 	defer o.Unlock()
-
 
 	for _, proof := range proofs {
 		watchArray, exists := o.Proofs[proof.Y]
@@ -131,7 +130,7 @@ func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 func (o *Observer) SendMeltEvent(melt cashu.MeltRequestDB) {
 	o.Lock()
 	watchArray, exists := o.MeltQuote[melt.Quote]
-	 o.Unlock()
+	o.Unlock()
 	if exists {
 		for _, v := range watchArray {
 			v.Channel <- melt
@@ -142,7 +141,7 @@ func (o *Observer) SendMeltEvent(melt cashu.MeltRequestDB) {
 func (o *Observer) SendMintEvent(mint cashu.MintRequestDB) {
 	o.Lock()
 	watchArray, exists := o.MintQuote[mint.Quote]
-	 o.Unlock()
+	o.Unlock()
 	if exists {
 		for _, v := range watchArray {
 			v.Channel <- mint
