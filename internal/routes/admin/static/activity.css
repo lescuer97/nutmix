@@ -1,8 +1,16 @@
 .activity {
-    display: flex;
-    justify-content: center;
-    align-content: center;
-    padding: 0% 10%
+  /* Extra-info should not be truncated: allow full content (wrap) */
+  .logs .extra {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    word-break: break-word;
+  }
+
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  padding: 0% 10%;
 }
 .balance {
   display: flex;
@@ -11,71 +19,108 @@
 }
 
 .data-list {
-    display: flex;
-    flex-direction: row;
-    margin-top: 25px;
-    gap: 15px;
-    /* width: 100; */
+  display: flex;
+  flex-direction: column;
+  margin-top: 25px;
+  gap: 15px;
+  /* width: 100; */
 }
 
+.table {
+  display: flex;
+  flex-direction: column;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.row-item {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+}
+
+.table-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 2px;
+  margin-bottom: 2px;
+  font-weight: bold;
+  font-size: 20px;
+}
 .time-select {
-    margin-bottom: 15px;
+  margin-bottom: 15px;
+}
+
+.cell {
+  padding: 10px;
+  text-align: center;
+  border: 1px solid var(--white);
+  overflow-wrap: break-word; /* modern */
+  word-wrap: break-word; /* legacy (older browsers) */
+  word-break: break-word;
 }
 
 button.time-button {
-    border-radius: 0px;
-    background-color: transparent;
-    color: var(--white);
-    border: 1px solid var(--white);
-    margin-left: 10px;
-    margin-right: 10px;
+  border-radius: 0px;
+  background-color: transparent;
+  color: var(--white);
+  border: 1px solid var(--white);
+  margin-left: 10px;
+  margin-right: 10px;
 }
 
 button.time-button.selected {
-    background-color: transparent;
-    color: var(--darkreader-inline-color);
+  background-color: transparent;
+  color: var(--darkreader-inline-color);
 }
 
-.data-table {
-      width: 50%;
-}
 .data-table h2 {
-    padding-left: 10px;
+  padding-left: 10px;
 }
 
 .data-table div {
-      display: flex;
-      flex-direction: column;
-      overflow-y: scroll;
-      overflow-x: hidden;
-      overflow-wrap: break-word;
-      max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overflow-wrap: break-word;
+  max-height: 500px;
 }
 
 .data-table caption {
-    text-align: left;
-    padding-left: 15px;
+  text-align: left;
+  padding-left: 15px;
 }
 
-
-tr.DEBUG {
-    background-color: #94ed74;
-    color: black;
+.level {
+  font-weight: bold;
+  font-size: 16px;
 }
 
-tr.WARN {
-    background-color: #f1fc74;
-    color: black;
+.DEBUG div{
+  background-color: #94ed74;
+  color: black;
 }
 
-tr.ERROR {
-    background-color: #ed6565;
-    color: black;
+.WARN div{
+  background-color: #f1fc74;
+  color: black;
+}
+
+.ERROR div{
+  background-color: #ed6565;
+  color: black;
 }
 
 .request-row {
-    max-width: 300px;
-    text-overflow: ellipsis;
+  text-overflow: ellipsis;
 }
 
 th,
@@ -86,47 +131,93 @@ td {
 }
 
 td.unit {
-    text-transform: uppercase;
+  text-transform: uppercase;
 }
 
-tr.Mint {
-    background-color: #94ed74;
-    color: black;
+.Mint div {
+  background-color: #94ed74;
+  color: black;
 }
 
-tr.Melt {
-    background-color: #ed6565;
-    color: black;
+.Melt div {
+  background-color: #ed6565;
+  color: black;
 }
 
 .flex-card {
-    display: flex;
-    flex-direction: row;
-    gap: 40px;
-
+  display: flex;
+  flex-direction: row;
+  gap: 40px;
 }
 .reserve-titles {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    margin-right: 8px;
-    margin-left: 8px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-right: 8px;
+  margin-left: 8px;
 }
 
 .reserves-data.iliquid {
-    color: red;
+  color: red;
 }
 
 .reserves-data .data {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    gap: 8px;
-    margin-right: 8px;
-    margin-left: 8px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 8px;
+  margin-right: 8px;
+  margin-left: 8px;
 }
 
 .reserves-data .data meter {
-    height: 20px;
+  height: 20px;
 }
 
+/* New logs layout: header row + body divs (no table) */
+.logs {
+  width: 100%;
+}
+.logs-header,
+.log-row {
+  display: grid;
+  grid-template-columns: 12% 52% 26% 10%; /* Level | Message | Extra | Time */
+  gap: 8px;
+  align-items: start; /* allow rows to expand with content */
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+.logs-header {
+  font-weight: bold;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  background: var(--card-bg, #f8f8f8);
+}
+.log-row {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+/* Allow content to wrap and let the row height adjust automatically */
+.log-row .col {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal; /* allow wrapping */
+  word-break: break-word;
+}
+
+/* Keep header columns single-line */
+.logs-header .col {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 800px) {
+  .logs-header,
+  .log-row {
+    grid-template-columns: 15% 55% 30%;
+  }
+  .logs-header .time,
+  .log-row .time {
+    display: none;
+  }
+}

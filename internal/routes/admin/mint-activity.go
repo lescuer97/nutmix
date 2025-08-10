@@ -15,7 +15,7 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintBalance(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		isFakeWallet := false
@@ -38,7 +38,7 @@ func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		milillisatBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
-			logger.Warn(
+			slog.Warn(
 				"mint.LightningComs.WalletBalance()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -60,7 +60,7 @@ func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-func MintMeltSummary(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintMeltSummary(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
@@ -70,7 +70,7 @@ func MintMeltSummary(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"database.GetMintMeltBalanceByTime(pool",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
@@ -82,14 +82,17 @@ func MintMeltSummary(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		mintMeltTotal := make(map[string]int64)
-		mintMeltTotal["Mint"] += 0
+		activitySummary := templates.ActivitySummary{
+			Mint: 0,
+			Melt: 0,
+			Net:  0,
+		}
 		// sum up mint
 		for _, mintRequest := range mintMeltBalance.Mint {
 			invoice, err := zpay32.Decode(mintRequest.Request, mint.LightningBackend.GetNetwork())
 
 			if err != nil {
-				logger.Debug(
+				slog.Debug(
 					"zpay32.Decode",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -102,23 +105,28 @@ func MintMeltSummary(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 				return
 			}
 
-			mintMeltTotal["Mint"] += int64(invoice.MilliSat.ToSatoshis().ToUnit(btcutil.AmountSatoshi))
+			activitySummary.Mint += int64(invoice.MilliSat.ToSatoshis().ToUnit(btcutil.AmountSatoshi))
 		}
 
 		// sum up melt amount
 		for _, meltRequest := range mintMeltBalance.Melt {
 
-			mintMeltTotal["Melt"] += int64(meltRequest.Amount)
+			activitySummary.Melt += int64(meltRequest.Amount)
 		}
-		mintMeltTotal["Melt"] = mintMeltTotal["Melt"] * -1
+		activitySummary.Melt = activitySummary.Melt * -1
 
 		// get net flows
-		mintMeltTotal["Net"] = mintMeltTotal["Mint"] + mintMeltTotal["Melt"]
+		activitySummary.Net = activitySummary.Mint + activitySummary.Mint
 
-		c.HTML(200, "mint-melt-activity", mintMeltTotal)
+		err = templates.MintMovements(activitySummary).Render(context.Background(), c.Writer)
+		if err != nil {
+			c.Error(err)
+			c.Status(400)
+			return
+		}
 	}
 }
-func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintMeltList(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
 		timeRequestDuration := ParseToTimeRequest(timeHeader)
@@ -126,7 +134,7 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"database.GetMintMeltBalanceByTime(pool",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -181,13 +189,13 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-func SwapsList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func SwapsList(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		swaps, err := mint.MintDB.GetAllLiquiditySwaps()
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"mint.MintDB.GetAllLiquiditySwaps()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 

@@ -173,30 +173,30 @@ templ Auth(config utils.Config) {
 		</label>
 	</div>
 	<script>
-        document.addEventListener('DOMContentLoaded', function() {
-          // Get all multiple select elements on the page
-          const multiSelects = document.querySelectorAll('select[multiple]');
-        
-          // Add event listener to each multiple select element
-          multiSelects.forEach(select => {
-            select.addEventListener('mousedown', function(e) {
-              console.log({event: e})
-              // Only prevent default if clicking on an option
-              if (e.target.nodeName === 'OPTION') {
-                e.preventDefault();
-                
-                // Toggle selection on the clicked option
-                const option = e.target;
-                option.selected = !option.selected;
-                
-                // Trigger change event
-                const event = new Event('change');
-                this.dispatchEvent(event);
-              }
-            });
-          });
-        });
-</script>
+		document.addEventListener("DOMContentLoaded", function () {
+			// Get all multiple select elements on the page
+			const multiSelects = document.querySelectorAll("select[multiple]");
+
+			// Add event listener to each multiple select element
+			multiSelects.forEach((select) => {
+				select.addEventListener("mousedown", function (e) {
+					console.log({ event: e });
+					// Only prevent default if clicking on an option
+					if (e.target.nodeName === "OPTION") {
+						e.preventDefault();
+
+						// Toggle selection on the clicked option
+						const option = e.target;
+						option.selected = !option.selected;
+
+						// Trigger change event
+						const event = new Event("change");
+						this.dispatchEvent(event);
+					}
+				});
+			});
+		});
+	</script>
 }
 
 templ MultiSelect(id string, name string, options []string, selectedValues []string) {
