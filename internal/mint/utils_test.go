@@ -139,11 +139,20 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 	}
 	outputs := []cashu.BlindedMessage{{Id: "00bfa73302d12ffd", B_: "blind1"}, {Id: "00bfa73302d12ffd", B_: "blind2"}, {Id: "00bfa73302d12ffd", B_: "blind2"}}
 
-	_, err = mint.VerifyOutputs(outputs, keysets.Keysets)
+	tx, err := mint.MintDB.GetTx(context.Background())
+	if err != nil {
+		t.Fatalf("could not get transaction. %v", err)
+
+	}
+	_, err = mint.VerifyOutputs(tx, outputs, keysets.Keysets)
 	if err == nil {
 		t.Errorf("should have failed because of there are repeated outputs: %+v ", err)
 	}
 	if !errors.Is(err, cashu.ErrRepeatedOutput) {
 		t.Errorf("Error there should be a repeated output. %v", err)
+	}
+	err = tx.Commit(context.Background())
+	if err == nil {
+		t.Fatalf("Could not get the commit tx: %+v ", err)
 	}
 }
