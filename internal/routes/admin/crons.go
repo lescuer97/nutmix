@@ -14,14 +14,14 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
+func CheckStatusOfLiquiditySwaps(mint *m.Mint) {
 
 	for {
 		func() {
 			ctx := context.Background()
 			tx, err := mint.MintDB.GetTx(ctx)
 			if err != nil {
-				logger.Debug(
+				slog.Debug(
 					"Could not get db transactions",
 					slog.String(utils.LogExtraInfo, err.Error()),
 				)
@@ -30,16 +30,16 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 			defer func() {
 				if p := recover(); p != nil {
-					logger.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err).Error())
+					slog.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err).Error())
 					mint.MintDB.Rollback(ctx, tx)
 
 				} else if err != nil {
-					logger.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err).Error())
+					slog.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err).Error())
 					mint.MintDB.Rollback(ctx, tx)
 				} else {
 					err = mint.MintDB.Commit(context.Background(), tx)
 					if err != nil {
-						logger.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err).Error())
+						slog.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err).Error())
 					}
 				}
 			}()
@@ -51,17 +51,17 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 			})
 
 			if err != nil {
-				logger.Warn(
+				slog.Warn(
 					"mint.MintDB.GetLiquiditySwapsByStates()",
 					slog.String(utils.LogExtraInfo, err.Error()))
 			}
 
 			for _, swap := range swaps {
-				logger.Debug(fmt.Sprintf("Checking out swap. %v", swap.Id))
+				slog.Debug(fmt.Sprintf("Checking out swap. %v", swap.Id))
 
 				swapTx, err := mint.MintDB.SubTx(ctx, tx)
 				if err != nil {
-					logger.Debug(
+					slog.Debug(
 						"Could not get swapTx for swap",
 						slog.String(utils.LogExtraInfo, err.Error()),
 					)
@@ -73,7 +73,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 				if now > int64(swap.Expiration) {
 					err := mint.MintDB.ChangeLiquiditySwapState(swapTx, swap.Id, utils.Expired)
 					if err != nil {
-						logger.Warn(
+						slog.Warn(
 							"mint.MintDB.ChangeLiquiditySwapState(swap.Id,utils.Expired)",
 							slog.String(utils.LogExtraInfo, err.Error()))
 						continue
@@ -81,7 +81,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 				}
 				decodedInvoice, err := zpay32.Decode(swap.LightningInvoice, mint.LightningBackend.GetNetwork())
 				if err != nil {
-					logger.Warn(
+					slog.Warn(
 						"zpay32.Decode(swap.Destination, mint.LightningBackend.GetNetwork())",
 						slog.String(utils.LogExtraInfo, err.Error()))
 					mint.MintDB.Rollback(ctx, swapTx)
@@ -94,7 +94,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 				case utils.LiquidityIn:
 					status, _, err := mint.LightningBackend.CheckReceived(cashu.MintRequestDB{Quote: payHash}, decodedInvoice)
 					if err != nil {
-						logger.Warn(
+						slog.Warn(
 							"mint.LightningBackend.CheckReceived(payHash)",
 							slog.String(utils.LogExtraInfo, err.Error()))
 						mint.MintDB.Rollback(ctx, swapTx)
@@ -114,7 +114,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 				case utils.LiquidityOut:
 					status, _, _, err := mint.LightningBackend.CheckPayed(payHash, decodedInvoice, swap.CheckingId)
 					if err != nil {
-						logger.Warn(
+						slog.Warn(
 							"mint.LightningBackend.CheckPayed(payHash)",
 							slog.String(utils.LogExtraInfo, err.Error()))
 						mint.MintDB.Rollback(ctx, swapTx)
@@ -135,17 +135,17 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, logger *slog.Logger) {
 
 				err = mint.MintDB.ChangeLiquiditySwapState(swapTx, swap.Id, swap.State)
 				if err != nil {
-					logger.Warn(
+					slog.Warn(
 						"mint.MintDB.ChangeLiquiditySwapState(swap.Id,utils.Expired)",
 						slog.String(utils.LogExtraInfo, err.Error()))
 					mint.MintDB.Rollback(ctx, swapTx)
 
 				}
 
-				logger.Debug(fmt.Sprintf("Commiting swap. %v", swap.Id))
+				slog.Debug(fmt.Sprintf("Commiting swap. %v", swap.Id))
 				err = mint.MintDB.Commit(context.Background(), swapTx)
 				if err != nil {
-					logger.Error(fmt.Errorf("\n Could not commit sub transaction: %+v \n", err).Error())
+					slog.Error(fmt.Errorf("\n Could not commit sub transaction: %+v \n", err).Error())
 				}
 			}
 

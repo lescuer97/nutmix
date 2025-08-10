@@ -1,19 +1,17 @@
 package routes
 
 import (
-	"log/slog"
-
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/middleware"
 )
 
-func V1Routes(r *gin.Engine, mint *mint.Mint, logger *slog.Logger) {
-	r.Use(middleware.ClearAuthMiddleware(mint, logger))
-	r.Use(middleware.BlindAuthMiddleware(mint, logger))
-	v1AuthRoutes(r, mint, logger)
-	v1MintRoutes(r, mint, logger)
-	v1bolt11Routes(r, mint, logger)
-	v1WebSocketRoute(r, mint, logger)
+func V1Routes(r *gin.Engine, mint *mint.Mint) {
+	r.Use(middleware.ClearAuthMiddleware(mint))
+	r.Use(middleware.BlindAuthMiddleware(mint))
+	v1AuthRoutes(r, mint)
+	v1MintRoutes(r, mint)
+	v1bolt11Routes(r, mint)
+	v1WebSocketRoute(r, mint)
 
 }

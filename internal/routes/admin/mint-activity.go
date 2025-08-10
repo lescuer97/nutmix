@@ -15,7 +15,7 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintBalance(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		isFakeWallet := false
@@ -38,7 +38,7 @@ func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		milillisatBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
-			logger.Warn(
+			slog.Warn(
 				"mint.LightningComs.WalletBalance()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -60,7 +60,7 @@ func MintBalance(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-func MintMeltSummary(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintMeltSummary(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
@@ -70,7 +70,7 @@ func MintMeltSummary(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"database.GetMintMeltBalanceByTime(pool",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
@@ -89,7 +89,7 @@ func MintMeltSummary(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			invoice, err := zpay32.Decode(mintRequest.Request, mint.LightningBackend.GetNetwork())
 
 			if err != nil {
-				logger.Debug(
+				slog.Debug(
 					"zpay32.Decode",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -118,7 +118,7 @@ func MintMeltSummary(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		c.HTML(200, "mint-melt-activity", mintMeltTotal)
 	}
 }
-func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintMeltList(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		timeHeader := c.GetHeader("time")
 		timeRequestDuration := ParseToTimeRequest(timeHeader)
@@ -126,7 +126,7 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(timeRequestDuration.RollBackFromNow().Unix())
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"database.GetMintMeltBalanceByTime(pool",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -181,13 +181,13 @@ func MintMeltList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-func SwapsList(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func SwapsList(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		swaps, err := mint.MintDB.GetAllLiquiditySwaps()
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"mint.MintDB.GetAllLiquiditySwaps()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 

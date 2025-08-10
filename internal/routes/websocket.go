@@ -22,7 +22,7 @@ func checkOrigin(r *http.Request) bool {
 	return true
 }
 
-func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
+func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 	v1 := r.Group("/v1")
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  4096,
@@ -33,7 +33,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	v1.GET("/ws", func(c *gin.Context) {
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
-			logger.Warn("upgrader.Upgrade(c.Writer, c.Request, nil)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("upgrader.Upgrade(c.Writer, c.Request, nil)", slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
 		defer conn.Close()
@@ -64,11 +64,11 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 				}
 				err = m.SendJson(conn, errMsg)
 			}
-			logger.Error("Error on creating websocket %+v", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("Error on creating websocket %+v", slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
 
-		logger.Debug(fmt.Sprintf("New request %+v", request))
+		slog.Debug(fmt.Sprintf("New request %+v", request))
 		// confirm subscription or unsubscribe
 		response := cashu.WsResponse{
 			JsonRpc: "2.0",
@@ -81,13 +81,13 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		err = m.SendJson(conn, response)
 		if err != nil {
-			logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
 		// Get initial state from proofs
 		err = CheckStatusOfSub(request, mint, conn)
 		if err != nil {
-			logger.Warn("CheckStatusOfSub(request, mint,conn)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("CheckStatusOfSub(request, mint,conn)", slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
 
@@ -97,7 +97,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		for {
 			select {
 			case error := <-listenError:
-				logger.Warn("go ListenToIncommingMessage(&activeSubs, conn, listining).", slog.String(utils.LogExtraInfo, error.Error()))
+				slog.Warn("go ListenToIncommingMessage(&activeSubs, conn, listining).", slog.String(utils.LogExtraInfo, error.Error()))
 				return
 
 			case proof, ok := <-proofChan:
@@ -114,7 +114,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
-						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						slog.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
 						return
 					}
 				}
@@ -132,7 +132,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
-						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						slog.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
 						return
 					}
 				}
@@ -149,7 +149,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
-						logger.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						slog.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
 						return
 					}
 				}
