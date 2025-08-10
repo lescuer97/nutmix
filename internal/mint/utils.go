@@ -79,16 +79,6 @@ func (m *Mint) checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []
 
 }
 
-func (m *Mint) GetRestorySigsFromBlindFactor(tx pgx.Tx, blindingFactors []string) ([]cashu.RecoverSigDB, error) {
-
-	recoverySigs, err := m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)
-	if err != nil {
-		return recoverySigs, fmt.Errorf("m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors): %w", err)
-	}
-
-	return recoverySigs, nil
-}
-
 func (m *Mint) VerifyOutputs(tx pgx.Tx, outputs []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
 	// check output have the correct unit
 	unit, err := m.checkMessagesAreSameUnit(outputs, keys)
