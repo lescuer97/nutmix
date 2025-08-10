@@ -33,7 +33,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 	v1.GET("/ws", func(c *gin.Context) {
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
-			slog.Warn("upgrader.Upgrade(c.Writer, c.Request, nil)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("upgrader.Upgrade(c.Writer, c.Request, nil)", slog.Any("error", err))
 			return
 		}
 		defer conn.Close()
@@ -81,13 +81,12 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 
 		err = m.SendJson(conn, response)
 		if err != nil {
-			slog.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("m.SendJson(conn, response)", slog.Any("error", err))
 			return
 		}
-		// Get initial state from proofs
 		err = CheckStatusOfSub(request, mint, conn)
 		if err != nil {
-			slog.Warn("CheckStatusOfSub(request, mint,conn)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("CheckStatusOfSub(request, mint,conn)", slog.Any("error", err))
 			return
 		}
 
@@ -97,7 +96,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 		for {
 			select {
 			case error := <-listenError:
-				slog.Warn("go ListenToIncommingMessage(&activeSubs, conn, listining).", slog.String(utils.LogExtraInfo, error.Error()))
+				slog.Warn("go ListenToIncommingMessage(&activeSubs, conn, listining).", slog.Any("error", error))
 				return
 
 			case proof, ok := <-proofChan:
@@ -114,7 +113,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
-						slog.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						slog.Warn("m.SendJson(conn, response)", slog.Any("error", err))
 						return
 					}
 				}
@@ -132,7 +131,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
-						slog.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						slog.Warn("m.SendJson(conn, response)", slog.Any("error", err))
 						return
 					}
 				}
@@ -149,7 +148,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
-						slog.Warn("m.SendJson(conn, response)", slog.String(utils.LogExtraInfo, err.Error()))
+						slog.Warn("m.SendJson(conn, response)", slog.Any("error", err))
 						return
 					}
 				}

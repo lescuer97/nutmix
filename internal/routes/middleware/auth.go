@@ -43,7 +43,7 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 				token := c.GetHeader("Clear-auth")
 				err := mint.VerifyAuthClearToken(token)
 				if err != nil {
-					slog.Error(fmt.Errorf("mint.VerifyAuthClearToken(token). %w", err).Error())
+					slog.Error("mint.VerifyAuthClearToken(token)", slog.Any("error", err))
 					c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
 					return
 				}
@@ -87,7 +87,7 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 				}
 				authProof, err := cashu.DecodeAuthToken(blindAuth)
 				if err != nil {
-					slog.Warn(fmt.Errorf("cashu.DecodeAuthToken(blindAuth). ").Error())
+					slog.Warn("cashu.DecodeAuthToken(blindAuth)")
 					c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
 					c.Abort()
 					return
@@ -96,7 +96,7 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 				authProof.Amount = 1
 				err = mint.VerifyAuthBlindToken(authProof)
 				if err != nil {
-					slog.Error(fmt.Errorf("mint.VerifyAuthBlindToken(authProof). %w", err).Error())
+					slog.Error("mint.VerifyAuthBlindToken(authProof)", slog.Any("error", err))
 					c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
 					return
 				}

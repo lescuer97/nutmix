@@ -35,7 +35,7 @@ func KeysetsLayoutPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
-			slog.Error("mint.Signer.GetKeysets() %+v", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("mint.Signer.GetKeysets()", slog.Any("error", err))
 			c.JSON(500, "Server side error")
 			return
 		}

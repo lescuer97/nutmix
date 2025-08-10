@@ -289,7 +289,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 
 	AmountProofs, SecretsList, err := utils.GetAndCalculateProofsValues(&meltRequest.Inputs)
 	if err != nil {
-		slog.Warn("utils.GetProofsValues(&meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+		slog.Warn("utils.GetProofsValues(&meltRequest.Inputs)", slog.Any("error", err))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("utils.GetAndCalculateProofsValues(&meltRequest.Inputs) %w", err)
 	}
 
@@ -311,7 +311,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 
 	err = m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs)
 	if err != nil {
-		slog.Debug("Could not verify Proofs", slog.String(utils.LogExtraInfo, err.Error()))
+		slog.Debug("Could not verify Proofs", slog.Any("error", err))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs) %w", err)
 	}
 

@@ -124,7 +124,7 @@ func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 		if err != nil {
 			slog.Error(
 				"database.GetNostrLogin(pool, nostrEvent.Content )",
-				slog.String(utils.LogExtraInfo, err.Error()),
+				slog.Any("error", err),
 			)
 			c.JSON(500, "Opps!, something wrong happened")
 			return
@@ -138,7 +138,7 @@ func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 		// check valid signature
 		validSig, err := nostrEvent.CheckSignature()
 		if err != nil {
-			slog.Info("nostrEvent.CheckSignature()", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("nostrEvent.CheckSignature()", slog.Any("error", err))
 			c.JSON(400, "Invalid signature")
 			return
 		}
@@ -152,14 +152,14 @@ func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 		// check signature happened with the correct private key.
 		sigBytes, err := hex.DecodeString(nostrEvent.Sig)
 		if err != nil {
-			slog.Info("hex.DecodeString(nostrEvent.Sig)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("hex.DecodeString(nostrEvent.Sig)", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
 
 		sig, err := schnorr.ParseSignature(sigBytes)
 		if err != nil {
-			slog.Info("schnorr.ParseSignature(sigBytes)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("schnorr.ParseSignature(sigBytes)", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
@@ -175,14 +175,14 @@ func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 
 		_, value, err := nip19.Decode(adminPubkey)
 		if err != nil {
-			slog.Info("nip19.Decode(adminPubkey)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("nip19.Decode(adminPubkey)", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
 
 		decodedKey, err := hex.DecodeString(value.(string))
 		if err != nil {
-			slog.Info("hex.DecodeString(value.(string))", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("hex.DecodeString(value.(string))", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
@@ -190,7 +190,7 @@ func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 		pubkey, err := schnorr.ParsePubKey(decodedKey)
 
 		if err != nil {
-			slog.Info("schnorr.ParsePubKey(decodedKey)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("schnorr.ParsePubKey(decodedKey)", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
@@ -216,7 +216,7 @@ func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 		err = mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated)
 
 		if err != nil {
-			slog.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something wrong happened")
 			return
 		}
@@ -224,7 +224,7 @@ func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 		token, err := makeJWTToken(loginKey.Serialize())
 
 		if err != nil {
-			slog.Warn("Could not makeJWTToken", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("Could not makeJWTToken", slog.Any("error", err))
 			c.JSON(500, nil)
 			return
 		}

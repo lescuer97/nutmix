@@ -57,7 +57,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 	auth.GET("/blind/keysets", func(c *gin.Context) {
 		keys, err := mint.Signer.GetAuthKeys()
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.Signer.GetAuthKeys() %w", err).Error())
+			slog.Error("mint.Signer.GetAuthKeys()", slog.Any("error", err))
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -84,14 +84,14 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 
 		keysets, err := mint.Signer.GetAuthKeys()
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
+			slog.Error("mint.Signer.GetKeys()", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 		unit, err := mint.VerifyOutputs(mintRequest.Outputs, keysets.Keysets)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.VerifyOutputs(mintRequest.Outputs). %w", err).Error())
+			slog.Error("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -111,14 +111,14 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 
 		if amountBlindMessages > uint64(mint.Config.MINT_AUTH_MAX_BLIND_TOKENS) {
-			slog.Warn(fmt.Errorf("Trying to mint auth tokens over the limit").Error())
+			slog.Warn("Trying to mint auth tokens over the limit")
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.MAXIMUM_BAT_MINT_LIMIT_EXCEEDED, nil))
 			return
 		}
 
 		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(mintRequest.Outputs)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.Signer.SignBlindMessages(mintRequest.Outputs): %w", err).Error())
+			slog.Error("mint.Signer.SignBlindMessages(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return

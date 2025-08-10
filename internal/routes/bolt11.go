@@ -176,7 +176,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+			slog.Error("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)", slog.Any("error", err))
 		}
 
 		err = mint.MintDB.Commit(ctx, tx)
@@ -226,14 +226,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		if mintRequestDB.Pubkey != nil {
 			valid, err := mintRequest.VerifyPubkey(mintRequestDB.Pubkey)
 			if err != nil {
-				slog.Error(fmt.Errorf("Cold not verify signature: %w", err).Error())
+				slog.Error("Cold not verify signature", slog.Any("error", err))
 				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 				return
 			}
 
 			if !valid {
-				slog.Error(fmt.Errorf("Invalid signature: %w", err).Error())
+				slog.Error("Invalid signature", slog.Any("error", err))
 				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 				return
@@ -242,21 +242,21 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.VerifyUnitSupport(mintRequestDB.Unit)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.VerifyUnitSupport(quote.Unit). %w", err).Error())
+			slog.Error("mint.VerifyUnitSupport(quote.Unit)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
+			slog.Error("mint.Signer.GetKeys()", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 		_, err = mint.VerifyOutputs(mintRequest.Outputs, keysets.Keysets)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.VerifyOutputs(mintRequest.Outputs). %w", err).Error())
+			slog.Error("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -326,14 +326,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.ChangeMintRequestState(tx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+			slog.Error("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)", slog.Any("error", err))
 			return
 		}
 
 		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 		if err != nil {
-			slog.Error(fmt.Errorf("SetRecoverySigs on minting: %w", err).Error())
-			slog.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
+			slog.Error("SetRecoverySigs on minting", slog.Any("error", err))
+			slog.Error("recoverySigsDb", slog.Any("recovery_sigs", recoverySigsDb))
 			return
 		}
 
@@ -362,7 +362,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.VerifyUnitSupport(meltRequest.Unit)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.VerifyUnitSupport(quote.Unit). %w", err).Error())
+			slog.Error("mint.VerifyUnitSupport(quote.Unit)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -402,7 +402,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		unit, err := cashu.UnitFromString(meltRequest.Unit)
 
 		if err != nil {
-			slog.Error(fmt.Errorf("cashu.UnitFromString(meltRequest.Unit). %w. %w", err, cashu.ErrUnitNotSupported).Error())
+			slog.Error("cashu.UnitFromString(meltRequest.Unit)", slog.Any("error", err), slog.Any("err", cashu.ErrUnitNotSupported))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -420,7 +420,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			if unit == cashu.Sat {
 				err = mppAmount.To(cashu.Sat)
 				if err != nil {
-					slog.Error(fmt.Errorf("mppAmount.To(cashu.Sat). %w. %w", err, cashu.ErrUnitNotSupported).Error())
+					slog.Error("mppAmount.To(cashu.Sat)", slog.Any("error", err), slog.Any("err", cashu.ErrUnitNotSupported))
 					errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 					c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 					return
@@ -440,7 +440,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		isInternal, err := mint.IsInternalTransaction(meltRequest.Request)
 		if err != nil {
-			slog.Info(fmt.Errorf("mint.IsInternalTransaction(meltRequest.Request): %w", err).Error())
+			slog.Info("mint.IsInternalTransaction(meltRequest.Request)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -470,7 +470,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		if !isInternal {
 			feesResponse, err := mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)
 			if err != nil {
-				slog.Info(fmt.Errorf("mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount): %w", err).Error())
+				slog.Info("mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)", slog.Any("error", err))
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -492,8 +492,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		err = mint.MintDB.SaveMeltRequest(tx, dbRequest)
 
 		if err != nil {
-			slog.Warn(fmt.Errorf("SaveQuoteMeltRequest: %w", err).Error())
-			slog.Warn(fmt.Errorf("dbRequest: %+v", dbRequest).Error())
+			slog.Warn("SaveQuoteMeltRequest", slog.Any("error", err))
+			slog.Warn("dbRequest", slog.Any("db_request", dbRequest))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
@@ -513,7 +513,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		quote, err := mint.CheckMeltQuoteState(quoteId)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.CheckMeltQuoteState(quoteId). %w", err).Error())
+			slog.Error("mint.CheckMeltQuoteState(quoteId)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -534,7 +534,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		quote, err := mint.Melt(meltRequest)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.Melt(meltRequest). %w", err).Error())
+			slog.Error("mint.Melt(meltRequest)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return

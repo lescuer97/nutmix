@@ -46,7 +46,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 		keys, err := mint.Signer.GetKeysets()
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.Signer.GetKeys() %w", err).Error())
+			slog.Error("mint.Signer.GetKeys()", slog.Any("error", err))
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -241,14 +241,14 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 		_, SecretsList, err := utils.GetAndCalculateProofsValues(&swapRequest.Inputs)
 		if err != nil {
-			slog.Warn("utils.GetAndCalculateProofsValues(&swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("utils.GetAndCalculateProofsValues(&swapRequest.Inputs)", slog.Any("error", err))
 			c.JSON(400, "Problem processing proofs")
 			return
 		}
 
 		err = mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs). %w", err).Error())
+			slog.Error("mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -306,7 +306,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		swapRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
 		err = mint.MintDB.SetProofsState(tx, swapRequest.Inputs, cashu.PROOF_SPENT)
 		if err != nil {
-			slog.Warn("mint.MintDB.SetProofsState(tx,swapRequest.Inputs , cashu.PROOF_SPENT)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("mint.MintDB.SetProofsState(tx,swapRequest.Inputs , cashu.PROOF_SPENT)", slog.Any("error", err))
 
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
@@ -332,9 +332,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 	v1.POST("/checkstate", func(c *gin.Context) {
 		var checkStateRequest cashu.PostCheckStateRequest
-		err := c.BindJSON(&checkStateRequest)
+		err = c.BindJSON(&checkStateRequest)
 		if err != nil {
-			slog.Info("c.BindJSON(&checkStateRequest)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("c.BindJSON(&checkStateRequest)", slog.Any("error", err))
 			c.JSON(400, "Malformed Body")
 			return
 		}
@@ -354,7 +354,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		err := c.BindJSON(&restoreRequest)
 
 		if err != nil {
-			slog.Info("c.BindJSON(&restoreRequest)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("c.BindJSON(&restoreRequest)", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -367,7 +367,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 		blindRecoverySigs, err := mint.GetRestorySigsFromBlindFactor(blindingFactors)
 		if err != nil {
-			slog.Error("mint.GetRestorySigsFromBlindFactor(blindingFactors)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("mint.GetRestorySigsFromBlindFactor(blindingFactors)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
