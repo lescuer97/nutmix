@@ -152,7 +152,7 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 		t.Errorf("Error there should be a repeated output. %v", err)
 	}
 	err = tx.Commit(context.Background())
-	if err == nil {
-		t.Fatalf("Could not get the commit tx: %+v ", err)
+	if err != nil {
+		t.Fatalf("Could not commit   tx: %+v ", err)
 	}
 }
