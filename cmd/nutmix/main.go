@@ -94,7 +94,7 @@ func main() {
 	defer db.Close()
 
 	if err != nil {
-		slog.Error(fmt.Sprintf("Error conecting to db %+v", err))
+		slog.Error("Error conecting to db", slog.Any("error", err))
 		log.Panic()
 	}
 
@@ -112,13 +112,13 @@ func main() {
 	mint, err := mint.SetUpMint(ctx, config, db, signer)
 
 	if err != nil {
-		slog.Warn(fmt.Sprintf("SetUpMint: %+v ", err))
+		slog.Warn("SetUpMint", slog.Any("error", err))
 		return
 	}
 	if config.MINT_REQUIRE_AUTH {
 		oidcClient, err := oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL): %+v ", err))
+			slog.Warn("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL)", slog.Any("error", err))
 			return
 		}
 		mint.OICDClient = oidcClient
@@ -138,7 +138,7 @@ func main() {
 
 	err = mint.CheckPendingQuoteAndProofs()
 	if err != nil {
-		slog.Error(fmt.Sprintf("SetUpMint: %+v ", err))
+		slog.Error("SetUpMint", slog.Any("error", err))
 		return
 	}
 	routes.V1Routes(r, mint)
@@ -147,7 +147,7 @@ func main() {
 
 	PORT := fmt.Sprintf(":%v", 8081)
 
-	slog.Info(fmt.Sprintf("Nutmix started in port %v", 8081))
+	slog.Info("Nutmix started in port", slog.Int("port", 8081))
 
 	r.Run(PORT)
 }

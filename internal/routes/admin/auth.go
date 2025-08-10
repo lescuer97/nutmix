@@ -29,7 +29,7 @@ func AuthMiddleware(secret []byte) gin.HandlerFunc {
 
 				// Don't forget to validate the alg is what you expect:
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					slog.Warn(fmt.Sprintf("Unexpected signing method: %v", token.Header["alg"]))
+					slog.Warn("Unexpected signing method", slog.Any("alg", token.Header["alg"]))
 					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 				}
 				return secret, nil

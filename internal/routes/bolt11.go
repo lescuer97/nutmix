@@ -26,7 +26,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		err := c.BindJSON(&mintRequest)
 
 		if err != nil {
-			slog.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -56,7 +56,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.VerifyUnitSupport(mintRequest.Unit)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.VerifyUnitSupport(mintRequest.Unit). %w", err).Error())
+			slog.Error("mint.VerifyUnitSupport(mintRequest.Unit)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -65,12 +65,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 		now := time.Now().Unix()
 
-		slog.Debug(fmt.Sprintf("Requesting invoice for amount: %v. backend: %v", mintRequest.Amount, mint.LightningBackend.LightningType()))
+		slog.Debug("Requesting invoice for amount", 
+			slog.Uint64("amount", mintRequest.Amount),
+			slog.Any("backend", mint.LightningBackend.LightningType()))
 
 		unit, err := cashu.UnitFromString(mintRequest.Unit)
 
 		if err != nil {
-			slog.Error(fmt.Errorf("cashu.UnitFromString(mintRequest.Unit). %w. %w", err, cashu.ErrUnitNotSupported).Error())
+			slog.Error("cashu.UnitFromString(mintRequest.Unit)", slog.Any("error", err), slog.Any("err", cashu.ErrUnitNotSupported))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -96,7 +98,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: uint64(mintRequest.Amount)})
 		if err != nil {
-			slog.Info(err.Error())
+			slog.Info("Payment request", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -120,7 +122,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.SaveMintRequest(tx, mintRequestDB)
 		if err != nil {
-			slog.Error(fmt.Errorf("SaveQuoteRequest: %w", err).Error())
+			slog.Error("SaveQuoteRequest", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -148,7 +150,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		quote, err := mint.MintDB.GetMintRequestById(tx, quoteId)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint:quote mint.MintDB.GetMintRequestById(tx, quoteId): %w", err).Error())
+			slog.Error("mint:quote mint.MintDB.GetMintRequestById(tx, quoteId)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -161,7 +163,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		}
 		invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
-			slog.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())
+			slog.Warn("Mint decoding zpay32.Decode", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -193,7 +195,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		err := c.BindJSON(&mintRequest)
 
 		if err != nil {
-			slog.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -209,7 +211,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		mintRequestDB, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
 
 		if err != nil {
-			slog.Error(fmt.Errorf(" mint-resquest mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %w", err).Error())
+			slog.Error(" mint-resquest mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -268,7 +270,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		}
 		invoice, err := zpay32.Decode(mintRequestDB.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
-			slog.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())
+			slog.Warn("Mint decoding zpay32.Decode", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -353,7 +355,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		err := c.BindJSON(&meltRequest)
 
 		if err != nil {
-			slog.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -481,7 +483,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
 			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
-			slog.Warn(fmt.Sprintf("m.MintDB.GetTx(ctx). %+v", err))
+			slog.Warn("m.MintDB.GetTx(ctx)", slog.Any("error", err))
 			return
 		}
 		defer mint.MintDB.Rollback(ctx, tx)
@@ -499,7 +501,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
 			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
-			slog.Warn(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err).Error())
+			slog.Warn("mint.MintDB.Commit(ctx tx)", slog.Any("error", err))
 			return
 		}
 
@@ -525,7 +527,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
 		if err != nil {
-			slog.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}

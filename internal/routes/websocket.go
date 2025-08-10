@@ -64,11 +64,11 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 				}
 				err = m.SendJson(conn, errMsg)
 			}
-			slog.Error("Error on creating websocket %+v", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("Error on creating websocket", slog.Any("error", err))
 			return
 		}
 
-		slog.Debug(fmt.Sprintf("New request %+v", request))
+		slog.Debug("New request", slog.Any("request", request))
 		// confirm subscription or unsubscribe
 		response := cashu.WsResponse{
 			JsonRpc: "2.0",

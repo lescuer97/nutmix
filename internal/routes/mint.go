@@ -18,7 +18,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 		keys, err := mint.Signer.GetActiveKeys()
 		if err != nil {
-			slog.Error(fmt.Sprintf("mint.Signer.GetActiveKeys() %+v ", err))
+			slog.Error("mint.Signer.GetActiveKeys()", slog.Any("error", err))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -34,7 +34,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		keysets, err := mint.Signer.GetKeysById(id)
 
 		if err != nil {
-			slog.Error(fmt.Sprintf("mint.Signer.GetKeysById(id) %+v", err))
+			slog.Error("mint.Signer.GetKeysById(id)", slog.Any("error", err))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -228,7 +228,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 		err := c.BindJSON(&swapRequest)
 		if err != nil {
-			slog.Info("Incorrect body: %+v", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -272,7 +272,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 
 		if len(knownProofs) != 0 {
-			slog.Warn("Proofs already spent", slog.String(utils.LogExtraInfo, fmt.Sprintf("know proofs: %+v", knownProofs)))
+			slog.Warn("Proofs already spent", slog.Any("known_proofs", knownProofs))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}
@@ -316,7 +316,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 		if err != nil {
 			slog.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
-			slog.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
+			slog.Error("recoverySigsDb", slog.Any("recovery_sigs", recoverySigsDb))
 			c.JSON(200, response)
 			return
 		}

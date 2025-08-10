@@ -32,7 +32,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 	auth.GET("/blind/keys", func(c *gin.Context) {
 		keys, err := mint.Signer.GetAuthActiveKeys()
 		if err != nil {
-			slog.Error(fmt.Sprintf("mint.Signer.GetAuthActiveKeys() %+v ", err))
+			slog.Error("mint.Signer.GetAuthActiveKeys()", slog.Any("error", err))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -46,7 +46,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		keysets, err := mint.Signer.GetAuthKeysById(id)
 
 		if err != nil {
-			slog.Error(fmt.Sprintf("mint.Signer.GetAuthKeysById(id) %+v", err))
+			slog.Error("mint.Signer.GetAuthKeysById(id)", slog.Any("error", err))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -69,7 +69,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		var mintRequest cashu.PostMintBolt11Request
 		err := c.BindJSON(&mintRequest)
 		if err != nil {
-			slog.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -126,8 +126,8 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 		if err != nil {
-			slog.Error(fmt.Errorf("SetRecoverySigs on minting: %w", err).Error())
-			slog.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
+			slog.Error("SetRecoverySigs on minting", slog.Any("error", err))
+			slog.Error("recoverySigsDb", slog.Any("recovery_sigs", recoverySigsDb))
 			return
 		}
 

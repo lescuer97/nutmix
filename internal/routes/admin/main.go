@@ -55,11 +55,11 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 					break
 				}
 			}
-			slog.Error(fmt.Sprintf("Error from calls: %+v", c.Errors.String()))
+			slog.Error("Error from calls", slog.String("errors", c.Errors.String()))
 			component := templates.ErrorNotif(message)
 			err := component.Render(c.Request.Context(), c.Writer)
 			if err != nil {
-				slog.Error(fmt.Sprintf("could not render error notification: %+v", err))
+				slog.Error("Could not render error notification", slog.Any("error", err))
 				return
 			}
 		}

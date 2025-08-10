@@ -30,16 +30,16 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint) {
 
 			defer func() {
 				if p := recover(); p != nil {
-					slog.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err).Error())
+					slog.Error("Rolling back because of failure", slog.Any("error", err))
 					mint.MintDB.Rollback(ctx, tx)
 
 				} else if err != nil {
-					slog.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err).Error())
+					slog.Error("Rolling back because of failure", slog.Any("error", err))
 					mint.MintDB.Rollback(ctx, tx)
 				} else {
 					err = mint.MintDB.Commit(context.Background(), tx)
 					if err != nil {
-						slog.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err).Error())
+						slog.Error("Failed to commit transaction", slog.Any("error", err))
 					}
 				}
 			}()
@@ -57,7 +57,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint) {
 			}
 
 			for _, swap := range swaps {
-				slog.Debug(fmt.Sprintf("Checking out swap. %v", swap.Id))
+				slog.Debug("Checking out swap", slog.String("swap_id", swap.Id))
 
 				swapTx, err := mint.MintDB.SubTx(ctx, tx)
 				if err != nil {
@@ -142,10 +142,10 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint) {
 
 				}
 
-				slog.Debug(fmt.Sprintf("Commiting swap. %v", swap.Id))
+				slog.Debug("Commiting swap", slog.String("swap_id", swap.Id))
 				err = mint.MintDB.Commit(context.Background(), swapTx)
 				if err != nil {
-					slog.Error(fmt.Errorf("\n Could not commit sub transaction: %+v \n", err).Error())
+					slog.Error("Could not commit sub transaction", slog.Any("error", err))
 				}
 			}
 
