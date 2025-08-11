@@ -325,7 +325,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		mint.Observer.SendProofsEvent(swapRequest.Inputs)
+		go mint.Observer.SendProofsEvent(swapRequest.Inputs)
 		c.JSON(200, response)
 	})
 

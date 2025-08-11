@@ -485,6 +485,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 
-	m.Observer.SendMeltEvent(quote)
+	go m.Observer.SendProofsEvent(meltRequest.Inputs)
+	go m.Observer.SendMeltEvent(quote)
 	return response, nil
 }

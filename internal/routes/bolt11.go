@@ -350,8 +350,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			return
 		}
 
-		logger.Debug("Sending mint envent to sockets")
-		mint.Observer.SendMintEvent(mintRequestDB)
+		logger.Debug("sending mint request to observer")
+		go mint.Observer.SendMintEvent(mintRequestDB)
 		logger.Debug(fmt.Sprintf("returning success to client: mint quote id: %v", mintRequestDB.Quote))
 		// Store BlidedSignature
 		c.JSON(200, cashu.PostMintBolt11Response{
@@ -532,7 +532,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	})
 
 	v1.POST("/melt/bolt11", func(c *gin.Context) {
-		log.Printf("\n\n melt Tryy")
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
 		if err != nil {

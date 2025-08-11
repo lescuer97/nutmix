@@ -185,7 +185,7 @@ func handleWSRequest(request cashu.WsRequest, observer *mint.Observer, proofChan
 		}
 
 	case cashu.Unsubcribe:
-		observer.RemoveWatch(request.Params.SubId)
+		go observer.RemoveWatch(request.Params.SubId)
 		closeChan <- "asked for unsubscribe"
 	}
 	return nil
