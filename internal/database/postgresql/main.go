@@ -538,14 +538,13 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) 
 	var signaturesList []cashu.RecoverSigDB
 
 	rows, err := tx.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
-	defer rows.Close()
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return signaturesList, nil
 		}
 		return signaturesList, databaseError(fmt.Errorf("Error checking for  recovery_signature: %w", err))
 	}
+	defer rows.Close()
 
 	signatures := make([]cashu.RecoverSigDB, 0)
 	for rows.Next() {

@@ -60,17 +60,17 @@ func main() {
 		Level: slog.LevelInfo,
 	}
 
+	err = godotenv.Load(".env")
+	if err != nil {
+		log.Panic("ERROR: no .env file found and not running in docker")
+	}
+
 	if os.Getenv("DEBUG") == "true" {
 		opts.Level = slog.LevelDebug
 	}
 
 	logger := slog.New(slog.NewJSONHandler(w, opts))
 
-	err = godotenv.Load(".env")
-	if err != nil {
-		logger.Error("ERROR: no .env file found and not running in docker")
-		log.Panic()
-	}
 
 	// check in ADMIN_NOSTR_NPUB is not empty
 	if os.Getenv("ADMIN_NOSTR_NPUB") == "" {
