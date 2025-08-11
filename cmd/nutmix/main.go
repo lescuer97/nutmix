@@ -65,7 +65,6 @@ func main() {
 		log.Panic("ERROR: no .env file found and not running in docker")
 	}
 
-
 	if os.Getenv("DEBUG") == "true" {
 		opts.Level = slog.LevelDebug
 	}

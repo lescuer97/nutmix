@@ -12,7 +12,6 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/mint"
 	m "github.com/lescuer97/nutmix/internal/mint"
-	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 

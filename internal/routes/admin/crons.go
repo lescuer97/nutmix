@@ -3,7 +3,6 @@ package admin
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 	"log/slog"
 	"time"
 

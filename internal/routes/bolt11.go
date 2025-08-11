@@ -65,7 +65,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 		now := time.Now().Unix()
 
-		slog.Debug("Requesting invoice for amount", 
+		slog.Debug("Requesting invoice for amount",
 			slog.Uint64("amount", mintRequest.Amount),
 			slog.Any("backend", mint.LightningBackend.LightningType()))
 

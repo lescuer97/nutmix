@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"embed"
 	"errors"
-	"fmt"
 	"html/template"
 	"io/fs"
 	"log"

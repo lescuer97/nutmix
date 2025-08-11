@@ -332,7 +332,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 	v1.POST("/checkstate", func(c *gin.Context) {
 		var checkStateRequest cashu.PostCheckStateRequest
-		err = c.BindJSON(&checkStateRequest)
+		err := c.BindJSON(&checkStateRequest)
 		if err != nil {
 			slog.Info("c.BindJSON(&checkStateRequest)", slog.Any("error", err))
 			c.JSON(400, "Malformed Body")
