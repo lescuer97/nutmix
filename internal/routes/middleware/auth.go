@@ -34,7 +34,7 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 				// For paths matching the pattern, check for the "clear auth" header
 				clearAuth := c.GetHeader("Clear-auth")
 				if clearAuth == "" {
-					slog.Warn(fmt.Errorf("Tried to do a clear auth without token.").Error())
+					slog.Warn("Tried to do a clear auth without token.")
 					c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
 					c.Abort()
 					return
@@ -80,7 +80,7 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 				// For paths matching the pattern, check for the "clear auth" header
 				blindAuth := c.GetHeader("Blind-auth")
 				if blindAuth == "" {
-					slog.Warn(fmt.Errorf("Tried to do a blind auth without token.").Error())
+					slog.Warn("Tried to do a blind auth without token.")
 					c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_BLIND_AUTH, nil))
 					c.Abort()
 					return

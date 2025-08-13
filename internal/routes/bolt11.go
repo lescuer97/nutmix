@@ -46,7 +46,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		if mint.Config.PEG_IN_LIMIT_SATS != nil {
 			if mintRequest.Amount > uint64(*mint.Config.PEG_IN_LIMIT_SATS) {
-				slog.Info("Mint amount over the limit", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
+				slog.Info("Mint amount over the limit", slog.Uint64("amount", mintRequest.Amount))
 
 				c.JSON(400, "Mint amount over the limit")
 				return
@@ -80,7 +80,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		quoteId, err := utils.RandomHash()
 		if err != nil {
-			slog.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
+			slog.Info("utils.RandomHash()", slog.Uint64("amount", mintRequest.Amount))
 			c.JSON(500, "Opps! there was a problem with the mint")
 			return
 		}
@@ -169,7 +169,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		}
 		quote, err = m.CheckMintRequest(mint, quote, invoice)
 		if err != nil {
-			slog.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
+			slog.Warn("m.CheckMintRequest(mint, quote)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -277,14 +277,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
 		if err != nil {
-			slog.Info(fmt.Errorf("UnmarshallAmt: %w", err).Error())
+			slog.Info("UnmarshallAmt", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
 		// check the amount in outputs are the same as the quote
 		if int32(*invoice.MilliSat) < int32(amountMilsats) {
-			slog.Info(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)).Error())
+			slog.Info("wrong amount of milisats", slog.Int("invoice_milisats", int(*invoice.MilliSat)), slog.Int("needed_milisats", int(amountMilsats)))
 			c.JSON(403, "Amounts in outputs are not the same")
 			return
 		}
@@ -296,14 +296,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 					c.JSON(200, mintRequestDB)
 					return
 				}
-				slog.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
+				slog.Warn("m.CheckMintRequest(mint, quote)", slog.Any("error", err))
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
 
 			err = mint.MintDB.ChangeMintRequestState(tx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
 			if err != nil {
-				slog.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+				slog.Error("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)", slog.Any("error", err))
 				return
 			}
 
@@ -315,7 +315,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(mintRequest.Outputs)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.Signer.SignBlindMessages(mintRequest.Outputs): %w", err).Error())
+			slog.Error("mint.Signer.SignBlindMessages(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -370,7 +370,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		invoice, err := zpay32.Decode(meltRequest.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
-			slog.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
+			slog.Info("zpay32.Decode", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -389,7 +389,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		quoteId, err := utils.RandomHash()
 		if err != nil {
-			slog.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(meltRequest.Request)))
+			slog.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, meltRequest.Request))
 			c.JSON(500, "Opps! there was a problem with the mint")
 			return
 		}
@@ -446,7 +446,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		}
 
 		if isMpp && isInternal {
-			slog.Info(fmt.Sprint("Internal MPP not allowed", err))
+			slog.Info("Internal MPP not allowed", slog.Any("error", err))
 			c.JSON(403, "Internal MPP not allowed")
 			return
 		}
