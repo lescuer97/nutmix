@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"embed"
 	"errors"
-	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
@@ -27,7 +26,7 @@ type ErrorNotif struct {
 	Error string
 }
 
-func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
+func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 
@@ -55,11 +54,11 @@ func ErrorHtmlMessageMiddleware(logger *slog.Logger) gin.HandlerFunc {
 					break
 				}
 			}
-			logger.Error(fmt.Sprintf("Error from calls: %+v", c.Errors.String()))
+			slog.Error("Error from calls", slog.String("errors", c.Errors.String()))
 			component := templates.ErrorNotif(message)
 			err := component.Render(c.Request.Context(), c.Writer)
 			if err != nil {
-				logger.Error(fmt.Sprintf("could not render error notification: %+v", err))
+				slog.Error("Could not render error notification", slog.Any("error", err))
 				return
 			}
 		}
@@ -73,10 +72,10 @@ var static embed.FS
 //go:embed templates/*.html
 var templatesFs embed.FS
 
-func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
+func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 	contentStatic, err := fs.Sub(static, "static")
 	if err != nil {
-		logger.Error(
+		slog.Error(
 			`fs.Sub(static, "static")`,
 			slog.String(utils.LogExtraInfo, err.Error()),
 		)
@@ -92,7 +91,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 
 	loginKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
-		logger.Error(
+		slog.Error(
 			"secp256k1.GeneratePrivateKey()",
 			slog.String(utils.LogExtraInfo, err.Error()),
 		)
@@ -100,46 +99,46 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, logger *slog.
 
 	}
 
-	adminRoute.Use(ErrorHtmlMessageMiddleware(logger))
+	adminRoute.Use(ErrorHtmlMessageMiddleware())
 	// I use the first active keyset as secret for jwt token signing
-	adminRoute.Use(AuthMiddleware(logger, loginKey.Serialize()))
+	adminRoute.Use(AuthMiddleware(loginKey.Serialize()))
 
 	// PAGES SETUP
 	// This is /admin pages
 	adminRoute.GET("", InitPage(mint))
 	adminRoute.GET("/keysets", KeysetsPage(mint))
 	adminRoute.GET("/settings", MintSettingsPage(mint))
-	adminRoute.GET("/login", LoginPage(logger, mint))
+	adminRoute.GET("/login", LoginPage(mint))
 	adminRoute.GET("/bolt11", LightningNodePage(mint))
 
 	// change routes
-	adminRoute.POST("/login", Login(mint, logger, loginKey))
-	adminRoute.POST("/mintsettings", MintSettingsForm(mint, logger))
-	adminRoute.POST("/bolt11", Bolt11Post(mint, logger))
-	adminRoute.POST("/rotate/sats", RotateSatsSeed(mint, logger))
+	adminRoute.POST("/login", Login(mint, loginKey))
+	adminRoute.POST("/mintsettings", MintSettingsForm(mint))
+	adminRoute.POST("/bolt11", Bolt11Post(mint))
+	adminRoute.POST("/rotate/sats", RotateSatsSeed(mint))
 
 	// fractional html components
-	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint, logger))
+	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint))
 	adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
-	adminRoute.GET("/mint-balance", MintBalance(mint, logger))
-	adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint, logger))
-	adminRoute.GET("/mint-melt-list", MintMeltList(mint, logger))
-	adminRoute.GET("/logs", LogsTab(logger))
+	adminRoute.GET("/mint-balance", MintBalance(mint))
+	adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint))
+	adminRoute.GET("/mint-melt-list", MintMeltList(mint))
+	adminRoute.GET("/logs", LogsTab())
 
 	// only have swap routes if liquidity manager is possible
 	if utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
 
-		adminRoute.GET("/liquidity", LigthningLiquidityPage(logger, mint))
-		adminRoute.GET("/liquidity/:swapId", SwapStatusPage(logger, mint))
-		adminRoute.GET("/swaps-list", SwapsList(mint, logger))
-		adminRoute.GET("/liquidity-button", LiquidityButton(logger))
-		adminRoute.GET("/liquid-swap-form", SwapOutForm(logger, mint))
-		adminRoute.GET("/lightning-swap-form", LightningSwapForm(logger))
-		adminRoute.POST("/out-swap-req", SwapOutRequest(logger, mint))
-		adminRoute.POST("/in-swap-req", SwapInRequest(logger, mint))
-		adminRoute.GET("/swap/:swapId", SwapStateCheck(logger, mint))
-		adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(logger, mint))
-		go CheckStatusOfLiquiditySwaps(mint, logger)
+		adminRoute.GET("/liquidity", LigthningLiquidityPage(mint))
+		adminRoute.GET("/liquidity/:swapId", SwapStatusPage(mint))
+		adminRoute.GET("/swaps-list", SwapsList(mint))
+		adminRoute.GET("/liquidity-button", LiquidityButton())
+		adminRoute.GET("/liquid-swap-form", SwapOutForm(mint))
+		adminRoute.GET("/lightning-swap-form", LightningSwapForm())
+		adminRoute.POST("/out-swap-req", SwapOutRequest(mint))
+		adminRoute.POST("/in-swap-req", SwapInRequest(mint))
+		adminRoute.GET("/swap/:swapId", SwapStateCheck(mint))
+		adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(mint))
+		go CheckStatusOfLiquiditySwaps(mint)
 	}
 
 }
@@ -197,7 +196,7 @@ func (t TIME_REQUEST) RollBackFromNow() time.Time {
 	return rollBackHour.Add(-duration)
 }
 
-func LogsTab(logger *slog.Logger) gin.HandlerFunc {
+func LogsTab() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -209,7 +208,7 @@ func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 		logsdir, err := utils.GetLogsDirectory()
 
 		if err != nil {
-			logger.Warn(
+			slog.Warn(
 				"utils.GetLogsDirectory()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -218,7 +217,7 @@ func LogsTab(logger *slog.Logger) gin.HandlerFunc {
 		file, err := os.Open(logsdir + "/" + m.LogFileName)
 		defer file.Close()
 		if err != nil {
-			logger.Warn(
+			slog.Warn(
 				"os.Open(logsdir ",
 				slog.String(utils.LogExtraInfo, err.Error()))
 

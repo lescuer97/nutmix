@@ -21,7 +21,7 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 )
 
-func LiquidityButton(logger *slog.Logger) gin.HandlerFunc {
+func LiquidityButton() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 		component := templates.LiquidityButton()
@@ -37,13 +37,13 @@ func LiquidityButton(logger *slog.Logger) gin.HandlerFunc {
 }
 
 // swaps out of the mint
-func SwapOutForm(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
+func SwapOutForm(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 		milillisatBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
 
-			logger.Warn(
+			slog.Warn(
 				"mint.LightningComs.WalletBalance()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -65,7 +65,7 @@ func SwapOutForm(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 }
 
 // Swaps into the mint
-func LightningSwapForm(logger *slog.Logger) gin.HandlerFunc {
+func LightningSwapForm() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 		component := templates.SwapInPostForm()
@@ -80,7 +80,7 @@ func LightningSwapForm(logger *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
+func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
@@ -98,7 +98,7 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 		amount := decodedInvoice.MilliSat.ToSatoshis()
 		feesResponse, err := mint.LightningBackend.QueryFees(invoice, decodedInvoice, false, cashu.Amount{Unit: cashu.Sat, Amount: uint64(amount)})
 		if err != nil {
-			logger.Info(fmt.Errorf("mint.LightningComs.PayInvoice: %w", err).Error())
+			slog.Info("mint.LightningComs.PayInvoice", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -118,7 +118,7 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Debug(
+			slog.Debug(
 				"Could not get db transactions",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)
@@ -163,7 +163,7 @@ func SwapOutRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 	}
 }
 
-func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
+func SwapInRequest(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
@@ -204,7 +204,7 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Debug(
+			slog.Debug(
 				"Could not get db transactions",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)
@@ -258,7 +258,7 @@ func SwapInRequest(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 	}
 }
 
-func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
+func SwapStateCheck(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 		// only needs the amount and we generate an invoice from the mint directly
@@ -266,7 +266,7 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Debug(
+			slog.Debug(
 				"Could not get db transactions",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)
@@ -308,7 +308,7 @@ func SwapStateCheck(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
 	}
 }
 
-func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFunc {
+func ConfirmSwapOutTransaction(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
@@ -317,7 +317,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Debug(
+			slog.Debug(
 				"Could not get db transactions",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)
@@ -362,13 +362,13 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
 			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
-			logger.Error(fmt.Sprintf("\n Failed to commit transaction: %+v \n", err))
+			slog.Error("Failed to commit transaction", slog.Any("error", err))
 			return
 		}
 
 		tx, err = mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Debug(
+			slog.Debug(
 				"Could not get db transactions",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)
@@ -390,12 +390,12 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 
 		fee := uint64(float64(swapRequest.Amount) * 0.10)
 
-		logger.Info(fmt.Sprintf("making payment to invoice: %+v", swapRequest.LightningInvoice))
+		slog.Info("making payment to invoice", slog.String("invoice", swapRequest.LightningInvoice))
 		payment, err := mint.LightningBackend.PayInvoice(cashu.MeltRequestDB{Request: swapRequest.LightningInvoice}, decodedInvoice, fee, false, cashu.Amount{Unit: cashu.Sat, Amount: swapRequest.Amount})
 
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN {
-			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
+			slog.Warn("Possible payment failure", slog.Any("error", err), slog.Any("payment", payment))
 
 			// if exception of lightning payment says fail do a payment status recheck.
 			status, _, _, err := mint.LightningBackend.CheckPayed(swapRequest.LightningInvoice, decodedInvoice, swapRequest.CheckingId)
@@ -405,7 +405,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 
 				err = mint.MintDB.ChangeLiquiditySwapState(tx, swapRequest.Id, swapRequest.State)
 				if err != nil {
-					logger.Error(fmt.Errorf("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.UnknownProblem): %w", err).Error())
+					slog.Error("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.UnknownProblem)", slog.Any("error", err))
 				}
 
 				return
@@ -418,7 +418,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 				// change melt request state
 				err = mint.MintDB.ChangeLiquiditySwapState(tx, swapRequest.Id, swapRequest.State)
 				if err != nil {
-					logger.Error(fmt.Errorf("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.UnknownProblem): %w", err).Error())
+					slog.Error("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.UnknownProblem)", slog.Any("error", err))
 				}
 
 				return
@@ -428,7 +428,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 				swapRequest.State = utils.LightningPaymentFail
 				err = mint.MintDB.ChangeLiquiditySwapState(tx, swapRequest.Id, swapRequest.State)
 				if err != nil {
-					logger.Error(fmt.Errorf("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail): %w", err).Error())
+					slog.Error("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail)", slog.Any("error", err))
 				}
 				return
 			}
@@ -438,7 +438,7 @@ func ConfirmSwapOutTransaction(logger *slog.Logger, mint *m.Mint) gin.HandlerFun
 
 		err = mint.MintDB.ChangeLiquiditySwapState(tx, swapRequest.Id, swapRequest.State)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail): %w", err).Error())
+			slog.Error("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail)", slog.Any("error", err))
 		}
 
 		// change swap to waiting for chain confirmations

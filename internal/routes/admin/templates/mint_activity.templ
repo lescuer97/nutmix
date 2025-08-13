@@ -1,7 +1,6 @@
 package templates
 
 import (
-	"fmt"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"strconv"
 	"time"
@@ -26,11 +25,11 @@ templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs Mint
 	{{ neededBalanceString := strconv.FormatUint(neededBalance, 10) }}
 	{{ enoughLiquidity := balance < neededBalance }}
 	{{ percentageOfLiquidity := (float64(balance) / float64(neededBalance)) * 100 }}
-	{{ percentageOfLiquidityStr := fmt.Sprintf("%.2f", percentageOfLiquidity) }}
+	{{ percentageOfLiquidityStr := strconv.FormatFloat(percentageOfLiquidity, 'f', 2, 64) }}
 	{{ 	ratioProofSigAmount := (float64(proofs.Amount) / float64(sigs.Amount)) * 100 }}
-	{{ ratioProofSigAmountStr := fmt.Sprintf("%.2f", ratioProofSigAmount) }}
+	{{ ratioProofSigAmountStr := strconv.FormatFloat(ratioProofSigAmount, 'f', 2, 64) }}
 	{{ 	ratioProofSigAmountSats := (float64(proofs.SatAmount) / float64(sigs.SatAmount)) * 100 }}
-	{{ ratioProofSigAmountSatsStr := fmt.Sprintf("%.2f", ratioProofSigAmountSats) }}
+	{{ ratioProofSigAmountSatsStr := strconv.FormatFloat(ratioProofSigAmountSats, 'f', 2, 64) }}
 	<div class="flex-card">
 		<div class="card">
 			if fakeWallet {

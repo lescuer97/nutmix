@@ -693,12 +693,12 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 
 	r := gin.Default()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	routes.V1Routes(r, mint, logger)
+	routes.V1Routes(r, mint)
 
 	if adminRoute {
-		admin.AdminRoutes(ctx, r, mint, logger)
+		admin.AdminRoutes(ctx, r, mint)
 	}
 
 	return r, mint
@@ -734,12 +734,12 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 
 	r := gin.Default()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	routes.V1Routes(r, mint, logger)
+	routes.V1Routes(r, mint)
 
 	if adminRoute {
-		admin.AdminRoutes(ctx, r, mint, logger)
+		admin.AdminRoutes(ctx, r, mint)
 	}
 
 	return r, mint

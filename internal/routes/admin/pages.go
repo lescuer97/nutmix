@@ -21,7 +21,7 @@ type LoginParams struct {
 	ADMINNPUB string
 }
 
-func LoginPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
+func LoginPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		// generate nonce for login nostr
@@ -42,7 +42,7 @@ func LoginPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 
 		err = mint.MintDB.SaveNostrAuth(nostrLogin)
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"database.SaveNostrLoginAuth(pool, nostrLogin)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			if c.ContentType() == gin.MIMEJSON {
@@ -84,13 +84,13 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 	}
 }
 
-func LigthningLiquidityPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
+func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 		milillisatBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
 
-			logger.Warn(
+			slog.Warn(
 				"mint.LightningComs.WalletBalance()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -110,7 +110,7 @@ func LigthningLiquidityPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFun
 	}
 }
 
-func SwapStatusPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
+func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
@@ -118,7 +118,7 @@ func SwapStatusPage(logger *slog.Logger, mint *mint.Mint) gin.HandlerFunc {
 		tx, err := mint.MintDB.GetTx(ctx)
 
 		if err != nil {
-			logger.Debug(
+			slog.Debug(
 				"Incorrect body",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)

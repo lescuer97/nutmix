@@ -13,7 +13,7 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB, logger *slog.Logger) (cashu.MeltRequestDB, error) {
+func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB) (cashu.MeltRequestDB, error) {
 	mintRequest, err := m.MintDB.GetMintRequestByRequest(tx, meltQuote.Request)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -45,7 +45,7 @@ func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB, lo
 	mintRequest.State = cashu.PAID
 	mintRequest.RequestPaid = true
 
-	logger.Info(fmt.Sprintf("Settling bolt11 payment internally: %v. mintRequest: %v, %v, %v", meltQuote.Quote, mintRequest.Quote, meltQuote.Amount, meltQuote.Unit))
+	slog.Info("Settling bolt11 payment internally", slog.String("quote", meltQuote.Quote), slog.String("mint_request", mintRequest.Quote), slog.Uint64("amount", meltQuote.Amount), slog.String("unit", meltQuote.Unit))
 
 	err = m.MintDB.ChangeMeltRequestState(tx, meltQuote.Quote, meltQuote.RequestPaid, meltQuote.State, meltQuote.Melted, meltQuote.FeePaid)
 	if err != nil {
@@ -189,26 +189,26 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 	return quote, nil
 }
 
-func (m *Mint) CheckPendingQuoteAndProofs(logger *slog.Logger) error {
+func (m *Mint) CheckPendingQuoteAndProofs() error {
 	quotes, err := m.MintDB.GetMeltQuotesByState(cashu.PENDING)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetMeltQuotesByState(cashu.PENDING). %w", err)
 	}
 
 	for _, quote := range quotes {
-		logger.Info(fmt.Sprintf("Attempting to solve pending quote for: %v", quote))
+		slog.Info("Attempting to solve pending quote for", slog.Any("quote", quote))
 		quote, err := m.CheckMeltQuoteState(quote.Quote)
 		if err != nil {
 			return fmt.Errorf("m.CheckMeltQuoteState(quote.Quote). %w", err)
 		}
 
-		logger.Info(fmt.Sprintf("Melt quote %v state: %v", quote.Quote, quote.State))
+		slog.Info("Melt quote state", slog.String("quote", quote.Quote), slog.String("state", string(quote.State)))
 	}
 
 	return nil
 }
 
-func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger) (cashu.PostMeltQuoteBolt11Response, error) {
+func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuoteBolt11Response, error) {
 	if len(meltRequest.Inputs) == 0 {
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("Outputs are empty")
 	}
@@ -236,12 +236,12 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	}
 
 	if quote.State == cashu.PENDING {
-		logger.Warn("Quote is pending")
+		slog.Warn("Quote is pending")
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf(" %w m.MintDB.GetMeltRequestById(tx, meltRequest.Quote): %w", cashu.ErrQuoteIsPending, err)
 	}
 
 	if quote.Melted {
-		logger.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
+		slog.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w quote.Melted: %w", cashu.ErrMeltAlreadyPaid, err)
 	}
 	keysets, err := m.Signer.GetKeysets()
@@ -289,12 +289,12 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 
 	AmountProofs, SecretsList, err := utils.GetAndCalculateProofsValues(&meltRequest.Inputs)
 	if err != nil {
-		logger.Warn("utils.GetProofsValues(&meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+		slog.Warn("utils.GetProofsValues(&meltRequest.Inputs)", slog.Any("error", err))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("utils.GetAndCalculateProofsValues(&meltRequest.Inputs) %w", err)
 	}
 
 	if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
-		logger.Info(fmt.Sprintf("Not enought proofs to expend. Needs: %v", quote.Amount))
+		slog.Info("Not enough proofs to expend", slog.Uint64("needs", quote.Amount))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)): %w", cashu.ErrNotEnoughtProofs, err)
 	}
 
@@ -305,19 +305,19 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	}
 
 	if len(knownProofs) != 0 {
-		logger.Info("Proofs already used", slog.String(utils.LogExtraInfo, fmt.Sprintf("knownproofs:  %+v", knownProofs)))
+		slog.Info("Proofs already used", slog.Any("known_proofs", knownProofs))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w len(knownProofs) != 0 %w", cashu.ErrProofSpent, err)
 	}
 
 	err = m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs)
 	if err != nil {
-		logger.Debug("Could not verify Proofs", slog.String(utils.LogExtraInfo, err.Error()))
+		slog.Debug("Could not verify Proofs", slog.Any("error", err))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs) %w", err)
 	}
 
 	invoice, err := zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork())
 	if err != nil {
-		logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
+		slog.Info("zpay32.Decode", slog.Any("error", err))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork()) %w", err)
 	}
 
@@ -349,7 +349,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
 
-	quote, err = m.settleIfInternalMelt(tx, quote, logger)
+	quote, err = m.settleIfInternalMelt(tx, quote)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
@@ -365,13 +365,13 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		payment, err := m.LightningBackend.PayInvoice(quote, invoice, quote.FeeReserve, quote.Mpp, amount)
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {
-			logger.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
+			slog.Warn("Possible payment failure", slog.Any("error", err), slog.Any("payment", payment))
 
-			logger.Debug("changing checking Id to payment checking Id", slog.String("quote.CheckingId", quote.CheckingId), slog.String("payment.CheckingId", payment.CheckingId))
+			slog.Debug("changing checking Id to payment checking Id", slog.String("quote.CheckingId", quote.CheckingId), slog.String("payment.CheckingId", payment.CheckingId))
 			quote.CheckingId = payment.CheckingId
 			err = m.MintDB.ChangeCheckingId(tx, quote.Quote, quote.CheckingId)
 			if err != nil {
-				logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
+				slog.Error("ModifyQuoteMeltPayStatusAndMelted", slog.Any("error", err))
 			}
 
 			// if exception of lightning payment says fail do a payment status recheck.
@@ -379,7 +379,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 
 			// if error on checking payement we will save as pending and returns status
 			if err != nil {
-				logger.Warn("Something happened while paying the invoice. Keeping proofs and quote as pending ")
+				slog.Warn("Something happened while paying the invoice. Keeping proofs and quote as pending ")
 				// keeps the proofs and quotes as pending in the database
 				err = m.MintDB.Commit(context.Background(), tx)
 				if err != nil {
@@ -388,7 +388,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote) %w", err)
 			}
 
-			logger.Info("after check payed verification")
+			slog.Info("after check payed verification")
 			quote.FeePaid = fee_paid
 
 			switch status {
@@ -398,7 +398,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 				// change melt request state
 				err = m.MintDB.ChangeMeltRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
 				if err != nil {
-					logger.Error(fmt.Errorf("ModifyQuoteMeltPayStatusAndMelted: %w", err).Error())
+					slog.Error("ModifyQuoteMeltPayStatusAndMelted", slog.Any("error", err))
 				}
 
 				err = m.MintDB.Commit(context.Background(), tx)
@@ -459,7 +459,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		err = m.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 
 		if err != nil {
-			logger.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
+			slog.Error("recoverySigsDb", slog.Any("recovery_sigs", recoverySigsDb))
 			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.SaveRestoreSigs(tx, recoverySigsDb) %w", err)
 
 		}
@@ -488,13 +488,13 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	// send proofs to database
 	err = m.MintDB.SetProofsState(tx, meltRequest.Inputs, cashu.PROOF_SPENT)
 	if err != nil {
-		logger.Error(fmt.Errorf("Proofs: %+v", meltRequest.Inputs).Error())
+		slog.Error("Proofs", slog.Any("proofs", meltRequest.Inputs))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.SetProofsState(tx, meltRequest.Inputs, cashu.PROOF_SPENT) %w", err)
 	}
 
 	err = m.MintDB.DeleteChangeByQuote(tx, quote.Quote)
 	if err != nil {
-		logger.Info(fmt.Errorf("mint.MintDB.SaveMeltChange(meltRequest.Outputs, quote.Quote) %w", err).Error())
+		slog.Info("mint.MintDB.SaveMeltChange(meltRequest.Outputs, quote.Quote)", slog.Any("error", err))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteChangeByQuote(tx, quote.Quote) %w", err)
 	}
 
