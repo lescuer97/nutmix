@@ -4,12 +4,12 @@ import "strconv"
 import "time"
 
 type KeysetData struct {
-	Id        string
-	Active    bool
-	Unit      string
-	Fees      uint
-	CreatedAt int64
-	Version   uint64
+	Id          string
+	Active      bool
+	Unit        string
+	Fees        uint
+	CreatedAt   int64
+	Version     uint64
 	ExpireLimit *time.Time
 }
 
@@ -37,9 +37,9 @@ templ KeysetsPage() {
 					<input type="number" name="FEE" value="0"/>
 				</label>
 				<label for="EXPIRE_LIMIT" class="settings-input">
-    			  Hours for expiration of keyset
-    			  <input type="number" name="EXPIRE_LIMIT" value="270" />
-    			</label>
+					Hours for expiration of keyset
+					<input type="number" name="EXPIRE_LIMIT" value="270"/>
+				</label>
 				<button style="min-width: 150px;" hx-disabled-elt="this" class="square" type="submit">
 					Rotate Sats keys up
 				</button>

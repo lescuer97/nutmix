@@ -4,11 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
@@ -16,7 +17,6 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
 const AdminAuthKey = "admin-cookie"
@@ -24,9 +24,7 @@ const AdminAuthKey = "admin-cookie"
 func AuthMiddleware(secret []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
-
 			token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
-
 				// Don't forget to validate the alg is what you expect:
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					slog.Warn("Unexpected signing method", slog.Any("alg", token.Header["alg"]))
@@ -80,8 +78,15 @@ func AuthMiddleware(secret []byte) gin.HandlerFunc {
 	}
 }
 
-func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
+var ErrIncorrectNpub = errors.New("Incorrect npub used in signature")
+
+func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey *btcec.PublicKey) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if adminNostrPubkey == nil {
+			slog.Error("adminNostrPubkey is nil. this should have never happened")
+			panic("adminNostrPubkey is nil")
+		}
+
 		// parse data for login
 		slog.Debug("Attempting log in")
 		var nostrEvent nostr.Event
@@ -120,13 +125,12 @@ func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 		}()
 
 		nostrLogin, err := mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)
-
 		if err != nil {
 			slog.Error(
-				"database.GetNostrLogin(pool, nostrEvent.Content )",
+				"mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)",
 				slog.Any("error", err),
 			)
-			c.JSON(500, "Opps!, something wrong happened")
+			c.JSON(400, "Content is not available")
 			return
 		}
 
@@ -164,57 +168,20 @@ func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 			return
 		}
 
-		adminPubkey := os.Getenv("ADMIN_NOSTR_NPUB")
-
-		if adminPubkey == "" {
-			slog.Error("ERROR: NO ADMIN PUBKEY PRESENT")
-			c.JSON(500, "Something happend!")
-			return
-
-		}
-
-		_, value, err := nip19.Decode(adminPubkey)
-		if err != nil {
-			slog.Info("nip19.Decode(adminPubkey)", slog.Any("error", err))
-			c.JSON(500, "Something happend!")
-			return
-		}
-
-		decodedKey, err := hex.DecodeString(value.(string))
-		if err != nil {
-			slog.Info("hex.DecodeString(value.(string))", slog.Any("error", err))
-			c.JSON(500, "Something happend!")
-			return
-		}
-
-		pubkey, err := schnorr.ParsePubKey(decodedKey)
-
-		if err != nil {
-			slog.Info("schnorr.ParsePubKey(decodedKey)", slog.Any("error", err))
-			c.JSON(500, "Something happend!")
-			return
-		}
-
 		eventHash := sha256.Sum256(nostrEvent.Serialize())
-
-		verified := sig.Verify(eventHash[:], pubkey)
-
+		verified := sig.Verify(eventHash[:], adminNostrPubkey)
 		if !verified {
 			if c.ContentType() == gin.MIMEJSON {
 				c.JSON(400, "Private key used is not correct")
 				return
 			} else {
-				slog.Warn("Private key used is not correct")
-				c.Header("HX-RETARGET", "error-message")
-				c.HTML(400, "incorrect-key-error", nil)
+				c.Error(ErrIncorrectNpub)
 				return
 			}
 		}
 
 		nostrLogin.Activated = verified
-
 		err = mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated)
-
 		if err != nil {
 			slog.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something wrong happened")

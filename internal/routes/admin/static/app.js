@@ -57,7 +57,7 @@ nip07form?.addEventListener("submit", (e) => {
                 res
                   .text()
                   .then((text) => {
-                    window.htmx.swap(`#${targetHeader}`, text, {
+                    window.htmx.swap(targetHeader, text, {
                       swapStyle: "innerHTML",
                     });
                   })
