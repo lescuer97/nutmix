@@ -18,7 +18,41 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"golang.org/x/net/html"
 )
+
+func ExtractPasswordNonce(htmlContent string) (string, error) {
+	doc, err := html.Parse(strings.NewReader(htmlContent))
+	if err != nil {
+		return "", err
+	}
+
+	var result string
+	var traverse func(*html.Node)
+	traverse = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "input" {
+			var name, val string
+			for _, attr := range n.Attr {
+				if attr.Key == "name" && attr.Val == "passwordNonce" {
+					name = attr.Val
+				}
+				if attr.Key == "value" {
+					val = attr.Val
+				}
+			}
+			if name == "passwordNonce" {
+				result = val
+				return
+			}
+		}
+		// Recursively search children unless found
+		for c := n.FirstChild; c != nil && result == ""; c = c.NextSibling {
+			traverse(c)
+		}
+	}
+	traverse(doc)
+
+	return result, nil}
 
 func TestSetupMintAdminLoginSuccess(t *testing.T) {
 	const posgrespassword = "password"
@@ -77,17 +111,17 @@ func TestSetupMintAdminLoginSuccess(t *testing.T) {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-	var loginParams admin.LoginParams
-	err = json.Unmarshal(w.Body.Bytes(), &loginParams)
 
+	nonces, err := ExtractPasswordNonce(w.Body.String())
 	if err != nil {
-		t.Errorf("Error unmarshalling response: %v", err)
+		t.Fatalf("extractNonces(w.Body.String()): %v", err)
 	}
+
 
 	// sign nonce with admin nostr privkey
 	eventToSign := nostr.Event{
 		Kind:      27235,
-		Content:   loginParams.Nonce,
+		Content:   nonces,
 		CreatedAt: nostr.Timestamp(time.Now().Unix()),
 	}
 
@@ -169,17 +203,20 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-	var loginParams admin.LoginParams
-	err = json.Unmarshal(w.Body.Bytes(), &loginParams)
 
+	nonces, err := ExtractPasswordNonce(w.Body.String())
 	if err != nil {
-		t.Errorf("Error unmarshalling response: %v", err)
+		t.Fatalf("extractNonces(w.Body.String()): %v", err)
+	}
+
+	if len(nonces) == 0 {
+		t.Fatalf("could not extract any nonces: %v", err)
 	}
 
 	// sign nonce with admin nostr privkey
 	eventToSign := nostr.Event{
 		Kind:      27235,
-		Content:   loginParams.Nonce,
+		Content:   nonces,
 		CreatedAt: nostr.Timestamp(time.Now().Unix()),
 	}
 
@@ -274,17 +311,19 @@ func TestRotateKeyUpCall(t *testing.T) {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-	var loginParams admin.LoginParams
-	err = json.Unmarshal(w.Body.Bytes(), &loginParams)
-
+	nonces, err := ExtractPasswordNonce(w.Body.String())
 	if err != nil {
-		t.Errorf("Error unmarshalling response: %v", err)
+		t.Fatalf("extractNonces(w.Body.String()): %v", err)
+	}
+
+	if len(nonces) == 0 {
+		t.Fatalf("could not extract any nonces: %v", err)
 	}
 
 	// sign nonce with admin nostr privkey
 	eventToSign := nostr.Event{
 		Kind:      27235,
-		Content:   loginParams.Nonce,
+		Content:   nonces,
 		CreatedAt: nostr.Timestamp(time.Now().Unix()),
 	}
 

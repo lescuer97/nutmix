@@ -4,22 +4,27 @@ import (
 	"context"
 	"crypto/rand"
 	"embed"
+	"encoding/hex"
 	"errors"
 	"html/template"
 	"io/fs"
 	"log"
 	"net/http"
+	"strings"
 
 	"log/slog"
 	"os"
 	"slices"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
 type ErrorNotif struct {
@@ -36,26 +41,26 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 				switch {
 				case errors.Is(e, utils.ErrAlreadyLNPaying):
 					message = "Error paying invoice"
-					break
 				case errors.Is(e, ErrInvalidNostrKey):
 					message = "Nostr npub is not valid"
-					break
 				case errors.Is(e, ErrInvalidOICDURL):
 					message = ErrInvalidOICDURL.Error()
-					break
 				case errors.Is(e, ErrUnitNotCorrect):
 					message = "Keyset Unit is not correct"
-					break
 				case errors.Is(e, ErrInvalidStrikeCheck):
 					message = ErrInvalidStrikeCheck.Error()
-					break
 				case errors.Is(e, ErrInvalidStrikeConfig):
 					message = ErrInvalidStrikeCheck.Error()
-					break
+				case errors.Is(e, ErrIncorrectNpub):
+					message = ErrIncorrectNpub.Error()
+					c.Status(http.StatusBadRequest)
 				}
 			}
 			slog.Error("Error from calls", slog.String("errors", c.Errors.String()))
+
 			component := templates.ErrorNotif(message)
+			c.Header("HX-Reswap", "innerHtml")
+			c.Header("HX-Retarget", "#notifications")
 			err := component.Render(c.Request.Context(), c.Writer)
 			if err != nil {
 				slog.Error("Could not render error notification", slog.Any("error", err))
@@ -96,49 +101,83 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 			slog.String(utils.LogExtraInfo, err.Error()),
 		)
 		log.Panicf("secp256k1.GeneratePrivateKey(). %+v", err)
-
 	}
+
+	var nostrPubkey *btcec.PublicKey
+	adminNpubStr := os.Getenv("ADMIN_NOSTR_NPUB")
+	if adminNpubStr != "" {
+		_, value, err := nip19.Decode(adminNpubStr)
+		if err != nil {
+			slog.Info("nip19.Decode(adminNpubStr)", slog.Any("error", err))
+			panic("invalid  ADMIN_NOSTR_NPUB ")
+		}
+
+		decodedKey, err := hex.DecodeString(value.(string))
+		if err != nil {
+			slog.Info("hex.DecodeString(value.(string))", slog.Any("error", err))
+			panic("decoded ADMIN_NOSTR_NPUB is not correct")
+		}
+
+		pubkey, err := schnorr.ParsePubKey(decodedKey)
+		if err != nil {
+			slog.Info("schnorr.ParsePubKey(decodedKey)", slog.Any("error", err))
+			panic("")
+		}
+
+		nostrPubkey = pubkey
+	}
+
+	// INFO: if the admin page has a 404 we redirect to the login
+	r.Use(func(c *gin.Context) {
+		c.Next()
+		if c.Writer.Status() == http.StatusNotFound &&
+			strings.Contains(c.Request.URL.Path, "/admin") {
+			c.Redirect(http.StatusFound, "/admin/login")
+			c.Abort()
+		}
+	})
 
 	adminRoute.Use(ErrorHtmlMessageMiddleware())
 	// I use the first active keyset as secret for jwt token signing
 	adminRoute.Use(AuthMiddleware(loginKey.Serialize()))
-
 	// PAGES SETUP
 	// This is /admin pages
-	adminRoute.GET("", InitPage(mint))
-	adminRoute.GET("/keysets", KeysetsPage(mint))
-	adminRoute.GET("/settings", MintSettingsPage(mint))
-	adminRoute.GET("/login", LoginPage(mint))
-	adminRoute.GET("/bolt11", LightningNodePage(mint))
+	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
+	if nostrPubkey != nil {
+		adminRoute.GET("", InitPage(mint))
+		adminRoute.GET("/keysets", KeysetsPage(mint))
+		adminRoute.GET("/settings", MintSettingsPage(mint))
+		adminRoute.GET("/bolt11", LightningNodePage(mint))
 
-	// change routes
-	adminRoute.POST("/login", Login(mint, loginKey))
-	adminRoute.POST("/mintsettings", MintSettingsForm(mint))
-	adminRoute.POST("/bolt11", Bolt11Post(mint))
-	adminRoute.POST("/rotate/sats", RotateSatsSeed(mint))
+		// change routes
+		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
+		adminRoute.POST("/mintsettings", MintSettingsForm(mint))
+		adminRoute.POST("/bolt11", Bolt11Post(mint))
+		adminRoute.POST("/rotate/sats", RotateSatsSeed(mint))
 
-	// fractional html components
-	adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint))
-	adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
-	adminRoute.GET("/mint-balance", MintBalance(mint))
-	adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint))
-	adminRoute.GET("/mint-melt-list", MintMeltList(mint))
-	adminRoute.GET("/logs", LogsTab())
+		// fractional html components
+		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint))
+		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
+		adminRoute.GET("/mint-balance", MintBalance(mint))
+		adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint))
+		adminRoute.GET("/mint-melt-list", MintMeltList(mint))
+		adminRoute.GET("/logs", LogsTab())
 
-	// only have swap routes if liquidity manager is possible
-	if utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
+		// only have swap routes if liquidity manager is possible
+		if utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
 
-		adminRoute.GET("/liquidity", LigthningLiquidityPage(mint))
-		adminRoute.GET("/liquidity/:swapId", SwapStatusPage(mint))
-		adminRoute.GET("/swaps-list", SwapsList(mint))
-		adminRoute.GET("/liquidity-button", LiquidityButton())
-		adminRoute.GET("/liquid-swap-form", SwapOutForm(mint))
-		adminRoute.GET("/lightning-swap-form", LightningSwapForm())
-		adminRoute.POST("/out-swap-req", SwapOutRequest(mint))
-		adminRoute.POST("/in-swap-req", SwapInRequest(mint))
-		adminRoute.GET("/swap/:swapId", SwapStateCheck(mint))
-		adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(mint))
-		go CheckStatusOfLiquiditySwaps(mint)
+			adminRoute.GET("/liquidity", LigthningLiquidityPage(mint))
+			adminRoute.GET("/liquidity/:swapId", SwapStatusPage(mint))
+			adminRoute.GET("/swaps-list", SwapsList(mint))
+			adminRoute.GET("/liquidity-button", LiquidityButton())
+			adminRoute.GET("/liquid-swap-form", SwapOutForm(mint))
+			adminRoute.GET("/lightning-swap-form", LightningSwapForm())
+			adminRoute.POST("/out-swap-req", SwapOutRequest(mint))
+			adminRoute.POST("/in-swap-req", SwapInRequest(mint))
+			adminRoute.GET("/swap/:swapId", SwapStateCheck(mint))
+			adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(mint))
+			go CheckStatusOfLiquiditySwaps(mint)
+		}
 	}
 
 }
