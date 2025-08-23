@@ -49,10 +49,10 @@ func main() {
 
 	// Manipulate Config file
 	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0764)
-	defer logFile.Close()
 	if err != nil {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
+	defer logFile.Close()
 
 	w := io.MultiWriter(os.Stdout, logFile)
 
@@ -90,12 +90,11 @@ func main() {
 	}
 
 	db, err := postgresql.DatabaseSetup(ctx, "migrations")
-	defer db.Close()
-
 	if err != nil {
 		logger.Error(fmt.Sprintf("Error conecting to db %+v", err))
 		log.Panic()
 	}
+	defer db.Close()
 
 	config, err := mint.SetUpConfigDB(db)
 	if err != nil {

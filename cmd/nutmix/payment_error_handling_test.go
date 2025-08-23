@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/mint"
@@ -11,10 +16,6 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"net/http/httptest"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
@@ -132,9 +133,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var postMeltResponse cashu.PostMeltQuoteBolt11Response
-
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
-
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
@@ -148,7 +147,10 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	}
 	defer mint.MintDB.Rollback(ctx, tx)
 
-	proofs, _ := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
+	proofs, err := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret}): %+v", err)
+	}
 
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"strings"
 	"time"
@@ -486,7 +485,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 		defer mint.MintDB.Rollback(ctx, tx)
 
-		log.Printf("dbRequest: %+v", dbRequest)
 		err = mint.MintDB.SaveMeltRequest(tx, dbRequest)
 
 		if err != nil {
@@ -521,7 +519,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	})
 
 	v1.POST("/melt/bolt11", func(c *gin.Context) {
-		log.Printf("\n\n melt Tryy")
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
 		if err != nil {

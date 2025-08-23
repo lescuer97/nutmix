@@ -253,6 +253,13 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
+		err = swapRequest.ValidateSigflag()
+		if err != nil {
+			logger.Error(fmt.Errorf("swapRequest.ValidateSigflag(). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
 
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
