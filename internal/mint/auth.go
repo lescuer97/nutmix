@@ -108,7 +108,7 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 		return fmt.Errorf("m.MintDB.SaveProof(tx, proofArray). %w", err)
 	}
 
-	err = m.Signer.VerifyProofs(proofArray, nil)
+	err = m.Signer.VerifyProofs(proofArray)
 	if err != nil {
 		return fmt.Errorf("m.Signer.VerifyProofs(proofArray, nil). %w", err)
 	}

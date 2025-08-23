@@ -254,16 +254,6 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
 	}
-	if len(meltRequest.Outputs) > 0 {
-		outputUnit, err := m.VerifyOutputs(meltRequest.Outputs, keysets.Keysets)
-		if err != nil {
-			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.VerifyOutputs(meltRequest.Outputs): %w", cashu.ErrUnitNotSupported, err)
-		}
-
-		if outputUnit != unit {
-			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. Change output unit is different: ", cashu.ErrDifferentInputOutputUnit)
-		}
-	}
 
 	// if there are change outputs you need to check if the outputs are valid if they have the correct unit
 	if len(meltRequest.Outputs) > 0 {
@@ -309,9 +299,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w len(knownProofs) != 0 %w", cashu.ErrProofSpent, err)
 	}
 
-	err = m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs)
+	err = m.verifyProofs(meltRequest.Inputs)
 	if err != nil {
-		logger.Debug("Could not verify Proofs", slog.String(utils.LogExtraInfo, err.Error()))
+		logger.Debug("m.verifyProofs(meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs) %w", err)
 	}
 
