@@ -25,12 +25,8 @@ func TestCheckP2PKProof(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not parse spend condition. %+v", err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Errorf("could not parse witness. %+v", err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if err != nil {
 		t.Errorf("should not have errored. %+v", err)
 
@@ -60,12 +56,8 @@ func TestCheckP2PKProofInvalidSignature(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not parse spend condition. %+v", err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Errorf("could not parse witness. %+v", err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if !errors.Is(err, ErrNotEnoughSignatures) {
 		t.Errorf("Error should be about no valid signatures. %+v", err)
 	}
@@ -91,12 +83,8 @@ func TestCheckP2PKProofValidMultisig2of2(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not parse spend condition. %+v", err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Errorf("could not parse witness. %+v", err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if err != nil {
 		t.Errorf("should not have errored. %+v", err)
 
@@ -124,12 +112,8 @@ func TestCheckP2PKProofInvalidMultisig(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not parse spend condition. %+v", err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Errorf("could not parse witness. %+v", err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if !errors.Is(err, ErrNotEnoughSignatures) {
 		t.Errorf("Error should be about no valid signatures. %+v", err)
 	}
@@ -155,11 +139,7 @@ func TestCheckP2PKProofWithSpendableLocktime(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not parse spend condition. %+v", err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Errorf("could not parse witness. %+v", err)
-	}
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if err != nil {
 		t.Errorf("should not have errored. %+v", err)
 
@@ -187,12 +167,8 @@ func TestCheckP2PKProofInvalidLocktimeRefundKey(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not parse spend condition. %+v", err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Errorf("could not parse witness. %+v", err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if !errors.Is(err, ErrNoValidSignatures) {
 		t.Errorf("Error should be about no valid signatures. %+v", err)
 	}

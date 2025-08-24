@@ -134,13 +134,13 @@ func TestValidPreimageAndSignature(t *testing.T) {
 
 	// checkOutputs := false
 	// check if a proof is locked to a spend condition and verifies it
-	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned()
+	isProofLocked, spendCondition, err := proof.IsProofSpendConditioned()
 
 	if isProofLocked == false {
 		t.Errorf("Error in isProofLocked %+v", isProofLocked)
 	}
 
-	ok, err := proof.VerifyP2PK(spendCondition, witness)
+	ok, err := proof.VerifyP2PK(spendCondition)
 
 	if !ok {
 		t.Errorf("Error in ok %+v", ok)
@@ -177,13 +177,13 @@ func TestInvalidSignatureAndValidPreimageHTLC(t *testing.T) {
 	}
 
 	// check if a proof is locked to a spend condition and verifies it
-	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned()
+	isProofLocked, spendCondition, err := proof.IsProofSpendConditioned()
 
 	if isProofLocked == false {
 		t.Errorf("Error in isProofLocked %+v", isProofLocked)
 	}
 
-	ok, err := proof.VerifyHTLC(spendCondition, witness)
+	ok, err := proof.VerifyHTLC(spendCondition)
 
 	if ok {
 		t.Errorf("Error in ok %+v", ok)
@@ -215,13 +215,13 @@ func TestValidSignatureAndInvalidPreimageHTLC(t *testing.T) {
 	}
 
 	// check if a proof is locked to a spend condition and verifies it
-	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned()
+	isProofLocked, spendCondition, err := proof.IsProofSpendConditioned()
 
 	if isProofLocked == false {
 		t.Errorf("Error in isProofLocked %+v", isProofLocked)
 	}
 
-	ok, err := proof.VerifyP2PK(spendCondition, witness)
+	ok, err := proof.VerifyP2PK(spendCondition)
 
 	if ok {
 		t.Errorf("Error in ok %+v", ok)
@@ -253,11 +253,7 @@ func TestVectorValidProof(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proof.parseSpendCondition(): %+v %+v", []byte(proofString), err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Fatalf("proof.parseWitness(): %+v %+v", []byte(proofString), err)
-	}
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if err != nil {
 		t.Fatalf("spendCondition.VerifySignatures(witness, proof.Secret): %+v ", []byte(proofString))
 	}
@@ -289,12 +285,8 @@ func TestVectorInvalidProofSignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proof.parseSpendCondition(): %+v %+v", []byte(proofString), err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Fatalf("proof.parseWitness(): %+v %+v", []byte(proofString), err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 
 	if valid != false {
 		t.Error("proof should be valid")
@@ -323,12 +315,8 @@ func TestVectorValid2Signatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proof.parseSpendCondition(): %+v %+v", []byte(proofString), err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Fatalf("proof.parseWitness(): %+v %+v", []byte(proofString), err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if err != nil {
 		t.Fatalf("spendCondition.VerifySignatures(witness, proof.Secret): %+v ", []byte(proofString))
 	}
@@ -359,12 +347,8 @@ func TestVectorNotEnoughtSignatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proof.parseSpendCondition(): %+v %+v", []byte(proofString), err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Fatalf("proof.parseWitness(): %+v %+v", []byte(proofString), err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 
 	if valid != false {
 		t.Error("proof should be valid")
@@ -393,12 +377,8 @@ func TestVectorRefundKeySpendable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proof.parseSpendCondition(): %+v %+v", []byte(proofString), err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Fatalf("proof.parseWitness(): %+v %+v", []byte(proofString), err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if err != nil {
 		t.Fatalf("spendCondition.VerifySignatures(witness, proof.Secret): %+v ", []byte(proofString))
 	}
@@ -429,12 +409,8 @@ func TestVectorRefundSigInvalidFromFuture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proof.parseSpendCondition(): %+v %+v", []byte(proofString), err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Fatalf("proof.parseWitness(): %+v %+v", []byte(proofString), err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if valid != false {
 		t.Error("proof should be valid")
 	}
@@ -456,12 +432,8 @@ func TestVectorSamePubkeySignatureMultisig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proof.parseSpendCondition(): %+v %+v", []byte(proofString), err)
 	}
-	witness, err := proof.parseWitness()
-	if err != nil {
-		t.Fatalf("proof.parseWitness(): %+v %+v", []byte(proofString), err)
-	}
 
-	valid, err := proof.VerifyP2PK(spendCondition, witness)
+	valid, err := proof.VerifyP2PK(spendCondition)
 	if valid != false {
 		t.Error("proof should be valid")
 	}

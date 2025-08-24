@@ -59,9 +59,13 @@ type Proof struct {
 	Quote   *string    `json:"quote" db:"quote"`
 }
 
-func (p Proof) VerifyP2PK(spendCondition *SpendCondition, witness *Witness) (bool, error) {
+func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 	currentTime := time.Now().Unix()
 	hashMessage := sha256.Sum256([]byte(p.Secret))
+	witness, err := p.parseWitness()
+	if err != nil {
+		return false, fmt.Errorf("p.parseWitness(). %+v", err)
+	}
 	pubkeys, err := p.Pubkeys()
 	if err != nil {
 		return false, fmt.Errorf("p.Pubkeys(). %+v", err)
@@ -128,13 +132,16 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition, witness *Witness) (boo
 	}
 }
 
-func (p Proof) VerifyHTLC(spendCondition *SpendCondition, witness *Witness) (bool, error) {
+func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 	currentTime := time.Now().Unix()
 	hashMessage := sha256.Sum256([]byte(p.Secret))
+	witness, err := p.parseWitness()
+	if err != nil {
+		return false, fmt.Errorf("p.parseWitness(). %+v", err)
+	}
 	pubkeys, err := p.Pubkeys()
 	if err != nil {
 		return false, fmt.Errorf("p.Pubkeys(). %+v", err)
-
 	}
 	// check if locktime has passed and if there are refund keys
 	if spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
@@ -170,6 +177,11 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition, witness *Witness) (boo
 		}
 	}
 
+	err = spendCondition.VerifyPreimage(witness)
+	if err != nil {
+		return false, fmt.Errorf("spendCondition.VerifyPreimage  %w ", err)
+	}
+
 	// append all posibles keys for signing
 	amountValidSigs := 0
 	for _, sig := range witness.Signatures {
@@ -180,10 +192,6 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition, witness *Witness) (boo
 				continue
 			}
 		}
-	}
-	err = spendCondition.VerifyPreimage(witness)
-	if err != nil {
-		return false, fmt.Errorf("spendCondition.VerifyPreimage  %w ", err)
 	}
 
 	// check if there is a multisig set up if not check if there is only one valid signature
@@ -260,32 +268,14 @@ func (p Proof) parseWitness() (*Witness, error) {
 	return &witness, nil
 }
 
-func (p Proof) IsProofSpendConditioned() (bool, *SpendCondition, *Witness, error) {
-	var witness Witness
-	var witnessErr error
-
-	// Only try to unmarshal witness if it's not empty
-	if p.Witness != "" {
-		witnessErr = json.Unmarshal([]byte(p.Witness), &witness)
-	} else {
-		// Empty witness is valid, just leave witness as zero value
-		witnessErr = nil
-	}
+func (p Proof) IsProofSpendConditioned() (bool, *SpendCondition, error) {
 
 	var spendCondition SpendCondition
-
-	spendConditionErr := json.Unmarshal([]byte(p.Secret), &spendCondition)
-
-	switch {
-	case witnessErr == nil && spendConditionErr == nil:
-		return true, &spendCondition, &witness, nil
-	case witnessErr != nil && spendConditionErr == nil:
-		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %w, %w", ErrCouldNotParseWitness, witnessErr)
-	case spendConditionErr != nil && witnessErr == nil:
-		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %w, %w", ErrCouldNotParseSpendCondition, spendConditionErr)
-	default:
-		return false, nil, nil, nil
+	err := json.Unmarshal([]byte(p.Secret), &spendCondition)
+	if err != nil {
+		return false, nil, nil
 	}
+	return true, &spendCondition, nil
 }
 
 func (p Proof) HashSecretToCurve() (Proof, error) {

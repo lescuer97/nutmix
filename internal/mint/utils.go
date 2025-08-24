@@ -185,14 +185,14 @@ func (m *Mint) VerifyInputsAndOutputs(proofs cashu.Proofs, outputs []cashu.Blind
 func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
 
 	for _, proof := range proofs {
-		isLocked, spendCondition, witness, err := proof.IsProofSpendConditioned()
+		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
 		if err != nil {
 			return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
 		}
 		if isLocked {
 			switch spendCondition.Type {
 			case cashu.P2PK:
-				valid, err := proof.VerifyP2PK(spendCondition, witness)
+				valid, err := proof.VerifyP2PK(spendCondition)
 				if err != nil {
 					return fmt.Errorf("proof.VerifyP2PK(spendCondition, witness). %w", err)
 				}
@@ -200,7 +200,7 @@ func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
 					return cashu.ErrInvalidSpendCondition
 				}
 			case cashu.HTLC:
-				valid, err := proof.VerifyP2PK(spendCondition, witness)
+				valid, err := proof.VerifyHTLC(spendCondition)
 				if err != nil {
 					return fmt.Errorf("proof.VerifyP2PK(spendCondition, witness). %w", err)
 				}
@@ -210,7 +210,6 @@ func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
 			}
 
 		}
-
 	}
 	err := m.Signer.VerifyProofs(proofs)
 	if err != nil {

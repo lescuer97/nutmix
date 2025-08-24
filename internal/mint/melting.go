@@ -302,7 +302,13 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	err = m.verifyProofs(meltRequest.Inputs)
 	if err != nil {
 		logger.Debug("m.verifyProofs(meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs) %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.verifyProofs(meltRequest.Inputs) %w", err)
+	}
+
+	err = meltRequest.ValidateSigflag()
+	if err != nil {
+		logger.Debug("meltRequest.ValidateSigflag()", slog.String(utils.LogExtraInfo, err.Error()))
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.verifyProofs(meltRequest.Inputs) %w", err)
 	}
 
 	invoice, err := zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork())
