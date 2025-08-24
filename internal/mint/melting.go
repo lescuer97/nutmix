@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
@@ -65,7 +66,12 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 	quote, err := m.MintDB.GetMeltRequestById(initialTx, quoteId)
 
 	if err != nil {
-		return quote, fmt.Errorf("m.MintDB.GetMeltRequestById(quoteId). %w", err)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "55P03" {
+			// lock not available -> treat as pending
+			return quote, cashu.ErrQuoteIsPending
+		}
+		return quote, fmt.Errorf("m.MintDB.GetMeltRequestById(quoteId): %w", err)
 	}
 	pending_proofs, err := m.MintDB.GetProofsFromQuote(initialTx, quote.Quote)
 	if err != nil {
@@ -233,7 +239,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	}
 
 	if quote.State != cashu.UNPAID {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w mint.CheckMeltQuoteState(quoteId): %w", cashu.ErrMeltAlreadyPaid, err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w", cashu.ErrMeltAlreadyPaid)
 	}
 
 	keysets, err := m.Signer.GetKeysets()
@@ -243,7 +249,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 
 	unit, err := m.CheckProofsAreSameUnit(meltRequest.Inputs, keysets.Keysets)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w: m.CheckProofsAreSameUnit(meltRequest.Inputs): %v", cashu.ErrUnitNotSupported, err)
 	}
 
 	// check for needed amount of fees
@@ -260,7 +266,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 
 	if AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)) {
 		logger.Info(fmt.Sprintf("Not enought proofs to expend. Needs: %v", quote.Amount))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. AmountProofs < (quote.Amount + quote.FeeReserve + uint64(fee)): %w", cashu.ErrNotEnoughtProofs, err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w", cashu.ErrNotEnoughtProofs)
 	}
 
 	err = m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs)
@@ -287,12 +293,12 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 
 	if quote.State == cashu.PENDING {
 		logger.Warn("Quote is pending")
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf(" %w m.MintDB.GetMeltRequestById(tx, meltRequest.Quote): %w", cashu.ErrQuoteIsPending, err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w", cashu.ErrQuoteIsPending)
 	}
 
 	if quote.Melted {
 		logger.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w quote.Melted: %w", cashu.ErrMeltAlreadyPaid, err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w", cashu.ErrMeltAlreadyPaid)
 	}
 
 	// check if we know any of the proofs
@@ -303,7 +309,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 
 	if len(knownProofs) != 0 {
 		logger.Info("Proofs already used", slog.String(utils.LogExtraInfo, fmt.Sprintf("knownproofs:  %+v", knownProofs)))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w len(knownProofs) != 0 %w", cashu.ErrProofSpent, err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w: len(knownProofs) != 0", cashu.ErrProofSpent)
 	}
 	if len(meltRequest.Outputs) > 0 {
 		outputUnit, err := m.VerifyOutputs(preparationTx, meltRequest.Outputs, keysets.Keysets)
@@ -449,7 +455,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request, logger *slog.Logger
 	if err != nil {
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
 	}
-			defer m.MintDB.Rollback(ctx, paidLnxTx)
+	defer m.MintDB.Rollback(ctx, paidLnxTx)
 	totalExpent := quote.Amount + paidLightningFeeSat + uint64(fee)
 	if AmountProofs > totalExpent && len(meltRequest.Outputs) > 0 {
 		overpaidFees := AmountProofs - totalExpent
