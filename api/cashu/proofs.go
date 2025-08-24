@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -269,13 +271,32 @@ func (p Proof) parseWitness() (*Witness, error) {
 }
 
 func (p Proof) IsProofSpendConditioned() (bool, *SpendCondition, error) {
-
-	var spendCondition SpendCondition
-	err := json.Unmarshal([]byte(p.Secret), &spendCondition)
-	if err != nil {
+	var rawJsonSecret []json.RawMessage
+	if err := json.Unmarshal([]byte(p.Secret), &rawJsonSecret); err != nil {
 		return false, nil, nil
 	}
-	return true, &spendCondition, nil
+
+	// Well-known secret should have a length of at least 2
+	if len(rawJsonSecret) < 2 {
+		return false, nil, errors.New("invalid secret: length < 2")
+	}
+
+	var kind string
+	if err := json.Unmarshal(rawJsonSecret[0], &kind); err != nil {
+		return false, nil, fmt.Errorf("json.Unmarshal(rawJsonSecret[0], &kind);%w", err)
+	}
+
+	log.Printf("\n\nkind: %+v", kind)
+	if kind != "P2PK" && kind != "HTLC" {
+		return false, nil, nil
+	}
+
+	spendCondition, err := p.parseSpendCondition()
+	if err != nil {
+		return false, nil, fmt.Errorf("p.parseSpendCondition(). %w", err)
+
+	}
+	return true, spendCondition, nil
 }
 
 func (p Proof) HashSecretToCurve() (Proof, error) {

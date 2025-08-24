@@ -418,11 +418,11 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 		pubkeys:            make(map[*btcec.PublicKey]bool),
 	}
 	for _, proof := range proofs {
-		spendCondition, err := proof.parseSpendCondition()
+		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
 		if err != nil {
-			return sigFlagValidation, err
+			return sigFlagValidation, fmt.Errorf("proof.parseSpendCondition(). %w", err)
 		}
-		if spendCondition != nil {
+		if isLocked && spendCondition != nil {
 			if spendCondition.Data.Tags.Sigflag == SigAll {
 				sigFlagValidation.sigFlag = SigAll
 			}

@@ -1,7 +1,6 @@
 package cashu
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -87,7 +86,7 @@ type PostMeltBolt11Request struct {
 func (p *PostMeltBolt11Request) ValidateSigflag() error {
 	sigFlagValidation, err := checkForSigAll(p.Inputs)
 	if err != nil {
-		return err
+		return fmt.Errorf("checkForSigAll(p.Inputs). %w", err)
 	}
 	if sigFlagValidation.sigFlag == SigAll {
 
@@ -155,43 +154,6 @@ func (p *PostMeltBolt11Request) verifyConditions() error {
 
 		if string(spendCondition.Data.Tags.originalTag) != string(firstSpendCondition.Data.Tags.originalTag) {
 			return fmt.Errorf("not same tags %w", ErrInvalidSpendCondition)
-		}
-
-	}
-	return nil
-}
-func (p *PostMeltBolt11Request) firstProofValues() error {
-	firstProof := p.Inputs[0]
-	firstSpendCondition, err := firstProof.parseSpendCondition()
-	if err != nil {
-		return nil
-	}
-
-	firstTagString, err := json.Marshal(firstSpendCondition.Data.Tags)
-	if err != nil {
-		return nil
-	}
-
-	for _, proof := range p.Inputs {
-		spendCondition, err := proof.parseSpendCondition()
-		if err != nil {
-			return nil
-		}
-
-		if spendCondition.Data.Data != firstSpendCondition.Data.Data {
-			return ErrInvalidSpendCondition
-		}
-		if spendCondition.Data.Tags.NSigRefund != firstSpendCondition.Data.Tags.NSigRefund {
-			return ErrInvalidSpendCondition
-		}
-
-		tagString, err := json.Marshal(spendCondition.Data.Tags)
-		if err != nil {
-			return nil
-		}
-
-		if string(tagString) != string(firstTagString) {
-			return ErrInvalidSpendCondition
 		}
 
 	}
