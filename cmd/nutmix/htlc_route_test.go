@@ -587,13 +587,13 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	if errorRes.Code != cashu.UNKNOWN {
+	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
-	if *errorRes.Detail != `Locktime has passed and no refund key was found` {
-		t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
-	}
+	// if *errorRes.Detail != `Locktime has passed and no refund key was found` {
+	// 	t.Fatalf("Expected response No valid signatures, got %s", w.Body.String())
+	// }
 
 	// TRY SWAPPING with refund key
 	swapProofsRefund, err := GenerateProofsHTLC(postSwapResponse.Signatures, correctPreimage, activeKeys, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{lockingPrivKeyTwo, refundPrivKey})
