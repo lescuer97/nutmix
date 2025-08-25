@@ -170,7 +170,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			}
 			err = m.MintDB.Commit(context.Background(), settleTx)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
+				return quote, fmt.Errorf("m.MintDB.Commit(context.Background(), settleTx). %w", err)
 			}
 
 		}
@@ -184,17 +184,17 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 
 			err = m.MintDB.ChangeMeltRequestState(failedLnTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee) %w", err)
+				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(failedLnTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid) %w", err)
 			}
 
 			err = m.MintDB.DeleteChangeByQuote(failedLnTx, quote.Quote)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.DeleteChangeByQuote(quote.Quote) %w", err)
+				return quote, fmt.Errorf("m.MintDB.DeleteChangeByQuote(failedLnTx, quote.Quote) %w", err)
 			}
 			if len(pending_proofs) > 0 {
 				err = m.MintDB.DeleteProofs(failedLnTx, pending_proofs)
 				if err != nil {
-					return quote, fmt.Errorf("m.MintDB.DeleteProofs(tx, pending_proofs). %w", err)
+					return quote, fmt.Errorf("m.MintDB.DeleteProofs(failedLnTx, pending_proofs). %w", err)
 				}
 			}
 
