@@ -3,7 +3,6 @@ package mockdb
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jackc/pgx/v5"
@@ -32,7 +31,7 @@ type MockDB struct {
 }
 
 func databaseError(err error) error {
-	return fmt.Errorf("%w  %w", DBError, err)
+	return errors.Join(DBError, err)
 }
 
 func (m *MockDB) GetAllSeeds() ([]cashu.Seed, error) {

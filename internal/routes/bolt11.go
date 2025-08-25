@@ -191,25 +191,31 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		var mintRequest cashu.PostMintBolt11Request
 
 		err := c.BindJSON(&mintRequest)
-
 		if err != nil {
 			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
 
+		keysets, err := mint.Signer.GetKeysets()
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+
 		ctx := context.Background()
-		tx, err := mint.MintDB.GetTx(ctx)
+		preparationTx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
 			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, tx)
+		defer mint.MintDB.Rollback(ctx, preparationTx)
 
-		mintRequestDB, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
-
+		mintRequestDB, err := mint.MintDB.GetMintRequestById(preparationTx, mintRequest.Quote)
 		if err != nil {
-			logger.Error(fmt.Errorf(" mint-resquest mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %w", err).Error())
+			logger.Error(fmt.Errorf(" mint-resquest mint.MintDB.GetMintRequestById(preparationTx, mintRequest.Quote): %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -245,18 +251,19 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
-		keysets, err := mint.Signer.GetKeysets()
-		if err != nil {
-			logger.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
-			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
-			return
-		}
-		_, err = mint.VerifyOutputs(mintRequest.Outputs, keysets.Keysets)
+		// quote
+
+		logger.Debug(fmt.Sprintf("before verifying outputs  for keysets %+v and mint quote id: %v. ", keysets.Keysets, mintRequestDB.Quote))
+		_, err = mint.VerifyOutputs(preparationTx, mintRequest.Outputs, keysets.Keysets)
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.VerifyOutputs(mintRequest.Outputs). %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+		err = mint.MintDB.Commit(ctx, preparationTx)
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, preparationTx). %w", err))
 			return
 		}
 
@@ -288,29 +295,45 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 		if !mintRequestDB.RequestPaid && mintRequestDB.State == cashu.UNPAID {
 
+			logger.Debug(fmt.Sprintf("Checking payment state quote id: %v. ", mintRequestDB.Quote))
 			mintRequestDB, err = m.CheckMintRequest(mint, mintRequestDB, invoice)
 			if err != nil {
 				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
-					c.JSON(200, mintRequestDB)
+					logger.Error(fmt.Errorf(".CheckMintRequest(mint, mintRequestDB, invoice): %w", err).Error())
+					errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+					c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 					return
 				}
 				logger.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
-
-			err = mint.MintDB.ChangeMintRequestState(tx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
+			afterCheckTx, err := mint.MintDB.GetTx(ctx)
 			if err != nil {
-				logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+				c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+				return
+			}
+			defer mint.MintDB.Rollback(ctx, afterCheckTx)
+
+			logger.Debug(fmt.Sprintf("Changing state of mint request id %v. To: %v", mintRequestDB.Quote, mintRequestDB.State))
+			err = mint.MintDB.ChangeMintRequestState(afterCheckTx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
+			if err != nil {
+				logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterCheckTx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+				return
+			}
+			err = mint.MintDB.Commit(ctx, afterCheckTx)
+			if err != nil {
+				c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 				return
 			}
 
-			if mintRequestDB.State != cashu.PAID {
-				c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
-				return
-			}
 		}
 
+		if mintRequestDB.State != cashu.PAID {
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
+			return
+		}
+		logger.Debug(fmt.Sprintf("Signing blind signatures in Mint request : id %v", mintRequestDB.Quote))
 		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(mintRequest.Outputs)
 		if err != nil {
 			logger.Error(fmt.Errorf("mint.Signer.SignBlindMessages(mintRequest.Outputs): %w", err).Error())
@@ -321,27 +344,38 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		mintRequestDB.Minted = true
 		mintRequestDB.State = cashu.ISSUED
-
-		err = mint.MintDB.ChangeMintRequestState(tx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
+		afterBlindSignTx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			return
+		}
+		defer mint.MintDB.Rollback(ctx, afterBlindSignTx)
+
+		err = mint.MintDB.ChangeMintRequestState(afterBlindSignTx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
+		if err != nil {
+			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterBlindSignTx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 			return
 		}
 
-		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
+		logger.Debug(fmt.Sprintf("Saving restore sigs for quote: id %v", mintRequestDB.Quote))
+		err = mint.MintDB.SaveRestoreSigs(afterBlindSignTx, recoverySigsDb)
 		if err != nil {
-			logger.Error(fmt.Errorf("SetRecoverySigs on minting: %w", err).Error())
-			logger.Error(fmt.Errorf("recoverySigsDb: %+v", recoverySigsDb).Error())
+			logger.Error(fmt.Errorf("mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb): %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
-		err = mint.MintDB.Commit(ctx, tx)
+		logger.Debug(fmt.Sprintf("Commiting transaction for: id %v", mintRequestDB.Quote))
+		err = mint.MintDB.Commit(ctx, afterBlindSignTx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, afterBlindSignTx). %w", err))
 			return
 		}
 
-		mint.Observer.SendMintEvent(mintRequestDB)
+		logger.Debug("sending mint request to observer")
+		go mint.Observer.SendMintEvent(mintRequestDB)
+		logger.Debug(fmt.Sprintf("returning success to client: mint quote id: %v", mintRequestDB.Quote))
 		// Store BlidedSignature
 		c.JSON(200, cashu.PostMintBolt11Response{
 			Signatures: blindedSignatures,
@@ -521,7 +555,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 	})
 
 	v1.POST("/melt/bolt11", func(c *gin.Context) {
-		log.Printf("\n\n melt Tryy")
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
 		if err != nil {

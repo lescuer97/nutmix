@@ -90,7 +90,7 @@ func (l *LndGrpcWallet) lndGrpcPayInvoice(invoice string, feeReserve uint64, lig
 	switch {
 	case res.GetPaymentError() == "invoice is already paid":
 		lightningResponse.PaymentState = FAILED
-		return fmt.Errorf("%w, %w", ErrAlreadyPaid, err)
+		return fmt.Errorf("%w", ErrAlreadyPaid)
 	case res.GetPaymentError() != "":
 		lightningResponse.PaymentState = FAILED
 		return err

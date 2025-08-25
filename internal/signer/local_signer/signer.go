@@ -293,7 +293,7 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 		}
 
 		if err != nil {
-			err = fmt.Errorf("GenerateBlindSignature: %w %w", cashu.ErrInvalidBlindMessage, err)
+			err = errors.Join(cashu.ErrInvalidBlindMessage, err)
 			return nil, nil, err
 		}
 
@@ -355,7 +355,7 @@ func (l *LocalSigner) validateProof(proof cashu.Proof, checkOutputs *bool, pubke
 	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
 
 	if err != nil {
-		return fmt.Errorf("proof.IsProofSpendConditioned(): %w %w", err, cashu.ErrInvalidProof)
+		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", errors.Join(err, cashu.ErrInvalidProof))
 	}
 
 	if isProofLocked {
@@ -371,11 +371,11 @@ func (l *LocalSigner) validateProof(proof cashu.Proof, checkOutputs *bool, pubke
 	}
 	parsedBlinding, err := hex.DecodeString(proof.C)
 	if err != nil {
-		return fmt.Errorf("hex.DecodeString: %w %w", err, cashu.ErrInvalidProof)
+		return fmt.Errorf("hex.DecodeString: %w", errors.Join(err, cashu.ErrInvalidProof))
 	}
 	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
 	if err != nil {
-		return fmt.Errorf("secp256k1.ParsePubKey: %w %w", err, cashu.ErrInvalidProof)
+		return fmt.Errorf("secp256k1.ParsePubKey: %w", errors.Join(err, cashu.ErrInvalidProof))
 	}
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
 	if !verified {
