@@ -3,6 +3,7 @@ package remotesigner
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -248,7 +249,7 @@ func (l *RemoteSigner) validateIfLockedProof(proof cashu.Proof, checkOutputs *bo
 	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
 
 	if err != nil {
-		return fmt.Errorf("proof.IsProofSpendConditioned(): %w %w", err, cashu.ErrInvalidProof)
+		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", errors.Join(cashu.ErrInvalidProof, err))
 	}
 
 	if isProofLocked {
@@ -286,7 +287,7 @@ func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.
 		}
 
 		if err != nil {
-			return fmt.Errorf("proof.IsProofSpendConditioned(): %w %w", err, cashu.ErrInvalidProof)
+			return errors.Join(fmt.Errorf("proof.IsProofSpendConditioned(): %w ", err), cashu.ErrInvalidProof)
 		}
 
 		bytesId, err := hex.DecodeString(val.Id)

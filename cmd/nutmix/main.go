@@ -71,7 +71,6 @@ func main() {
 
 	logger := slog.New(slog.NewJSONHandler(w, opts))
 
-
 	// check in ADMIN_NOSTR_NPUB is not empty
 	if os.Getenv("ADMIN_NOSTR_NPUB") == "" {
 		logger.Error("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")

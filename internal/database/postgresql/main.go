@@ -25,7 +25,7 @@ type Postgresql struct {
 }
 
 func databaseError(err error) error {
-	return fmt.Errorf("%w  %w", DBError, err)
+	return errors.Join(DBError, err)
 }
 
 func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error) {

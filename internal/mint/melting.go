@@ -116,9 +116,9 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			}
 			defer m.MintDB.Rollback(ctx, settleTx)
 
-			changeMessages, err := m.MintDB.GetMeltChangeByQuote(initialTx, quote.Quote)
+			changeMessages, err := m.MintDB.GetMeltChangeByQuote(settleTx, quote.Quote)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.GetMeltChangeByQuote(tx, quote.Quote). %w", err)
+				return quote, fmt.Errorf("m.MintDB.GetMeltChangeByQuote(settleTx, quote.Quote). %w", err)
 			}
 
 			fee, err := cashu.Fees(pending_proofs, keysets.Keysets)
