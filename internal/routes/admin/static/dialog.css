@@ -1,17 +1,1 @@
-dialog {
-    padding: 0;
-    /* width: 100%; */
-    /* height: 100%; */
-}
-dialog::backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(3px); /* Optional: adds blur effect */
-}
-
-dialog label {
-    display: flex;
-    flex-direction: column;
-    padding: 5px;
-    gap: 10px;
-    width: 100%;
-}
+/* dialog styles removed because no <dialog> usage was found in templates. Kept file intentionally empty for future use. */
