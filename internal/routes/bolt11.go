@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"strings"
 	"time"
@@ -18,7 +17,7 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
+func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 	v1 := r.Group("/v1")
 
 	v1.POST("/mint/quote/bolt11", func(c *gin.Context) {
@@ -26,27 +25,27 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err := c.BindJSON(&mintRequest)
 
 		if err != nil {
-			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
 
 		if mintRequest.Amount == 0 {
-			logger.Info("Amount missing")
+			slog.Info("Amount missing")
 			c.JSON(400, "Amount missing")
 			return
 		}
 
 		var mintRequestDB cashu.MintRequestDB
 		if mint.Config.PEG_OUT_ONLY {
-			logger.Info("Peg out only enables")
+			slog.Info("Peg out only enables")
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.MINTING_DISABLED, nil))
 			return
 		}
 
 		if mint.Config.PEG_IN_LIMIT_SATS != nil {
 			if mintRequest.Amount > uint64(*mint.Config.PEG_IN_LIMIT_SATS) {
-				logger.Info("Mint amount over the limit", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
+				slog.Info("Mint amount over the limit", slog.Uint64("amount", mintRequest.Amount))
 
 				c.JSON(400, "Mint amount over the limit")
 				return
@@ -56,7 +55,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		err = mint.VerifyUnitSupport(mintRequest.Unit)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(mintRequest.Unit). %w", err).Error())
+			slog.Error("mint.VerifyUnitSupport(mintRequest.Unit)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -65,12 +64,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 		now := time.Now().Unix()
 
-		logger.Debug(fmt.Sprintf("Requesting invoice for amount: %v. backend: %v", mintRequest.Amount, mint.LightningBackend.LightningType()))
+		slog.Debug("Requesting invoice for amount",
+			slog.Uint64("amount", mintRequest.Amount),
+			slog.Any("backend", mint.LightningBackend.LightningType()))
 
 		unit, err := cashu.UnitFromString(mintRequest.Unit)
 
 		if err != nil {
-			logger.Error(fmt.Errorf("cashu.UnitFromString(mintRequest.Unit). %w. %w", err, cashu.ErrUnitNotSupported).Error())
+			slog.Error("cashu.UnitFromString(mintRequest.Unit)", slog.Any("error", err), slog.Any("err", cashu.ErrUnitNotSupported))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -78,7 +79,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		quoteId, err := utils.RandomHash()
 		if err != nil {
-			logger.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(mintRequest.Amount)))
+			slog.Info("utils.RandomHash()", slog.Uint64("amount", mintRequest.Amount))
 			c.JSON(500, "Opps! there was a problem with the mint")
 			return
 		}
@@ -96,13 +97,13 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: uint64(mintRequest.Amount)})
 		if err != nil {
-			logger.Info(err.Error())
+			slog.Info("Payment request", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
 		if resInvoice.PaymentRequest == "" {
-			logger.Error("The lightning backend is not returning an invoice.")
+			slog.Error("The lightning backend is not returning an invoice.")
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -120,7 +121,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		err = mint.MintDB.SaveMintRequest(tx, mintRequestDB)
 		if err != nil {
-			logger.Error(fmt.Errorf("SaveQuoteRequest: %w", err).Error())
+			slog.Error("SaveQuoteRequest", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -148,7 +149,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		quote, err := mint.MintDB.GetMintRequestById(tx, quoteId)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint:quote mint.MintDB.GetMintRequestById(tx, quoteId): %w", err).Error())
+			slog.Error("mint:quote mint.MintDB.GetMintRequestById(tx, quoteId)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -161,20 +162,20 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 		invoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
-			logger.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())
+			slog.Warn("Mint decoding zpay32.Decode", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 		quote, err = m.CheckMintRequest(mint, quote, invoice)
 		if err != nil {
-			logger.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
+			slog.Warn("m.CheckMintRequest(mint, quote)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
 		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+			slog.Error("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)", slog.Any("error", err))
 		}
 
 		err = mint.MintDB.Commit(ctx, tx)
@@ -192,14 +193,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		err := c.BindJSON(&mintRequest)
 		if err != nil {
-			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
 
 		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
+			slog.Error(fmt.Errorf("mint.Signer.GetKeys(). %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -215,14 +216,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		mintRequestDB, err := mint.MintDB.GetMintRequestById(preparationTx, mintRequest.Quote)
 		if err != nil {
-			logger.Error(fmt.Errorf(" mint-resquest mint.MintDB.GetMintRequestById(preparationTx, mintRequest.Quote): %w", err).Error())
+			slog.Error(" mint-resquest mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
 		if mintRequestDB.Minted {
-			logger.Warn("Quote already minted", slog.String(utils.LogExtraInfo, mintRequestDB.Quote))
+			slog.Warn("Quote already minted", slog.String(utils.LogExtraInfo, mintRequestDB.Quote))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_ISSUED, nil))
 			return
 		}
@@ -230,14 +231,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		if mintRequestDB.Pubkey != nil {
 			valid, err := mintRequest.VerifyPubkey(mintRequestDB.Pubkey)
 			if err != nil {
-				logger.Error(fmt.Errorf("Cold not verify signature: %w", err).Error())
+				slog.Error("Cold not verify signature", slog.Any("error", err))
 				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 				return
 			}
 
 			if !valid {
-				logger.Error(fmt.Errorf("Invalid signature: %w", err).Error())
+				slog.Error("Invalid signature", slog.Any("error", err))
 				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 				return
@@ -246,17 +247,17 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		err = mint.VerifyUnitSupport(mintRequestDB.Unit)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(quote.Unit). %w", err).Error())
+			slog.Error("mint.VerifyUnitSupport(quote.Unit)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 		// quote
 
-		logger.Debug(fmt.Sprintf("before verifying outputs  for keysets %+v and mint quote id: %v. ", keysets.Keysets, mintRequestDB.Quote))
+		slog.Debug(fmt.Sprintf("before verifying outputs  for keysets %+v and mint quote id: %v. ", keysets.Keysets, mintRequestDB.Quote))
 		_, err = mint.VerifyOutputs(preparationTx, mintRequest.Outputs, keysets.Keysets)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.VerifyOutputs(mintRequest.Outputs). %w", err).Error())
+			slog.Error("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -275,36 +276,36 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 		invoice, err := zpay32.Decode(mintRequestDB.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
-			logger.Warn(fmt.Errorf("Mint decoding zpay32.Decode: %w", err).Error())
+			slog.Warn("Mint decoding zpay32.Decode", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
 		amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
 		if err != nil {
-			logger.Info(fmt.Errorf("UnmarshallAmt: %w", err).Error())
+			slog.Info("UnmarshallAmt", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
 		// check the amount in outputs are the same as the quote
 		if int32(*invoice.MilliSat) < int32(amountMilsats) {
-			logger.Info(fmt.Errorf("wrong amount of milisats: %v, needed %v", int32(*invoice.MilliSat), int32(amountMilsats)).Error())
+			slog.Info("wrong amount of milisats", slog.Int("invoice_milisats", int(*invoice.MilliSat)), slog.Int("needed_milisats", int(amountMilsats)))
 			c.JSON(403, "Amounts in outputs are not the same")
 			return
 		}
 		if !mintRequestDB.RequestPaid && mintRequestDB.State == cashu.UNPAID {
 
-			logger.Debug(fmt.Sprintf("Checking payment state quote id: %v. ", mintRequestDB.Quote))
+			slog.Debug(fmt.Sprintf("Checking payment state quote id: %v. ", mintRequestDB.Quote))
 			mintRequestDB, err = m.CheckMintRequest(mint, mintRequestDB, invoice)
 			if err != nil {
 				if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
-					logger.Error(fmt.Errorf(".CheckMintRequest(mint, mintRequestDB, invoice): %w", err).Error())
+					slog.Error(fmt.Errorf(".CheckMintRequest(mint, mintRequestDB, invoice): %w", err).Error())
 					errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 					c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 					return
 				}
-				logger.Warn(fmt.Errorf("m.CheckMintRequest(mint, quote): %w", err).Error())
+				slog.Warn("m.CheckMintRequest(mint, quote)", slog.Any("error", err))
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -315,10 +316,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			}
 			defer mint.MintDB.Rollback(ctx, afterCheckTx)
 
-			logger.Debug(fmt.Sprintf("Changing state of mint request id %v. To: %v", mintRequestDB.Quote, mintRequestDB.State))
+			slog.Debug(fmt.Sprintf("Changing state of mint request id %v. To: %v", mintRequestDB.Quote, mintRequestDB.State))
 			err = mint.MintDB.ChangeMintRequestState(afterCheckTx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
 			if err != nil {
-				logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterCheckTx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+				slog.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterCheckTx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 				return
 			}
 			err = mint.MintDB.Commit(ctx, afterCheckTx)
@@ -333,10 +334,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.REQUEST_NOT_PAID, nil))
 			return
 		}
-		logger.Debug(fmt.Sprintf("Signing blind signatures in Mint request : id %v", mintRequestDB.Quote))
+		slog.Debug(fmt.Sprintf("Signing blind signatures in Mint request : id %v", mintRequestDB.Quote))
 		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(mintRequest.Outputs)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.Signer.SignBlindMessages(mintRequest.Outputs): %w", err).Error())
+			slog.Error("mint.Signer.SignBlindMessages(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -353,29 +354,29 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		err = mint.MintDB.ChangeMintRequestState(afterBlindSignTx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterBlindSignTx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+			slog.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterBlindSignTx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
 			return
 		}
 
-		logger.Debug(fmt.Sprintf("Saving restore sigs for quote: id %v", mintRequestDB.Quote))
+		slog.Debug(fmt.Sprintf("Saving restore sigs for quote: id %v", mintRequestDB.Quote))
 		err = mint.MintDB.SaveRestoreSigs(afterBlindSignTx, recoverySigsDb)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb): %w", err).Error())
+			slog.Error(fmt.Errorf("mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb): %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
-		logger.Debug(fmt.Sprintf("Commiting transaction for: id %v", mintRequestDB.Quote))
+		slog.Debug(fmt.Sprintf("Commiting transaction for: id %v", mintRequestDB.Quote))
 		err = mint.MintDB.Commit(ctx, afterBlindSignTx)
 		if err != nil {
 			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, afterBlindSignTx). %w", err))
 			return
 		}
 
-		logger.Debug("sending mint request to observer")
+		slog.Debug("sending mint request to observer")
 		go mint.Observer.SendMintEvent(mintRequestDB)
-		logger.Debug(fmt.Sprintf("returning success to client: mint quote id: %v", mintRequestDB.Quote))
+		slog.Debug(fmt.Sprintf("returning success to client: mint quote id: %v", mintRequestDB.Quote))
 		// Store BlidedSignature
 		c.JSON(200, cashu.PostMintBolt11Response{
 			Signatures: blindedSignatures,
@@ -387,14 +388,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err := c.BindJSON(&meltRequest)
 
 		if err != nil {
-			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
 
 		err = mint.VerifyUnitSupport(meltRequest.Unit)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.VerifyUnitSupport(quote.Unit). %w", err).Error())
+			slog.Error("mint.VerifyUnitSupport(quote.Unit)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -402,7 +403,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		invoice, err := zpay32.Decode(meltRequest.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
-			logger.Info(fmt.Errorf("zpay32.Decode: %w", err).Error())
+			slog.Info("zpay32.Decode", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
@@ -421,7 +422,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		quoteId, err := utils.RandomHash()
 		if err != nil {
-			logger.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, fmt.Sprint(meltRequest.Request)))
+			slog.Info("utils.RandomHash()", slog.String(utils.LogExtraInfo, meltRequest.Request))
 			c.JSON(500, "Opps! there was a problem with the mint")
 			return
 		}
@@ -434,7 +435,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		unit, err := cashu.UnitFromString(meltRequest.Unit)
 
 		if err != nil {
-			logger.Error(fmt.Errorf("cashu.UnitFromString(meltRequest.Unit). %w. %w", err, cashu.ErrUnitNotSupported).Error())
+			slog.Error("cashu.UnitFromString(meltRequest.Unit)", slog.Any("error", err), slog.Any("err", cashu.ErrUnitNotSupported))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -452,7 +453,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 			if unit == cashu.Sat {
 				err = mppAmount.To(cashu.Sat)
 				if err != nil {
-					logger.Error(fmt.Errorf("mppAmount.To(cashu.Sat). %w. %w", err, cashu.ErrUnitNotSupported).Error())
+					slog.Error("mppAmount.To(cashu.Sat)", slog.Any("error", err), slog.Any("err", cashu.ErrUnitNotSupported))
 					errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 					c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 					return
@@ -463,7 +464,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		}
 
 		if isMpp && !mint.LightningBackend.ActiveMPP() {
-			logger.Info("Tried to do mpp when it is not available")
+			slog.Info("Tried to do mpp when it is not available")
 			c.JSON(400, "Sorry! MPP is not available")
 			return
 		}
@@ -472,13 +473,13 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		isInternal, err := mint.IsInternalTransaction(meltRequest.Request)
 		if err != nil {
-			logger.Info(fmt.Errorf("mint.IsInternalTransaction(meltRequest.Request): %w", err).Error())
+			slog.Info("mint.IsInternalTransaction(meltRequest.Request)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
 
 		if isMpp && isInternal {
-			logger.Info(fmt.Sprint("Internal MPP not allowed", err))
+			slog.Info("Internal MPP not allowed", slog.Any("error", err))
 			c.JSON(403, "Internal MPP not allowed")
 			return
 		}
@@ -502,7 +503,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		if !isInternal {
 			feesResponse, err := mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)
 			if err != nil {
-				logger.Info(fmt.Errorf("mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount): %w", err).Error())
+				slog.Info("mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)", slog.Any("error", err))
 				c.JSON(500, "Opps!, something went wrong")
 				return
 			}
@@ -515,17 +516,16 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
 			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
-			logger.Warn(fmt.Sprintf("m.MintDB.GetTx(ctx). %+v", err))
+			slog.Warn("m.MintDB.GetTx(ctx)", slog.Any("error", err))
 			return
 		}
 		defer mint.MintDB.Rollback(ctx, tx)
 
-		log.Printf("dbRequest: %+v", dbRequest)
 		err = mint.MintDB.SaveMeltRequest(tx, dbRequest)
 
 		if err != nil {
-			logger.Warn(fmt.Errorf("SaveQuoteMeltRequest: %w", err).Error())
-			logger.Warn(fmt.Errorf("dbRequest: %+v", dbRequest).Error())
+			slog.Warn("SaveQuoteMeltRequest", slog.Any("error", err))
+			slog.Warn("dbRequest", slog.Any("db_request", dbRequest))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
@@ -533,7 +533,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
 			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
-			logger.Warn(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err).Error())
+			slog.Warn("mint.MintDB.Commit(ctx tx)", slog.Any("error", err))
 			return
 		}
 
@@ -545,7 +545,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		quote, err := mint.CheckMeltQuoteState(quoteId)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.Melt(meltRequest, logger ). %w", err).Error())
+			slog.Error("mint.CheckMeltQuoteState(quoteId)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -558,14 +558,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		var meltRequest cashu.PostMeltBolt11Request
 		err := c.BindJSON(&meltRequest)
 		if err != nil {
-			logger.Info(fmt.Sprintf("Incorrect body: %+v", err))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
 
-		quote, err := mint.Melt(meltRequest, logger)
+		quote, err := mint.Melt(meltRequest)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.Melt(meltRequest, logger ). %w", err).Error())
+			slog.Error("mint.Melt(meltRequest)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
