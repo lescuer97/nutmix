@@ -116,7 +116,7 @@ func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
 
 	return nil
 }
-func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		// check the different variables that could change
@@ -137,7 +137,7 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		// Check pegin limit.
 		pegInLitmit, err := checkLimitSat(c.Request.PostFormValue("PEG_IN_LIMIT_SATS"))
 		if err != nil {
-			logger.Debug(
+			slog.Debug(
 				`checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))`,
 				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
@@ -152,7 +152,7 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		// Check pegout limit.
 		pegOutLitmit, err := checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))
 		if err != nil {
-			logger.Debug(
+			slog.Debug(
 				`checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))`,
 				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{
@@ -172,7 +172,7 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 			if err != nil {
 				c.Error(ErrInvalidNostrKey)
-				logger.Warn(
+				slog.Warn(
 					"nip19.Decode(nostrKey)",
 					slog.String(utils.LogExtraInfo, err.Error()))
 				return
@@ -191,7 +191,7 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		err = changeAuthSettings(mint, c)
 		if err != nil {
 			c.Error(fmt.Errorf("changeAuthSettings(mint, c). %w", err))
-			logger.Warn(
+			slog.Warn(
 				`fmt.Errorf("changeAuthSettings(mint, c). %w", err)`,
 				slog.String(utils.LogExtraInfo, err.Error()))
 			return
@@ -199,7 +199,7 @@ func MintSettingsForm(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		err = mint.MintDB.UpdateConfig(mint.Config)
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"mint.MintDB.UpdateConfig(mint.Config)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -230,7 +230,7 @@ func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	}
 }
 
-func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -244,7 +244,7 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 		chainparam, err := m.CheckChainParams(formNetwork)
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"m.CheckChainParams(formNetwork)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -280,7 +280,7 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 			err := lndWallet.SetupGrpc(lndHost, macaroon, tlsCert)
 			if err != nil {
-				logger.Error(
+				slog.Error(
 					"lndWallet.SetupGrpc",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -295,7 +295,7 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			// check connection
 			_, err = lndWallet.WalletBalance()
 			if err != nil {
-				logger.Warn(
+				slog.Warn(
 					"Could not get lightning balance",
 					slog.String(utils.LogExtraInfo, err.Error()))
 				errorMessage := ErrorNotif{
@@ -362,7 +362,7 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 			err := clnWallet.SetupGrpc(clnHost, clnCaCert, clnClientCert, clnClientKey, macaroon)
 			if err != nil {
-				logger.Error(
+				slog.Error(
 					"lndWallet.SetupGrpc",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -377,7 +377,7 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 			// check connection
 			_, err = clnWallet.WalletBalance()
 			if err != nil {
-				logger.Warn(
+				slog.Warn(
 					"Could not get lightning balance",
 					slog.String(utils.LogExtraInfo, err.Error()))
 				errorMessage := ErrorNotif{
@@ -400,7 +400,7 @@ func Bolt11Post(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		err = mint.MintDB.UpdateConfig(mint.Config)
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"mint.MintDB.UpdateConfig(mint.Config)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			errorMessage := ErrorNotif{

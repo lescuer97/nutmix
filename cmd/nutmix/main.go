@@ -60,38 +60,38 @@ func main() {
 		Level: slog.LevelInfo,
 	}
 
+	err = godotenv.Load(".env")
+	if err != nil {
+		log.Panic("ERROR: no .env file found and not running in docker")
+	}
+
 	if os.Getenv("DEBUG") == "true" {
 		opts.Level = slog.LevelDebug
 	}
 
 	logger := slog.New(slog.NewJSONHandler(w, opts))
-
-	err = godotenv.Load(".env")
-	if err != nil {
-		logger.Error("ERROR: no .env file found and not running in docker")
-		log.Panic()
-	}
+	slog.SetDefault(logger)
 
 	// check in ADMIN_NOSTR_NPUB is not empty
 	if os.Getenv("ADMIN_NOSTR_NPUB") == "" {
-		logger.Error("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")
+		slog.Error("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")
 		log.Panicln("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")
 	}
 
 	ctx := context.Background()
 
 	if os.Getenv(DOCKER_ENV) == "true" {
-		logger.Info("Running in docker")
+		slog.Info("Running in docker")
 	}
 
 	if os.Getenv(MODE_ENV) == "prod" {
 		gin.SetMode(gin.ReleaseMode)
-		logger.Info("Running in Release mode")
+		slog.Info("Running in Release mode")
 	}
 
 	db, err := postgresql.DatabaseSetup(ctx, "migrations")
 	if err != nil {
-		logger.Error(fmt.Sprintf("Error conecting to db %+v", err))
+		slog.Error("Error conecting to db", slog.Any("error", err))
 		log.Panic()
 	}
 	defer db.Close()
@@ -110,13 +110,13 @@ func main() {
 	mint, err := mint.SetUpMint(ctx, config, db, signer)
 
 	if err != nil {
-		logger.Warn(fmt.Sprintf("SetUpMint: %+v ", err))
+		slog.Warn("SetUpMint", slog.Any("error", err))
 		return
 	}
 	if config.MINT_REQUIRE_AUTH {
 		oidcClient, err := oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL)
 		if err != nil {
-			logger.Warn(fmt.Sprintf("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL): %+v ", err))
+			slog.Warn("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL)", slog.Any("error", err))
 			return
 		}
 		mint.OICDClient = oidcClient
@@ -134,18 +134,18 @@ func main() {
 
 	r.Use(middleware.CacheMiddleware(store))
 
-	err = mint.CheckPendingQuoteAndProofs(logger)
+	err = mint.CheckPendingQuoteAndProofs()
 	if err != nil {
-		logger.Error(fmt.Sprintf("SetUpMint: %+v ", err))
+		slog.Error("SetUpMint", slog.Any("error", err))
 		return
 	}
-	routes.V1Routes(r, mint, logger)
+	routes.V1Routes(r, mint)
 
-	admin.AdminRoutes(ctx, r, mint, logger)
+	admin.AdminRoutes(ctx, r, mint)
 
 	PORT := fmt.Sprintf(":%v", 8081)
 
-	logger.Info(fmt.Sprintf("Nutmix started in port %v", 8081))
+	slog.Info("Nutmix started in port", slog.Int("port", 8081))
 
 	r.Run(PORT)
 }

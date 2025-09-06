@@ -84,7 +84,7 @@ templ ListItem(swap utils.LiquiditySwap) {
 	{{ liquidityType := swap.Type.ToString() }}
 	{{ state := swap.State.ToString() }}
 	{{ url := "liquidity/" + swap.Id }}
-	{{escapedUrl :=  templ.EscapeString(url)}}
+	{{ escapedUrl := templ.EscapeString(url) }}
 	<tr>
 		<th scope="row">{ amount }</th>
 		<td class="request-row">{ liquidityType }</td>

@@ -11,14 +11,14 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
+func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
 
 		keys, err := mint.Signer.GetActiveKeys()
 		if err != nil {
-			logger.Error(fmt.Sprintf("mint.Signer.GetActiveKeys() %+v ", err))
+			slog.Error("mint.Signer.GetActiveKeys()", slog.Any("error", err))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -34,7 +34,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		keysets, err := mint.Signer.GetKeysById(id)
 
 		if err != nil {
-			logger.Error(fmt.Sprintf("mint.Signer.GetKeysById(id) %+v", err))
+			slog.Error("mint.Signer.GetKeysById(id)", slog.Any("error", err))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -46,7 +46,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		keys, err := mint.Signer.GetKeysets()
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.Signer.GetKeys() %w", err).Error())
+			slog.Error("mint.Signer.GetKeys()", slog.Any("error", err))
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -228,34 +228,34 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		err := c.BindJSON(&swapRequest)
 		if err != nil {
-			logger.Info("Incorrect body: %+v", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("Incorrect body", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
 
 		if len(swapRequest.Inputs) == 0 || len(swapRequest.Outputs) == 0 {
-			logger.Info("Inputs or Outputs are empty")
+			slog.Info("Inputs or Outputs are empty")
 			c.JSON(400, "Inputs or Outputs are empty")
 			return
 		}
 
 		_, SecretsList, err := utils.GetAndCalculateProofsValues(&swapRequest.Inputs)
 		if err != nil {
-			logger.Warn("utils.GetAndCalculateProofsValues(&swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("utils.GetAndCalculateProofsValues(&swapRequest.Inputs)", slog.Any("error", err))
 			c.JSON(400, "Problem processing proofs")
 			return
 		}
 
 		err = mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs)
 		if err != nil {
-			logger.Error(fmt.Errorf("mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs). %w", err).Error())
+			slog.Error("mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 		err = swapRequest.ValidateSigflag()
 		if err != nil {
-			logger.Error(fmt.Errorf("swapRequest.ValidateSigflag(). %w", err).Error())
+			slog.Error(fmt.Errorf("swapRequest.ValidateSigflag(). %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -273,13 +273,13 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		knownProofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)
 
 		if err != nil {
-			logger.Error("mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("mint.MintDB.GetProofsFromSecretCurve(tx, SecretsList)", slog.String(utils.LogExtraInfo, err.Error()))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
 
 		if len(knownProofs) != 0 {
-			logger.Warn("Proofs already spent", slog.String(utils.LogExtraInfo, fmt.Sprintf("know proofs: %+v", knownProofs)))
+			slog.Warn("Proofs already spent", slog.Any("known_proofs", knownProofs))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}
@@ -290,7 +290,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err = mint.MintDB.SaveProof(tx, swapRequest.Inputs)
 
 		if err != nil {
-			logger.Error("mint.MintDB.SaveProof(tx, swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("mint.MintDB.SaveProof(tx, swapRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -300,7 +300,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(swapRequest.Outputs)
 
 		if err != nil {
-			logger.Error("mint.Signer.SignBlindMessages(swapRequest.Outputs)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("mint.Signer.SignBlindMessages(swapRequest.Outputs)", slog.String(utils.LogExtraInfo, err.Error()))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -313,7 +313,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		swapRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
 		err = mint.MintDB.SetProofsState(tx, swapRequest.Inputs, cashu.PROOF_SPENT)
 		if err != nil {
-			logger.Warn("mint.MintDB.SetProofsState(tx,swapRequest.Inputs , cashu.PROOF_SPENT)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("mint.MintDB.SetProofsState(tx,swapRequest.Inputs , cashu.PROOF_SPENT)", slog.Any("error", err))
 
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(403, cashu.ErrorCodeToResponse(errorCode, details))
@@ -322,8 +322,8 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
 		if err != nil {
-			logger.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
-			logger.Error("recoverySigsDb", slog.String(utils.LogExtraInfo, fmt.Sprintf("%+v", recoverySigsDb)))
+			slog.Error("database.SetRestoreSigs", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("recoverySigsDb", slog.Any("recovery_sigs", recoverySigsDb))
 			c.JSON(200, response)
 			return
 		}
@@ -341,7 +341,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		var checkStateRequest cashu.PostCheckStateRequest
 		err := c.BindJSON(&checkStateRequest)
 		if err != nil {
-			logger.Info("c.BindJSON(&checkStateRequest)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("c.BindJSON(&checkStateRequest)", slog.Any("error", err))
 			c.JSON(400, "Malformed Body")
 			return
 		}
@@ -361,7 +361,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 		err := c.BindJSON(&restoreRequest)
 
 		if err != nil {
-			logger.Info("c.BindJSON(&restoreRequest)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("c.BindJSON(&restoreRequest)", slog.Any("error", err))
 			c.JSON(400, "Malformed body request")
 			return
 		}
@@ -374,7 +374,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint, logger *slog.Logger) {
 
 		blindRecoverySigs, err := mint.GetRestorySigsFromBlindFactor(blindingFactors)
 		if err != nil {
-			logger.Error("mint.GetRestorySigsFromBlindFactor(blindingFactors)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("mint.GetRestorySigsFromBlindFactor(blindingFactors)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
