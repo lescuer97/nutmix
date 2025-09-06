@@ -31,11 +31,11 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 
 	}
 }
-func KeysetsLayoutPage(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func KeysetsLayoutPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
-			logger.Error("mint.Signer.GetKeysets() %+v", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("mint.Signer.GetKeysets()", slog.Any("error", err))
 			c.JSON(500, "Server side error")
 			return
 		}
@@ -88,7 +88,7 @@ type RotateRequest struct {
 	Unit cashu.Unit
 }
 
-func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
+func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rotateRequest RotateRequest
 		if c.ContentType() == gin.MIMEJSON {
@@ -117,7 +117,7 @@ func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 
 			newSeedFee, err := strconv.ParseUint(feeString, 10, 64)
 			if err != nil {
-				logger.Error(
+				slog.Error(
 					"Err: There was a problem rotating the key",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -134,7 +134,7 @@ func RotateSatsSeed(mint *m.Mint, logger *slog.Logger) gin.HandlerFunc {
 		err := mint.Signer.RotateKeyset(rotateRequest.Unit, rotateRequest.Fee)
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"mint.Signer.RotateKeyset(cashu.Sat, rotateRequest.Fee)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 

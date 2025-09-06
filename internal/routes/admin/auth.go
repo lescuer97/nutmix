@@ -21,7 +21,7 @@ import (
 
 const AdminAuthKey = "admin-cookie"
 
-func AuthMiddleware(logger *slog.Logger, secret []byte) gin.HandlerFunc {
+func AuthMiddleware(secret []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
 
@@ -29,14 +29,14 @@ func AuthMiddleware(logger *slog.Logger, secret []byte) gin.HandlerFunc {
 
 				// Don't forget to validate the alg is what you expect:
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					logger.Warn(fmt.Sprintf("Unexpected signing method: %v", token.Header["alg"]))
+					slog.Warn("Unexpected signing method", slog.Any("alg", token.Header["alg"]))
 					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 				}
 				return secret, nil
 			})
 
 			if err != nil {
-				logger.Debug(
+				slog.Debug(
 					"jwt.Parse(cookie)",
 					slog.String(utils.LogExtraInfo, err.Error()),
 				)
@@ -80,15 +80,15 @@ func AuthMiddleware(logger *slog.Logger, secret []byte) gin.HandlerFunc {
 	}
 }
 
-func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
+func Login(mint *mint.Mint, loginKey *secp256k1.PrivateKey) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// parse data for login
-		logger.Debug("Attempting log in")
+		slog.Debug("Attempting log in")
 		var nostrEvent nostr.Event
 		err := c.BindJSON(&nostrEvent)
 
 		if err != nil {
-			logger.Debug(
+			slog.Debug(
 				"Incorrect body",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)
@@ -122,9 +122,9 @@ func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey)
 		nostrLogin, err := mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)
 
 		if err != nil {
-			logger.Error(
+			slog.Error(
 				"database.GetNostrLogin(pool, nostrEvent.Content )",
-				slog.String(utils.LogExtraInfo, err.Error()),
+				slog.Any("error", err),
 			)
 			c.JSON(500, "Opps!, something wrong happened")
 			return
@@ -138,13 +138,13 @@ func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey)
 		// check valid signature
 		validSig, err := nostrEvent.CheckSignature()
 		if err != nil {
-			logger.Info("nostrEvent.CheckSignature()", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("nostrEvent.CheckSignature()", slog.Any("error", err))
 			c.JSON(400, "Invalid signature")
 			return
 		}
 
 		if !validSig {
-			logger.Warn("Invalid Signature")
+			slog.Warn("Invalid Signature")
 			c.JSON(403, "Invalid signature")
 			return
 		}
@@ -152,14 +152,14 @@ func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey)
 		// check signature happened with the correct private key.
 		sigBytes, err := hex.DecodeString(nostrEvent.Sig)
 		if err != nil {
-			logger.Info("hex.DecodeString(nostrEvent.Sig)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("hex.DecodeString(nostrEvent.Sig)", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
 
 		sig, err := schnorr.ParseSignature(sigBytes)
 		if err != nil {
-			logger.Info("schnorr.ParseSignature(sigBytes)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("schnorr.ParseSignature(sigBytes)", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
@@ -167,7 +167,7 @@ func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey)
 		adminPubkey := os.Getenv("ADMIN_NOSTR_NPUB")
 
 		if adminPubkey == "" {
-			logger.Error("ERROR: NO ADMIN PUBKEY PRESENT")
+			slog.Error("ERROR: NO ADMIN PUBKEY PRESENT")
 			c.JSON(500, "Something happend!")
 			return
 
@@ -175,14 +175,14 @@ func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey)
 
 		_, value, err := nip19.Decode(adminPubkey)
 		if err != nil {
-			logger.Info("nip19.Decode(adminPubkey)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("nip19.Decode(adminPubkey)", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
 
 		decodedKey, err := hex.DecodeString(value.(string))
 		if err != nil {
-			logger.Info("hex.DecodeString(value.(string))", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("hex.DecodeString(value.(string))", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
@@ -190,7 +190,7 @@ func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey)
 		pubkey, err := schnorr.ParsePubKey(decodedKey)
 
 		if err != nil {
-			logger.Info("schnorr.ParsePubKey(decodedKey)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Info("schnorr.ParsePubKey(decodedKey)", slog.Any("error", err))
 			c.JSON(500, "Something happend!")
 			return
 		}
@@ -204,7 +204,7 @@ func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey)
 				c.JSON(400, "Private key used is not correct")
 				return
 			} else {
-				logger.Warn("Private key used is not correct")
+				slog.Warn("Private key used is not correct")
 				c.Header("HX-RETARGET", "error-message")
 				c.HTML(400, "incorrect-key-error", nil)
 				return
@@ -216,7 +216,7 @@ func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey)
 		err = mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated)
 
 		if err != nil {
-			logger.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something wrong happened")
 			return
 		}
@@ -224,7 +224,7 @@ func Login(mint *mint.Mint, logger *slog.Logger, loginKey *secp256k1.PrivateKey)
 		token, err := makeJWTToken(loginKey.Serialize())
 
 		if err != nil {
-			logger.Warn("Could not makeJWTToken", slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("Could not makeJWTToken", slog.Any("error", err))
 			c.JSON(500, nil)
 			return
 		}

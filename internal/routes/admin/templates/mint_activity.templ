@@ -1,7 +1,6 @@
 package templates
 
 import (
-	"fmt"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"strconv"
 	"time"
@@ -26,11 +25,11 @@ templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs Mint
 	{{ neededBalanceString := strconv.FormatUint(neededBalance, 10) }}
 	{{ enoughLiquidity := balance < neededBalance }}
 	{{ percentageOfLiquidity := (float64(balance) / float64(neededBalance)) * 100 }}
-	{{ percentageOfLiquidityStr := fmt.Sprintf("%.2f", percentageOfLiquidity) }}
-	{{ 	ratioProofSigAmount := (float64(proofs.Amount) / float64(sigs.Amount)) * 100 }}
-	{{ ratioProofSigAmountStr := fmt.Sprintf("%.2f", ratioProofSigAmount) }}
-	{{ 	ratioProofSigAmountSats := (float64(proofs.SatAmount) / float64(sigs.SatAmount)) * 100 }}
-	{{ ratioProofSigAmountSatsStr := fmt.Sprintf("%.2f", ratioProofSigAmountSats) }}
+	{{ percentageOfLiquidityStr := strconv.FormatFloat(percentageOfLiquidity, 'f', 2, 64) }}
+	{{ ratioProofSigAmount := (float64(proofs.Amount) / float64(sigs.Amount)) * 100 }}
+	{{ ratioProofSigAmountStr := strconv.FormatFloat(ratioProofSigAmount, 'f', 2, 64) }}
+	{{ ratioProofSigAmountSats := (float64(proofs.SatAmount) / float64(sigs.SatAmount)) * 100 }}
+	{{ ratioProofSigAmountSatsStr := strconv.FormatFloat(ratioProofSigAmountSats, 'f', 2, 64) }}
 	<div class="flex-card">
 		<div class="card">
 			if fakeWallet {
@@ -96,25 +95,23 @@ templ MintMovements(statuses ActivitySummary) {
 
 templ Logs(logs []utils.SlogRecordJSON) {
 	<h2>Logs</h2>
-	<div class="">
-		<table class="">
-			<thead>
-				<tr>
-					<th class="level" scope="col">Level</th>
-					<th scope="col">Message</th>
-					<th scope="col">Time</th>
-				</tr>
-			</thead>
-			<tbody>
-				for _, log := range logs {
-					<tr class={ log.Level.String() }>
-						<th scope="row">{ log.Level.String() }</th>
-						<td class="request-row">{ log.Msg } { log.ExtraInfo } </td>
-						<td class="time">{ log.Time.Format(time.UnixDate) }</td>
-					</tr>
-				}
-			</tbody>
-		</table>
+	<div class="table">
+		<div class="table-header">
+			<div class="cell level" style="width: 5%">Level</div>
+			<div class="cell message" style="width: 40%">Message</div>
+			<div class="cell extra" style="width: 40%">Extra info</div>
+			<div class="cell time" style="width: 15%">Time</div>
+		</div>
+		<div class="rows logs">
+			for _, log := range logs {
+				<div class={ "row-item ", log.Level.String() }>
+					<div class="cell level" style="width: 5%">{ log.Level.String() }</div>
+					<div class="cell message" style="width: 40%">{ log.Msg }</div>
+					<div class="cell extra" style="width: 40%">{ log.ExtraInfo }</div>
+					<div class="cell time" style="width: 15%">{ log.Time.Format(time.UnixDate) }</div>
+				</div>
+			}
+		</div>
 	</div>
 }
 
@@ -142,29 +139,25 @@ func (ms ListMintMeltVisual) Swap(i, j int) {
 
 templ MintMeltEventList(eventList []MintMeltRequestVisual) {
 	<h2>Mint & Melt</h2>
-	<div>
-		<table class="">
-			<thead>
-				<tr>
-					<th scope="col">Type</th>
-					<th scope="col">Request</th>
-					<th scope="col">Unit</th>
-					<th scope="col">Status</th>
-					<th scope="col">Time</th>
-				</tr>
-			</thead>
-			<tbody>
-				for _, event := range eventList {
-					<tr class={ event.Type }>
-						<th scope="row">{ event.Type }</th>
-						<td class="request-row">{ event.Request }</td>
-						<td class="unit">{ event.Unit }</td>
-						<td>{ event.Status }</td>
-						<td>{ event.SeenAt }</td>
-					</tr>
-				}
-			</tbody>
-		</table>
+	<div class="table">
+		<div class="table-header">
+			<div class="cell type" style="width: 5%">Type</div>
+			<div class="cell request" style="width: 65%">Request</div>
+			<div class="cell unit" style="width: 5%">Unit</div>
+			<div class="cell status" style="width: 10%">Status</div>
+			<div class="cell time" style="width: 15%">Time</div>
+		</div>
+		<div class="rows logs">
+			for _, event := range eventList {
+				<div class={ "row-item", event.Type }>
+					<div class="cell type" style="width: 5%">{ event.Type }</div>
+					<div class="cell request request-row" style="width: 65%">{ event.Request }</div>
+					<div class="cell unit" style="width: 5%">{ event.Unit }</div>
+					<div class="cell status" style="width: 10%">{ event.Status }</div>
+					<div class="cell time" style="width: 15%">{ event.SeenAt }</div>
+				</div>
+			}
+		</div>
 	</div>
 }
 
@@ -211,7 +204,7 @@ templ MintActivityLayout(liquidityManagerAvailable bool) {
 					hx-swap="innerHTML"
 					hx-trigger="load, reload"
 					hx-headers="javascript:{time: event?.detail?.time}"
-					class="data-table log-table"
+					class=""
 				></div>
 				<div
 					hx-get="/admin/mint-melt-list"
@@ -219,7 +212,7 @@ templ MintActivityLayout(liquidityManagerAvailable bool) {
 					hx-swap="innerHTML"
 					hx-trigger="load, reload"
 					hx-headers="javascript:{time: event?.detail?.time}"
-					class="data-table mint-melt-table"
+					class=""
 				></div>
 			</div>
 		</main>
