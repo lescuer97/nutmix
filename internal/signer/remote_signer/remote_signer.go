@@ -3,13 +3,11 @@ package remotesigner
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"log"
 	"math"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/lescuer97/nutmix/api/cashu"
 	sig "github.com/lescuer97/nutmix/internal/gen"
 	"github.com/lescuer97/nutmix/internal/signer"
@@ -243,51 +241,18 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 
 	return blindSigs, recoverySigs, nil
 }
-func (l *RemoteSigner) validateIfLockedProof(proof cashu.Proof, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
 
-	// check if a proof is locked to a spend condition and verifies it
-	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
-
-	if err != nil {
-		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", errors.Join(cashu.ErrInvalidProof, err))
-	}
-
-	if isProofLocked {
-		ok, err := proof.VerifyWitness(spendCondition, witness, pubkeysFromProofs)
-
-		if err != nil {
-			return fmt.Errorf("proof.VerifyWitnessSig(): %w", err)
-		}
-
-		if !ok {
-			return cashu.ErrInvalidProof
-		}
-	}
-	return nil
-}
-
-func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage) error {
+func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {
 
 	ctx := context.Background()
 	// INFO: we verify locally if the proofs are locked and valid before sending to the crypto signer
 	proofsVericationRequest := sig.Proofs{}
-
 	proofsVericationRequest.Proof = make([]*sig.Proof, len(proofs))
-	pubkeysFromProofs := make(map[*btcec.PublicKey]bool)
-	verifyOutputs := false
 	for i, val := range proofs {
-		err := s.validateIfLockedProof(val, &verifyOutputs, &pubkeysFromProofs)
-		if err != nil {
-			return fmt.Errorf("s.validateIfLockedProof(val, &verifyOutputs, &pubkeysFromProofs). %w", err)
-		}
 
 		C, err := hex.DecodeString(val.C)
 		if err != nil {
 			return fmt.Errorf("hex.DecodeString(val.C). %w", err)
-		}
-
-		if err != nil {
-			return errors.Join(fmt.Errorf("proof.IsProofSpendConditioned(): %w ", err), cashu.ErrInvalidProof)
 		}
 
 		bytesId, err := hex.DecodeString(val.Id)

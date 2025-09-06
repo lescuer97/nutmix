@@ -152,10 +152,46 @@ func (m *Mint) VerifyInputsAndOutputs(tx pgx.Tx, proofs cashu.Proofs, outputs []
 		return fmt.Errorf("(proofs.Amount() - (uint64(fee) + AmountSignature)). %w %w", err, cashu.ErrUnbalanced)
 	}
 
-	err = m.Signer.VerifyProofs(proofs, outputs)
-
+	err = m.verifyProofs(proofs)
 	if err != nil {
-		return fmt.Errorf("m.Signer.VerifyProofs(proofs, outputs). %w", err)
+		return fmt.Errorf("m.verifyProofs(proofs). %w", err)
+	}
+
+	return nil
+}
+
+func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
+
+	for _, proof := range proofs {
+		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
+		if err != nil {
+			return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
+		}
+		if isLocked {
+			switch spendCondition.Type {
+			case cashu.P2PK:
+				valid, err := proof.VerifyP2PK(spendCondition)
+				if err != nil {
+					return fmt.Errorf("proof.VerifyP2PK(spendCondition, witness). %w", err)
+				}
+				if !valid {
+					return cashu.ErrInvalidSpendCondition
+				}
+			case cashu.HTLC:
+				valid, err := proof.VerifyHTLC(spendCondition)
+				if err != nil {
+					return fmt.Errorf("proof.VerifyP2PK(spendCondition, witness). %w", err)
+				}
+				if !valid {
+					return cashu.ErrInvalidSpendCondition
+				}
+			}
+
+		}
+	}
+	err := m.Signer.VerifyProofs(proofs)
+	if err != nil {
+		return fmt.Errorf("m.Signer.VerifyProofs(proofs). %w", err)
 	}
 
 	return nil

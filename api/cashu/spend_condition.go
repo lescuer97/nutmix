@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -140,11 +139,13 @@ func (sc SpendConditionType) String() (string, error) {
 }
 
 type TagsInfo struct {
-	Sigflag  SigFlag
-	Pubkeys  []*btcec.PublicKey
-	NSigs    int
-	Locktime int
-	Refund   []*btcec.PublicKey
+	originalTag string
+	Sigflag     SigFlag
+	Pubkeys     []*btcec.PublicKey
+	NSigs       int
+	Locktime    int
+	Refund      []*btcec.PublicKey
+	NSigRefund  int
 }
 
 func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
@@ -236,9 +237,8 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 		}
 
 	}
-
+	tags.originalTag = string(b)
 	return nil
-
 }
 
 type SpendConditionData struct {
@@ -264,87 +264,15 @@ func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 
 }
 
-func (sc *SpendCondition) VerifySignatures(witness *Witness, message string) (bool, []*btcec.PublicKey, error) {
-
-	currentTime := time.Now().Unix()
-
-	hashMessage := sha256.Sum256([]byte(message))
-
-	pubkeys := make(map[*btcec.PublicKey]bool)
-	pubkeysFromProofs := sc.Data.Tags.Pubkeys
-	for _, pubkey := range sc.Data.Tags.Pubkeys {
-		pubkeys[pubkey] = true
-	}
-
-	if sc.Type == P2PK {
-		pubkey, err := hex.DecodeString(sc.Data.Data)
-
-		if err != nil {
-			return false, sc.Data.Tags.Pubkeys, ErrNoValidSignatures
-		}
-		parsedPubkey, err := btcec.ParsePubKey(pubkey)
-		if err != nil {
-			return false, sc.Data.Tags.Pubkeys, ErrNoValidSignatures
-		}
-
-		pubkeys[parsedPubkey] = true
-		pubkeysFromProofs = append(pubkeysFromProofs, parsedPubkey)
-	}
-
-	// check if locktime has passed and if there are refund keys
-	if sc.Data.Tags.Locktime != 0 && currentTime > int64(sc.Data.Tags.Locktime) && len(sc.Data.Tags.Refund) > 0 {
-		for _, sig := range witness.Signatures {
-			for _, pubkey := range sc.Data.Tags.Refund {
-				if sig.Verify(hashMessage[:], pubkey) {
-					return true, pubkeysFromProofs, nil
-				}
-			}
-		}
-		return false, pubkeysFromProofs, ErrLocktimePassed
-	}
-
-	// append all posibles keys for signing
-	amountValidSigs := 0
-
-	for _, sig := range witness.Signatures {
-		for pubkey, _ := range pubkeys {
-			if sig.Verify(hashMessage[:], pubkey) {
-				amountValidSigs += 1
-				delete(pubkeys, pubkey)
-				continue
-			}
-		}
-	}
-
-	// check if there is a multisig set up if not check if there is only one valid signature
-	switch {
-
-	case amountValidSigs == 0:
-		return false, pubkeysFromProofs, ErrNoValidSignatures
-
-	case sc.Data.Tags.NSigs > 0 && amountValidSigs < sc.Data.Tags.NSigs:
-		return false, pubkeysFromProofs, ErrNotEnoughSignatures
-
-	case sc.Data.Tags.NSigs > 0 && amountValidSigs >= sc.Data.Tags.NSigs:
-		return true, pubkeysFromProofs, nil
-
-	case amountValidSigs >= 1:
-		return true, pubkeysFromProofs, nil
-
-	default:
-		return false, pubkeysFromProofs, nil
-
-	}
-}
-
 type Tags int
 
 const (
-	Sigflag  Tags = iota + 1
-	Pubkeys  Tags = iota + 2
-	NSigs    Tags = iota + 3
-	Locktime Tags = iota + 4
-	Refund   Tags = iota + 5
+	Sigflag    Tags = iota + 1
+	Pubkeys    Tags = iota + 2
+	NSigs      Tags = iota + 3
+	Locktime   Tags = iota + 4
+	Refund     Tags = iota + 5
+	NSigRefund Tags = iota + 6
 )
 
 func (t Tags) String() string {
@@ -358,6 +286,8 @@ func (t Tags) String() string {
 	case Locktime:
 		return "locktime"
 	case Refund:
+		return "refund"
+	case NSigRefund:
 		return "refund"
 	}
 	return ""
@@ -375,6 +305,8 @@ func TagFromString(s string) (Tags, error) {
 		return Locktime, nil
 	case "refund":
 		return Refund, nil
+	case "n_sigs_refund":
+		return NSigRefund, nil
 	default:
 		return 0, ErrInvalidTagName
 	}
@@ -472,3 +404,61 @@ func (wit *Witness) UnmarshalJSON(b []byte) error {
 	return nil
 
 }
+
+type SigflagValidation struct {
+	sigFlag            SigFlag
+	signaturesRequired uint
+	pubkeys            map[*btcec.PublicKey]bool
+}
+
+func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
+	sigFlagValidation := SigflagValidation{
+		sigFlag:            SigInputs,
+		signaturesRequired: 0,
+		pubkeys:            make(map[*btcec.PublicKey]bool),
+	}
+	for _, proof := range proofs {
+		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
+		if err != nil {
+			return sigFlagValidation, fmt.Errorf("proof.parseSpendCondition(). %w", err)
+		}
+		if isLocked && spendCondition != nil {
+			if spendCondition.Data.Tags.Sigflag == SigAll {
+				sigFlagValidation.sigFlag = SigAll
+			}
+			if sigFlagValidation.signaturesRequired < uint(spendCondition.Data.Tags.NSigs) {
+				sigFlagValidation.signaturesRequired = uint(spendCondition.Data.Tags.NSigs)
+			}
+
+			for _, pubkey := range spendCondition.Data.Tags.Pubkeys {
+				sigFlagValidation.pubkeys[pubkey] = true
+			}
+		}
+	}
+	return sigFlagValidation, nil
+}
+
+func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]bool, signatures []*schnorr.Signature) (uint, error) {
+	hashMessage := sha256.Sum256([]byte(msg))
+	amountValidSigs := uint(0)
+
+	for _, sig := range signatures {
+		for pubkey, _ := range pubkeys {
+			if sig.Verify(hashMessage[:], pubkey) {
+				amountValidSigs += 1
+				delete(pubkeys, pubkey)
+				continue
+			}
+		}
+	}
+	return amountValidSigs, nil
+}
+
+// func GetSignaturesFromWitness(proof Proof) ([]*schnorr.Signature, error){
+//
+// }
+// func MakeSigAllMessage(proofs Proofs) (string, error){
+// 	for _, proof := range proofs{
+// 	}
+//
+// }

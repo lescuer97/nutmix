@@ -9,7 +9,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/elnosh/gonuts/crypto"
 	"github.com/jackc/pgx/v5"
@@ -305,33 +304,19 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 
 }
 
-func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof, blindMessages []cashu.BlindedMessage) error {
-	checkOutputs := false
-
-	pubkeysFromProofs := make(map[*btcec.PublicKey]bool)
+func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof) error {
 
 	for _, proof := range proofs {
-		err := l.validateProof(proof, &checkOutputs, &pubkeysFromProofs)
+		err := l.validateProof(proof)
 		if err != nil {
 			return fmt.Errorf("l.validateProof(proof, unit, &checkOutputs, &pubkeysFromProofs): %w", err)
-		}
-	}
-	// if any sig allis present all outputs also need to be check with the pubkeys from the proofs
-	if checkOutputs {
-		for _, blindMessage := range blindMessages {
-
-			err := blindMessage.VerifyBlindMessageSignature(pubkeysFromProofs)
-			if err != nil {
-				return fmt.Errorf("blindMessage.VerifyBlindMessageSignature: %w", err)
-			}
-
 		}
 	}
 
 	return nil
 }
 
-func (l *LocalSigner) validateProof(proof cashu.Proof, checkOutputs *bool, pubkeysFromProofs *map[*btcec.PublicKey]bool) error {
+func (l *LocalSigner) validateProof(proof cashu.Proof) error {
 	var keysetToUse cashu.MintKey
 
 	keysets, exists := l.keysets[proof.Id]
@@ -349,25 +334,6 @@ func (l *LocalSigner) validateProof(proof cashu.Proof, checkOutputs *bool, pubke
 	// check if keysetToUse is not assigned
 	if keysetToUse.Id == "" {
 		return cashu.ErrKeysetForProofNotFound
-	}
-
-	// check if a proof is locked to a spend condition and verifies it
-	isProofLocked, spendCondition, witness, err := proof.IsProofSpendConditioned(checkOutputs)
-
-	if err != nil {
-		return fmt.Errorf("proof.IsProofSpendConditioned(): %w", errors.Join(err, cashu.ErrInvalidProof))
-	}
-
-	if isProofLocked {
-		ok, err := proof.VerifyWitness(spendCondition, witness, pubkeysFromProofs)
-
-		if err != nil {
-			return fmt.Errorf("proof.VerifyWitnessSig(): %w", err)
-		}
-
-		if !ok {
-			return cashu.ErrInvalidProof
-		}
 	}
 	parsedBlinding, err := hex.DecodeString(proof.C)
 	if err != nil {

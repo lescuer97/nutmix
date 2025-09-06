@@ -249,7 +249,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 
 	unit, err := m.CheckProofsAreSameUnit(meltRequest.Inputs, keysets.Keysets)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w: m.CheckProofsAreSameUnit(meltRequest.Inputs): %v", cashu.ErrUnitNotSupported, err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w. m.CheckProofsAreSameUnit(meltRequest.Inputs): %w", cashu.ErrUnitNotSupported, err)
 	}
 
 	// check for needed amount of fees
@@ -269,10 +269,16 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w", cashu.ErrNotEnoughtProofs)
 	}
 
-	err = m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs)
+	err = m.verifyProofs(meltRequest.Inputs)
 	if err != nil {
-		slog.Debug("Could not verify Proofs", slog.Any("error", err))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.Signer.VerifyProofs(meltRequest.Inputs, meltRequest.Outputs) %w", err)
+		slog.Debug("m.verifyProofs(meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.verifyProofs(meltRequest.Inputs) %w", err)
+	}
+
+	err = meltRequest.ValidateSigflag()
+	if err != nil {
+		slog.Debug("meltRequest.ValidateSigflag()", slog.String(utils.LogExtraInfo, err.Error()))
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("meltRequest.ValidateSigflag() %w", err)
 	}
 
 	ctx := context.Background()
