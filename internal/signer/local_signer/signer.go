@@ -292,7 +292,7 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 		}
 
 		if err != nil {
-			err = fmt.Errorf("GenerateBlindSignature: %w %w", cashu.ErrInvalidBlindMessage, err)
+			err = errors.Join(cashu.ErrInvalidBlindMessage, err)
 			return nil, nil, err
 		}
 
@@ -337,11 +337,11 @@ func (l *LocalSigner) validateProof(proof cashu.Proof) error {
 	}
 	parsedBlinding, err := hex.DecodeString(proof.C)
 	if err != nil {
-		return fmt.Errorf("hex.DecodeString: %w %w", err, cashu.ErrInvalidProof)
+		return fmt.Errorf("hex.DecodeString: %w", errors.Join(err, cashu.ErrInvalidProof))
 	}
 	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
 	if err != nil {
-		return fmt.Errorf("secp256k1.ParsePubKey: %w %w", err, cashu.ErrInvalidProof)
+		return fmt.Errorf("secp256k1.ParsePubKey: %w", errors.Join(err, cashu.ErrInvalidProof))
 	}
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
 	if !verified {

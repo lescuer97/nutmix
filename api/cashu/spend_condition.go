@@ -251,7 +251,7 @@ func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 	preImageBytes, err := hex.DecodeString(witness.Preimage)
 
 	if err != nil {
-		return fmt.Errorf("hex.DecodeString: %w, %w", ErrInvalidHexPreimage, err)
+		return errors.Join(ErrInvalidHexPreimage, err)
 	}
 
 	parsedPreimage := sha256.Sum256(preImageBytes)

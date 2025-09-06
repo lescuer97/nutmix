@@ -79,29 +79,7 @@ func (m *Mint) checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []
 
 }
 
-func (m *Mint) GetRestorySigsFromBlindFactor(blindingFactors []string) ([]cashu.RecoverSigDB, error) {
-
-	var recoverySigs []cashu.RecoverSigDB
-	ctx := context.Background()
-	tx, err := m.MintDB.GetTx(ctx)
-	if err != nil {
-		return recoverySigs, fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
-	}
-	defer m.MintDB.Rollback(ctx, tx)
-
-	recoverySigs, err = m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)
-	if err != nil {
-		return recoverySigs, fmt.Errorf("m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors): %w", err)
-	}
-
-	err = m.MintDB.Commit(ctx, tx)
-	if err != nil {
-		return recoverySigs, fmt.Errorf("m.MintDB.Commit(ctx, tx): %w", err)
-	}
-	return recoverySigs, nil
-}
-
-func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
+func (m *Mint) VerifyOutputs(tx pgx.Tx, outputs []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
 	// check output have the correct unit
 	unit, err := m.checkMessagesAreSameUnit(outputs, keys)
 	if err != nil {
@@ -125,7 +103,7 @@ func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicK
 	for _, output := range outputs {
 		blindingFactors = append(blindingFactors, output.B_)
 	}
-	blindRecoverySigs, err := m.GetRestorySigsFromBlindFactor(blindingFactors)
+	blindRecoverySigs, err := m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)
 	if err != nil {
 		return unit, fmt.Errorf("m.GetRestorySigsFromBlindFactor(blindingFactors). %w", err)
 	}
@@ -136,7 +114,7 @@ func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicK
 	return unit, nil
 }
 
-func (m *Mint) VerifyInputsAndOutputs(proofs cashu.Proofs, outputs []cashu.BlindedMessage) error {
+func (m *Mint) VerifyInputsAndOutputs(tx pgx.Tx, proofs cashu.Proofs, outputs []cashu.BlindedMessage) error {
 	keysets, err := m.Signer.GetKeysets()
 	if err != nil {
 		return fmt.Errorf("m.Signer.GetKeys(). %w", err)
@@ -148,7 +126,7 @@ func (m *Mint) VerifyInputsAndOutputs(proofs cashu.Proofs, outputs []cashu.Blind
 		return fmt.Errorf("m.CheckProofsAreSameUnit(proofs, keysets.Keysets). %w", err)
 	}
 
-	outputUnit, err := m.VerifyOutputs(outputs, keysets.Keysets)
+	outputUnit, err := m.VerifyOutputs(tx, outputs, keysets.Keysets)
 	if err != nil {
 		return fmt.Errorf("m.VerifyOutputs(outputs). %w", err)
 	}
