@@ -89,7 +89,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
-		unit, err := mint.VerifyOutputs(mintRequest.Outputs, keysets.Keysets)
+		unit, err := mint.VerifyOutputs(tx, mintRequest.Outputs, keysets.Keysets)
 		if err != nil {
 			slog.Error("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)

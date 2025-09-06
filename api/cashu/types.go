@@ -244,14 +244,14 @@ func (p Proof) parseWitnessAndSecret() (*SpendCondition, *Witness, error) {
 	err := json.Unmarshal([]byte(p.Secret), &spendCondition)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Secret), &spendCondition)  %w, %w", ErrCouldNotParseSpendCondition, err)
+		return nil, nil, errors.Join(fmt.Errorf("json.Unmarshal([]byte(p.Secret), &spendCondition)  %w ", ErrCouldNotParseSpendCondition), err)
 
 	}
 
 	err = json.Unmarshal([]byte(p.Witness), &witness)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w, %w", ErrCouldNotParseWitness, err)
+		return nil, nil, errors.Join(fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w", err), ErrCouldNotParseWitness)
 
 	}
 
@@ -274,9 +274,9 @@ func (p Proof) IsProofSpendConditioned(checkOutputs *bool) (bool, *SpendConditio
 		}
 		return true, &spendCondition, &witness, nil
 	case witnessErr != nil && spendConditionErr == nil:
-		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %w, %w", ErrCouldNotParseWitness, witnessErr)
+		return true, nil, nil, errors.Join(fmt.Errorf("json.Unmarshal([]byte)  %w", ErrCouldNotParseWitness), witnessErr)
 	case spendConditionErr != nil && witnessErr == nil:
-		return true, nil, nil, fmt.Errorf("json.Unmarshal([]byte)  %w, %w", ErrCouldNotParseSpendCondition, spendConditionErr)
+		return true, nil, nil, errors.Join(fmt.Errorf("json.Unmarshal([]byte)  %w", ErrCouldNotParseSpendCondition), spendConditionErr)
 	default:
 		return false, nil, nil, nil
 	}
@@ -311,7 +311,7 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 	} else {
 		err = json.Unmarshal([]byte(p.Witness), &witness)
 		if err != nil {
-			return fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w, %w", ErrCouldNotParseWitness, err)
+			return errors.Join(fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w", ErrCouldNotParseWitness), err)
 		}
 	}
 
@@ -334,7 +334,7 @@ func (p *Proof) AddPreimage(preimage string) error {
 	} else {
 		err := json.Unmarshal([]byte(p.Witness), &witness)
 		if err != nil {
-			return fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w, %w", ErrCouldNotParseWitness, err)
+			return errors.Join(fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w", ErrCouldNotParseWitness), err)
 		}
 	}
 

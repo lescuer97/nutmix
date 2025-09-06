@@ -34,6 +34,7 @@ type Observer struct {
 
 func (o *Observer) AddProofWatch(y string, proofChan ProofWatchChannel) {
 	o.Lock()
+	defer o.Unlock()
 	val, exists := o.Proofs[y]
 
 	if exists {
@@ -42,10 +43,10 @@ func (o *Observer) AddProofWatch(y string, proofChan ProofWatchChannel) {
 	} else {
 		o.Proofs[y] = []ProofWatchChannel{proofChan}
 	}
-	o.Unlock()
 }
 func (o *Observer) AddMintWatch(quote string, mintChan MintQuoteChannel) {
 	o.Lock()
+	defer o.Unlock()
 	val, exists := o.MintQuote[quote]
 
 	if exists {
@@ -54,10 +55,10 @@ func (o *Observer) AddMintWatch(quote string, mintChan MintQuoteChannel) {
 	} else {
 		o.MintQuote[quote] = []MintQuoteChannel{mintChan}
 	}
-	o.Unlock()
 }
 func (o *Observer) AddMeltWatch(quote string, meltChan MeltQuoteChannel) {
 	o.Lock()
+	defer o.Unlock()
 	val, exists := o.MeltQuote[quote]
 
 	if exists {
@@ -66,17 +67,19 @@ func (o *Observer) AddMeltWatch(quote string, meltChan MeltQuoteChannel) {
 	} else {
 		o.MeltQuote[quote] = []MeltQuoteChannel{meltChan}
 	}
-	o.Unlock()
 }
 
 func (o *Observer) RemoveWatch(subId string) {
 	o.Lock()
+	proofChans := []chan cashu.Proof{}
+	mintRequestChans := []chan cashu.MintRequestDB{}
+	meltRequestChans := []chan cashu.MeltRequestDB{}
 	for key, proofWatchArray := range o.Proofs {
 		for i, proofWatch := range proofWatchArray {
 			if proofWatch.SubId == subId {
 				newArray := slices.Delete(proofWatchArray, i, i+1)
 				o.Proofs[key] = newArray
-				close(proofWatch.Channel)
+				proofChans = append(proofChans, proofWatch.Channel)
 			}
 		}
 	}
@@ -85,7 +88,7 @@ func (o *Observer) RemoveWatch(subId string) {
 			if mintWatch.SubId == subId {
 				newArray := slices.Delete(mintWatchArray, i, i+1)
 				o.MintQuote[key] = newArray
-				close(mintWatch.Channel)
+				mintRequestChans = append(mintRequestChans, mintWatch.Channel)
 			}
 		}
 	}
@@ -94,15 +97,26 @@ func (o *Observer) RemoveWatch(subId string) {
 			if meltWatch.SubId == subId {
 				newArray := slices.Delete(meltWatchArray, i, i+1)
 				o.MeltQuote[key] = newArray
-				close(meltWatch.Channel)
+				meltRequestChans = append(meltRequestChans, meltWatch.Channel)
 			}
 		}
 	}
 	o.Unlock()
+	for i := range proofChans {
+		close(proofChans[i])
+	}
+	for i := range mintRequestChans {
+		close(mintRequestChans[i])
+	}
+	for i := range meltRequestChans {
+		close(meltRequestChans[i])
+	}
 }
 
 func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 	o.Lock()
+	defer o.Unlock()
+
 	for _, proof := range proofs {
 		watchArray, exists := o.Proofs[proof.Y]
 		if exists {
@@ -111,29 +125,28 @@ func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 			}
 		}
 	}
-	o.Unlock()
 }
 
 func (o *Observer) SendMeltEvent(melt cashu.MeltRequestDB) {
 	o.Lock()
 	watchArray, exists := o.MeltQuote[melt.Quote]
+	o.Unlock()
 	if exists {
 		for _, v := range watchArray {
 			v.Channel <- melt
 		}
 	}
-	o.Unlock()
 }
 
 func (o *Observer) SendMintEvent(mint cashu.MintRequestDB) {
 	o.Lock()
 	watchArray, exists := o.MintQuote[mint.Quote]
+	o.Unlock()
 	if exists {
 		for _, v := range watchArray {
 			v.Channel <- mint
 		}
 	}
-	o.Unlock()
 }
 
 func SendJson(conn *websocket.Conn, content any) error {
