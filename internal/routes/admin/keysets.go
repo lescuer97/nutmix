@@ -16,6 +16,7 @@ import (
 )
 
 var ErrUnitNotCorrect = errors.New("Unit not correct")
+var ErrNoExpiryTime = errors.New("No expiry time provided")
 
 func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 
@@ -84,8 +85,9 @@ func KeysetsLayoutPage(mint *m.Mint) gin.HandlerFunc {
 }
 
 type RotateRequest struct {
-	Fee  uint
-	Unit cashu.Unit
+	Fee              uint
+	Unit             cashu.Unit
+	ExpireLimitHours uint
 }
 
 func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
@@ -107,8 +109,14 @@ func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
 				c.Error(ErrUnitNotCorrect)
 				return
 			}
-			unit, err := cashu.UnitFromString(unitStr)
 
+			expireLimitStr := c.Request.PostFormValue("EXPIRE_LIMIT")
+			if expireLimitStr == "" {
+				c.Error(ErrNoExpiryTime)
+				return
+			}
+
+			unit, err := cashu.UnitFromString(unitStr)
 			if err != nil {
 				c.Error(fmt.Errorf("cashu.UnitFromString(unitStr). %w. %w", err, ErrUnitNotCorrect))
 				return
@@ -129,9 +137,24 @@ func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
 				return
 			}
 			rotateRequest.Fee = uint(newSeedFee)
+
+			expiryLimit, err := strconv.ParseUint(expireLimitStr, 10, 64)
+			if err != nil {
+				slog.Error(
+					"Err: There was a problem rotating the key",
+					slog.String(utils.LogExtraInfo, err.Error()))
+
+				errorMessage := ErrorNotif{
+					Error: "Expire limit is not an integer",
+				}
+
+				c.HTML(200, "settings-error", errorMessage)
+				return
+			}
+			rotateRequest.ExpireLimitHours = uint(expiryLimit)
 		}
 
-		err := mint.Signer.RotateKeyset(rotateRequest.Unit, rotateRequest.Fee)
+		err := mint.Signer.RotateKeyset(rotateRequest.Unit, rotateRequest.Fee, rotateRequest.ExpireLimitHours)
 
 		if err != nil {
 			slog.Error(

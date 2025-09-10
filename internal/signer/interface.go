@@ -11,7 +11,7 @@ type Signer interface {
 	GetAuthKeysById(id string) (GetKeysResponse, error)
 	GetAuthActiveKeys() (GetKeysResponse, error)
 
-	RotateKeyset(unit cashu.Unit, fee uint) error
+	RotateKeyset(unit cashu.Unit, fee uint, expiry_limit uint) error
 	GetSignerPubkey() (string, error)
 
 	SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error)
