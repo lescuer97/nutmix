@@ -19,12 +19,12 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 	}
 	localsigner.getSignerPrivateKey()
 
-	err = localsigner.RotateKeyset(cashu.Msat, uint(100))
+	err = localsigner.RotateKeyset(cashu.Msat, uint(100), 240)
 	if err != nil {
 		t.Fatalf("localsigner.RotateKeyset(cashu.Msat, uint(100)) %+v", err)
 	}
 
-	err = localsigner.RotateKeyset(cashu.Sat, uint(100))
+	err = localsigner.RotateKeyset(cashu.Sat, uint(100), 240)
 	if err != nil {
 		t.Fatalf("localsigner.RotateKeyset(cashu.Sat, uint(100)) %+v", err)
 	}
@@ -97,7 +97,7 @@ func TestRotateAuthSeedUnit(t *testing.T) {
 	}
 	localsigner.getSignerPrivateKey()
 
-	err = localsigner.RotateKeyset(cashu.AUTH, uint(100))
+	err = localsigner.RotateKeyset(cashu.AUTH, uint(100), 240)
 	if err != nil {
 		t.Fatalf("localsigner.RotateKeyset(cashu.Msat, uint(100)) %+v", err)
 	}
