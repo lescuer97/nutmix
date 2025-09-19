@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -31,6 +32,7 @@ var (
 	DOCKER_ENV           = "DOCKER"
 	MODE_ENV             = "MODE"
 	MINT_PRIVATE_KEY_ENV = "MINT_PRIVATE_KEY"
+	PORT                 = "PORT"
 )
 
 func main() {
@@ -143,9 +145,18 @@ func main() {
 
 	admin.AdminRoutes(ctx, r, mint)
 
-	PORT := fmt.Sprintf(":%v", 8081)
+	PORT = ":8081"
+	PORTStr := os.Getenv("PORT")
+	if PORTStr != "" {
+		portInt, err := strconv.ParseUint(PORTStr, 10, 64)
+		if err != nil {
+			slog.Error("Your picked port is not correct", slog.Any("error", err))
+			return
+		}
+		PORT  = fmt.Sprintf(":%v", portInt)
+	}
 
-	slog.Info("Nutmix started in port", slog.Int("port", 8081))
+	slog.Info("Nutmix started in port", slog.String("port",PORT ))
 
 	r.Run(PORT)
 }

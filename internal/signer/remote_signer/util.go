@@ -22,25 +22,25 @@ func GetTlsSecurityCredential() (credentials.TransportCredentials, error) {
 		log.Panic("SIGNER_CLIENT_TLS_CERT path not available.")
 	}
 	caCertPath := os.Getenv("SIGNER_CA_CERT")
-	if caCertPath == "" {
-		log.Panic("SIGNER_CA_CERT path not available.")
-	}
+
 	// Load server certificate and key
 	serverCert, err := tls.LoadX509KeyPair(tlsCertPath, tlsKeyPath)
 	if err != nil {
 		log.Fatalf("Failed to load server cert: %v", err)
 	}
 
-	// Load CA certificate
-	caCert, err := os.ReadFile(caCertPath)
-	if err != nil {
-		log.Fatalf("Failed to load CA cert: %v", err)
-	}
-
-	// Create a certificate pool and add the CA certificate
 	certPool := x509.NewCertPool()
-	if !certPool.AppendCertsFromPEM(caCert) {
-		log.Fatal("Failed to add CA certificate to pool")
+	if caCertPath != "" {
+		// Load CA certificate
+		caCert, err := os.ReadFile(caCertPath)
+		if err != nil {
+			log.Fatalf("Failed to load CA cert: %v", err)
+		}
+
+		// Create a certificate pool and add the CA certificate
+		if !certPool.AppendCertsFromPEM(caCert) {
+			log.Fatal("Failed to add CA certificate to pool")
+		}
 	}
 
 	// Create TLS configuration
