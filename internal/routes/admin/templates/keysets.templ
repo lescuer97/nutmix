@@ -1,6 +1,7 @@
 package templates 
 
 import "strconv"
+import "time"
 
 type KeysetData struct {
 	Id        string
@@ -9,6 +10,7 @@ type KeysetData struct {
 	Fees      uint
 	CreatedAt int64
 	Version   uint64
+	ExpireLimit *time.Time
 }
 
 templ KeysetsPage() {
@@ -34,6 +36,10 @@ templ KeysetsPage() {
 					Fees (PPK). Ex: 100 PPK = 1 sat / 10 Inputs
 					<input type="number" name="FEE" value="0"/>
 				</label>
+				<label for="EXPIRE_LIMIT" class="settings-input">
+    			  Hours for expiration of keyset
+    			  <input type="number" name="EXPIRE_LIMIT" value="270" />
+    			</label>
 				<button style="min-width: 150px;" hx-disabled-elt="this" class="square" type="submit">
 					Rotate Sats keys up
 				</button>

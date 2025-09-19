@@ -13,11 +13,11 @@ import (
 
 func GetTlsSecurityCredential() (credentials.TransportCredentials, error) {
 
-	tlsCertPath := os.Getenv("SIGNER_CLIENT_TLS_KEY")
+	tlsCertPath := os.Getenv("SIGNER_CLIENT_TLS_CERT")
 	if tlsCertPath == "" {
 		log.Panic("SIGNER_CLIENT_TLS_KEY path not available.")
 	}
-	tlsKeyPath := os.Getenv("SIGNER_CLIENT_TLS_CERT")
+	tlsKeyPath := os.Getenv("SIGNER_CLIENT_TLS_KEY")
 	if tlsKeyPath == "" {
 		log.Panic("SIGNER_CLIENT_TLS_CERT path not available.")
 	}

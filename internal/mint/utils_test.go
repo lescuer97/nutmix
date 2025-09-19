@@ -82,7 +82,7 @@ func TestIsInternalTransactionFail(t *testing.T) {
 func TestVerifyUnitOfProofFail(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 
-	err := mint.Signer.RotateKeyset(cashu.EUR, 0)
+	err := mint.Signer.RotateKeyset(cashu.EUR, 0, 240)
 	if err != nil {
 		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
 	}
@@ -104,7 +104,7 @@ func TestVerifyUnitOfProofFail(t *testing.T) {
 func TestVerifyUnitOfProofPass(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 
-	err := mint.Signer.RotateKeyset(cashu.EUR, 0)
+	err := mint.Signer.RotateKeyset(cashu.EUR, 0, 240)
 	if err != nil {
 		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
 	}
@@ -128,7 +128,7 @@ func TestVerifyUnitOfProofPass(t *testing.T) {
 func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 
-	err := mint.Signer.RotateKeyset(cashu.EUR, 0)
+	err := mint.Signer.RotateKeyset(cashu.EUR, 0, 240)
 	if err != nil {
 		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
 	}

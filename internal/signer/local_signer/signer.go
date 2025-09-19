@@ -158,7 +158,7 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 
 }
 
-func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
+func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit uint) error {
 	ctx := context.Background()
 	tx, err := l.db.GetTx(ctx)
 	if err != nil {

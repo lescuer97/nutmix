@@ -153,7 +153,7 @@ func (s *RemoteSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 	return response, nil
 }
 
-func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
+func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours uint) error {
 
 	ctx := context.Background()
 
@@ -162,11 +162,15 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint) error {
 		return fmt.Errorf("ConvertCashuUnitToSignature(unit). %w", err)
 	}
 
+	now := time.Now()
+	now = now.Add(time.Duration(expiry_limit_hours) * time.Hour)
+
 	amounts := GetAmountsFromMaxOrder(32)
 	rotationReq := sig.RotationRequest{
 		Unit:        unitSig,
 		InputFeePpk: uint64(fee),
 		Amounts:     amounts,
+		FinalExpiry: uint64(now.Unix()),
 	}
 	rotationResponse, err := s.grpcClient.RotateKeyset(ctx, &rotationReq)
 	if err != nil {
