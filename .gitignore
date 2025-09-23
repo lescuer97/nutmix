@@ -12,6 +12,7 @@ tmp/
 tls/
 
 build/
+release/
 
 keycloak/keycloak_export
 keycloak/postgres_data

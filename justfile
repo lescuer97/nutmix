@@ -5,51 +5,68 @@ export PATH := env_var("PATH") + ":" + `go env GOPATH` + "/bin"
 APP_NAME := "nutmix"
 DOCKER_IMAGE := "nutmix"
 BUILD_DIR := "build"
-CGO_ENABLED := "0"
-GOOS := "linux"
-GOARCH := "amd64"
 RUN_ARGS := ""  # Additional arguments for running the app locally
+RELEASE_DIR := "release"
+
+PLATFORMS := "linux/amd64 linux/arm64 darwin/arm64"
 # Read current version from VERSION file
-VERSION := `cat VERSION 2>/dev/null || echo "0.0.0"`
-GO_BIN := `go env GOPATH`
-PROTOC_GEN_GO := `which protoc-gen-go || echo "$(go env GOPATH)/bin/protoc-gen-go"`
-PROTOC_GEN_GO_GRPC := `which protoc-gen-go-grpc || echo "$(go env GOPATH)/bin/protoc-gen-go-grpc"`
-TEMPL_CMD := `which templ || echo "$(go env GOPATH)/bin/templ"`
+MODULE := "github.com/lescuer97/nutmix"
+VERSION := `cat VERSION 2>/dev/null || echo "0.3.0"`
+BUILD_TIME := `date -u +"%Y-%m-%dT%H:%M:%SZ"`
+COMMIT_HASH := `git rev-parse --short HEAD 2>/dev/null || echo "unknown"`
 
 
-# Default task
+# Default recipe
 default:
-    @just --list
+    @just help
 
-# Help task
+# Help recipe
 help:
-    @echo "Available tasks:"
-    @echo "  build            - Build the application"
+    @echo "Available recipe:"
+    @echo "End User:"
     @echo "  run              - Build and run the application locally"
-    @echo "  dev              - Start database and run application locally"
+    @echo "  docker-run       - Run application in Docker"
+    @echo "  docker-up        - Start all services with docker-compose"
+    @echo "  docker-down      - Stop all services"
+
+    @echo "\nDeveloper Focused:"
     @echo "  deps             - Install required dependencies"
     @echo "  gen-proto        - Generate protobuf code"
     @echo "  gen-templ        - Generate go code from templ files"
     @echo "  gen-test-keys    - Generate test keys for MINT_PRIVATE_KEY"
+    @echo "  dev              - Start database and run application locally"
     @echo "  test             - Run tests"
     @echo "  lint             - Run linter"
+    @echo "  clean-all        - Clean build artifacts and cache"
+    @echo "  docker-db        - Start only the database service"
+    @echo "  docker-db-down   - Stop the database service"
+    @echo "  docker-clean     - Clean up Docker resources"
+
+    @echo "\nBuild and Release:"
+    @echo "  build            - Build the application"
+    @echo "  build-platform <platform>  - Build the application for a specified platform, linux/amd64 linux/arm64 and darwin/arm64"
     @echo "  clean            - Clean build artifacts"
+    @echo "  release          - Builds all artifacts for release"
+    @echo "  docker-build     - Build Docker image with version tags"
+    @echo "  docker-push      - Push Docker images to registry"
+
+    @echo "\nVersioning:"
     @echo "  version          - Show current version"
     @echo "  version-bump     - Bump version (patch by default)"
     @echo "  version-set      - Set specific version (e.g., just version-set 1.2.3)"
     @echo "  version-major    - Bump major version"
     @echo "  version-minor    - Bump minor version"
     @echo "  version-patch    - Bump patch version"
-    @echo "  docker-build     - Build Docker image with version tags"
-    @echo "  docker-run       - Run application in Docker"
-    @echo "  docker-push      - Push Docker images to registry"
-    @echo "  docker-clean     - Clean up Docker resources"
-    @echo "  docker-up        - Start all services with docker-compose"
-    @echo "  docker-down      - Stop all services"
-    @echo "  docker-db        - Start only the database service"
-    @echo "  docker-db-down   - Stop the database service"
 
-# Build task
+# Run recipe
+run:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Running {{APP_NAME}} v{{VERSION}} locally..."
+    just build
+    ./{{BUILD_DIR}}/{{APP_NAME}} {{RUN_ARGS}}
+
+# Build recipe
 build:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -57,31 +74,23 @@ build:
     mkdir -p {{BUILD_DIR}}
     just gen-proto
     just gen-templ
-    go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o {{BUILD_DIR}}/{{APP_NAME}} cmd/nutmix/*.go
+    go build -ldflags="-s -w \
+        -X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
+        -X '{{MODULE}}/internal/utils.BuildTime={{BUILD_TIME}}' \
+        -X '{{MODULE}}/internal/utils.GitCommit={{COMMIT_HASH}}'" \
+        -trimpath -o {{BUILD_DIR}}/{{APP_NAME}} cmd/nutmix/*.go
 
-# Dependencies task
+# Dependencies recipe
 deps:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Checking dependencies..."
 
-    # Helper to check and install Go tools
-    install_if_missing() {
-      local tool=$1
-      local pkg=$2
-      if ! command -v "$tool" >/dev/null 2>&1; then
-        echo "Installing $tool..."
-        go install "$pkg"
-      else
-        echo "$tool already installed"
-      fi
-    }
-
-    # Check Go tools (pinned versions)
-    install_if_missing protoc-gen-go google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.1
-    install_if_missing protoc-gen-go-grpc google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
-    install_if_missing goose github.com/pressly/goose/v3/cmd/goose@v3.21.1
-    install_if_missing templ github.com/a-h/templ/cmd/templ@v0.2.747
+    # Install Go tools (pinned versions)
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+    go install github.com/pressly/goose/v3/cmd/goose@v3.25.0
+    go install github.com/a-h/templ/cmd/templ@v0.3.943
 
     # Check protobuf-compiler
     if ! command -v protoc >/dev/null 2>&1; then
@@ -113,7 +122,6 @@ gen-proto:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Generating protobuf code..."
-    just deps
     protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
 
 # Generate Go code from templ files
@@ -121,26 +129,15 @@ gen-templ:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Generating Go code from templ files..."
-    just deps
-    templ generate internal/routes/admin/templates/
+    templ generate .
 
-# Run task
-run:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    echo "Running {{APP_NAME}} v{{VERSION}} locally..."
-    just build
-    ./{{BUILD_DIR}}/{{APP_NAME}} {{RUN_ARGS}}
 
-# Dev task
+# Dev recipe
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Starting development environment..."
     just docker-db
-    DATABASE_URL="postgres://nutmix:admin@localhost:5432/nutmix"
-    POSTGRES_HOST="localhost"
-    POSTGRES_PORT="5432"
     just run
 
 # Generate test keys
@@ -148,31 +145,89 @@ gen-test-keys:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "MINT_PRIVATE_KEY=$(openssl rand -hex 32)"
-    #echo "use the npub generated below for ADMIN_NOSTR_NPUB"
-    #go run ./cmd/gen_nostr_key
 
-# Test task
+# Test recipe
 test:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running tests..."
     go test -v ./...
 
-# Lint task
+# Lint recipe
 lint:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running linter..."
     golangci-lint run
 
-# Clean task
+# Clean recipe
 clean:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Cleaning..."
-    rm -rf {{BUILD_DIR}}
+    rm -rf {{BUILD_DIR}} {{RELEASE_DIR}}
 
-# Docker build task
+clean-all:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Cleaning..."
+    rm -rf {{BUILD_DIR}} {{RELEASE_DIR}}
+    # Optionally clean Go caches
+    echo "Cleaned Go caches"
+    go clean -cache -modcache -testcache
+
+build-platform target:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Parse the target (e.g., "linux/amd64")
+    OS=$(echo {{target}} | cut -d/ -f1)
+    ARCH=$(echo {{target}} | cut -d/ -f2)
+
+    # Set the output binary name
+    OUTPUT={{RELEASE_DIR}}/{{APP_NAME}}-${OS}-${ARCH}-{{VERSION}}
+    # Note Windows does not build due to syslog not being supported.
+    if [ "$OS" = "windows" ]; then
+        echo "Warning: Building for Windows is not fully supported due to syslog dependency."
+        exit 1
+    fi
+    if [ "$OS" = "darwin" ] && [ "$ARCH" = "amd64" ]; then
+        echo "Error: Building for darwin/amd64 is not supported due to dlopen symbol conflict."
+        exit 1
+    fi
+
+    # Build the binary
+    echo "Building for $OS/$ARCH..."
+    GOOS=$OS GOARCH=$ARCH go build  \
+        -ldflags="-s -w \
+        -X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
+        -X '{{MODULE}}/internal/utils.BuildTime={{BUILD_TIME}}' \
+        -X '{{MODULE}}/internal/utils.GitCommit={{COMMIT_HASH}}'" \
+        -trimpath -o $OUTPUT cmd/nutmix/*.go
+
+    echo "Built $OUTPUT"
+
+# Build for all platforms
+release:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Clean the release directory
+    rm -rf {{RELEASE_DIR}}
+    mkdir -p {{RELEASE_DIR}}
+
+    # Build for each platform
+    for platform in {{PLATFORMS}}; do
+        just build-platform $platform
+    done
+
+    echo "Release binaries are in the {{RELEASE_DIR}} directory"
+
+# ============================
+# Docker
+# ============================
+
+# Docker build recipe
 docker-build:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -180,7 +235,7 @@ docker-build:
     just build
     docker build -t {{DOCKER_IMAGE}}:latest -t {{DOCKER_IMAGE}}:{{VERSION}} .
 
-# Docker run task
+# Docker run recipe
 docker-run:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -188,7 +243,7 @@ docker-run:
     just docker-build
     docker run --rm -p 8080:8080 {{DOCKER_IMAGE}}:{{VERSION}}
 
-# Docker push task
+# Docker push recipe
 docker-push:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -197,7 +252,7 @@ docker-push:
     docker push {{DOCKER_IMAGE}}:latest
     docker push {{DOCKER_IMAGE}}:{{VERSION}}
 
-# Docker clean task
+# Docker clean recipe
 docker-clean:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -205,35 +260,39 @@ docker-clean:
     docker rmi -f {{DOCKER_IMAGE}}:latest || true
     docker rmi -f {{DOCKER_IMAGE}}:{{VERSION}} || true
 
-# Docker up task
+# Docker up recipe
 docker-up:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Starting all services with docker-compose..."
     export UID=$(id -u) && export GID=$(id -g) && docker compose up -d
 
-# Docker down task
+# Docker down recipe
 docker-down:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Stopping all services..."
     docker compose down
 
-# Docker db task
+# Docker db recipe
 docker-db:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Starting database service..."
-    docker compose -f docker-compose-dev.yml up -d db
+    docker compose -f docker-compose.yml up -d db
 
-# Docker db down task
+# Docker db down recipe
 docker-db-down:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Stopping database service..."
-    docker compose -f docker-compose-dev.yml down db
+    docker compose -f docker-compose.yml down db
 
-# Version tasks
+
+# ============================
+# Versioning
+# ============================
+# Version recipe
 version:
     #!/usr/bin/env bash
     set -euo pipefail
