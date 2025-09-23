@@ -217,16 +217,16 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 		response := cashu.GetInfoResponse{
 			Name:            mint.Config.NAME,
-			Version:         "nutmix/0.3.9",
+			Version:         "nutmix/" + utils.AppVersion,
 			Pubkey:          mint.MintPubkey,
 			Description:     mint.Config.DESCRIPTION,
 			DescriptionLong: mint.Config.DESCRIPTION_LONG,
 			Motd:            mint.Config.MOTD,
 			Contact:         contacts,
 			Nuts:            nuts,
-			IconUrl: mint.Config.IconUrl,
-			TosUrl: mint.Config.TosUrl,
-			Time: time.Now().Unix() ,
+			IconUrl:         mint.Config.IconUrl,
+			TosUrl:          mint.Config.TosUrl,
+			Time:            time.Now().Unix(),
 		}
 
 		c.JSON(200, response)
