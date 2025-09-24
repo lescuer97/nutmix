@@ -11,11 +11,11 @@ jobs:
         os: [ubuntu-latest]
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.23.5'
-          cache-dependency-path: subdir/go.sum
+          cache: true
 
       - name: Go Toolchain info
         run: |
@@ -24,12 +24,24 @@ jobs:
       - name: Install Protocol Buffers
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
-
       # --- Go plugins for protoc --------------------------------------------
+      - name: Cache protoc-gen tools
+        id: cache-protoc
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/protoc-gen-*
+          key: ${{ runner.os }}-protoc-gen-tools-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-protoc-gen-tools-
+
       - name: Install protoc Go plugins
+        if: steps.cache-protoc.outputs.cache-hit != 'true'
         run: |
           go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+      - name: Make protoc plugins available
+        run: |
           # make GOPATH/bin visible to every later step
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
@@ -37,16 +49,26 @@ jobs:
         run: |
           protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
 
-      - name: install templ
+      - name: Cache templ binary
+        id: cache-templ
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin/templ
+          key: ${{ runner.os }}-templ-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-templ-
+
+      - name: Install templ
+        if: steps.cache-templ.outputs.cache-hit != 'true'
         run: |
           go install github.com/a-h/templ/cmd/templ@latest
 
-      - name: run templ build
+      - name: Run templ build
         run: |
           templ generate .
 
       - name: Install dependencies
-        run: go get -t ./... 
+        run: go get -t ./...
 
       - name: Build
         run: |
