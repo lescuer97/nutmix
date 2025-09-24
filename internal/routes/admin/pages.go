@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"strconv"
 
 	"github.com/a-h/templ"
@@ -16,22 +15,16 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-type LoginParams struct {
-	Nonce     string
-	ADMINNPUB string
-}
-
-func LoginPage(mint *mint.Mint) gin.HandlerFunc {
+func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		// generate nonce for login nostr
 		nonce, err := cashu.GenerateNonceHex()
 		if err != nil {
-			if c.ContentType() == gin.MIMEJSON {
-				c.JSON(500, "there was a problem generating a nonce")
-			} else {
-				c.HTML(200, "error.html", nil)
-			}
+			slog.Error(
+				"database.SaveNostrLoginAuth(pool, nostrLogin)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			c.Error(err)
+			return
 		}
 
 		nostrLogin := database.NostrLoginAuth{
@@ -45,26 +38,16 @@ func LoginPage(mint *mint.Mint) gin.HandlerFunc {
 			slog.Error(
 				"database.SaveNostrLoginAuth(pool, nostrLogin)",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			if c.ContentType() == gin.MIMEJSON {
-				c.JSON(500, "there was a problem generating a nonce")
-			} else {
-				c.HTML(200, "error.html", nil)
-			}
+			c.Error(err)
 			return
 
 		}
 
-		adminNPUB := os.Getenv("ADMIN_NOSTR_NPUB")
-
-		loginValues := LoginParams{
-			Nonce:     nostrLogin.Nonce,
-			ADMINNPUB: adminNPUB,
-		}
-
-		if c.ContentType() == gin.MIMEJSON {
-			c.JSON(200, loginValues)
-		} else {
-			c.HTML(200, "login.html", loginValues)
+		ctx := context.Background()
+		err = templates.LoginPage(nonce, adminNostrKeyAvailable).Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(err)
+			return
 		}
 
 	}
@@ -78,7 +61,6 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 
 		if err != nil {
 			c.Error(err)
-			// c.HTML(400,"", nil)
 			return
 		}
 	}

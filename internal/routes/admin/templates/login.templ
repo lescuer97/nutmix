@@ -1,0 +1,35 @@
+package templates
+
+templ LayoutEmpty() {
+	@head()
+	<body>
+		<div hx-ext="remove-me" id="notifications"></div>
+		{ children... }
+	</body>
+}
+
+templ LoginPage(nonce string, adminNpubActive bool) {
+	@LayoutEmpty() {
+		<main class="login">
+			if !adminNpubActive {
+				<div class="admin-notif">
+					<h2>
+						Please set the <b>ADMIN_NOSTR_NPUB</b> enviroment variable to be able to access the
+						Admin dashboard. 
+					</h2>
+					<h3>
+						This will allow you to change the configuration of the Mint.
+					</h3>
+				</div>
+			} else {
+				<div class="login-form">
+					<form id="nip07-form">
+						<h3>Please make sure that you have a NIP-07 Browser add on.</h3>
+						<input name="passwordNonce" hidden value={ nonce }/>
+						<button type="submit">Login with Browser Add-On</button>
+					</form>
+				</div>
+			}
+		</main>
+	}
+}

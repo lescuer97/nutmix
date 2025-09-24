@@ -74,12 +74,6 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(w, opts))
 	slog.SetDefault(logger)
 
-	// check in ADMIN_NOSTR_NPUB is not empty
-	if os.Getenv("ADMIN_NOSTR_NPUB") == "" {
-		slog.Error("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")
-		log.Panicln("Please setup the ADMIN_NOSTR_NPUB so you can setup your mint")
-	}
-
 	ctx := context.Background()
 
 	if os.Getenv(DOCKER_ENV) == "true" {
@@ -153,10 +147,10 @@ func main() {
 			slog.Error("Your picked port is not correct", slog.Any("error", err))
 			return
 		}
-		PORT  = fmt.Sprintf(":%v", portInt)
+		PORT = fmt.Sprintf(":%v", portInt)
 	}
 
-	slog.Info("Nutmix started in port", slog.String("port",PORT ))
+	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
 	r.Run(PORT)
 }

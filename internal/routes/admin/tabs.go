@@ -167,9 +167,7 @@ func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
 		nostrKey := c.Request.PostFormValue("NOSTR")
 
 		if len(nostrKey) > 0 {
-
 			isValid, err := isNostrKeyValid(nostrKey)
-
 			if err != nil {
 				c.Error(ErrInvalidNostrKey)
 				slog.Warn(
