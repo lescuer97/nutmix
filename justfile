@@ -11,7 +11,7 @@ RELEASE_DIR := "release"
 PLATFORMS := "linux/amd64 linux/arm64 darwin/arm64"
 # Read current version from VERSION file
 MODULE := "github.com/lescuer97/nutmix"
-VERSION := `cat VERSION 2>/dev/null || echo "0.3.0"`
+VERSION := `cat VERSION 2>/dev/null || echo "0.0.0"`
 BUILD_TIME := `date -u +"%Y-%m-%dT%H:%M:%SZ"`
 COMMIT_HASH := `git rev-parse --short HEAD 2>/dev/null || echo "unknown"`
 
@@ -89,7 +89,6 @@ deps:
     # Install Go tools (pinned versions)
     go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
-    go install github.com/pressly/goose/v3/cmd/goose@v3.25.0
     go install github.com/a-h/templ/cmd/templ@v0.3.943
 
     # Check protobuf-compiler
@@ -265,7 +264,7 @@ docker-up:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Starting all services with docker-compose..."
-    export UID=$(id -u) && export GID=$(id -g) && docker compose up -d
+    docker compose up -d
 
 # Docker down recipe
 docker-down:
@@ -287,6 +286,20 @@ docker-db-down:
     set -euo pipefail
     echo "Stopping database service..."
     docker compose -f docker-compose.yml down db
+
+# Docker mint recipe
+docker-mint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Starting mint service..."
+    docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d mint
+
+# Docker mint down recipe
+docker-mint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Stopping mint service..."
+    docker compose -f docker-compose.yml down mint
 
 
 # ============================

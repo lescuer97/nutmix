@@ -1,0 +1,4 @@
+services:
+  mint:
+    ports:
+      - "${MINT_PORT:-8081}:8081"

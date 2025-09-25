@@ -46,6 +46,7 @@ services:
       DOCKER: "true"
     build: ./
     restart: on-failure:10
+    user: "${UID}:${GID}"
     depends_on:
       - db
     labels:
