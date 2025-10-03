@@ -40,6 +40,8 @@ help:
     @echo "  clean-all        - Clean build artifacts and cache"
     @echo "  docker-db        - Start only the database service"
     @echo "  docker-db-down   - Stop the database service"
+    @echo "  docker-mint      - Start only the mint service"
+    @echo "  docker-mint-down - Stop the mint service"
     @echo "  docker-clean     - Clean up Docker resources"
 
     @echo "\nBuild and Release:"
@@ -295,7 +297,7 @@ docker-mint:
     docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d mint
 
 # Docker mint down recipe
-docker-mint:
+docker-mint-down:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Stopping mint service..."
