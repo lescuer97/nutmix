@@ -16,8 +16,17 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		t.Errorf("could not setup master key %+v", err)
 	}
 
-	// Key for mint
-	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat, 0, true)
+	seed := Seed{
+		Id:          "id",
+		Unit:        Sat.String(),
+		Version:     0,
+		InputFeePpk: 0,
+	}
+
+	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), seed)
+	if err != nil {
+		t.Errorf("could not generate keyset %+v", err)
+	}
 
 	walletKey, err := bip32.NewMasterKey([]byte("walletseed"))
 	if err != nil {
@@ -32,8 +41,13 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not create blindmessage %+v", err)
 	}
+	justPubkeys := []*secp256k1.PublicKey{}
 
-	keysetId, err := DeriveKeysetId(generatedKeysets)
+	for i := range generatedKeysets {
+		justPubkeys = append(justPubkeys, generatedKeysets[i].GetPubKey())
+	}
+
+	keysetId, err := DeriveKeysetId(justPubkeys)
 
 	if err != nil {
 		t.Errorf("could not derive keyset id %+v", err)

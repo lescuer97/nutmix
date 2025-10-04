@@ -795,10 +795,8 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	const posgrespassword = "password"
 	const postgresuser = "user"
-	ctx := context.Background()
-
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(t.Context(),
+		"postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
@@ -811,7 +809,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	connUri, err := postgresContainer.ConnectionString(ctx)
+	connUri, err := postgresContainer.ConnectionString(t.Context())
 
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
@@ -822,12 +820,12 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	t.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx := context.WithValue(t.Context(), mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 
-	_, bobLnd, _, _, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
+	aliceLnd, bobLnd, btcD, lnbitsAlice, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
 
 	ctx = context.WithValue(ctx, utils.LND_HOST, os.Getenv(utils.LND_HOST))
 	ctx = context.WithValue(ctx, utils.LND_TLS_CERT, os.Getenv(utils.LND_TLS_CERT))
@@ -841,6 +839,18 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	// Clean up the container
 	defer func() {
+		if err := aliceLnd.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container aliceContainer: %s", err)
+		}
+		if err := bobLnd.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container aliceContainer: %s", err)
+		}
+		if err := btcD.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container btcD: %s", err)
+		}
+		if err := lnbitsAlice.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container lnbits: %s", err)
+		}
 		if err := postgresContainer.Terminate(ctx); err != nil {
 			log.Fatalf("failed to terminate container: %s", err)
 		}
@@ -849,13 +859,11 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 }
 func TestMintBolt11LNBITSLigthning(t *testing.T) {
-
 	const posgrespassword = "password"
 	const postgresuser = "user"
-	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(t.Context(),
+		"postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
@@ -868,8 +876,7 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	connUri, err := postgresContainer.ConnectionString(ctx)
-
+	connUri, err := postgresContainer.ConnectionString(t.Context())
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
@@ -879,15 +886,13 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	t.Setenv("MINT_LIGHTNING_BACKEND", "LNbitsWallet")
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx := context.WithValue(t.Context(), mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
 	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
-
-	_, bobLnd, _, _, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-bolt11-tests")
-
 	ctx = context.WithValue(ctx, utils.MINT_LNBITS_ENDPOINT, os.Getenv(utils.MINT_LNBITS_ENDPOINT))
 	ctx = context.WithValue(ctx, utils.MINT_LNBITS_KEY, os.Getenv(utils.MINT_LNBITS_KEY))
+	aliceLnd, bobLnd, btcD, lnbitsAlice, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-bolt11-tests")
 
 	if err != nil {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
@@ -897,6 +902,18 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 
 	// Clean up the container
 	defer func() {
+		if err := aliceLnd.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container aliceContainer: %s", err)
+		}
+		if err := bobLnd.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container aliceContainer: %s", err)
+		}
+		if err := btcD.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container btcD: %s", err)
+		}
+		if err := lnbitsAlice.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container lnbits: %s", err)
+		}
 		if err := postgresContainer.Terminate(ctx); err != nil {
 			log.Fatalf("failed to terminate container: %s", err)
 		}

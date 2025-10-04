@@ -21,6 +21,7 @@ type MintPublicKeyset struct {
 	Keys        map[uint64]string
 	InputFeePpk uint
 	Version     uint64
+	FinalExpiry *uint64
 }
 
 type RemoteSigner struct {
@@ -108,6 +109,7 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 			Active:      key.Active,
 			InputFeePpk: uint(key.InputFeePpk),
 			Version:     key.Version,
+			FinalExpiry: &key.FinalExpiry,
 		}
 
 		stringKeys := make(map[uint64]string)

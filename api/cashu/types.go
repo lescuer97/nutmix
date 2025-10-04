@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -182,11 +183,27 @@ type MintKey struct {
 	PrivKey     *secp256k1.PrivateKey `json:"priv_key"`
 	CreatedAt   int64                 `json:"created_at"`
 	InputFeePpk uint                  `json:"input_fee_ppk"`
+	FinalExpiry *uint64               `json:"final_expiry"`
 }
 
 func (keyset *MintKey) GetPubKey() *secp256k1.PublicKey {
 	pubkey := keyset.PrivKey.PubKey()
 	return pubkey
+}
+
+func OrderedListOfPubkeys(listKeys []MintKey) []*secp256k1.PublicKey {
+	sort.Slice(listKeys, func(i, j int) bool {
+		return listKeys[i].Amount < listKeys[j].Amount
+	})
+
+	pubkeys := make([]*secp256k1.PublicKey, 0)
+	for i := range listKeys {
+		if listKeys[i].PrivKey == nil {
+			panic("Private key should have never been null at this point")
+		}
+		pubkeys = append(pubkeys, listKeys[i].PrivKey.PubKey())
+	}
+	return pubkeys
 }
 
 type Seed struct {
@@ -195,7 +212,8 @@ type Seed struct {
 	Version     int
 	Unit        string
 	Id          string
-	InputFeePpk uint `json:"input_fee_ppk" db:"input_fee_ppk"`
+	InputFeePpk uint    `json:"input_fee_ppk" db:"input_fee_ppk"`
+	FinalExpiry *uint64 `json:"final_expiry" db:"final_expiry"`
 }
 
 type SwapMintMethod struct {
@@ -240,6 +258,7 @@ type Keyset struct {
 	Unit        string            `json:"unit"`
 	Keys        map[string]string `json:"keys"`
 	InputFeePpk uint              `json:"input_fee_ppk"`
+	FinalExpiry *uint64           `json:"final_expiry,omitempty" db:"final_expiry"`
 }
 
 type PostMintQuoteBolt11Request struct {
@@ -462,6 +481,7 @@ type BasicKeysetResponse struct {
 	Active      bool   `json:"active"`
 	InputFeePpk uint   `json:"input_fee_ppk"`
 	Version     uint64
+	FinalExpiry *uint64 `json:"final_expiry,omitempty"`
 }
 
 type PostCheckStateRequest struct {
