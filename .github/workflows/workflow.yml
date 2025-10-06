@@ -34,6 +34,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-protoc-gen-tools-
 
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
       - name: Install protoc Go plugins
         if: steps.cache-protoc.outputs.cache-hit != 'true'
         run: |
