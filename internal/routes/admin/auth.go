@@ -91,7 +91,6 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 		slog.Debug("Attempting log in")
 		var nostrEvent nostr.Event
 		err := c.BindJSON(&nostrEvent)
-
 		if err != nil {
 			slog.Debug(
 				"Incorrect body",
