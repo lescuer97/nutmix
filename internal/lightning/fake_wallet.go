@@ -120,7 +120,11 @@ func (f FakeWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amoun
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
 
-	payReq, err := CreateMockInvoice(amount.Amount, "mock invoice", f.Network, expireTime)
+	description := "mock invoice"
+	if quote.Description != nil {
+		description = *quote.Description
+	}
+	payReq, err := CreateMockInvoice(amount.Amount, description, f.Network, expireTime)
 	if err != nil {
 		return response, fmt.Errorf(`CreateMockInvoice(amount, "mock invoice", f.Network, expireTime). %w`, err)
 	}
@@ -154,5 +158,8 @@ func (f FakeWallet) ActiveMPP() bool {
 	return false
 }
 func (f FakeWallet) VerifyUnitSupport(unit cashu.Unit) bool {
+	return true
+}
+func (f FakeWallet) DescriptionSupport() bool {
 	return true
 }

@@ -27,7 +27,7 @@ type strikeAccountBalanceResponse struct {
 }
 type strikeInvoiceRequest struct {
 	CorrelationId string       `json:"correlationId"`
-	Description   string       `json:"description"`
+	Description   *string      `json:"description,omitempty"`
 	Amount        strikeAmount `json:"amount"`
 }
 
@@ -372,7 +372,7 @@ func (l Strike) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (
 	}
 	reqInvoice := strikeInvoiceRequest{
 		CorrelationId: quote.Quote,
-		Description:   "",
+		Description:   quote.Description,
 		Amount:        strikeAmt,
 	}
 
@@ -440,4 +440,7 @@ func (f Strike) VerifyUnitSupport(unit cashu.Unit) bool {
 	default:
 		return false
 	}
+}
+func (f Strike) DescriptionSupport() bool {
+	return true
 }

@@ -232,6 +232,11 @@ func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amo
 		Out:    false,
 		Expiry: 900,
 	}
+
+	if quote.Description != nil {
+		reqInvoice.Memo = *quote.Description
+	}
+
 	var response InvoiceResponse
 
 	supported := l.VerifyUnitSupport(amount.Unit)
@@ -293,4 +298,8 @@ func (f LnbitsWallet) VerifyUnitSupport(unit cashu.Unit) bool {
 	} else {
 		return false
 	}
+}
+
+func (f LnbitsWallet) DescriptionSupport() bool {
+	return true
 }

@@ -104,6 +104,11 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 					bolt11Method.MaxAmount = *mint.Config.PEG_IN_LIMIT_SATS
 				}
 
+				descriptionEnabled := mint.LightningBackend.DescriptionSupport()
+				bolt11Method.Options = &cashu.SwapMintMethodOptions{
+					Description: &descriptionEnabled,
+				}
+
 				nuts[nut] = cashu.SwapMintInfo{
 					Methods: &[]cashu.SwapMintMethod{
 						bolt11Method,
