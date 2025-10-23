@@ -20,36 +20,38 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 		if !mint.Config.MINT_REQUIRE_AUTH {
 			c.Next()
 		}
-		// Check if current path matches any of the patterns
-		for _, pattern := range mint.Config.MINT_AUTH_CLEAR_AUTH_URLS {
-			if !mint.Config.MINT_REQUIRE_AUTH {
-				log.Panicf("mint require auth should always be on when using the middleware")
-			}
+		if mint.Config.MINT_REQUIRE_AUTH {
+			// Check if current path matches any of the patterns
+			for _, pattern := range mint.Config.MINT_AUTH_CLEAR_AUTH_URLS {
+				if !mint.Config.MINT_REQUIRE_AUTH {
+					log.Panicf("mint require auth should always be on when using the middleware")
+				}
 
-			matches, err := matchesPattern(requestPath, pattern)
-			if err != nil {
-				log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
-			}
-			if matches {
-				slog.Info("Trying to access restricted route")
-				// For paths matching the pattern, check for the "clear auth" header
-				clearAuth := c.GetHeader("Clear-auth")
-				if clearAuth == "" {
-					slog.Warn("Tried to do a clear auth without token.")
-					c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
-					c.Abort()
-					return
-				}
-				// check if it's valid token
-				token := c.GetHeader("Clear-auth")
-				err := mint.VerifyAuthClearToken(token)
+				matches, err := matchesPattern(requestPath, pattern)
 				if err != nil {
-					slog.Error("mint.VerifyAuthClearToken(token)", slog.Any("error", err))
-					c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
-					return
+					log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
 				}
-				// Header exists, continue processing
-				break
+				if matches {
+					slog.Info("Trying to access restricted route")
+					// For paths matching the pattern, check for the "clear auth" header
+					clearAuth := c.GetHeader("Clear-auth")
+					if clearAuth == "" {
+						slog.Warn("Tried to do a clear auth without token.")
+						c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
+						c.Abort()
+						return
+					}
+					// check if it's valid token
+					token := c.GetHeader("Clear-auth")
+					err := mint.VerifyAuthClearToken(token)
+					if err != nil {
+						slog.Error("mint.VerifyAuthClearToken(token)", slog.Any("error", err))
+						c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
+						return
+					}
+					// Header exists, continue processing
+					break
+				}
 			}
 		}
 
@@ -68,41 +70,43 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 			c.Next()
 		}
 		// Check if current path matches any of the patterns
-		for _, pattern := range mint.Config.MINT_AUTH_BLIND_AUTH_URLS {
-			if !mint.Config.MINT_REQUIRE_AUTH {
-				log.Panicf("mint require auth should always be on when using the middleware")
-			}
-			matches, err := matchesPattern(requestPath, pattern)
-			if err != nil {
-				log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
-			}
-			if matches {
-				slog.Info("Trying to access restricted route")
-				// For paths matching the pattern, check for the "clear auth" header
-				blindAuth := c.GetHeader("Blind-auth")
-				if blindAuth == "" {
-					slog.Warn("Tried to do a blind auth without token.")
-					c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_BLIND_AUTH, nil))
-					c.Abort()
-					return
+		if mint.Config.MINT_REQUIRE_AUTH {
+			for _, pattern := range mint.Config.MINT_AUTH_BLIND_AUTH_URLS {
+				if !mint.Config.MINT_REQUIRE_AUTH {
+					log.Panicf("mint require auth should always be on when using the middleware")
 				}
-				authProof, err := cashu.DecodeAuthToken(blindAuth)
+				matches, err := matchesPattern(requestPath, pattern)
 				if err != nil {
-					slog.Warn("cashu.DecodeAuthToken(blindAuth)")
-					c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
-					c.Abort()
-					return
+					log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
 				}
+				if matches {
+					slog.Info("Trying to access restricted route")
+					// For paths matching the pattern, check for the "clear auth" header
+					blindAuth := c.GetHeader("Blind-auth")
+					if blindAuth == "" {
+						slog.Warn("Tried to do a blind auth without token.")
+						c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_BLIND_AUTH, nil))
+						c.Abort()
+						return
+					}
+					authProof, err := cashu.DecodeAuthToken(blindAuth)
+					if err != nil {
+						slog.Warn("cashu.DecodeAuthToken(blindAuth)")
+						c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
+						c.Abort()
+						return
+					}
 
-				authProof.Amount = 1
-				err = mint.VerifyAuthBlindToken(authProof)
-				if err != nil {
-					slog.Error("mint.VerifyAuthBlindToken(authProof)", slog.Any("error", err))
-					c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
-					return
+					authProof.Amount = 1
+					err = mint.VerifyAuthBlindToken(authProof)
+					if err != nil {
+						slog.Error("mint.VerifyAuthBlindToken(authProof)", slog.Any("error", err))
+						c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
+						return
+					}
+					// Header exists, continue processing
+					break
 				}
-				// Header exists, continue processing
-				break
 			}
 		}
 
