@@ -14,7 +14,7 @@ import (
 func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 	ctx := context.Background()
 
-	if clams.Azp != m.Config.MINT_AUTH_OICD_CLIENT_ID {
+	if clams.ClientId != m.Config.MINT_AUTH_OICD_CLIENT_ID {
 		return cashu.ErrInvalidAuthToken
 	}
 	tx, err := m.MintDB.GetTx(ctx)
@@ -31,7 +31,6 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 			return fmt.Errorf("m.MintDB.GetAuthUser(tx, clams.Sub). %w", err)
 		}
 		authUser.Sub = clams.Sub
-		authUser.Aud = clams.Aud
 		authUser.LastLoggedIn = uint64(now.Unix())
 		err = m.MintDB.MakeAuthUser(tx, authUser)
 		if err != nil {
@@ -55,7 +54,7 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 }
 
 func (m *Mint) VerifyAuthClearToken(token string) error {
-	verifier := m.OICDClient.Verifier(&oidc.Config{Now: time.Now, SkipClientIDCheck: true})
+	verifier := m.OICDClient.Verifier(&oidc.Config{ClientID: m.Config.MINT_AUTH_OICD_CLIENT_ID, Now: time.Now, SkipClientIDCheck: false})
 
 	ctx := context.Background()
 	idToken, err := verifier.Verify(ctx, token)
