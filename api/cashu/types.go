@@ -199,11 +199,15 @@ type Seed struct {
 }
 
 type SwapMintMethod struct {
-	Method    string             `json:"method"`
-	Unit      string             `json:"unit"`
-	MinAmount int                `json:"min_amount,omitempty"`
-	MaxAmount int                `json:"max_amount,omitempty"`
-	Commands  []SubscriptionKind `json:"commands,omitempty"`
+	Method    string                 `json:"method"`
+	Unit      string                 `json:"unit"`
+	MinAmount int                    `json:"min_amount,omitempty"`
+	MaxAmount int                    `json:"max_amount,omitempty"`
+	Commands  []SubscriptionKind     `json:"commands,omitempty"`
+	Options   *SwapMintMethodOptions `json:"options,omitempty"`
+}
+type SwapMintMethodOptions struct {
+	Description *bool `json:"description,omitempty"`
 }
 
 type MultipathPaymentSetting struct {
@@ -355,6 +359,7 @@ type MintRequestDB struct {
 	Amount      *uint64              `json:"amount"`
 	CheckingId  string               `json:"checking_id"`
 	Pubkey      *secp256k1.PublicKey `json:"pubkey"`
+	Description *string              `json:"description,omitempty"`
 }
 
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {

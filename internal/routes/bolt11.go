@@ -36,7 +36,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		var mintRequestDB cashu.MintRequestDB
 		if mint.Config.PEG_OUT_ONLY {
 			slog.Info("Peg out only enables")
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.MINTING_DISABLED, nil))
@@ -84,7 +83,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		mintRequestDB = cashu.MintRequestDB{
+		mintRequestDB := cashu.MintRequestDB{
 			Quote:       quoteId,
 			RequestPaid: false,
 			Expiry:      expireTime,
@@ -93,6 +92,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			SeenAt:      now,
 			Amount:      &mintRequest.Amount,
 			Pubkey:      mintRequest.Pubkey,
+			Description: mintRequest.Description,
 		}
 
 		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: uint64(mintRequest.Amount)})
