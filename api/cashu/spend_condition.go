@@ -451,7 +451,6 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 			}
 
 			currentTime := time.Now().Unix()
-
 			// Incase of expiration we set the refund pubkeys and the n_sigs_refund
 			if spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
 				sigFlagValidation.expired = true
@@ -484,12 +483,3 @@ func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]bool, signatur
 	}
 	return amountValidSigs, nil
 }
-
-// func GetSignaturesFromWitness(proof Proof) ([]*schnorr.Signature, error){
-//
-// }
-// func MakeSigAllMessage(proofs Proofs) (string, error){
-// 	for _, proof := range proofs{
-// 	}
-//
-// }
