@@ -3,6 +3,7 @@ package cashu
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 )
 
 type PostSwapRequest struct {
@@ -15,6 +16,7 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 	if err != nil {
 		return fmt.Errorf("checkForSigAll(p.Inputs). %w", err)
 	}
+	log.Println("sigflagValidation: ", sigFlagValidation.sigFlag)
 	if sigFlagValidation.sigFlag == SigAll {
 
 		firstSpendCondition, err := p.Inputs[0].parseSpendCondition()
@@ -51,6 +53,9 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		if err != nil {
 			return err
 		}
+
+		log.Println("amountOfSigs: ", amountOfSigs)
+		log.Println("sigFlagValidation.signaturesRequired: ", sigFlagValidation.signaturesRequired)
 
 		if amountOfSigs >= sigFlagValidation.signaturesRequired {
 			return nil

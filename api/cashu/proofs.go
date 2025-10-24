@@ -72,15 +72,16 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 		return false, fmt.Errorf("p.Pubkeys(). %+v", err)
 
 	}
+
 	// check if locktime has passed and if there are refund keys
 	if spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
-		refundPubkeys := make(map[*btcec.PublicKey]bool)
+		refundPubkeys := make(map[*btcec.PublicKey]struct{})
 		for i := range spendCondition.Data.Tags.Refund {
 			if spendCondition.Data.Tags.Refund[i] != nil {
-				refundPubkeys[spendCondition.Data.Tags.Refund[i]] = true
+				refundPubkeys[spendCondition.Data.Tags.Refund[i]] = struct{}{}
 			}
 		}
-		amountValidRefundSigs := 0
+		amountValidRefundSigs := uint(0)
 		for _, sig := range witness.Signatures {
 			for pubkey, _ := range refundPubkeys {
 				if sig.Verify(hashMessage[:], pubkey) {
@@ -107,7 +108,7 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 	}
 
 	// append all posibles keys for signing
-	amountValidSigs := 0
+	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
 		for pubkey, _ := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {
@@ -152,7 +153,7 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 				refundPubkeys[spendCondition.Data.Tags.Refund[i]] = true
 			}
 		}
-		amountValidRefundSigs := 0
+		amountValidRefundSigs := uint(0)
 		for _, sig := range witness.Signatures {
 			for pubkey, _ := range refundPubkeys {
 				if sig.Verify(hashMessage[:], pubkey) {
@@ -184,7 +185,7 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 	}
 
 	// append all posibles keys for signing
-	amountValidSigs := 0
+	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
 		for pubkey, _ := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {

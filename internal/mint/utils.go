@@ -167,7 +167,7 @@ func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
 		if err != nil {
 			return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
 		}
-		if isLocked {
+		if isLocked && spendCondition.Data.Tags.Sigflag != cashu.SigAll {
 			switch spendCondition.Type {
 			case cashu.P2PK:
 				valid, err := proof.VerifyP2PK(spendCondition)
