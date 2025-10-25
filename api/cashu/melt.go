@@ -2,6 +2,7 @@ package cashu
 
 import (
 	"fmt"
+	"strconv"
 )
 
 type ACTION_STATE string
@@ -92,11 +93,11 @@ func (p *PostMeltBolt11Request) ValidateSigflag() error {
 
 		firstSpendCondition, err := p.Inputs[0].parseSpendCondition()
 		if err != nil {
-			return fmt.Errorf("p.Inputs[0].parseWitnessAndSecret(). %w", err)
+			return fmt.Errorf("p.Inputs[0].parseSpendCondition(). %w", err)
 		}
 		firstWitness, err := p.Inputs[0].parseWitness()
 		if err != nil {
-			return fmt.Errorf("p.Inputs[0].parseWitnessAndSecret(). %w", err)
+			return fmt.Errorf("p.Inputs[0].parseWitness(). %w", err)
 		}
 
 		if firstSpendCondition == nil || firstWitness == nil {
@@ -115,6 +116,7 @@ func (p *PostMeltBolt11Request) ValidateSigflag() error {
 
 		// makes message
 		msg := p.makeSigAllMsg()
+		fmt.Println("melt message: ", msg)
 
 		pubkeys, err := p.Inputs[0].Pubkeys()
 		if err != nil {
@@ -163,10 +165,10 @@ func (p *PostMeltBolt11Request) verifyConditions() error {
 func (p *PostMeltBolt11Request) makeSigAllMsg() string {
 	message := ""
 	for _, proof := range p.Inputs {
-		message = message + proof.Secret
+		message = message + proof.Secret + proof.C
 	}
 	for _, blindMessage := range p.Outputs {
-		message = message + blindMessage.B_
+		message = message + strconv.FormatUint(blindMessage.Amount, 10) + blindMessage.Id + blindMessage.B_
 	}
 	message = message + p.Quote
 	return message

@@ -3,6 +3,8 @@ package cashu
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"strconv"
 )
 
 type PostSwapRequest struct {
@@ -15,6 +17,7 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 	if err != nil {
 		return fmt.Errorf("checkForSigAll(p.Inputs). %w", err)
 	}
+	log.Println("sigflagValidation: ", sigFlagValidation.sigFlag)
 	if sigFlagValidation.sigFlag == SigAll {
 
 		firstSpendCondition, err := p.Inputs[0].parseSpendCondition()
@@ -51,6 +54,9 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		if err != nil {
 			return err
 		}
+
+		log.Println("amountOfSigs: ", amountOfSigs)
+		log.Println("sigFlagValidation.signaturesRequired: ", sigFlagValidation.signaturesRequired)
 
 		if amountOfSigs >= sigFlagValidation.signaturesRequired {
 			return nil
@@ -127,10 +133,10 @@ func (p *PostSwapRequest) firstProofValues() error {
 func (p *PostSwapRequest) makeSigAllMsg() string {
 	message := ""
 	for _, proof := range p.Inputs {
-		message = message + proof.Secret
+		message = message + proof.Secret + proof.C
 	}
 	for _, blindMessage := range p.Outputs {
-		message = message + blindMessage.B_
+		message = message + strconv.FormatUint(blindMessage.Amount, 10) + blindMessage.Id + blindMessage.B_
 	}
 	return message
 }

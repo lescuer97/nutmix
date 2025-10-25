@@ -54,7 +54,7 @@ type Proof struct {
 	Secret  string     `json:"secret"`
 	C       string     `json:"C" db:"c"`
 	Y       string     `json:"Y" db:"y"`
-	Witness string     `json:"witness" db:"witness"`
+	Witness string     `json:"witness,omitempty" db:"witness,omitempty"`
 	SeenAt  int64      `json:"seen_at"`
 	State   ProofState `json:"state"`
 	Quote   *string    `json:"quote" db:"quote"`
@@ -72,42 +72,11 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 		return false, fmt.Errorf("p.Pubkeys(). %+v", err)
 
 	}
-	// check if locktime has passed and if there are refund keys
-	if spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
-		refundPubkeys := make(map[*btcec.PublicKey]bool)
-		for i := range spendCondition.Data.Tags.Refund {
-			if spendCondition.Data.Tags.Refund[i] != nil {
-				refundPubkeys[spendCondition.Data.Tags.Refund[i]] = true
-			}
-		}
-		amountValidRefundSigs := 0
-		for _, sig := range witness.Signatures {
-			for pubkey, _ := range refundPubkeys {
-				if sig.Verify(hashMessage[:], pubkey) {
-					amountValidRefundSigs += 1
-					delete(refundPubkeys, pubkey)
-					continue
-				}
-			}
-		}
 
-		switch {
-		case amountValidRefundSigs == 0:
-			return false, ErrNoValidSignatures
-		case spendCondition.Data.Tags.NSigRefund > 0 && amountValidRefundSigs < spendCondition.Data.Tags.NSigRefund:
-			return false, ErrNotEnoughSignatures
-		case spendCondition.Data.Tags.NSigRefund > 0 && amountValidRefundSigs >= spendCondition.Data.Tags.NSigRefund:
-			return true, nil
-		case amountValidRefundSigs >= 1:
-			return true, nil
-		default:
-			return false, ErrLocktimePassed
-
-		}
-	}
+	locktimePassed := spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime)
 
 	// append all posibles keys for signing
-	amountValidSigs := 0
+	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
 		for pubkey, _ := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {
@@ -118,17 +87,33 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 		}
 	}
 
+	// INFO:  if the locktime is passed and we have a nsigrefund we set it
+	nsigToCheck := uint(1)
+	if spendCondition.Data.Tags.NSigs > nsigToCheck {
+		nsigToCheck = spendCondition.Data.Tags.NSigs
+	}
+
+	if locktimePassed {
+		nsigToCheck = 1
+		if spendCondition.Data.Tags.NSigRefund > nsigToCheck {
+			nsigToCheck = spendCondition.Data.Tags.NSigRefund
+		}
+	}
+
 	// check if there is a multisig set up if not check if there is only one valid signature
 	switch {
 	case amountValidSigs == 0:
 		return false, ErrNoValidSignatures
-	case spendCondition.Data.Tags.NSigs > 0 && amountValidSigs < spendCondition.Data.Tags.NSigs:
+	case nsigToCheck > 0 && amountValidSigs < nsigToCheck:
 		return false, ErrNotEnoughSignatures
-	case spendCondition.Data.Tags.NSigs > 0 && amountValidSigs >= spendCondition.Data.Tags.NSigs:
+	case nsigToCheck > 0 && amountValidSigs >= nsigToCheck:
 		return true, nil
 	case amountValidSigs >= 1:
 		return true, nil
 	default:
+		if locktimePassed {
+			return false, ErrLocktimePassed
+		}
 		return false, nil
 	}
 }
@@ -152,7 +137,7 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 				refundPubkeys[spendCondition.Data.Tags.Refund[i]] = true
 			}
 		}
-		amountValidRefundSigs := 0
+		amountValidRefundSigs := uint(0)
 		for _, sig := range witness.Signatures {
 			for pubkey, _ := range refundPubkeys {
 				if sig.Verify(hashMessage[:], pubkey) {
@@ -184,7 +169,7 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 	}
 
 	// append all posibles keys for signing
-	amountValidSigs := 0
+	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
 		for pubkey, _ := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {
@@ -210,13 +195,14 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 	}
 }
 
-func (p Proof) Pubkeys() (map[*btcec.PublicKey]bool, error) {
+// Retuns the pubkeys available for signing
+func (p Proof) Pubkeys() (map[*btcec.PublicKey]struct{}, error) {
 	spendCondition, err := p.parseSpendCondition()
 	if err != nil {
 		return nil, err
 	}
 
-	pubkeysMap := make(map[*btcec.PublicKey]bool, 0)
+	pubkeysMap := make(map[*btcec.PublicKey]struct{}, 0)
 	switch spendCondition.Type {
 	case P2PK:
 		spendConditionDataBytes, err := hex.DecodeString(spendCondition.Data.Data)
@@ -228,11 +214,20 @@ func (p Proof) Pubkeys() (map[*btcec.PublicKey]bool, error) {
 		if err != nil {
 			return nil, fmt.Errorf("btcec.ParsePubKey(spendConditionDataBytes). %w", err)
 		}
-		pubkeysMap[dataPubkey] = true
+		pubkeysMap[dataPubkey] = struct{}{}
 		if spendCondition.Data.Tags.Pubkeys != nil {
 			for i := range spendCondition.Data.Tags.Pubkeys {
 				if spendCondition.Data.Tags.Pubkeys[i] != nil {
-					pubkeysMap[spendCondition.Data.Tags.Pubkeys[i]] = true
+					pubkeysMap[spendCondition.Data.Tags.Pubkeys[i]] = struct{}{}
+				}
+			}
+		}
+
+		if spendCondition.Data.Tags.Locktime != 0 && time.Now().Unix() > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
+			pubkeysMap = make(map[*btcec.PublicKey]struct{})
+			for i := range spendCondition.Data.Tags.Refund {
+				if spendCondition.Data.Tags.Refund[i] != nil {
+					pubkeysMap[spendCondition.Data.Tags.Refund[i]] = struct{}{}
 				}
 			}
 		}
@@ -241,7 +236,16 @@ func (p Proof) Pubkeys() (map[*btcec.PublicKey]bool, error) {
 		if spendCondition.Data.Tags.Pubkeys != nil {
 			for i := range spendCondition.Data.Tags.Pubkeys {
 				if spendCondition.Data.Tags.Pubkeys[i] != nil {
-					pubkeysMap[spendCondition.Data.Tags.Pubkeys[i]] = true
+					pubkeysMap[spendCondition.Data.Tags.Pubkeys[i]] = struct{}{}
+				}
+			}
+		}
+
+		if spendCondition.Data.Tags.Locktime != 0 && time.Now().Unix() > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
+			pubkeysMap = make(map[*btcec.PublicKey]struct{})
+			for i := range spendCondition.Data.Tags.Refund {
+				if spendCondition.Data.Tags.Refund[i] != nil {
+					pubkeysMap[spendCondition.Data.Tags.Refund[i]] = struct{}{}
 				}
 			}
 		}
