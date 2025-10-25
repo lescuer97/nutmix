@@ -87,13 +87,26 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 		}
 	}
 
+	// INFO:  if the locktime is already and nsig is bigger than 1 we change
+	nsigToCheck := uint(1)
+	if spendCondition.Data.Tags.NSigs > nsigToCheck {
+		nsigToCheck = spendCondition.Data.Tags.NSigs
+	}
+
+	if locktimePassed {
+		nsigToCheck = 1
+		if spendCondition.Data.Tags.NSigRefund > nsigToCheck {
+			nsigToCheck = spendCondition.Data.Tags.NSigRefund
+		}
+	}
+
 	// check if there is a multisig set up if not check if there is only one valid signature
 	switch {
 	case amountValidSigs == 0:
 		return false, ErrNoValidSignatures
-	case spendCondition.Data.Tags.NSigs > 0 && amountValidSigs < spendCondition.Data.Tags.NSigs:
+	case nsigToCheck > 0 && amountValidSigs < nsigToCheck:
 		return false, ErrNotEnoughSignatures
-	case spendCondition.Data.Tags.NSigs > 0 && amountValidSigs >= spendCondition.Data.Tags.NSigs:
+	case nsigToCheck > 0 && amountValidSigs >= nsigToCheck:
 		return true, nil
 	case amountValidSigs >= 1:
 		return true, nil
