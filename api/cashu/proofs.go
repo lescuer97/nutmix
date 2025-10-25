@@ -87,7 +87,7 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 		}
 	}
 
-	// INFO:  if the locktime is already and nsig is bigger than 1 we change
+	// INFO:  if the locktime is passed and we have a nsigrefund we set it
 	nsigToCheck := uint(1)
 	if spendCondition.Data.Tags.NSigs > nsigToCheck {
 		nsigToCheck = spendCondition.Data.Tags.NSigs
