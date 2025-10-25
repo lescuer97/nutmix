@@ -468,7 +468,7 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 	return sigFlagValidation, nil
 }
 
-func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]bool, signatures []*schnorr.Signature) (uint, error) {
+func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]struct{}, signatures []*schnorr.Signature) (uint, error) {
 	hashMessage := sha256.Sum256([]byte(msg))
 	amountValidSigs := uint(0)
 
