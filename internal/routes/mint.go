@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -223,6 +224,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			Motd:            mint.Config.MOTD,
 			Contact:         contacts,
 			Nuts:            nuts,
+			IconUrl: mint.Config.IconUrl,
+			TosUrl: mint.Config.TosUrl,
+			Time: time.Now().Unix() ,
 		}
 
 		c.JSON(200, response)

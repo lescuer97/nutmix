@@ -57,6 +57,16 @@ templ General(config utils.Config) {
 			<input name="NOSTR" value={ config.NOSTR } type="text"/>
 		</label>
 	</div>
+	<div class="form-section">
+		<label for="ICON_URL" class="settings-input">
+			Icon URL
+			<input name="ICON_URL" value={ stringOrEmpty(config.IconUrl) } type="text"/>
+		</label>
+		<label for="TOS_URL" class="settings-input">
+			Terms of Service URL
+			<input name="TOS_URL" value={ stringOrEmpty(config.TosUrl) } type="text"/>
+		</label>
+	</div>
 }
 
 templ Lightning(config utils.Config) {
@@ -210,6 +220,13 @@ templ MultiSelect(id string, name string, options []string, selectedValues []str
 			</option>
 		}
 	</select>
+}
+
+func stringOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func isSelected(value string, selectedValues []string) bool {
