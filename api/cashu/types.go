@@ -235,6 +235,9 @@ type GetInfoResponse struct {
 	Contact         []ContactInfo  `json:"contact"`
 	Motd            string         `json:"motd"`
 	Nuts            map[string]any `json:"nuts"`
+	TosUrl          *string        `json:"tos_url,omitempty"`
+	IconUrl         *string        `json:"icon_url,omitempty"`
+	Time            int64          `json:"time"`
 }
 
 type KeysResponse map[string][]Keyset
