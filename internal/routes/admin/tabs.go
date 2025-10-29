@@ -75,11 +75,6 @@ func validateURL(urlStr string) error {
 		return nil // Empty URL is valid (nil field)
 	}
 	
-	// Basic URL validation
-	if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
-		return fmt.Errorf("URL must start with http:// or https://")
-	}
-	
 	// Additional basic validation - try to parse URL
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
@@ -148,6 +143,9 @@ func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
 		iconUrl := c.Request.PostFormValue("ICON_URL")
 		tosUrl := c.Request.PostFormValue("TOS_URL")
 		
+		iconUrl = strings.TrimSpace(iconUrl)
+		tosUrl = strings.TrimSpace(tosUrl)
+
 		// Validate Icon URL if provided
 		if iconUrl != "" {
 			if err := validateURL(iconUrl); err != nil {
