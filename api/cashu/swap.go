@@ -45,7 +45,7 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		// makes message
 		msg := p.makeSigAllMsg()
 
-		pubkeys, err := p.Inputs[0].Pubkeys()
+		pubkeys, err := p.Inputs[0].PubkeysForVerification()
 		if err != nil {
 			return fmt.Errorf("p.Inputs[0].Pubkeys(). %w", err)
 		}

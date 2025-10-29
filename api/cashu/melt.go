@@ -118,7 +118,7 @@ func (p *PostMeltBolt11Request) ValidateSigflag() error {
 		msg := p.makeSigAllMsg()
 		fmt.Println("melt message: ", msg)
 
-		pubkeys, err := p.Inputs[0].Pubkeys()
+		pubkeys, err := p.Inputs[0].PubkeysForVerification()
 		if err != nil {
 			return fmt.Errorf("p.Inputs[0].Pubkeys(). %w", err)
 		}
