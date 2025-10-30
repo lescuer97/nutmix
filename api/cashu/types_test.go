@@ -39,11 +39,9 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		t.Errorf("could not derive keyset id %+v", err)
 	}
 
-	blindingFactor := hex.EncodeToString((publicKeyBlindFactor.SerializeCompressed()))
-
 	blindMessage := BlindedMessage{
 		Amount: 1,
-		B_:     blindingFactor,
+		B_:     publicKeyBlindFactor,
 		Id:     keysetId,
 	}
 
@@ -258,6 +256,55 @@ func TestCashuAmountConvertEURStrError(t *testing.T) {
 	}
 }
 
+func TestBlindedMessageUnmarshalJSON(t *testing.T) {
+	// Example valid hex-encoded public key (compressed format)
+	validPubKeyHex := "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834"
+
+	// JSON input with a valid B_ field
+	jsonInput := `{
+		"amount": 100,
+		"keyset_id": "example-keyset-id",
+		"B_": "` + validPubKeyHex + `"
+	}`
+
+	// Unmarshal the JSON into a BlindedMessage
+	var msg BlindedMessage
+	err := json.Unmarshal([]byte(jsonInput), &msg)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
+
+	// Verify the parsed public key
+	pubkeyBytes, err := hex.DecodeString(validPubKeyHex)
+	if err != nil {
+		t.Fatalf("could not decode hex string. %v", err)
+	}
+	expectedPubKey, err := secp256k1.ParsePubKey(pubkeyBytes)
+	if err != nil {
+		t.Fatalf("Failed to parse expected public key: %v", err)
+	}
+
+	if !msg.B_.IsEqual(expectedPubKey) {
+		t.Errorf("BlindedSecret does not match expected public key")
+	}
+
+	if hex.EncodeToString(msg.B_.SerializeCompressed()) != validPubKeyHex {
+		t.Errorf("SerializeCompressed doesn't do what I thought")
+	}
+
+	// Test invalid JSON input
+	invalidJsonInput := `{
+		"amount": 100,
+		"keyset_id": "example-keyset-id",
+		"B_": "invalid-hex-string"
+	}`
+
+	err = json.Unmarshal([]byte(invalidJsonInput), &msg)
+	if err == nil {
+		t.Errorf("Expected error for invalid hex string, but got none")
+	}
+}
+
 // TEST VECTORS NUT 20 - Signature on Mint Quote
 // https://github.com/cashubtc/nuts/blob/main/20.md#
 
@@ -315,10 +362,10 @@ func TestNut20SuccessfulSignature(t *testing.T) {
 	if request.Quote != "9d745270-1405-46de-b5c5-e2762b4f5e00" {
 		t.Errorf("quote not parsed correctly")
 	}
-	if request.Outputs[0].B_ != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
+	if hex.EncodeToString(request.Outputs[0].B_.SerializeCompressed()) != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
 		t.Errorf("First output not parsed correctly")
 	}
-	if request.Outputs[len(request.Outputs)-1].B_ != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
+	if hex.EncodeToString(request.Outputs[len(request.Outputs)-1].B_.SerializeCompressed()) != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
 		t.Errorf("last output not parsed correctly")
 	}
 
@@ -385,10 +432,10 @@ func TestNut20FailureSignature(t *testing.T) {
 	if request.Quote != "9d745270-1405-46de-b5c5-e2762b4f5e00" {
 		t.Errorf("quote not parsed correctly")
 	}
-	if request.Outputs[0].B_ != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
+	if hex.EncodeToString(request.Outputs[0].B_.SerializeCompressed()) != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
 		t.Errorf("First output not parsed correctly")
 	}
-	if request.Outputs[len(request.Outputs)-1].B_ != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
+	if hex.EncodeToString(request.Outputs[len(request.Outputs)-1].B_.SerializeCompressed()) != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
 		t.Errorf("last output not parsed correctly")
 	}
 

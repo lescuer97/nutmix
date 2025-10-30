@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
+	"database/sql/driver"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -92,10 +94,10 @@ func UnitFromString(s string) (Unit, error) {
 var AvailableSeeds []Unit = []Unit{Sat}
 
 type BlindedMessage struct {
-	Amount  uint64 `json:"amount"`
-	Id      string `json:"id"`
-	B_      string `json:"B_"`
-	Witness string `json:"witness,omitempty" db:"witness"`
+	Amount  uint64               `json:"amount"`
+	Id      string               `json:"id"`
+	B_      *secp256k1.PublicKey `json:"B_"`
+	Witness string               `json:"witness,omitempty" db:"witness"`
 }
 
 func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey]bool) error {
@@ -110,13 +112,8 @@ func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey
 		return fmt.Errorf("json.Unmarshal([]byte(b.Witness), &p2pkWitness)  %w", err)
 	}
 
-	decodedBlindFactor, err := hex.DecodeString(b.B_)
-
-	if err != nil {
-		return fmt.Errorf("hex.DecodeString(b.B_)  %w", err)
-	}
-
-	hash := sha256.Sum256(decodedBlindFactor)
+	serializedPubKey := b.B_.SerializeCompressed()
+	hash := sha256.Sum256(serializedPubKey)
 
 	for _, sig := range p2pkWitness.Signatures {
 		for pubkey := range pubkeys {
@@ -132,19 +129,8 @@ func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey
 }
 
 func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
-	decodedBlindFactor, err := hex.DecodeString(b.B_)
 
-	if err != nil {
-		return BlindSignature{}, fmt.Errorf("DecodeString: %w", err)
-	}
-
-	B_, err := secp256k1.ParsePubKey(decodedBlindFactor)
-
-	if err != nil {
-		return BlindSignature{}, fmt.Errorf("ParsePubKey: %w", err)
-	}
-
-	C_ := crypto.SignBlindedMessage(B_, k)
+	C_ := crypto.SignBlindedMessage(b.B_, k)
 
 	blindSig := BlindSignature{
 		Amount: b.Amount,
@@ -152,13 +138,62 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 		C_:     hex.EncodeToString(C_.SerializeCompressed()),
 	}
 
-	err = blindSig.GenerateDLEQ(B_, k)
-
+	err := blindSig.GenerateDLEQ(b.B_, k)
 	if err != nil {
 		return blindSig, fmt.Errorf("blindSig.GenerateDLEQ: %w", err)
 	}
 
 	return blindSig, nil
+}
+
+func (b *BlindedMessage) UnmarshalJSON(data []byte) error {
+	// Define an alias to avoid infinite recursion
+	type Alias BlindedMessage
+	aux := &struct {
+		B_ string `json:"B_"` // Temporarily hold B_ as a string
+		*Alias
+	}{
+		Alias: (*Alias)(b),
+	}
+
+	// Unmarshal into the auxiliary struct
+	if err := json.Unmarshal(data, aux); err != nil {
+		return errors.Join(ErrInvalidBlindMessage, err)
+	}
+
+	// Decode the hex string into bytes
+	decoded, err := hex.DecodeString(aux.B_)
+	if err != nil {
+		return errors.Join(ErrInvalidBlindMessage, err)
+	}
+
+	// Parse the bytes into a secp256k1.PublicKey
+	pubKey, err := secp256k1.ParsePubKey(decoded)
+	if err != nil {
+		return errors.Join(ErrInvalidBlindMessage, err)
+	}
+
+	// Assign the parsed public key to the struct
+	b.B_ = pubKey
+	return nil
+}
+
+func (b *BlindedMessage) MarshalJSON() ([]byte, error) {
+	// Serialize the public key to a hex-encoded string
+	var blindedSecretHex string
+	if b.B_ != nil {
+		blindedSecretHex = hex.EncodeToString(b.B_.SerializeCompressed())
+	}
+
+	// Create a temporary struct for JSON encoding
+	type Alias BlindedMessage
+	return json.Marshal(&struct {
+		B_ string `json:"B_"`
+		*Alias
+	}{
+		B_:    blindedSecretHex,
+		Alias: (*Alias)(b),
+	})
 }
 
 type BlindSignature struct {
@@ -393,7 +428,7 @@ func (p *PostMintBolt11Request) UnmarshalJSON(data []byte) error {
 		Signature *string          `json:"signature,omitempty"`
 	}
 	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("could not marshall into aux struc for PostMintBolt11Request: %w", err)
+		return fmt.Errorf("could not marshall into PostMintBolt11Request: %w", err)
 	}
 
 	p.Outputs = aux.Outputs
@@ -421,11 +456,13 @@ func (p *PostMintBolt11Request) VerifyPubkey(pubkey *secp256k1.PublicKey) (bool,
 		return false, fmt.Errorf("signature not available for verification. %w", ErrMintQuoteNoValidSignature)
 	}
 
-	msg := p.Quote
+	var msg strings.Builder
+	msg.WriteString(p.Quote)
 	for _, output := range p.Outputs {
-		msg += output.B_
+		B_Hex := hex.EncodeToString(output.B_.SerializeCompressed())
+		msg.WriteString(B_Hex)
 	}
-	hash := sha256.Sum256([]byte(msg))
+	hash := sha256.Sum256([]byte(msg.String()))
 
 	return p.Signature.Verify(hash[:], pubkey), nil
 }
@@ -483,10 +520,12 @@ type PostCheckStateResponse struct {
 	States []CheckState `json:"states"`
 }
 
+// TODO: because of the db tag we need a custom driver.Value and sql.Scanner, so we are wrapping
+// secp256k1.PublicKey and secp256k1.PrivateKey
 type RecoverSigDB struct {
 	Amount    uint64              `json:"amount"`
 	Id        string              `json:"id"`
-	B_        string              `json:"B_" db:"B_"`
+	B_        WrappedPublicKey    `json:"B_" db:"B_"`
 	C_        string              `json:"C_" db:"C_"`
 	CreatedAt int64               `json:"created_at" db:"created_at"`
 	Dleq      *BlindSignatureDLEQ `json:"dleq,omitempty"`
@@ -502,7 +541,7 @@ func (r RecoverSigDB) GetBlindedMessage() BlindedMessage {
 	return BlindedMessage{
 		Amount: r.Amount,
 		Id:     r.Id,
-		B_:     r.B_,
+		B_:     r.B_.PublicKey,
 	}
 }
 
@@ -705,10 +744,10 @@ func (b *BlindSignature) VerifyDLEQ(
 }
 
 type MeltChange struct {
-	B_        string `db:"B_"`
-	Id        string `db:"id"`
-	Quote     string `db:"quote"`
-	CreatedAt int64  `json:"created_at" db:"created_at"`
+	B_        WrappedPublicKey `db:"B_"`
+	Id        string           `db:"id"`
+	Quote     string           `db:"quote"`
+	CreatedAt int64            `json:"created_at" db:"created_at"`
 }
 
 type Amount struct {
@@ -764,4 +803,76 @@ func (a *Amount) CentsToUSD() (string, error) {
 	}
 	dollars := float64(a.Amount) / 100
 	return fmt.Sprintf("%.2f", dollars), nil
+}
+
+type WrappedPublicKey struct {
+	*secp256k1.PublicKey
+}
+
+type PrivateKey struct {
+	*secp256k1.PrivateKey
+}
+
+func (p WrappedPublicKey) Value() (driver.Value, error) {
+	if p.PublicKey == nil {
+		return nil, nil
+	}
+	return hex.EncodeToString(p.PublicKey.SerializeCompressed()), nil
+}
+
+func (p *WrappedPublicKey) Scan(value interface{}) error {
+	if value == nil {
+		p.PublicKey = nil
+		return nil
+	}
+
+	strValue, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("failed to scan PublicKey: value is not a string")
+	}
+
+	decoded, err := hex.DecodeString(strValue)
+	if err != nil {
+		return fmt.Errorf("failed to decode hex string: %w", err)
+	}
+
+	pubKey, err := secp256k1.ParsePubKey(decoded)
+	if err != nil {
+		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	p.PublicKey = pubKey
+	return nil
+}
+
+func (p PrivateKey) Value() (driver.Value, error) {
+	if p.PrivateKey == nil {
+		return nil, nil
+	}
+	return hex.EncodeToString(p.PrivateKey.Serialize()), nil
+}
+
+func (p *PrivateKey) Scan(value interface{}) error {
+	if value == nil {
+		p.PrivateKey = nil
+		return nil
+	}
+
+	strValue, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("failed to scan PrivateKey: value is not a string")
+	}
+
+	decoded, err := hex.DecodeString(strValue)
+	if err != nil {
+		return fmt.Errorf("failed to decode hex string: %w", err)
+	}
+
+	privKey := secp256k1.PrivKeyFromBytes(decoded)
+	if privKey == nil {
+		return fmt.Errorf("failed to parse private key.")
+	}
+
+	p.PrivateKey = privKey
+	return nil
 }

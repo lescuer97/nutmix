@@ -281,8 +281,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	excesMintingBlindMessage[0].B_ = "badsig"
-
 	excessMintRequest := cashu.PostMintBolt11Request{
 		Quote:   postMintQuoteResponse.Quote,
 		Outputs: excesMintingBlindMessage,
@@ -290,7 +288,14 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	jsonRequestBody, _ = json.Marshal(excessMintRequest)
 
-	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
+	// validation of blindedMessages happens earlier on now the struct
+	// is a secp256k1 vs string. This will cause the error that B_ isn't
+	// on the curve.
+	origSig := hex.EncodeToString(excesMintingBlindMessage[0].B_.SerializeCompressed())
+	badSig := "0339c26071c6bb5593a20a5e8cb7d0bd8a9e2f8548e1db645b431678cb9dd6beef"
+	replacedRequestBody := strings.Replace(string(jsonRequestBody), origSig, badSig, 1)
+
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(replacedRequestBody))
 
 	w = httptest.NewRecorder()
 
@@ -746,8 +751,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 }
 
 func newBlindedMessage(id string, amount uint64, B_ *secp256k1.PublicKey) cashu.BlindedMessage {
-	B_str := hex.EncodeToString(B_.SerializeCompressed())
-	return cashu.BlindedMessage{Amount: amount, B_: B_str, Id: id}
+	return cashu.BlindedMessage{Amount: amount, B_: B_, Id: id}
 }
 
 // returns Blinded messages, secrets - [][]byte, and list of r
@@ -1060,8 +1064,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	excesMintingBlindMessage, _, _, err := CreateBlindedMessages(1000, activeKeys)
 
-	excesMintingBlindMessage[0].B_ = "badsig"
-
 	excessMintRequest := cashu.PostMintBolt11Request{
 		Quote:   postMintQuoteResponse.Quote,
 		Outputs: excesMintingBlindMessage,
@@ -1069,7 +1071,14 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	jsonRequestBody, _ = json.Marshal(excessMintRequest)
 
-	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
+	// validation of blindedMessages happens earlier on now the struct
+	// is a secp256k1 vs string. This will cause the error that B_ isn't
+	// able to parse due to hex encoding.
+	origSig := hex.EncodeToString(excesMintingBlindMessage[0].B_.SerializeCompressed())
+	badSig := "badsig"
+	replacedRequestBody := strings.Replace(string(jsonRequestBody), origSig, badSig, 1)
+
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(replacedRequestBody))
 
 	w = httptest.NewRecorder()
 
@@ -1102,7 +1111,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	router.ServeHTTP(w, req)
 
 	if w.Code != 403 {
-		t.Fatalf("Expected status code 400, got %d", w.Code)
+		t.Fatalf("Expected status code 403, got %d", w.Code)
 	}
 
 	if w.Body.String() != `"Amounts in outputs are not the same"` {

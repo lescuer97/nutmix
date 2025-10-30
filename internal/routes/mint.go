@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 
@@ -385,7 +386,8 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		blindingFactors := []string{}
 
 		for _, output := range restoreRequest.Outputs {
-			blindingFactors = append(blindingFactors, output.B_)
+			B_Hex := hex.EncodeToString(output.B_.SerializeCompressed())
+			blindingFactors = append(blindingFactors, B_Hex)
 		}
 
 		ctx := context.Background()

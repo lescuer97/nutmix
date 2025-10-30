@@ -238,21 +238,8 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit uint)
 }
 
 func (l *LocalSigner) signBlindMessage(k *secp256k1.PrivateKey, message cashu.BlindedMessage) (cashu.BlindSignature, error) {
-	var blindSignature cashu.BlindSignature
 
-	decodedBlindFactor, err := hex.DecodeString(message.B_)
-
-	if err != nil {
-		return blindSignature, fmt.Errorf("DecodeString: %w", err)
-	}
-
-	B_, err := secp256k1.ParsePubKey(decodedBlindFactor)
-
-	if err != nil {
-		return blindSignature, fmt.Errorf("ParsePubKey: %w", err)
-	}
-
-	C_ := crypto.SignBlindedMessage(B_, k)
+	C_ := crypto.SignBlindedMessage(message.B_, k)
 
 	blindSig := cashu.BlindSignature{
 		Amount: message.Amount,
@@ -260,7 +247,7 @@ func (l *LocalSigner) signBlindMessage(k *secp256k1.PrivateKey, message cashu.Bl
 		C_:     hex.EncodeToString(C_.SerializeCompressed()),
 	}
 
-	err = blindSig.GenerateDLEQ(B_, k)
+	err := blindSig.GenerateDLEQ(message.B_, k)
 
 	if err != nil {
 		return blindSig, fmt.Errorf("blindSig.GenerateDLEQ: %w", err)
@@ -286,7 +273,7 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 			Amount:    output.Amount,
 			Id:        output.Id,
 			C_:        blindSignature.C_,
-			B_:        output.B_,
+			B_:        cashu.WrappedPublicKey{PublicKey: output.B_},
 			Dleq:      blindSignature.Dleq,
 			CreatedAt: time.Now().Unix(),
 		}

@@ -2,9 +2,11 @@ package mint
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"testing"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
@@ -137,7 +139,11 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}
-	outputs := []cashu.BlindedMessage{{Id: "00bfa73302d12ffd", B_: "blind1"}, {Id: "00bfa73302d12ffd", B_: "blind2"}, {Id: "00bfa73302d12ffd", B_: "blind2"}}
+	b_bytes1, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2")
+	B_1, err := secp256k1.ParsePubKey(b_bytes1)
+	b_bytes2, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107bb2")
+	B_2, err := secp256k1.ParsePubKey(b_bytes2)
+	outputs := []cashu.BlindedMessage{{Id: "00bfa73302d12ffd", B_: B_1}, {Id: "00bfa73302d12ffd", B_: B_2}, {Id: "00bfa73302d12ffd", B_: B_2}}
 
 	tx, err := mint.MintDB.GetTx(context.Background())
 	if err != nil {

@@ -2,6 +2,7 @@ package mint
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -87,22 +88,19 @@ func (m *Mint) VerifyOutputs(tx pgx.Tx, outputs []cashu.BlindedMessage, keys []c
 	}
 
 	outputsMap := make(map[string]bool)
+	blindingFactors := []string{}
 
-	// Check if there is a repeated output
+	// Check if there is a repeated output, if not add it to the blindingFactors
 	for _, output := range outputs {
-		exists, _ := outputsMap[output.B_]
-
+		outputKey := hex.EncodeToString(output.B_.SerializeCompressed())
+		exists := outputsMap[outputKey]
 		if exists {
 			return unit, cashu.ErrRepeatedOutput
 		}
-		outputsMap[output.B_] = true
+		outputsMap[outputKey] = true
+		blindingFactors = append(blindingFactors, outputKey)
 	}
 
-	// check if it has been signed before
-	blindingFactors := []string{}
-	for _, output := range outputs {
-		blindingFactors = append(blindingFactors, output.B_)
-	}
 	blindRecoverySigs, err := m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)
 	if err != nil {
 		return unit, fmt.Errorf("m.GetRestorySigsFromBlindFactor(blindingFactors). %w", err)

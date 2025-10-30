@@ -134,7 +134,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 
 				var blindMessages []cashu.BlindedMessage
 				for _, v := range changeMessages {
-					blindMessages = append(blindMessages, cashu.BlindedMessage{Id: v.Id, B_: v.Id})
+					blindMessages = append(blindMessages, cashu.BlindedMessage{Id: v.Id, B_: v.B_.PublicKey})
 
 				}
 				sigs, err := m.GetChangeOutput(blindMessages, overpaidFees, quote.Unit)

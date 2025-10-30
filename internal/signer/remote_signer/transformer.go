@@ -37,10 +37,8 @@ func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.Blinded
 	}
 
 	for i, val := range messages {
-		B_, err := hex.DecodeString(val.B_)
-		if err != nil {
-			return &messagesGrpc, fmt.Errorf("hex.DecodeString(val.B_). %w", err)
-		}
+		B_ := val.B_.SerializeCompressed()
+
 		idBytes, err := hex.DecodeString(val.Id)
 		if err != nil {
 			return &messagesGrpc, fmt.Errorf("hex.DecodeString(val.Id). %w", err)

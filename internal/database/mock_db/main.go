@@ -2,7 +2,9 @@ package mockdb
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jackc/pgx/v5"
@@ -293,21 +295,30 @@ func (m *MockDB) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.Proo
 
 func (m *MockDB) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error) {
 	var restore []cashu.RecoverSigDB
-	for i := 0; i < len(B_); i++ {
-
-		blindMessage := B_[i]
-
-		for j := 0; j < len(m.RecoverSigDB); j++ {
-
-			if blindMessage == m.RecoverSigDB[j].B_ {
-				restore = append(restore, m.RecoverSigDB[j])
-
+	for _, blindMessage := range B_ {
+		for _, record := range m.RecoverSigDB {
+			B_Hex := hex.EncodeToString(record.B_.SerializeCompressed())
+			if blindMessage == B_Hex {
+				restore = append(restore, record)
 			}
-
 		}
-
 	}
-
+	// TODO: remove this
+	// for i := 0; i < len(B_); i++ {
+	//
+	// 	blindMessage := B_[i]
+	//
+	// 	for j := 0; j < len(m.RecoverSigDB); j++ {
+	// 		B_Hex := hex.EncodeToString(m.RecoverSigDB[j].B_.SerializeCompressed())
+	// 		if blindMessage == B_Hex {
+	// 			restore = append(restore, m.RecoverSigDB[j])
+	//
+	// 		}
+	//
+	// 	}
+	//
+	// }
+	//
 	return restore, nil
 }
 
