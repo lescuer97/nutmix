@@ -254,6 +254,10 @@ func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 		return errors.Join(ErrInvalidHexPreimage, err)
 	}
 
+	if len(preImageBytes) != 32 {
+		return ErrInvalidPreimage
+	}
+
 	parsedPreimage := sha256.Sum256(preImageBytes)
 
 	if hex.EncodeToString(parsedPreimage[:]) != sc.Data.Data {
