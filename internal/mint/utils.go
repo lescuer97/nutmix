@@ -188,6 +188,11 @@ func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
 			}
 
 		}
+		if !isLocked {
+			if len(proof.Secret) != 64 {
+				return cashu.ErrCommonSecretNotCorrectSize
+			}
+		}
 	}
 	err := m.Signer.VerifyProofs(proofs)
 	if err != nil {
