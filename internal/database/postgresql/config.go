@@ -41,7 +41,9 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
             mint_auth_clear_auth_urls,
             mint_auth_blind_auth_urls,
             strike_key,
-            strike_endpoint
+            strike_endpoint,
+            icon_url,
+            tos_url
          FROM config WHERE id = 1`)
 	defer rows.Close()
 
@@ -96,8 +98,10 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
             mint_auth_clear_auth_urls,
             mint_auth_blind_auth_urls,
 			strike_key,
-			strike_endpoint
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,$26,$27, $28, $29,$30,$31)`
+			strike_endpoint,
+			icon_url,
+			tos_url
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,$26,$27, $28, $29,$30,$31,$32,$33)`
 
 	for {
 		tries += 1
@@ -133,6 +137,8 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
 			config.MINT_AUTH_BLIND_AUTH_URLS,
 			config.STRIKE_KEY,
 			config.STRIKE_ENDPOINT,
+			config.IconUrl,
+			config.TosUrl,
 		)
 
 		switch {
@@ -182,7 +188,9 @@ func (pql Postgresql) UpdateConfig(config utils.Config) error {
             mint_auth_clear_auth_urls = $27,
             mint_auth_blind_auth_urls = $28,
             strike_key = $29,
-            strike_endpoint = $30
+            strike_endpoint = $30,
+            icon_url = $31,
+            tos_url = $32
         WHERE id = 1`
 		_, err := pql.pool.Exec(context.Background(), stmt,
 			config.NAME,
@@ -215,6 +223,8 @@ func (pql Postgresql) UpdateConfig(config utils.Config) error {
 			config.MINT_AUTH_BLIND_AUTH_URLS,
 			config.STRIKE_KEY,
 			config.STRIKE_ENDPOINT,
+			config.IconUrl,
+			config.TosUrl,
 		)
 
 		switch {
