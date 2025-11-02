@@ -33,6 +33,11 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 			return ErrNoValidSignatures
 		}
 
+		err = firstSpendCondition.CheckValid()
+		if err != nil {
+			return fmt.Errorf("firstSpendCondition.CheckValid(). %w", err)
+		}
+
 		// check tha conditions are met
 		err = p.verifyConditions()
 		if err != nil {
