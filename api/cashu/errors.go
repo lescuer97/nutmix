@@ -3,14 +3,15 @@ package cashu
 import "errors"
 
 var (
-	ErrMeltAlreadyPaid           = errors.New("Melt already Paid")
-	ErrQuoteIsPending            = errors.New("Quote is pending")
-	ErrUnitNotSupported          = errors.New("Unit not supported")
-	ErrDifferentInputOutputUnit  = errors.New("Different input output unit")
-	ErrNotEnoughtProofs          = errors.New("Not enought proofs")
-	ErrProofSpent                = errors.New("Proof already spent")
-	ErrBlindMessageAlreadySigned = errors.New("Blind message already signed")
-	ErrUnknown                   = errors.New("Unknown error")
+	ErrMeltAlreadyPaid            = errors.New("Melt already Paid")
+	ErrQuoteIsPending             = errors.New("Quote is pending")
+	ErrUnitNotSupported           = errors.New("Unit not supported")
+	ErrDifferentInputOutputUnit   = errors.New("Different input output unit")
+	ErrNotEnoughtProofs           = errors.New("Not enought proofs")
+	ErrProofSpent                 = errors.New("Proof already spent")
+	ErrBlindMessageAlreadySigned  = errors.New("Blind message already signed")
+	ErrCommonSecretNotCorrectSize = errors.New("Proof secret is not correct size")
+	ErrUnknown                    = errors.New("Unknown error")
 )
 
 type ErrorCode int
