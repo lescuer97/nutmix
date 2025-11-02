@@ -105,6 +105,14 @@ func (sc *SpendCondition) String() (string, error) {
 	return str, nil
 }
 
+func (sc *SpendCondition) CheckValid() error {
+	if len(sc.Data.Tags.Pubkeys)+len(sc.Data.Tags.Pubkeys) > 10 {
+		return ErrInvalidSpendCondition
+	}
+
+	return nil
+}
+
 type SpendConditionType int
 
 const (
@@ -252,6 +260,10 @@ func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 
 	if err != nil {
 		return errors.Join(ErrInvalidHexPreimage, err)
+	}
+
+	if len(preImageBytes) != 32 {
+		return ErrInvalidPreimage
 	}
 
 	parsedPreimage := sha256.Sum256(preImageBytes)

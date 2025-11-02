@@ -292,8 +292,8 @@ func (p Proof) IsProofSpendConditioned() (bool, *SpendCondition, error) {
 	spendCondition, err := p.parseSpendCondition()
 	if err != nil {
 		return false, nil, fmt.Errorf("p.parseSpendCondition(). %w", err)
-
 	}
+
 	return true, spendCondition, nil
 }
 

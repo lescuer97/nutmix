@@ -52,7 +52,8 @@ func ExtractPasswordNonce(htmlContent string) (string, error) {
 	}
 	traverse(doc)
 
-	return result, nil}
+	return result, nil
+}
 
 func TestSetupMintAdminLoginSuccess(t *testing.T) {
 	const posgrespassword = "password"
@@ -111,12 +112,10 @@ func TestSetupMintAdminLoginSuccess(t *testing.T) {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
-
 	nonces, err := ExtractPasswordNonce(w.Body.String())
 	if err != nil {
 		t.Fatalf("extractNonces(w.Body.String()): %v", err)
 	}
-
 
 	// sign nonce with admin nostr privkey
 	eventToSign := nostr.Event{
@@ -202,7 +201,6 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-
 
 	nonces, err := ExtractPasswordNonce(w.Body.String())
 	if err != nil {
