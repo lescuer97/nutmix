@@ -168,6 +168,11 @@ func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
 			return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
 		}
 		if isLocked {
+
+			err = spendCondition.CheckValid()
+			if err != nil {
+				return fmt.Errorf("spendCondition.CheckValid(). %w", err)
+			}
 			switch spendCondition.Type {
 			case cashu.P2PK:
 				valid, err := proof.VerifyP2PK(spendCondition)

@@ -106,6 +106,10 @@ func (p *PostMeltBolt11Request) ValidateSigflag() error {
 		if firstWitness.Signatures == nil {
 			return ErrNoValidSignatures
 		}
+		err = firstSpendCondition.CheckValid()
+		if err != nil {
+			return fmt.Errorf("firstSpendCondition.CheckValid(). %w", err)
+		}
 
 		// check the conditions are met
 		err = p.verifyConditions()
