@@ -383,4 +383,3 @@ version-patch:
     # Write new version
     echo "$major.$minor.$patch" > VERSION
     echo "Version bumped to $major.$minor.$patch"
-
