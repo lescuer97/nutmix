@@ -2,7 +2,6 @@ package routes
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 
@@ -235,7 +234,8 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		err := c.BindJSON(&swapRequest)
 		if err != nil {
 			slog.Info("Incorrect body", slog.Any("error", err))
-			c.JSON(400, "Malformed body request")
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -386,8 +386,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		blindingFactors := []string{}
 
 		for _, output := range restoreRequest.Outputs {
-			B_Hex := hex.EncodeToString(output.B_.SerializeCompressed())
-			blindingFactors = append(blindingFactors, B_Hex)
+			blindingFactors = append(blindingFactors, output.B_.String())
 		}
 
 		ctx := context.Background()

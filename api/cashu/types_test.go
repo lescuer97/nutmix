@@ -41,7 +41,7 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 
 	blindMessage := BlindedMessage{
 		Amount: 1,
-		B_:     publicKeyBlindFactor,
+		B_:     WrappedPublicKey{PublicKey: publicKeyBlindFactor},
 		Id:     keysetId,
 	}
 
@@ -52,7 +52,7 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		t.Errorf("could GenerateBlindSignature %+v", err)
 	}
 
-	if blindSignature.C_ != "024b60ff45c5a4ef4630072a03eaabcb948beae56d034a3bba68dc8cda68845c5d" {
+	if blindSignature.C_.String() != "024b60ff45c5a4ef4630072a03eaabcb948beae56d034a3bba68dc8cda68845c5d" {
 		t.Errorf("blindSignature is not correct")
 	}
 
@@ -60,21 +60,11 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		t.Errorf("blindSignature id is not correct")
 	}
 
-	bytesC_, err := hex.DecodeString(blindSignature.C_)
-	if err != nil {
-		t.Errorf("could not decode hex %+v", err)
-	}
-
-	pubkeyC_, err := secp256k1.ParsePubKey(bytesC_)
-	if err != nil {
-		t.Errorf("could not secp256k1.ParsePubKey %+v", err)
-	}
-
-	unblindedFactor := crypto.UnblindSignature(pubkeyC_, privateKeyBlindFactor, generatedKeysets[1].PrivKey.PubKey())
+	unblindedFactor := crypto.UnblindSignature(blindSignature.C_.PublicKey, privateKeyBlindFactor, generatedKeysets[1].PrivKey.PubKey())
 
 	proof := Proof{
 		Amount: 1,
-		C:      hex.EncodeToString(unblindedFactor.SerializeCompressed()),
+		C:      WrappedPublicKey{PublicKey: unblindedFactor},
 		Secret: "secret",
 		Id:     keysetId,
 		Y:      "",
@@ -110,10 +100,19 @@ func TestGenerateDLEQ(t *testing.T) {
 		t.Errorf("secp256k1.ParsePubKey: %v", err)
 	}
 
-	C_ := "02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2"
+	c_bytes, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2")
+	if err != nil {
+		t.Errorf("error decoding c_: %v", err)
+	}
+
+	C_, err := secp256k1.ParsePubKey(c_bytes)
+
+	if err != nil {
+		t.Errorf("secp256k1.ParsePubKey: %v", err)
+	}
 
 	blindSignature := BlindSignature{
-		C_: C_,
+		C_: WrappedPublicKey{PublicKey: C_},
 	}
 
 	err = blindSignature.GenerateDLEQ(B_, a)
@@ -288,7 +287,7 @@ func TestBlindedMessageUnmarshalJSON(t *testing.T) {
 		t.Errorf("BlindedSecret does not match expected public key")
 	}
 
-	if hex.EncodeToString(msg.B_.SerializeCompressed()) != validPubKeyHex {
+	if msg.B_.String() != validPubKeyHex {
 		t.Errorf("SerializeCompressed doesn't do what I thought")
 	}
 
@@ -362,10 +361,10 @@ func TestNut20SuccessfulSignature(t *testing.T) {
 	if request.Quote != "9d745270-1405-46de-b5c5-e2762b4f5e00" {
 		t.Errorf("quote not parsed correctly")
 	}
-	if hex.EncodeToString(request.Outputs[0].B_.SerializeCompressed()) != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
+	if request.Outputs[0].B_.String() != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
 		t.Errorf("First output not parsed correctly")
 	}
-	if hex.EncodeToString(request.Outputs[len(request.Outputs)-1].B_.SerializeCompressed()) != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
+	if request.Outputs[len(request.Outputs)-1].B_.String() != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
 		t.Errorf("last output not parsed correctly")
 	}
 
@@ -432,10 +431,10 @@ func TestNut20FailureSignature(t *testing.T) {
 	if request.Quote != "9d745270-1405-46de-b5c5-e2762b4f5e00" {
 		t.Errorf("quote not parsed correctly")
 	}
-	if hex.EncodeToString(request.Outputs[0].B_.SerializeCompressed()) != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
+	if request.Outputs[0].B_.String() != "0342e5bcc77f5b2a3c2afb40bb591a1e27da83cddc968abdc0ec4904201a201834" {
 		t.Errorf("First output not parsed correctly")
 	}
-	if hex.EncodeToString(request.Outputs[len(request.Outputs)-1].B_.SerializeCompressed()) != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
+	if request.Outputs[len(request.Outputs)-1].B_.String() != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
 		t.Errorf("last output not parsed correctly")
 	}
 

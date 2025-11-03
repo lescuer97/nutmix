@@ -2,7 +2,6 @@ package mint
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -92,7 +91,7 @@ func (m *Mint) VerifyOutputs(tx pgx.Tx, outputs []cashu.BlindedMessage, keys []c
 
 	// Check if there is a repeated output, if not add it to the blindingFactors
 	for _, output := range outputs {
-		outputKey := hex.EncodeToString(output.B_.SerializeCompressed())
+		outputKey := output.B_.String()
 		exists := outputsMap[outputKey]
 		if exists {
 			return unit, cashu.ErrRepeatedOutput
@@ -147,7 +146,7 @@ func (m *Mint) VerifyInputsAndOutputs(tx pgx.Tx, proofs cashu.Proofs, outputs []
 
 	balance := (proofs.Amount() - (uint64(fee) + AmountSignature))
 	if balance != 0 {
-		return fmt.Errorf("(proofs.Amount() - (uint64(fee) + AmountSignature)). %w %w", err, cashu.ErrUnbalanced)
+		return fmt.Errorf("(proofs.Amount() - (uint64(fee) + AmountSignature)). %w", cashu.ErrUnbalanced)
 	}
 
 	err = m.verifyProofs(proofs)

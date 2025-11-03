@@ -291,7 +291,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	// validation of blindedMessages happens earlier on now the struct
 	// is a secp256k1 vs string. This will cause the error that B_ isn't
 	// on the curve.
-	origSig := hex.EncodeToString(excesMintingBlindMessage[0].B_.SerializeCompressed())
+	origSig := excesMintingBlindMessage[0].B_.String()
 	badSig := "0339c26071c6bb5593a20a5e8cb7d0bd8a9e2f8548e1db645b431678cb9dd6beef"
 	replacedRequestBody := strings.Replace(string(jsonRequestBody), origSig, badSig, 1)
 
@@ -309,10 +309,10 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
 	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
-		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
+		t.Errorf(`Expected code be Minting disables. Got:  %q`, errorResponse.Code)
 	}
 	if errorResponse.Error != "Proof could not be verified" {
-		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Error)
+		t.Errorf(`Expected code be Minting disables. Got:  %q`, errorResponse.Error)
 	}
 
 	// MINTING TESTING ENDS
@@ -422,17 +422,19 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
 
-	invalidSignatureProofs[0].C = "badSig"
-	invalidSignatureProofs[len(invalidSignatureProofs)-1].C = "badSig"
-
 	invalidSwapRequest := cashu.PostSwapRequest{
 		Inputs:  invalidSignatureProofs,
 		Outputs: swapInvalidSigBlindedMessages,
 	}
 
 	jsonRequestBody, _ = json.Marshal(invalidSwapRequest)
+	origProof := invalidSignatureProofs[0].C.String()
+	badSig = "badSig"
+	replacedRequestBody = strings.Replace(string(jsonRequestBody), origProof, badSig, 1)
+	origProof = invalidSignatureProofs[len(invalidSignatureProofs)-1].C.String()
+	replacedRequestBody = strings.Replace(replacedRequestBody, origProof, badSig, 1)
 
-	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(replacedRequestBody))
 
 	w = httptest.NewRecorder()
 
@@ -573,25 +575,27 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		Inputs: meltProofs,
 	}
 
-	InvalidProofsMeltRequest.Inputs[0].C = "badSig"
-
 	jsonRequestBody, _ = json.Marshal(InvalidProofsMeltRequest)
+	origProof = InvalidProofsMeltRequest.Inputs[0].C.String()
+	badSig = "badSig"
+	replacedRequestBody = strings.Replace(string(jsonRequestBody), origProof, badSig, 1)
 
-	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
+	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(replacedRequestBody))
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	if w.Code != 400 {
-		t.Errorf("Expected status code 403, got %d", w.Code)
+		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
-	var errorRes cashu.ErrorResponse
-	err = json.Unmarshal(w.Body.Bytes(), &errorRes)
+	errorResponse = cashu.ErrorResponse{}
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+
 	if err != nil {
-		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
-		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
+	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
+		t.Errorf("Expected Invalid Proof, got %v", errorResponse.Code)
 	}
 
 	w.Flush()
@@ -751,7 +755,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 }
 
 func newBlindedMessage(id string, amount uint64, B_ *secp256k1.PublicKey) cashu.BlindedMessage {
-	return cashu.BlindedMessage{Amount: amount, B_: B_, Id: id}
+	return cashu.BlindedMessage{Amount: amount, B_: cashu.WrappedPublicKey{PublicKey: B_}, Id: id}
 }
 
 // returns Blinded messages, secrets - [][]byte, and list of r
@@ -916,15 +920,6 @@ func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResp
 	// unblid the signatures and make proofs
 	for i, output := range signatures {
 
-		parsedBlindFactor, err := hex.DecodeString(output.C_)
-		if err != nil {
-			return nil, fmt.Errorf("Error decoding hex: %w", err)
-		}
-		blindedFactor, err := secp256k1.ParsePubKey(parsedBlindFactor)
-		if err != nil {
-			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
-		}
-
 		pubkeyStr := keyset.Keysets[0].Keys[output.Amount]
 		pubkeyBytes, err := hex.DecodeString(pubkeyStr)
 		if err != nil {
@@ -935,11 +930,9 @@ func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResp
 			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
-		C := crypto.UnblindSignature(blindedFactor, secretsKey[i], mintPublicKey)
+		C := crypto.UnblindSignature(output.C_.PublicKey, secretsKey[i], mintPublicKey)
 
-		hexC := hex.EncodeToString(C.SerializeCompressed())
-
-		proofs = append(proofs, cashu.Proof{Id: output.Id, Amount: output.Amount, C: hexC, Secret: secrets[i]})
+		proofs = append(proofs, cashu.Proof{Id: output.Id, Amount: output.Amount, C: cashu.WrappedPublicKey{PublicKey: C}, Secret: secrets[i]})
 	}
 
 	return proofs, nil
@@ -1074,7 +1067,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	// validation of blindedMessages happens earlier on now the struct
 	// is a secp256k1 vs string. This will cause the error that B_ isn't
 	// able to parse due to hex encoding.
-	origSig := hex.EncodeToString(excesMintingBlindMessage[0].B_.SerializeCompressed())
+	origSig := excesMintingBlindMessage[0].B_.String()
 	badSig := "badsig"
 	replacedRequestBody := strings.Replace(string(jsonRequestBody), origSig, badSig, 1)
 
@@ -1322,17 +1315,19 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Fatalf("could not createBlind message: %v", err)
 	}
 
-	invalidSignatureProofs[0].C = "badSig"
-	invalidSignatureProofs[len(invalidSignatureProofs)-1].C = "badSig"
-
 	invalidSwapRequest := cashu.PostSwapRequest{
 		Inputs:  invalidSignatureProofs,
 		Outputs: swapInvalidSigBlindedMessages,
 	}
 
 	jsonRequestBody, _ = json.Marshal(invalidSwapRequest)
+	origProof := invalidSignatureProofs[0].C.String()
+	badSig = "badSig"
+	replacedRequestBody = strings.Replace(string(jsonRequestBody), origProof, badSig, 1)
+	origProof = invalidSignatureProofs[len(invalidSignatureProofs)-1].C.String()
+	replacedRequestBody = strings.Replace(string(jsonRequestBody), origProof, badSig, 1)
 
-	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(string(jsonRequestBody)))
+	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(replacedRequestBody))
 
 	w = httptest.NewRecorder()
 
@@ -1499,11 +1494,12 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		Inputs: meltProofs,
 	}
 
-	InvalidProofsMeltRequest.Inputs[0].C = "badSig"
-
 	jsonRequestBody, _ = json.Marshal(InvalidProofsMeltRequest)
+	origSig = InvalidProofsMeltRequest.Inputs[0].C.String()
+	badSig = "badSig"
+	replacedRequestBody = strings.Replace(string(jsonRequestBody), origSig, badSig, 1)
 
-	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
+	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(replacedRequestBody))
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

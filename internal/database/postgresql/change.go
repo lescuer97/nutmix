@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-	"encoding/hex"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -19,8 +18,7 @@ func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, q
 
 	now := time.Now().Unix()
 	for _, sig := range change {
-		B_Hex := hex.EncodeToString(sig.B_.SerializeCompressed())
-		entries = append(entries, []any{B_Hex, now, sig.Id, quote})
+		entries = append(entries, []any{sig.B_.String(), now, sig.Id, quote})
 	}
 
 	for {

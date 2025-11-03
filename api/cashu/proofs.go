@@ -49,15 +49,15 @@ func (p *Proofs) SetQuoteReference(quote string) {
 }
 
 type Proof struct {
-	Amount  uint64     `json:"amount"`
-	Id      string     `json:"id"`
-	Secret  string     `json:"secret"`
-	C       string     `json:"C" db:"c"`
-	Y       string     `json:"Y" db:"y"`
-	Witness string     `json:"witness" db:"witness"`
-	SeenAt  int64      `json:"seen_at"`
-	State   ProofState `json:"state"`
-	Quote   *string    `json:"quote" db:"quote"`
+	Amount  uint64           `json:"amount"`
+	Id      string           `json:"id"`
+	Secret  string           `json:"secret"`
+	C       WrappedPublicKey `json:"C" db:"c"`
+	Y       string           `json:"Y" db:"y"`
+	Witness string           `json:"witness" db:"witness"`
+	SeenAt  int64            `json:"seen_at"`
+	State   ProofState       `json:"state"`
+	Quote   *string          `json:"quote" db:"quote"`
 }
 
 func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
@@ -362,5 +362,37 @@ func (p *Proof) AddPreimage(preimage string) error {
 	}
 
 	p.Witness = witnessStr
+	return nil
+}
+
+func (p *Proof) UnmarshalJSON(data []byte) error {
+	// Define an alias to avoid infinite recursion
+	type Alias Proof
+	aux := &struct {
+		C string `json:"C"` // Temporarily hold C as a string
+		*Alias
+	}{
+		Alias: (*Alias)(p),
+	}
+
+	// Unmarshal into the auxiliary struct
+	if err := json.Unmarshal(data, aux); err != nil {
+		return errors.Join(ErrInvalidProof, err)
+	}
+
+	// Decode the hex string into bytes
+	decoded, err := hex.DecodeString(aux.C)
+	if err != nil {
+		return errors.Join(ErrInvalidProof, err)
+	}
+
+	// Parse the bytes into a secp256k1.PublicKey
+	pubKey, err := secp256k1.ParsePubKey(decoded)
+	if err != nil {
+		return errors.Join(ErrInvalidProof, err)
+	}
+
+	// Assign the parsed public key to the struct
+	p.C = WrappedPublicKey{PublicKey: pubKey}
 	return nil
 }

@@ -303,22 +303,6 @@ func (m *MockDB) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]ca
 			}
 		}
 	}
-	// TODO: remove this
-	// for i := 0; i < len(B_); i++ {
-	//
-	// 	blindMessage := B_[i]
-	//
-	// 	for j := 0; j < len(m.RecoverSigDB); j++ {
-	// 		B_Hex := hex.EncodeToString(m.RecoverSigDB[j].B_.SerializeCompressed())
-	// 		if blindMessage == B_Hex {
-	// 			restore = append(restore, m.RecoverSigDB[j])
-	//
-	// 		}
-	//
-	// 	}
-	//
-	// }
-	//
 	return restore, nil
 }
 

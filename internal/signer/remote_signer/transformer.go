@@ -25,7 +25,15 @@ func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) []ca
 			E: secp256k1.PrivKeyFromBytes(val.Dleq.E),
 			S: secp256k1.PrivKeyFromBytes(val.Dleq.S),
 		}
-		blindSigs = append(blindSigs, cashu.BlindSignature{Amount: val.Amount, C_: hex.EncodeToString(val.BlindedSecret), Id: hex.EncodeToString(val.KeysetId), Dleq: &dleq})
+
+		// TODO: need to figure what to do with an error when ParsePubKey fails.
+		// C_ was C_: hex.EncodeToString(val.BlindedSecret)
+		C_, _ := secp256k1.ParsePubKey(val.BlindedSecret)
+		// C_, err := secp256k1.ParsePubKey(val.BlindedSecret)
+		// if err != nil {
+		// 	return blindSigs, err
+		// }
+		blindSigs = append(blindSigs, cashu.BlindSignature{Amount: val.Amount, C_: cashu.WrappedPublicKey{PublicKey: C_}, Id: hex.EncodeToString(val.KeysetId), Dleq: &dleq})
 	}
 
 	return blindSigs

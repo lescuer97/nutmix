@@ -234,7 +234,7 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 			Amount:    val.Amount,
 			Id:        val.Id,
 			C_:        val.C_,
-			B_:        cashu.WrappedPublicKey{PublicKey: messages[i].B_},
+			B_:        messages[i].B_,
 			CreatedAt: now,
 			Dleq:      val.Dleq,
 		})
@@ -252,10 +252,7 @@ func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {
 	proofsVericationRequest.Proof = make([]*sig.Proof, len(proofs))
 	for i, val := range proofs {
 
-		C, err := hex.DecodeString(val.C)
-		if err != nil {
-			return fmt.Errorf("hex.DecodeString(val.C). %w", err)
-		}
+		C := val.C.SerializeCompressed()
 
 		bytesId, err := hex.DecodeString(val.Id)
 		if err != nil {

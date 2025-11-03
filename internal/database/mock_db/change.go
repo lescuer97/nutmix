@@ -9,7 +9,7 @@ func (m *MockDB) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote 
 
 	for _, v := range change {
 		m.MeltChange = append(m.MeltChange, cashu.MeltChange{
-			B_:    cashu.WrappedPublicKey{PublicKey: v.B_},
+			B_:    v.B_,
 			Id:    v.Id,
 			Quote: quote,
 		})

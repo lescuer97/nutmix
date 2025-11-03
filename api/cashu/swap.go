@@ -1,7 +1,6 @@
 package cashu
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -132,8 +131,7 @@ func (p *PostSwapRequest) makeSigAllMsg() string {
 		msg.WriteString(proof.Secret)
 	}
 	for _, blindMessage := range p.Outputs {
-		B_Hex := hex.EncodeToString(blindMessage.B_.SerializeCompressed())
-		msg.WriteString(B_Hex)
+		msg.WriteString(blindMessage.B_.String())
 	}
 	return msg.String()
 }

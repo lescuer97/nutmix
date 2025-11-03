@@ -1,7 +1,6 @@
 package cashu
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strings"
 )
@@ -168,8 +167,7 @@ func (p *PostMeltBolt11Request) makeSigAllMsg() string {
 		msg.WriteString(proof.Secret)
 	}
 	for _, blindMessage := range p.Outputs {
-		B_Hex := hex.EncodeToString(blindMessage.B_.SerializeCompressed())
-		msg.WriteString(B_Hex)
+		msg.WriteString(blindMessage.B_.String())
 	}
 	msg.WriteString(p.Quote)
 	return msg.String()
