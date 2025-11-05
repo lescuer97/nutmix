@@ -21,7 +21,7 @@ import (
 
 const AdminAuthKey = "admin-cookie"
 
-func AuthMiddleware(logger *slog.Logger, secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
+func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
 			// Check if token is blacklisted first
