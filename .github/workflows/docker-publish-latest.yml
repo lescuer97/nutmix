@@ -1,8 +1,8 @@
-name: Publish Docker image on tag
+name: Publish Docker image latest
 
 on:
   push:
-    tags: ['v*'] 
+    branches: [ master ]
 
 jobs:
   build-and-push:
@@ -33,8 +33,8 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/nutmix:${{ github.ref_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/nutmix:latest
 
       - name: Image details
         run: |
-          echo "Pushed image: ${{ secrets.DOCKERHUB_USERNAME }}/nutmix:${{ github.ref_name }}"
+          echo "Pushed image: ${{ secrets.DOCKERHUB_USERNAME }}/nutmix:latest"
