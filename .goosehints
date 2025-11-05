@@ -1,5 +1,8 @@
 This is a GO application that uses the GIN web framework  [gin docs](https://gin-gonic.com/en/docs/).
 
-The golang application has an administrative dashboard that uses templ. View documentation: [templ docs](https://templ.guide/) for html templating.
+The golang application has an administrative dashboard that uses templ. View documentation: [templ
+docs](https://templ.guide/) for html templating. htmx is used for dynamic updates.
 
 Never commit to code to git.
+
+use repomix to pack the code for better analysis. 

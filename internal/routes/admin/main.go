@@ -111,6 +111,12 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 			slog.Info("nip19.Decode(adminNpubStr)", slog.Any("error", err))
 			panic("invalid  ADMIN_NOSTR_NPUB ")
 		}
+	// Create token blacklist
+	tokenBlacklist := NewTokenBlacklist()
+
+	adminRoute.Use(ErrorHtmlMessageMiddleware(logger))
+	// I use the first active keyset as secret for jwt token signing
+	adminRoute.Use(AuthMiddleware(logger, loginKey.Serialize(), tokenBlacklist))
 
 		decodedKey, err := hex.DecodeString(value.(string))
 		if err != nil {
@@ -149,11 +155,12 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.GET("/settings", MintSettingsPage(mint))
 		adminRoute.GET("/bolt11", LightningNodePage(mint))
 
-		// change routes
+	// change routes
 		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
 		adminRoute.POST("/mintsettings", MintSettingsForm(mint))
 		adminRoute.POST("/bolt11", Bolt11Post(mint))
 		adminRoute.POST("/rotate/sats", RotateSatsSeed(mint))
+	adminRoute.POST("/logout", LogoutHandler(logger, tokenBlacklist))
 
 		// fractional html components
 		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint))

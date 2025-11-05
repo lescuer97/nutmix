@@ -72,12 +72,30 @@ nav {
   display: flex;
   flex-direction: row;
   gap: 10px;
+  align-items: center;
 }
 
 nav a {
   align-self: center;
   font-weight: 600;
   font-size: 20px;
+}
+
+.logout-button {
+  background-color: var(--color-primary-100);
+  color: var(--white);
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 0px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.logout-button:hover {
+  background-color: var(--color-primary-200);
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 1px 10px 0px;
 }
 
 a {
