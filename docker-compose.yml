@@ -5,11 +5,14 @@ services:
     restart: unless-stopped
     ports:
       - 80:80
-      - 443:443
+      - "443:443/tcp"   # For normal HTTPS
+      - "443:443/udp"   # Required for HTTP/3 (QUIC)
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.websecure.address=:443"
+      # Enable HTTP3 (QUIC)
+      - "--entrypoints.websecure.http3=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
