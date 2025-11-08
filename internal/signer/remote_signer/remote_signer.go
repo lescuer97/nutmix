@@ -20,7 +20,7 @@ type MintPublicKeyset struct {
 	Active      bool
 	Keys        map[uint64]string
 	InputFeePpk uint
-	Version     uint64
+	Version     uint32
 }
 
 type RemoteSigner struct {
