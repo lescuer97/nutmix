@@ -168,7 +168,7 @@ func (p *PostMeltBolt11Request) makeSigAllMsg() string {
 		message = message + proof.Secret + proof.C
 	}
 	for _, blindMessage := range p.Outputs {
-		message = message + strconv.FormatUint(blindMessage.Amount, 10) + blindMessage.Id + blindMessage.B_
+		message = message + strconv.FormatUint(blindMessage.Amount, 10) + blindMessage.B_
 	}
 	message = message + p.Quote
 	return message
