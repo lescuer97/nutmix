@@ -1,9 +1,10 @@
 syntax = "proto3";
 
-package proto_signer;
+package signatory;
+
 option go_package = "nutmix_remote_signer/proto_signer";
 
-service SignerService {
+service Signatory {
   rpc BlindSign(BlindedMessages) returns (BlindSignResponse);
   rpc VerifyProofs(Proofs) returns (BooleanResponse);
   // returns all the keysets for the mint
@@ -64,7 +65,7 @@ message KeySet {
   uint64 input_fee_ppk = 4;
   Keys keys = 5;
   uint64 version  = 6;
-  uint64 final_expiry  = 7;
+  optional uint64 final_expiry  = 7;
 }
 
 message Keys {
@@ -76,7 +77,7 @@ message RotationRequest {
   uint64 input_fee_ppk = 2;
   repeated uint64 amounts = 3;
   // unix timestamp for expiration
-  uint64 final_expiry = 4;
+  optional uint64 final_expiry = 4;
 }
 
 enum CurrencyUnitType {
@@ -108,16 +109,6 @@ message Proof {
   bytes c = 4;
 }
 
-message ProofDLEQ {
-  bytes e = 1;
-  bytes s = 2;
-  bytes r = 3;
-}
-
-message SigningResponse {
-  Error error = 1;
-  BlindSignatures blind_signatures = 2;
-}
 message BlindSignatures {
   repeated BlindSignature blind_signatures = 1;
 }
@@ -132,28 +123,6 @@ message BlindSignature {
 message BlindSignatureDLEQ {
   bytes e = 1;
   bytes s = 2;
-}
-
-// Witness type
-message Witness {
-  oneof witness_type {
-    P2PKWitness p2pk_witness = 1;
-    HTLCWitness htlc_witness = 2;
-  }
-}
-
-// P2PKWitness type
-message P2PKWitness {
-  // List of signatures
-  repeated string signatures = 1;
-}
-
-// HTLCWitness type
-message HTLCWitness {
-  // Preimage
-  string preimage = 1;
-  // List of signatures
-  repeated string signatures = 2;
 }
 
 enum ErrorCode {
