@@ -33,6 +33,7 @@ type LightningBackend interface {
 	GetNetwork() *chaincfg.Params
 	ActiveMPP() bool
 	VerifyUnitSupport(unit cashu.Unit) bool
+	DescriptionSupport() bool
 }
 
 type PaymentStatus uint

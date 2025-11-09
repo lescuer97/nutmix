@@ -40,9 +40,40 @@ func KeysetsLayoutPage(mint *m.Mint) gin.HandlerFunc {
 			c.JSON(500, "Server side error")
 			return
 		}
+		authKeysets, err := mint.Signer.GetAuthKeys()
+		if err != nil {
+			slog.Error("mint.Signer.GetAuthKeys()", slog.Any("error", err))
+			c.JSON(500, "Server side error")
+			return
+		}
 
 		keysetMap := make(map[string][]templates.KeysetData)
 		for _, seed := range keysets.Keysets {
+			val, exits := keysetMap[seed.Unit]
+			if exits {
+				val = append(val, templates.KeysetData{
+					Id:      seed.Id,
+					Active:  seed.Active,
+					Unit:    seed.Unit,
+					Fees:    seed.InputFeePpk,
+					Version: seed.Version,
+				})
+
+				keysetMap[seed.Unit] = val
+
+			} else {
+				keysetMap[seed.Unit] = []templates.KeysetData{
+					{
+						Id:      seed.Id,
+						Active:  seed.Active,
+						Unit:    seed.Unit,
+						Fees:    seed.InputFeePpk,
+						Version: seed.Version,
+					},
+				}
+			}
+		}
+		for _, seed := range authKeysets.Keysets {
 			val, exits := keysetMap[seed.Unit]
 			if exits {
 				val = append(val, templates.KeysetData{

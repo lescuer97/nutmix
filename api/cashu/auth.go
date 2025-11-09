@@ -68,8 +68,8 @@ func (a AuthProof) Proof(y string, state ProofState) Proof {
 
 type AuthClams struct {
 	Sub string  `json:"sub"`
-	Azp string  `json:"azp"`
-	Aud *string `json:"aud"`
+	ClientId string  `json:"client_id"`
+	Aud *[]string `json:"aud"`
 }
 
 type PostAuthBlindMintResponse struct {

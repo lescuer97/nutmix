@@ -24,8 +24,8 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-var correctPreimage = hex.EncodeToString([]byte("12345"))
-var incorrectPreimage = hex.EncodeToString([]byte("54321"))
+var correctPreimage = "0000000000000000000000000000000000000000000000000000000000000001"
+var incorrectPreimage = "0000000000000000000000000000000000000000000000000000000000000002"
 
 func TestRoutesHTLCSwapMelt(t *testing.T) {
 	const posgrespassword = "password"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -102,6 +103,11 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 				if mint.Config.PEG_IN_LIMIT_SATS != nil {
 					bolt11Method.MaxAmount = *mint.Config.PEG_IN_LIMIT_SATS
+				}
+
+				descriptionEnabled := mint.LightningBackend.DescriptionSupport()
+				bolt11Method.Options = &cashu.SwapMintMethodOptions{
+					Description: &descriptionEnabled,
 				}
 
 				nuts[nut] = cashu.SwapMintInfo{
@@ -211,13 +217,16 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 		response := cashu.GetInfoResponse{
 			Name:            mint.Config.NAME,
-			Version:         "nutmix/0.3.7",
+			Version:         "nutmix/0.3.9",
 			Pubkey:          mint.MintPubkey,
 			Description:     mint.Config.DESCRIPTION,
 			DescriptionLong: mint.Config.DESCRIPTION_LONG,
 			Motd:            mint.Config.MOTD,
 			Contact:         contacts,
 			Nuts:            nuts,
+			IconUrl: mint.Config.IconUrl,
+			TosUrl: mint.Config.TosUrl,
+			Time: time.Now().Unix() ,
 		}
 
 		c.JSON(200, response)

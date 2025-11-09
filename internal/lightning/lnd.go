@@ -402,8 +402,14 @@ func (l LndGrpcWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 	if err != nil {
 		return response, fmt.Errorf(`amount.To(cashu.Sat) %w`, err)
 	}
+
+	Lndinvoice := lnrpc.Invoice{Value: int64(amount.Amount), Expiry: 900}
+	if quote.Description != nil {
+		Lndinvoice.Memo = *quote.Description
+	}
+
 	// Expiry time is 15 minutes
-	res, err := client.AddInvoice(ctx, &lnrpc.Invoice{Value: int64(amount.Amount), Expiry: 900})
+	res, err := client.AddInvoice(ctx, &Lndinvoice)
 
 	if err != nil {
 		return response, err
@@ -447,4 +453,8 @@ func (f LndGrpcWallet) VerifyUnitSupport(unit cashu.Unit) bool {
 	} else {
 		return false
 	}
+}
+
+func (f LndGrpcWallet) DescriptionSupport() bool {
+	return true
 }

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
@@ -68,6 +70,25 @@ func isNostrKeyValid(nostrKey string) (bool, error) {
 
 }
 
+func validateURL(urlStr string) error {
+	if urlStr == "" {
+		return nil // Empty URL is valid (nil field)
+	}
+	
+	// Additional basic validation - try to parse URL
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %w", err)
+	}
+	
+	// Ensure it has a valid scheme and host
+	if parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return fmt.Errorf("URL must contain a valid scheme and host")
+	}
+	
+	return nil
+}
+
 func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
 	activateAuthStr := c.Request.PostFormValue("MINT_REQUIRE_AUTH")
 	activateAuth := false
@@ -117,9 +138,50 @@ func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
 	return nil
 }
 func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
-
 	return func(c *gin.Context) {
-		// check the different variables that could change
+		// Validate URL fields first
+		iconUrl := c.Request.PostFormValue("ICON_URL")
+		tosUrl := c.Request.PostFormValue("TOS_URL")
+		
+		iconUrl = strings.TrimSpace(iconUrl)
+		tosUrl = strings.TrimSpace(tosUrl)
+
+		// Validate Icon URL if provided
+		if iconUrl != "" {
+			if err := validateURL(iconUrl); err != nil {
+				errorMessage := ErrorNotif{
+					Error: fmt.Sprintf("Invalid Icon URL: %s", err.Error()),
+				}
+				c.HTML(200, "settings-error", errorMessage)
+				return
+			}
+		}
+		
+		// Validate TOS URL if provided
+		if tosUrl != "" {
+			if err := validateURL(tosUrl); err != nil {
+				errorMessage := ErrorNotif{
+					Error: fmt.Sprintf("Invalid Terms of Service URL: %s", err.Error()),
+				}
+				c.HTML(200, "settings-error", errorMessage)
+				return
+			}
+		}
+
+		// Set values after validation
+		if iconUrl == "" {
+			mint.Config.IconUrl = nil
+		} else {
+			mint.Config.IconUrl = &iconUrl
+		}
+
+		if tosUrl == "" {
+			mint.Config.TosUrl = nil
+		} else {
+			mint.Config.TosUrl = &tosUrl
+		}
+		
+		// Now process all other form fields
 		mint.Config.NAME = c.Request.PostFormValue("NAME")
 		mint.Config.DESCRIPTION = c.Request.PostFormValue("DESCRIPTION")
 		mint.Config.DESCRIPTION_LONG = c.Request.PostFormValue("DESCRIPTION_LONG")
@@ -129,7 +191,6 @@ func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
 		pegoutOnly := c.Request.PostFormValue("PEG_OUT_ONLY")
 		if pegoutOnly == "on" {
 			mint.Config.PEG_OUT_ONLY = true
-
 		} else {
 			mint.Config.PEG_OUT_ONLY = false
 		}

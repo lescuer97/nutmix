@@ -38,6 +38,8 @@ func StringToLightningBackend(text string) LightningBackend {
 
 type Config struct {
 	NAME             string `db:"name"`
+	IconUrl          *string `db:"icon_url,omitempty"`
+	TosUrl           *string `db:"tos_url,omitempty"`
 	DESCRIPTION      string `db:"description"`
 	DESCRIPTION_LONG string `db:"description_long"`
 	MOTD             string `db:"motd"`
@@ -80,6 +82,8 @@ type Config struct {
 func (c *Config) Default() {
 	c.NAME = ""
 	c.DESCRIPTION = ""
+	c.IconUrl = nil
+	c.TosUrl = nil
 	c.DESCRIPTION_LONG = ""
 	c.MOTD = ""
 	c.EMAIL = ""
@@ -113,6 +117,8 @@ func (c *Config) Default() {
 func (c *Config) UseEnviromentVars() {
 	c.NAME = os.Getenv("NAME")
 	c.DESCRIPTION = os.Getenv("DESCRIPTION")
+	c.IconUrl = nil
+	c.TosUrl = nil
 	c.DESCRIPTION_LONG = os.Getenv("DESCRIPTION_LONG")
 	c.MOTD = os.Getenv("MOTD")
 	c.EMAIL = os.Getenv("EMAIL")

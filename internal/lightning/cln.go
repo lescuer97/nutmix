@@ -351,6 +351,9 @@ func (l CLNGRPCWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 		Label:       randUuid.String(),
 		Description: "",
 	}
+	if quote.Description != nil {
+		req.Description = *quote.Description
+	}
 
 	// Expiry time is 15 minutes
 	res, err := client.Invoice(ctx, &req)
@@ -408,4 +411,7 @@ func (f CLNGRPCWallet) VerifyUnitSupport(unit cashu.Unit) bool {
 	} else {
 		return false
 	}
+}
+func (f CLNGRPCWallet) DescriptionSupport() bool {
+	return true
 }

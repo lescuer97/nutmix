@@ -2,12 +2,13 @@ package middleware
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/mint"
 	"log"
 	"log/slog"
 	"regexp"
+
+	"github.com/gin-gonic/gin"
+	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/mint"
 )
 
 // ClearAuthMiddleware creates a middleware that checks for the "clear auth" header
