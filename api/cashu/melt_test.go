@@ -1,6 +1,8 @@
 package cashu
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 )
@@ -8,21 +10,21 @@ import (
 // This are NUT-11 Test Vectors
 func TestMeltRequestMsg(t *testing.T) {
 	meltRequestJson := []byte(`{
-  "quote": "2fc40ad3-2f6a-4a7e-91fb-b8c2b5dc2bf7",
+  "quote": "cF8911fzT88aEi1d-6boZZkq5lYxbUSVs-HbJxK0",
   "inputs": [
     {
-      "amount": 0,
-      "id": "009a1f293253e41e",
-      "secret": "[\"P2PK\",{\"nonce\":\"1d0db9cbd2aa7370a3d6e0e3ce5714758ed7a085e2f8da9814924100e1fc622e\",\"data\":\"026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a\",\"tags\":[[\"pubkeys\",\"026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a\",\"03142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9\"],[\"n_sigs\",\"2\"],[\"sigflag\",\"SIG_ALL\"]]}]",
-      "C": "026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a",
-      "witness": "{\"signatures\":[\"b2077717cfe43086582679ce3fbe1802f9b8652f93828c2e1a75b9e553c0ab66cd14b9c5f6c45a098375fe6583e106c7ccdb1421636daf893576e15815f3483f\",\"179f687c2236c3d0767f3b2af88478cad312e7f76183fb5781754494709334c578c7232dc57017d06b9130a406f8e3ece18245064cda4ef66808ed3ff68c933e\"]}"
+      "amount": 2,
+      "id": "00bfa73302d12ffd",
+      "secret": "[\"P2PK\",{\"nonce\":\"bbf9edf441d17097e39f5095a3313ba24d3055ab8a32f758ff41c10d45c4f3de\",\"data\":\"029116d32e7da635c8feeb9f1f4559eb3d9b42d400f9d22a64834d89cde0eb6835\",\"tags\":[[\"sigflag\",\"SIG_ALL\"]]}]",
+      "C": "02a9d461ff36448469dccf828fa143833ae71c689886ac51b62c8d61ddaa10028b",
+      "witness": "{\"signatures\":[\"478224fbe715e34f78cb33451db6fcf8ab948afb8bd04ff1a952c92e562ac0f7c1cb5e61809410635be0aa94d0448f7f7959bd5762cc3802b0a00ff58b2da747\"]}"
     }
   ],
   "outputs": [
     {
       "amount": 0,
-      "id": "009a1f293253e41e",
-      "B_": "028b708cfd03b38bdc0a561008119594106f0c563061ae3fbfc8981b5595fd4e2b"
+      "id": "00bfa73302d12ffd",
+      "B_": "038ec853d65ae1b79b5cdbc2774150b2cb288d6d26e12958a16fb33c32d9a86c39"
     }
   ]
 }`)
@@ -33,30 +35,35 @@ func TestMeltRequestMsg(t *testing.T) {
 		t.Fatalf("could not marshall  %+v", meltRequestJson)
 	}
 	msg := meltRequest.makeSigAllMsg()
-	if msg != `["P2PK",{"nonce":"1d0db9cbd2aa7370a3d6e0e3ce5714758ed7a085e2f8da9814924100e1fc622e","data":"026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a","tags":[["pubkeys","026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a","03142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9"],["n_sigs","2"],["sigflag","SIG_ALL"]]}]028b708cfd03b38bdc0a561008119594106f0c563061ae3fbfc8981b5595fd4e2b2fc40ad3-2f6a-4a7e-91fb-b8c2b5dc2bf7` {
+	if msg != `["P2PK",{"nonce":"bbf9edf441d17097e39f5095a3313ba24d3055ab8a32f758ff41c10d45c4f3de","data":"029116d32e7da635c8feeb9f1f4559eb3d9b42d400f9d22a64834d89cde0eb6835","tags":[["sigflag","SIG_ALL"]]}]02a9d461ff36448469dccf828fa143833ae71c689886ac51b62c8d61ddaa10028b0038ec853d65ae1b79b5cdbc2774150b2cb288d6d26e12958a16fb33c32d9a86c39cF8911fzT88aEi1d-6boZZkq5lYxbUSVs-HbJxK0` {
 		t.Errorf("Message is not correct %v", msg)
+	}
 
+	hashMessage := sha256.Sum256([]byte(msg))
+
+	if hex.EncodeToString(hashMessage[:]) != "9efa1067cc7dc870f4074f695115829c3cd817a6866c3b84e9814adf3c3cf262" {
+		t.Errorf("hash message is wrong %v", msg)
 	}
 
 }
 
 func TestMeltRequestValidSignature(t *testing.T) {
 	meltRequestJson := []byte(`{
-  "quote": "0f983814-de91-46b8-8875-1b358a35298a",
+  "quote": "cF8911fzT88aEi1d-6boZZkq5lYxbUSVs-HbJxK0",
   "inputs": [
     {
-      "amount": 0,
-      "id": "009a1f293253e41e",
-      "secret": "[\"P2PK\",{\"nonce\":\"600050bd36cccdc71dec82e97679fa3e7712c22ea33cf4fe69d4d78223757e57\",\"data\":\"026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a\",\"tags\":[[\"pubkeys\",\"026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a\"],[\"sigflag\",\"SIG_ALL\"]]}]",
-      "C": "026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a",
-      "witness": "{\"signatures\":[\"b66c342654ccc95a62100f8f4a76afe1aea612c9c63383be3c7feb5110bb8eabe7ccaa9f117abd524be8c9a2e331e7d70248aeae337b9ce405625b3c49fc627d\"]}"
+      "amount": 2,
+      "id": "00bfa73302d12ffd",
+      "secret": "[\"P2PK\",{\"nonce\":\"bbf9edf441d17097e39f5095a3313ba24d3055ab8a32f758ff41c10d45c4f3de\",\"data\":\"029116d32e7da635c8feeb9f1f4559eb3d9b42d400f9d22a64834d89cde0eb6835\",\"tags\":[[\"sigflag\",\"SIG_ALL\"]]}]",
+      "C": "02a9d461ff36448469dccf828fa143833ae71c689886ac51b62c8d61ddaa10028b",
+      "witness": "{\"signatures\":[\"478224fbe715e34f78cb33451db6fcf8ab948afb8bd04ff1a952c92e562ac0f7c1cb5e61809410635be0aa94d0448f7f7959bd5762cc3802b0a00ff58b2da747\"]}"
     }
   ],
   "outputs": [
     {
       "amount": 0,
-      "id": "009a1f293253e41e",
-      "B_": "026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a"
+      "id": "00bfa73302d12ffd",
+      "B_": "038ec853d65ae1b79b5cdbc2774150b2cb288d6d26e12958a16fb33c32d9a86c39"
     }
   ]
 }`)
@@ -75,21 +82,21 @@ func TestMeltRequestValidSignature(t *testing.T) {
 
 func TestMeltRequestValidMultiSig(t *testing.T) {
 	meltRequestJson := []byte(`{
-  "quote": "2fc40ad3-2f6a-4a7e-91fb-b8c2b5dc2bf7",
+  "quote": "Db3qEMVwFN2tf_1JxbZp29aL5cVXpSMIwpYfyOVF",
   "inputs": [
     {
-      "amount": 0,
-      "id": "009a1f293253e41e",
-      "secret": "[\"P2PK\",{\"nonce\":\"1d0db9cbd2aa7370a3d6e0e3ce5714758ed7a085e2f8da9814924100e1fc622e\",\"data\":\"026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a\",\"tags\":[[\"pubkeys\",\"026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a\",\"03142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9\"],[\"n_sigs\",\"2\"],[\"sigflag\",\"SIG_ALL\"]]}]",
-      "C": "026f6a2b1d709dbca78124a9f30a742985f7eddd894e72f637f7085bf69b997b9a",
-      "witness": "{\"signatures\":[\"b2077717cfe43086582679ce3fbe1802f9b8652f93828c2e1a75b9e553c0ab66cd14b9c5f6c45a098375fe6583e106c7ccdb1421636daf893576e15815f3483f\",\"179f687c2236c3d0767f3b2af88478cad312e7f76183fb5781754494709334c578c7232dc57017d06b9130a406f8e3ece18245064cda4ef66808ed3ff68c933e\"]}"
+      "amount": 2,
+      "id": "00bfa73302d12ffd",
+      "secret": "[\"P2PK\",{\"nonce\":\"68d7822538740e4f9c9ebf5183ef6c4501c7a9bca4e509ce2e41e1d62e7b8a99\",\"data\":\"0394e841bd59aeadce16380df6174cb29c9fea83b0b65b226575e6d73cc5a1bd59\",\"tags\":[[\"pubkeys\",\"033d892d7ad2a7d53708b7a5a2af101cbcef69522bd368eacf55fcb4f1b0494058\"],[\"n_sigs\",\"2\"],[\"sigflag\",\"SIG_ALL\"]]}]",
+      "C": "03a70c42ec9d7192422c7f7a3ad017deda309fb4a2453fcf9357795ea706cc87a9",
+      "witness": "{\"signatures\":[\"ed739970d003f703da2f101a51767b63858f4894468cc334be04aa3befab1617a81e3eef093441afb499974152d279e59d9582a31dc68adbc17ffc22a2516086\",\"f9efe1c70eb61e7ad8bd615c50ff850410a4135ea73ba5fd8e12a734743ad045e575e9e76ea5c52c8e7908d3ad5c0eaae93337e5c11109e52848dc328d6757a2\"]}"
     }
   ],
   "outputs": [
     {
       "amount": 0,
-      "id": "009a1f293253e41e",
-      "B_": "028b708cfd03b38bdc0a561008119594106f0c563061ae3fbfc8981b5595fd4e2b"
+      "id": "00bfa73302d12ffd",
+      "B_": "038ec853d65ae1b79b5cdbc2774150b2cb288d6d26e12958a16fb33c32d9a86c39"
     }
   ]
 }`)
