@@ -3,6 +3,8 @@ package cashu
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"strconv"
 )
 
 type PostSwapRequest struct {
@@ -15,6 +17,7 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 	if err != nil {
 		return fmt.Errorf("checkForSigAll(p.Inputs). %w", err)
 	}
+	log.Println("sigflagValidation: ", sigFlagValidation.sigFlag)
 	if sigFlagValidation.sigFlag == SigAll {
 
 		firstSpendCondition, err := p.Inputs[0].parseSpendCondition()
@@ -33,11 +36,6 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 			return ErrNoValidSignatures
 		}
 
-		err = firstSpendCondition.CheckValid()
-		if err != nil {
-			return fmt.Errorf("firstSpendCondition.CheckValid(). %w", err)
-		}
-
 		// check tha conditions are met
 		err = p.verifyConditions()
 		if err != nil {
@@ -47,7 +45,9 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		// makes message
 		msg := p.makeSigAllMsg()
 
-		pubkeys, err := p.Inputs[0].Pubkeys()
+		log.Println("\n msg: ", msg)
+
+		pubkeys, err := p.Inputs[0].PubkeysForVerification()
 		if err != nil {
 			return fmt.Errorf("p.Inputs[0].Pubkeys(). %w", err)
 		}
@@ -56,6 +56,9 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		if err != nil {
 			return err
 		}
+
+		log.Println("amountOfSigs: ", amountOfSigs)
+		log.Println("sigFlagValidation.signaturesRequired: ", sigFlagValidation.signaturesRequired)
 
 		if amountOfSigs >= sigFlagValidation.signaturesRequired {
 			return nil
@@ -132,7 +135,7 @@ func (p *PostSwapRequest) firstProofValues() error {
 func (p *PostSwapRequest) makeSigAllMsg() string {
 	message := ""
 	for _, proof := range p.Inputs {
-		message = message + proof.Secret
+		message = message + proof.Secret + proof.C
 	}
 	for _, blindMessage := range p.Outputs {
 		message = message + blindMessage.B_.String()

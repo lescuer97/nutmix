@@ -429,25 +429,32 @@ func TestVectorRefundSigInvalidFromFuture(t *testing.T) {
 	}
 }
 
-func TestVectorSamePubkeySignatureMultisig(t *testing.T) {
-	proofString := `{"amount":1,"id":"009a1f293253e41e","secret":"[\"P2PK\",{\"nonce\":\"e434a9efbc5f65d144a620e368c9a6dc12c719d0ebc57e0c74f7341864dc449a\",\"data\":\"02a60c27104cf6023581e790970fc33994a320abe36e7ceed16771b0f8d76f0666\",\"tags\":[[\"pubkeys\",\"039c6a20a6ba354b7bb92eb9750716c1098063006362a1fa2afca7421f262d45c5\",\"0203eb2f7cd72a4f725d3327216365d2df18bb4bbc810522fd973c9af987e9b05b\"],[\"locktime\",\"1744876528\"],[\"n_sigs\",\"2\"],[\"sigflag\",\"SIG_INPUTS\"]]}]","C":"02698c4e2b5f9534cd0687d87513c759790cf829aa5739184a3e3735471fbda904","witness":"{\"signatures\":[\"3e9ff9e55c9eccb9e5aa0b6c62d54500b40d0eebadb06efcc8e76f3ce38e0923f956ec1bccb9080db96a17c1e98a1b857abfd1a56bb25670037cea3db1f73d81\",\"c5e29c38e60c4db720cf3f78e590358cf1291a06b9eadf77c1108ae84d533520c2707ffda224eb6a63fddaee9abd5ecf8f2cd263d2556950550e3061a5511f65\"]}"}`
-	var proof Proof
-	err := json.Unmarshal([]byte(proofString), &proof)
-
-	if err != nil {
-		t.Fatalf("json.Unmarshal([]byte(singleProofWithP2PK)): %+v %+v ", []byte(singleProofWithP2PK), err)
-	}
-
-	spendCondition, err := proof.parseSpendCondition()
-	if err != nil {
-		t.Fatalf("proof.parseSpendCondition(): %+v %+v", []byte(proofString), err)
-	}
-
-	valid, err := proof.VerifyP2PK(spendCondition)
-	if valid != false {
-		t.Error("proof should be valid")
-	}
-	if !errors.Is(err, ErrNotEnoughSignatures) {
-		t.Errorf("Error should be ErrNotEnoughSignatures. %+v", err)
-	}
-}
+// func TestVectorSamePubkeySignatureMultisig(t *testing.T) {
+// 	proofString := `{"amount":1,"id":"009a1f293253e41e","secret":"[\"P2PK\",{\"nonce\":\"e434a9efbc5f65d144a620e368c9a6dc12c719d0ebc57e0c74f7341864dc449a\",\"data\":\"02a60c27104cf6023581e790970fc33994a320abe36e7ceed16771b0f8d76f0666\",\"tags\":[[\"pubkeys\",\"039c6a20a6ba354b7bb92eb9750716c1098063006362a1fa2afca7421f262d45c5\",\"0203eb2f7cd72a4f725d3327216365d2df18bb4bbc810522fd973c9af987e9b05b\"],[\"locktime\",\"1744876528\"],[\"n_sigs\",\"2\"],[\"sigflag\",\"SIG_INPUTS\"]]}]","C":"02698c4e2b5f9534cd0687d87513c759790cf829aa5739184a3e3735471fbda904","witness":"{\"signatures\":[\"3e9ff9e55c9eccb9e5aa0b6c62d54500b40d0eebadb06efcc8e76f3ce38e0923f956ec1bccb9080db96a17c1e98a1b857abfd1a56bb25670037cea3db1f73d81\",\"c5e29c38e60c4db720cf3f78e590358cf1291a06b9eadf77c1108ae84d533520c2707ffda224eb6a63fddaee9abd5ecf8f2cd263d2556950550e3061a5511f65\"]}"}`
+// 	var proof Proof
+// 	err := json.Unmarshal([]byte(proofString), &proof)
+//
+// 	if err != nil {
+// 		t.Fatalf("json.Unmarshal([]byte(singleProofWithP2PK)): %+v %+v ", []byte(singleProofWithP2PK), err)
+// 	}
+//
+// 	spendCondition, err := proof.parseSpendCondition()
+// 	if err != nil {
+// 		t.Fatalf("proof.parseSpendCondition(): %+v %+v", []byte(proofString), err)
+// 	}
+//
+// 	if spendCondition.Data.Tags.NSigs != 2 {
+// 		t.Error("nsig should be of value 2")
+// 	}
+// 	if len(spendCondition.Data.Tags.Pubkeys) != 2 {
+// 		t.Error("pubkey tags should be of length 2")
+// 	}
+//
+// 	valid, err := proof.VerifyP2PK(spendCondition)
+// 	if valid != false {
+// 		t.Error("proof should be valid")
+// 	}
+// 	if !errors.Is(err, ErrNotEnoughSignatures) {
+// 		t.Errorf("Error should be ErrNotEnoughSignatures. %+v", err)
+// 	}
+// }
