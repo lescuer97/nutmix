@@ -108,6 +108,14 @@ func (sc *SpendCondition) String() (string, error) {
 	return str, nil
 }
 
+func (sc *SpendCondition) CheckValid() error {
+	if len(sc.Data.Tags.Pubkeys)+len(sc.Data.Tags.Pubkeys) > 10 {
+		return ErrInvalidSpendCondition
+	}
+
+	return nil
+}
+
 type SpendConditionType int
 
 const (
