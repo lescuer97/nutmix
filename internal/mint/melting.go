@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 
 	"github.com/jackc/pgconn"
@@ -268,16 +269,17 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w", cashu.ErrNotEnoughtProofs)
 	}
 
-	err = m.verifyProofs(meltRequest.Inputs)
-	if err != nil {
-		slog.Debug("m.verifyProofs(meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.verifyProofs(meltRequest.Inputs) %w", err)
-	}
-
+	log.Printf("\n meltRequest.Inputs: %+v", meltRequest.Inputs)
 	err = meltRequest.ValidateSigflag()
 	if err != nil {
 		slog.Debug("meltRequest.ValidateSigflag()", slog.String(utils.LogExtraInfo, err.Error()))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("meltRequest.ValidateSigflag() %w", err)
+	}
+
+	err = m.verifyProofs(meltRequest.Inputs)
+	if err != nil {
+		slog.Debug("m.verifyProofs(meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.verifyProofs(meltRequest.Inputs) %w", err)
 	}
 
 	ctx := context.Background()

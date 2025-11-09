@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
+	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -73,8 +75,9 @@ func (sc *SpendCondition) String() (string, error) {
 	str += fmt.Sprintf(`"data":"%s",`, sc.Data.Data)
 	str += fmt.Sprintf(`"tags":[`)
 	str += fmt.Sprintf(`["sigflag","%s"],`, sc.Data.Tags.Sigflag.String())
-	str += fmt.Sprintf(`["n_sigs","%s"],`, strconv.Itoa(sc.Data.Tags.NSigs))
-	str += fmt.Sprintf(`["locktime","%s"],`, strconv.Itoa(sc.Data.Tags.Locktime))
+	str += fmt.Sprintf(`["n_sigs","%s"],`, strconv.Itoa(int(sc.Data.Tags.NSigs)))
+	str += fmt.Sprintf(`["n_sigs_refund","%s"],`, strconv.Itoa(int(sc.Data.Tags.NSigRefund)))
+	str += fmt.Sprintf(`["locktime","%s"],`, strconv.Itoa(int(sc.Data.Tags.Locktime)))
 	if len(sc.Data.Tags.Refund) > 0 {
 
 		str += fmt.Sprintf(`["refund"`)
@@ -103,14 +106,6 @@ func (sc *SpendCondition) String() (string, error) {
 	str += fmt.Sprintf(`]}]`)
 
 	return str, nil
-}
-
-func (sc *SpendCondition) CheckValid() error {
-	if len(sc.Data.Tags.Pubkeys)+len(sc.Data.Tags.Pubkeys) > 10 {
-		return ErrInvalidSpendCondition
-	}
-
-	return nil
 }
 
 type SpendConditionType int
@@ -150,10 +145,10 @@ type TagsInfo struct {
 	originalTag string
 	Sigflag     SigFlag
 	Pubkeys     []*btcec.PublicKey
-	NSigs       int
-	Locktime    int
+	NSigs       uint
+	Locktime    uint
 	Refund      []*btcec.PublicKey
-	NSigRefund  int
+	NSigRefund  uint
 }
 
 func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
@@ -224,24 +219,36 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
-			nSigs, err := strconv.Atoi(tagInfo[0])
+			nSigs, err := strconv.ParseUint(tagInfo[0], 10, 64)
 			if err != nil {
 				return fmt.Errorf("strconv.Atoi: %w", err)
 			}
 
-			tags.NSigs = nSigs
+			tags.NSigs = uint(nSigs)
+
+		case NSigRefund:
+			if len(tagInfo) != 1 {
+				return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+			}
+
+			nSigsRefund, err := strconv.ParseUint(tagInfo[0], 10, 64)
+			if err != nil {
+				return errors.New(fmt.Sprintf("strconv.Atoi: %s", tagInfo[0]))
+			}
+
+			tags.NSigRefund = uint(nSigsRefund)
 
 		case Locktime:
 			if len(tagInfo) != 1 {
 				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
-			locktime, err := strconv.Atoi(tagInfo[0])
+			locktime, err := strconv.ParseUint(tagInfo[0], 10, 64)
 			if err != nil {
 				return fmt.Errorf("strconv.Atoi: %w", err)
 			}
 
-			tags.Locktime = locktime
+			tags.Locktime = uint(locktime)
 		}
 
 	}
@@ -260,10 +267,6 @@ func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 
 	if err != nil {
 		return errors.Join(ErrInvalidHexPreimage, err)
-	}
-
-	if len(preImageBytes) != 32 {
-		return ErrInvalidPreimage
 	}
 
 	parsedPreimage := sha256.Sum256(preImageBytes)
@@ -420,14 +423,16 @@ func (wit *Witness) UnmarshalJSON(b []byte) error {
 type SigflagValidation struct {
 	sigFlag            SigFlag
 	signaturesRequired uint
-	pubkeys            map[*btcec.PublicKey]bool
+	pubkeys            map[*btcec.PublicKey]struct{}
+	expired            bool
 }
 
 func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 	sigFlagValidation := SigflagValidation{
 		sigFlag:            SigInputs,
-		signaturesRequired: 0,
-		pubkeys:            make(map[*btcec.PublicKey]bool),
+		signaturesRequired: 1,
+		pubkeys:            make(map[*btcec.PublicKey]struct{}),
+		expired:            false,
 	}
 	for _, proof := range proofs {
 		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
@@ -443,16 +448,31 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 			}
 
 			for _, pubkey := range spendCondition.Data.Tags.Pubkeys {
-				sigFlagValidation.pubkeys[pubkey] = true
+				sigFlagValidation.pubkeys[pubkey] = struct{}{}
+			}
+
+			currentTime := time.Now().Unix()
+			// Incase of expiration we set the refund pubkeys and the n_sigs_refund
+			if spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
+				sigFlagValidation.expired = true
+				refundPubkeys := make(map[*btcec.PublicKey]struct{})
+				for i := range spendCondition.Data.Tags.Refund {
+					if spendCondition.Data.Tags.Refund[i] != nil {
+						refundPubkeys[spendCondition.Data.Tags.Refund[i]] = struct{}{}
+					}
+				}
+				sigFlagValidation.pubkeys = refundPubkeys
+				sigFlagValidation.signaturesRequired = max(1, spendCondition.Data.Tags.NSigRefund)
 			}
 		}
 	}
 	return sigFlagValidation, nil
 }
 
-func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]bool, signatures []*schnorr.Signature) (uint, error) {
+func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]struct{}, signatures []*schnorr.Signature) (uint, error) {
 	hashMessage := sha256.Sum256([]byte(msg))
 	amountValidSigs := uint(0)
+	log.Printf("msg hash: %x", hashMessage)
 
 	for _, sig := range signatures {
 		for pubkey, _ := range pubkeys {
@@ -465,12 +485,3 @@ func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]bool, signatur
 	}
 	return amountValidSigs, nil
 }
-
-// func GetSignaturesFromWitness(proof Proof) ([]*schnorr.Signature, error){
-//
-// }
-// func MakeSigAllMessage(proofs Proofs) (string, error){
-// 	for _, proof := range proofs{
-// 	}
-//
-// }
