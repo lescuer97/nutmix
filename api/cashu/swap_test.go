@@ -1,6 +1,8 @@
 package cashu
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -36,6 +38,12 @@ func TestSwapRequestMsg(t *testing.T) {
 	msg := swapRequest.makeSigAllMsg()
 	if msg != `["P2PK",{"nonce":"c7f280eb55c1e8564e03db06973e94bc9b666d9e1ca42ad278408fe625950303","data":"030d8acedfe072c9fa449a1efe0817157403fbec460d8e79f957966056e5dd76c1","tags":[["sigflag","SIG_ALL"]]}]02c97ee3d1db41cf0a3ddb601724be8711a032950811bf326f8219c50c4808d3cd2038ec853d65ae1b79b5cdbc2774150b2cb288d6d26e12958a16fb33c32d9a86c39` {
 		t.Errorf("Message is not correct %v", msg)
+	}
+
+	hashMessage := sha256.Sum256([]byte(msg))
+
+	if hex.EncodeToString(hashMessage[:]) != "de7f9e3ca0fcc5ed3258fcf83dbf1be7fa78a5ed6da7bf2aa60d61e9dc6eb09a" {
+		t.Errorf("hash message is wrong %v", msg)
 	}
 
 }

@@ -1,6 +1,8 @@
 package cashu
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 )
@@ -35,6 +37,12 @@ func TestMeltRequestMsg(t *testing.T) {
 	msg := meltRequest.makeSigAllMsg()
 	if msg != `["P2PK",{"nonce":"bbf9edf441d17097e39f5095a3313ba24d3055ab8a32f758ff41c10d45c4f3de","data":"029116d32e7da635c8feeb9f1f4559eb3d9b42d400f9d22a64834d89cde0eb6835","tags":[["sigflag","SIG_ALL"]]}]02a9d461ff36448469dccf828fa143833ae71c689886ac51b62c8d61ddaa10028b0038ec853d65ae1b79b5cdbc2774150b2cb288d6d26e12958a16fb33c32d9a86c39cF8911fzT88aEi1d-6boZZkq5lYxbUSVs-HbJxK0` {
 		t.Errorf("Message is not correct %v", msg)
+	}
+
+	hashMessage := sha256.Sum256([]byte(msg))
+
+	if hex.EncodeToString(hashMessage[:]) != "9efa1067cc7dc870f4074f695115829c3cd817a6866c3b84e9814adf3c3cf262" {
+		t.Errorf("hash message is wrong %v", msg)
 	}
 
 }
