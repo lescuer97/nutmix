@@ -21,6 +21,7 @@ type MintPublicKeyset struct {
 	Keys        map[uint64]string
 	InputFeePpk uint
 	Version     uint64
+	FinalExpiry *uint64
 }
 
 type RemoteSigner struct {
@@ -108,6 +109,7 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 			Active:      key.Active,
 			InputFeePpk: uint(key.InputFeePpk),
 			Version:     key.Version,
+			FinalExpiry: key.FinalExpiry,
 		}
 
 		stringKeys := make(map[uint64]string)
@@ -166,11 +168,12 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hour
 	now = now.Add(time.Duration(expiry_limit_hours) * time.Hour)
 
 	amounts := GetAmountsFromMaxOrder(32)
+	timestamp := uint64(now.Unix())
 	rotationReq := sig.RotationRequest{
 		Unit:        unitSig,
 		InputFeePpk: uint64(fee),
 		Amounts:     amounts,
-		FinalExpiry: uint64(now.Unix()),
+		FinalExpiry: &timestamp,
 	}
 	rotationResponse, err := s.grpcClient.RotateKeyset(ctx, &rotationReq)
 	if err != nil {

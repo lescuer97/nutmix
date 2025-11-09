@@ -33,7 +33,6 @@ const (
 func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (testcontainers.Container, testcontainers.Container, testcontainers.Container, testcontainers.Container, error) {
 	// setup
 	net, err := network.New(ctx,
-		network.WithCheckDuplicate(),
 		network.WithAttachable(),
 		// Makes the network internal only, meaning the host machine cannot access it.
 		// Remove or use `network.WithDriver("bridge")` to change the network's mode.
@@ -49,7 +48,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	// Create bitcoind regtest node
 	reqbtcd := testcontainers.ContainerRequest{
-		Image:        "polarlightning/bitcoind:26.0",
+		Image:        "polarlightning/bitcoind:29.0",
 		Name:         "bitcoindbackend" + names,
 		WaitingFor:   wait.ForLog("Initialized HTTP server"),
 		ExposedPorts: []string{"18443/tcp", "18444/tcp", "28334/tcp", "28335/tcp", "28336/tcp"},
@@ -61,8 +60,8 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	btcdC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: reqbtcd,
 		Started:          true,
+		Reuse:            true,
 	})
-
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not setup bitcoind %w", err)
 	}
@@ -86,8 +85,8 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	// create Alice node LND
 	reqlndAlice := testcontainers.ContainerRequest{
-		Image:        "polarlightning/lnd:0.17.5-beta",
-		WaitingFor:   wait.ForLog("Server listening on"),
+		Image:        "polarlightning/lnd:0.19.2-beta",
+		WaitingFor:   wait.ForLog("Server listening on").AsRegexp(),
 		ExposedPorts: []string{"18445/tcp", "10009/tcp", "8080/tcp", "9735/tcp"},
 		Name:         "lndAlice" + names,
 		Networks:     []string{net.Name},
@@ -96,10 +95,24 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	lndAliceC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: reqlndAlice,
+		Reuse:            true,
 		Started:          true,
 	})
-
 	if err != nil {
+		logsReader, err := lndAliceC.Logs(ctx)
+		if err != nil {
+			log.Printf("logs error: %+v", err)
+		}
+		defer logsReader.Close()
+
+		logs, err := io.ReadAll(logsReader)
+		if err != nil {
+			log.Fatalf("Could not read container logs: %v", err)
+		}
+		log.Printf("\n logs: %+v", string(logs))
+		// reader := io.Reader(logs)
+		// buf := make([]byte, 1024)
+
 		return nil, nil, nil, nil, fmt.Errorf("could not create Alice lnd container  %w", err)
 	}
 
@@ -150,8 +163,8 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	// create bob node LND
 
 	reqLndBob := testcontainers.ContainerRequest{
-		Image:        "polarlightning/lnd:0.17.5-beta",
-		WaitingFor:   wait.ForLog("Server listening on"),
+		Image:        "polarlightning/lnd:0.19.2-beta",
+		WaitingFor:   wait.ForLog("Server listening on").AsRegexp(),
 		ExposedPorts: []string{"18446/tcp", "9736/tcp", "10009/tcp", "8081/tcp"},
 		Name:         "lndBob" + names,
 
@@ -162,6 +175,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	LndBobC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: reqLndBob,
 		Started:          true,
+		Reuse:            true,
 	})
 
 	lndBobIp, err := LndBobC.ContainerIP(ctx)
@@ -293,8 +307,11 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	tlscertReader := strings.NewReader(tlsCert)
 
 	aliceLnbitsContainerReq := testcontainers.ContainerRequest{
-		Image:      "lnbits/lnbits:v0.12.12",
-		WaitingFor: wait.ForLog("Application startup complete"),
+		Image: "lnbits/lnbits:v1.2.1",
+		WaitingFor: wait.ForAll(
+			wait.ForLog("Application startup complete").AsRegexp(),
+			wait.ForHTTP("/api/v1/status").WithPort("5000/tcp"),
+		), 
 		Files: []testcontainers.ContainerFile{
 			{
 				Reader:            tlscertReader,
@@ -311,20 +328,30 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	aliceLnbitsC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: aliceLnbitsContainerReq,
 		Started:          true,
+		Reuse:            true,
 	})
 
 	aliceLnbitsC.CopyToContainer(ctx, []byte(tlsCert), tlsCertPath, 0o700)
-
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get aliceLnbitsC %w", err)
 	}
 
 	aliceLnbitsIp, err := aliceLnbitsC.ContainerIP(ctx)
-
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get aliceLnbitsC.ContainerIP %w", err)
 	}
+	mappedPort, err := aliceLnbitsC.MappedPort(ctx, "5000")
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not get mapped port: %w", err)
+	}
 
+	host, err := aliceLnbitsC.Host(ctx)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not get container host: %w", err)
+	}
+
+	// This is the correct address for the host process to call
+	baseURL := fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
 	// Get API key for aliceLnbits
 
 	// make request for first install
@@ -346,7 +373,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	b := bytes.NewBuffer(jsonBytes)
 
-	req, err := http.NewRequest("PUT", "http://"+aliceLnbitsIp+":5000/api/v1/auth/first_install", b)
+	req, err := http.NewRequest("PUT", baseURL+"/api/v1/auth/first_install", b)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
 	}
