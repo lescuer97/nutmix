@@ -21,9 +21,17 @@ import (
 
 const AdminAuthKey = "admin-cookie"
 
-func AuthMiddleware(secret []byte) gin.HandlerFunc {
+func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
+			// Check if token is blacklisted first
+			if blacklist.IsTokenBlacklisted(cookie) {
+				c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
+				c.Header("HX-Redirect", "/admin/login")
+				c.Abort()
+				return
+			}
+
 			token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
 				// Don't forget to validate the alg is what you expect:
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

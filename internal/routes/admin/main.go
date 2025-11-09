@@ -136,10 +136,13 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 			c.Abort()
 		}
 	})
+	// Create token blacklist
+	tokenBlacklist := NewTokenBlacklist()
 
 	adminRoute.Use(ErrorHtmlMessageMiddleware())
 	// I use the first active keyset as secret for jwt token signing
-	adminRoute.Use(AuthMiddleware(loginKey.Serialize()))
+	adminRoute.Use(AuthMiddleware(loginKey.Serialize(), tokenBlacklist))
+
 	// PAGES SETUP
 	// This is /admin pages
 	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
@@ -154,6 +157,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.POST("/mintsettings", MintSettingsForm(mint))
 		adminRoute.POST("/bolt11", Bolt11Post(mint))
 		adminRoute.POST("/rotate/sats", RotateSatsSeed(mint))
+		adminRoute.POST("/logout", LogoutHandler(tokenBlacklist))
 
 		// fractional html components
 		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint))
