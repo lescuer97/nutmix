@@ -13,12 +13,13 @@ templ head() {
 
 templ navigation() {
 	<header>
-		<h2 hx-get="/admin/liquidity">Nutmix Dashboard</h2>
+		<h2><a href="/admin">Nutmix Dashboard</a></h2>
 		<nav>
 			<a href="/admin">Mint Activity</a>
 			<a href="/admin/keysets">Keysets</a>
 			<a href="/admin/settings">Mint settings</a>
 			<a href="/admin/bolt11">Lightning Backend</a>
+			<button hx-post="/admin/logout" class="logout-button">Logout</button>
 		</nav>
 	</header>
 }
