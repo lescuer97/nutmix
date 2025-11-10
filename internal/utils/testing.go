@@ -99,19 +99,6 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Started:          true,
 	})
 	if err != nil {
-		logsReader, err := lndAliceC.Logs(ctx)
-		if err != nil {
-			log.Printf("logs error: %+v", err)
-		}
-		defer logsReader.Close()
-
-		logs, err := io.ReadAll(logsReader)
-		if err != nil {
-			log.Fatalf("Could not read container logs: %v", err)
-		}
-		log.Printf("\n logs: %+v", string(logs))
-		// reader := io.Reader(logs)
-		// buf := make([]byte, 1024)
 
 		return nil, nil, nil, nil, fmt.Errorf("could not create Alice lnd container  %w", err)
 	}
