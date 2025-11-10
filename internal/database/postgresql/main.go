@@ -71,7 +71,7 @@ func (pql Postgresql) SubTx(ctx context.Context, tx pgx.Tx) (pgx.Tx, error) {
 func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT  created_at, active, version, unit, id,  "input_fee_ppk" FROM seeds ORDER BY version DESC`)
+	rows, err := pql.pool.Query(context.Background(), `SELECT  created_at, active, version, unit, id,  "input_fee_ppk", final_expiry FROM seeds ORDER BY version DESC`)
 	defer rows.Close()
 
 	if err != nil {
@@ -92,7 +92,7 @@ func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 }
 
 func (pql Postgresql) GetSeedsByUnit(tx pgx.Tx, unit cashu.Unit) ([]cashu.Seed, error) {
-	rows, err := tx.Query(context.Background(), "SELECT  created_at, active, version, unit, id, input_fee_ppk FROM seeds WHERE unit = $1", unit.String())
+	rows, err := tx.Query(context.Background(), "SELECT  created_at, active, version, unit, id, input_fee_ppk, final_expiry FROM seeds WHERE unit = $1", unit.String())
 	defer rows.Close()
 	if err != nil {
 		return []cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
@@ -116,7 +116,7 @@ func (pql Postgresql) SaveNewSeed(tx pgx.Tx, seed cashu.Seed) error {
 
 	for {
 		tries += 1
-		_, err := tx.Exec(context.Background(), "INSERT INTO seeds ( active, created_at, unit, id, version, input_fee_ppk) VALUES ($1, $2, $3, $4, $5, $6)", seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk)
+		_, err := tx.Exec(context.Background(), "INSERT INTO seeds ( active, created_at, unit, id, version, input_fee_ppk, final_expiry) VALUES ($1, $2, $3, $4, $5, $6, $7)", seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk, seed.FinalExpiry)
 
 		switch {
 		case err != nil && tries < 3:
@@ -134,11 +134,11 @@ func (pql Postgresql) SaveNewSeeds(seeds []cashu.Seed) error {
 	tries := 0
 
 	entries := [][]any{}
-	columns := []string{"active", "created_at", "unit", "id", "version", "input_fee_ppk"}
+	columns := []string{"active", "created_at", "unit", "id", "version", "input_fee_ppk", "final_expiry"}
 	tableName := "seeds"
 
 	for _, seed := range seeds {
-		entries = append(entries, []any{seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk})
+		entries = append(entries, []any{seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk, seed.FinalExpiry})
 	}
 
 	for {
@@ -622,6 +622,7 @@ func (pql Postgresql) GetProofsMintReserve() (templates.MintReserve, error) {
 	return mintReserve, nil
 }
 func (pql Postgresql) GetBlindSigsMintReserve() (templates.MintReserve, error) {
+
 	var mintReserve templates.MintReserve
 
 	rows, err := pql.pool.Query(context.Background(), `SELECT COALESCE(SUM(amount), 0) , COALESCE(COUNT(*), 0)  FROM recovery_signature`)

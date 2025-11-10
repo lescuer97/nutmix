@@ -28,6 +28,7 @@ func OrderKeysetByUnit(keysets []MintKey) KeysResponse {
 		keysetResponse.Unit = value[0].Unit
 		keysetResponse.Keys = make(map[string]string)
 		keysetResponse.InputFeePpk = value[0].InputFeePpk
+		keysetResponse.FinalExpiry = value[0].FinalExpiry
 
 		for _, keyset := range value {
 

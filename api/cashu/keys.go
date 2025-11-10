@@ -3,17 +3,20 @@ package cashu
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"math"
+	"strconv"
+	"time"
+
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/tyler-smith/go-bip32"
-	"math"
-	"time"
 )
 
-func DeriveKeysetId(keysets []MintKey) (string, error) {
+func DeriveKeysetId(keysets []*secp256k1.PublicKey) (string, error) {
 	concatBinaryArray := []byte{}
-	for _, keyset := range keysets {
-		pubkey := keyset.GetPubKey()
-
+	for _, pubkey := range keysets {
+		if pubkey == nil {
+			panic("pubkey should have never been nil at this time")
+		}
 		concatBinaryArray = append(concatBinaryArray, pubkey.SerializeCompressed()...)
 	}
 	hashedKeysetId := sha256.Sum256(concatBinaryArray)
@@ -22,7 +25,25 @@ func DeriveKeysetId(keysets []MintKey) (string, error) {
 	return "00" + hex[:14], nil
 }
 
-func GenerateKeysets(versionKey *bip32.Key, values []uint64, id string, unit Unit, inputFee uint, active bool) ([]MintKey, error) {
+func DeriveKeysetIdV2(pubKeysArray []*secp256k1.PublicKey, unit Unit, finalExpiry *time.Time) string {
+	var keysetIDBytes []byte
+
+	for _, key := range pubKeysArray {
+		if key == nil {
+			panic("pubkey should have never been nil at this time")
+		}
+		keysetIDBytes = append(keysetIDBytes, key.SerializeCompressed()...)
+	}
+
+	keysetIDBytes = append(keysetIDBytes, []byte("unit:"+unit.String())...)
+	if finalExpiry != nil {
+		keysetIDBytes = append(keysetIDBytes, []byte("final_expiry:"+strconv.Itoa(int(finalExpiry.Unix())))...)
+	}
+	hash := sha256.Sum256(keysetIDBytes)
+	return "01" + hex.EncodeToString(hash[:])
+}
+
+func GenerateKeysets(versionKey *bip32.Key, values []uint64, seed Seed) ([]MintKey, error) {
 	var keysets []MintKey
 
 	// Get the current time
@@ -30,7 +51,6 @@ func GenerateKeysets(versionKey *bip32.Key, values []uint64, id string, unit Uni
 
 	// Format the time as a string
 	formattedTime := currentTime.Unix()
-
 	for i, value := range values {
 		// uses the value it represents to derive the key
 		childKey, err := versionKey.NewChildKey(uint32(i))
@@ -40,13 +60,13 @@ func GenerateKeysets(versionKey *bip32.Key, values []uint64, id string, unit Uni
 		privKey := secp256k1.PrivKeyFromBytes(childKey.Key)
 
 		keyset := MintKey{
-			Id:          id,
-			Active:      active,
-			Unit:        unit.String(),
+			Id:          seed.Id,
+			Active:      seed.Active,
+			Unit:        seed.Unit,
 			Amount:      value,
 			PrivKey:     privKey,
 			CreatedAt:   formattedTime,
-			InputFeePpk: inputFee,
+			InputFeePpk: seed.InputFeePpk,
 		}
 
 		keysets = append(keysets, keyset)
