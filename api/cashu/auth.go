@@ -32,10 +32,10 @@ type PostAuthBlindMintRequest struct {
 }
 
 type AuthProof struct {
-	Id     string `json:"id"`
-	Secret string `json:"secret"`
-	C      string `json:"C" db:"c"`
-	Amount uint64 `json:"amount" db:"amount"`
+	Id     string           `json:"id"`
+	Secret string           `json:"secret"`
+	C      WrappedPublicKey `json:"C" db:"c"`
+	Amount uint64           `json:"amount" db:"amount"`
 }
 
 func (a AuthProof) Y() (string, error) {
@@ -67,9 +67,9 @@ func (a AuthProof) Proof(y string, state ProofState) Proof {
 }
 
 type AuthClams struct {
-	Sub string  `json:"sub"`
-	ClientId string  `json:"client_id"`
-	Aud *[]string `json:"aud"`
+	Sub      string    `json:"sub"`
+	ClientId string    `json:"client_id"`
+	Aud      *[]string `json:"aud"`
 }
 
 type PostAuthBlindMintResponse struct {

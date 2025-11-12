@@ -194,7 +194,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		err := c.BindJSON(&mintRequest)
 		if err != nil {
 			slog.Info("Incorrect body", slog.Any("error", err))
-			c.JSON(400, "Malformed body request")
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -559,7 +560,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		err := c.BindJSON(&meltRequest)
 		if err != nil {
 			slog.Info("Incorrect body", slog.Any("error", err))
-			c.JSON(400, "Malformed body request")
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 

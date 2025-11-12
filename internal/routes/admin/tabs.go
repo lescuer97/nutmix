@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
@@ -191,6 +189,7 @@ func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
 		pegoutOnly := c.Request.PostFormValue("PEG_OUT_ONLY")
 		if pegoutOnly == "on" {
 			mint.Config.PEG_OUT_ONLY = true
+
 		} else {
 			mint.Config.PEG_OUT_ONLY = false
 		}
