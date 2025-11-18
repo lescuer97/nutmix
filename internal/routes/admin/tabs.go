@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
@@ -72,18 +74,18 @@ func validateURL(urlStr string) error {
 	if urlStr == "" {
 		return nil // Empty URL is valid (nil field)
 	}
-	
+
 	// Additional basic validation - try to parse URL
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return fmt.Errorf("invalid URL format: %w", err)
 	}
-	
+
 	// Ensure it has a valid scheme and host
 	if parsedURL.Scheme == "" || parsedURL.Host == "" {
 		return fmt.Errorf("URL must contain a valid scheme and host")
 	}
-	
+
 	return nil
 }
 
@@ -140,7 +142,7 @@ func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
 		// Validate URL fields first
 		iconUrl := c.Request.PostFormValue("ICON_URL")
 		tosUrl := c.Request.PostFormValue("TOS_URL")
-		
+
 		iconUrl = strings.TrimSpace(iconUrl)
 		tosUrl = strings.TrimSpace(tosUrl)
 
@@ -154,7 +156,7 @@ func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
 				return
 			}
 		}
-		
+
 		// Validate TOS URL if provided
 		if tosUrl != "" {
 			if err := validateURL(tosUrl); err != nil {
@@ -178,7 +180,7 @@ func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
 		} else {
 			mint.Config.TosUrl = &tosUrl
 		}
-		
+
 		// Now process all other form fields
 		mint.Config.NAME = c.Request.PostFormValue("NAME")
 		mint.Config.DESCRIPTION = c.Request.PostFormValue("DESCRIPTION")
