@@ -3,6 +3,11 @@ package mint
 import (
 	"context"
 	"fmt"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
 	pq "github.com/lescuer97/nutmix/internal/database/postgresql"
 	"github.com/lescuer97/nutmix/internal/lightning"
@@ -11,9 +16,6 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"os"
-	"testing"
-	"time"
 )
 
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
@@ -99,12 +101,22 @@ func SetupDataOnDB(mint *Mint) error {
 		Mpp:         false,
 	}
 
+	c1Priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		return fmt.Errorf("secp256k1.GeneratePrivateKey: %+v ", err)
+	}
+	c1 := c1Priv.PubKey()
+	c2Priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		return fmt.Errorf("secp256k1.GeneratePrivateKey: %+v ", err)
+	}
+	c2 := c2Priv.PubKey()
 	proofs := cashu.Proofs{
 		cashu.Proof{
 			Amount: 2,
 			Id:     "00bfa73302d12ffd",
 			Secret: "secret1",
-			C:      "c1",
+			C:      cashu.WrappedPublicKey{PublicKey: c1},
 			Y:      "y1",
 			SeenAt: now,
 			State:  cashu.PROOF_PENDING,
@@ -114,7 +126,7 @@ func SetupDataOnDB(mint *Mint) error {
 			Amount: 2,
 			Id:     "00bfa73302d12ffd",
 			Secret: "secret2",
-			C:      "c2",
+			C:      cashu.WrappedPublicKey{PublicKey: c2},
 			Y:      "y2",
 			SeenAt: now,
 			State:  cashu.PROOF_PENDING,

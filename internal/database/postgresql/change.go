@@ -18,7 +18,7 @@ func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, q
 
 	now := time.Now().Unix()
 	for _, sig := range change {
-		entries = append(entries, []any{sig.B_, now, sig.Id, quote})
+		entries = append(entries, []any{sig.B_.String(), now, sig.Id, quote})
 	}
 
 	for {
@@ -35,8 +35,8 @@ func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, q
 		}
 
 	}
-
 }
+
 func (pql Postgresql) GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error) {
 
 	var meltChangeList []cashu.MeltChange

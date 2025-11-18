@@ -3,6 +3,7 @@ package cashu
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type PostSwapRequest struct {
@@ -130,14 +131,14 @@ func (p *PostSwapRequest) firstProofValues() error {
 }
 
 func (p *PostSwapRequest) makeSigAllMsg() string {
-	message := ""
+	var msg strings.Builder
 	for _, proof := range p.Inputs {
-		message = message + proof.Secret
+		msg.WriteString(proof.Secret)
 	}
 	for _, blindMessage := range p.Outputs {
-		message = message + blindMessage.B_
+		msg.WriteString(blindMessage.B_.String())
 	}
-	return message
+	return msg.String()
 }
 
 type PostSwapResponse struct {

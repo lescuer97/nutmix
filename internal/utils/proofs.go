@@ -95,6 +95,10 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 
 	case errors.Is(proofError, cashu.ErrMintQuoteNoValidSignature):
 		return cashu.MINT_QUOTE_INVALID_SIG, nil
+
+	case errors.Is(proofError, cashu.ErrCouldNotParsePublicKey):
+		message := cashu.ErrCouldNotParsePublicKey.Error()
+		return cashu.TOKEN_NOT_VERIFIED, &message
 	}
 
 	return cashu.UNKNOWN, nil

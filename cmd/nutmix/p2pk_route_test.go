@@ -287,15 +287,6 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keyset signer.GetKeys
 	// unblid the signatures and make proofs
 	for i, output := range signatures {
 
-		parsedBlindFactor, err := hex.DecodeString(output.C_)
-		if err != nil {
-			return nil, fmt.Errorf("Error decoding hex: %w", err)
-		}
-		blindedFactor, err := secp256k1.ParsePubKey(parsedBlindFactor)
-		if err != nil {
-			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
-		}
-
 		pubkeyStr := keyset.Keysets[0].Keys[output.Amount]
 		pubkeyBytes, err := hex.DecodeString(pubkeyStr)
 		if err != nil {
@@ -306,11 +297,9 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keyset signer.GetKeys
 			return nil, fmt.Errorf("Error parsing pubkey: %w", err)
 		}
 
-		C := crypto.UnblindSignature(blindedFactor, secretsKey[i], mintPublicKey)
+		C := crypto.UnblindSignature(output.C_.PublicKey, secretsKey[i], mintPublicKey)
 
-		hexC := hex.EncodeToString(C.SerializeCompressed())
-
-		proof := cashu.Proof{Id: output.Id, Amount: output.Amount, C: hexC, Secret: secrets[i]}
+		proof := cashu.Proof{Id: output.Id, Amount: output.Amount, C: cashu.WrappedPublicKey{PublicKey: C}, Secret: secrets[i]}
 
 		for _, privkey := range privkeys {
 			err = proof.Sign(privkey)

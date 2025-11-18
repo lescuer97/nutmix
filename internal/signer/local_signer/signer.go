@@ -238,29 +238,16 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit uint)
 }
 
 func (l *LocalSigner) signBlindMessage(k *secp256k1.PrivateKey, message cashu.BlindedMessage) (cashu.BlindSignature, error) {
-	var blindSignature cashu.BlindSignature
 
-	decodedBlindFactor, err := hex.DecodeString(message.B_)
-
-	if err != nil {
-		return blindSignature, fmt.Errorf("DecodeString: %w", err)
-	}
-
-	B_, err := secp256k1.ParsePubKey(decodedBlindFactor)
-
-	if err != nil {
-		return blindSignature, fmt.Errorf("ParsePubKey: %w", err)
-	}
-
-	C_ := crypto.SignBlindedMessage(B_, k)
+	C_ := crypto.SignBlindedMessage(message.B_.PublicKey, k)
 
 	blindSig := cashu.BlindSignature{
 		Amount: message.Amount,
 		Id:     message.Id,
-		C_:     hex.EncodeToString(C_.SerializeCompressed()),
+		C_:     cashu.WrappedPublicKey{PublicKey: C_},
 	}
 
-	err = blindSig.GenerateDLEQ(B_, k)
+	err := blindSig.GenerateDLEQ(message.B_.PublicKey, k)
 
 	if err != nil {
 		return blindSig, fmt.Errorf("blindSig.GenerateDLEQ: %w", err)
@@ -335,16 +322,9 @@ func (l *LocalSigner) validateProof(proof cashu.Proof) error {
 	if keysetToUse.Id == "" {
 		return cashu.ErrKeysetForProofNotFound
 	}
-	parsedBlinding, err := hex.DecodeString(proof.C)
-	if err != nil {
-		return fmt.Errorf("hex.DecodeString: %w", errors.Join(err, cashu.ErrInvalidProof))
-	}
-	pubkey, err := secp256k1.ParsePubKey(parsedBlinding)
-	if err != nil {
-		return fmt.Errorf("secp256k1.ParsePubKey: %w", errors.Join(err, cashu.ErrInvalidProof))
-	}
-	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, pubkey)
+	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, proof.C.PublicKey)
 	if !verified {
+		fmt.Printf("Proof verification failed for proof with Id: %s, Amount: %d, C: %s\n", proof.Id, proof.Amount, proof.C.String())
 		return cashu.ErrInvalidProof
 	}
 

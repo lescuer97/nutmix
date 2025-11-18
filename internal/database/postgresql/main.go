@@ -394,7 +394,8 @@ func (pql Postgresql) SaveProof(tx pgx.Tx, proofs []cashu.Proof) error {
 	tableName := "proofs"
 
 	for _, proof := range proofs {
-		entries = append(entries, []any{proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness, proof.SeenAt, proof.State, proof.Quote})
+		C := proof.C.String()
+		entries = append(entries, []any{C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness, proof.SeenAt, proof.State, proof.Quote})
 	}
 
 	_, err := tx.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
