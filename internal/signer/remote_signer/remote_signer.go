@@ -220,7 +220,10 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("CheckIfSignerErrorExists(blindSigsResponse.GetError()). %w", err)
 	}
 
-	blindSigs := ConvertSigBlindSignaturesToCashuBlindSigs(blindSigsResponse)
+	blindSigs, err := ConvertSigBlindSignaturesToCashuBlindSigs(blindSigsResponse)
+	if err != nil {
+		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("CheckIfSignerErrorExists(blindSigsResponse.GetError()). %w", err)
+	}
 	// verify we have the same amount of blindedmessages than BlindSignatures
 	if len(blindSigs) != len(messages) {
 		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("Not the correct amount of blind signatures")

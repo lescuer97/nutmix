@@ -24,17 +24,10 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-var correctPreimage string
-var incorrectPreimage string
-
-// there is a conditional check that the preimage is 32 bytes long
-func init() {
-	sum := sha256.Sum256([]byte("12345"))
-	correctPreimage = hex.EncodeToString(sum[:])
-
-	sum2 := sha256.Sum256([]byte("54321"))
-	incorrectPreimage = hex.EncodeToString(sum2[:])
-}
+var (
+	correctPreimage   = "0000000000000000000000000000000000000000000000000000000000000001"
+	incorrectPreimage = "0000000000000000000000000000000000000000000000000000000000000002"
+)
 
 func TestRoutesHTLCSwapMelt(t *testing.T) {
 	const posgrespassword = "password"
