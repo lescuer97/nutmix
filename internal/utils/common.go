@@ -37,14 +37,14 @@ func StringToLightningBackend(text string) LightningBackend {
 }
 
 type Config struct {
-	NAME             string `db:"name"`
+	NAME             string  `db:"name"`
 	IconUrl          *string `db:"icon_url,omitempty"`
 	TosUrl           *string `db:"tos_url,omitempty"`
-	DESCRIPTION      string `db:"description"`
-	DESCRIPTION_LONG string `db:"description_long"`
-	MOTD             string `db:"motd"`
-	EMAIL            string `db:"email"`
-	NOSTR            string `db:"nostr"`
+	DESCRIPTION      string  `db:"description"`
+	DESCRIPTION_LONG string  `db:"description_long"`
+	MOTD             string  `db:"motd"`
+	EMAIL            string  `db:"email"`
+	NOSTR            string  `db:"nostr"`
 
 	NETWORK string `db:"network"`
 
