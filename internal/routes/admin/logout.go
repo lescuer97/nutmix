@@ -9,7 +9,7 @@ import (
 )
 
 // LogoutHandler handles user logout requests
-func LogoutHandler( blacklist *TokenBlacklist) gin.HandlerFunc {
+func LogoutHandler(blacklist *TokenBlacklist) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract token from cookie
 		tokenString, err := c.Cookie(AdminAuthKey)

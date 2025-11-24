@@ -3,10 +3,10 @@ package database
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -34,6 +34,11 @@ const (
 	DOCKERDATABASE = "DOCKERDATABASE"
 	CUSTOMDATABASE = "CUSTOMDATABASE"
 )
+
+type EcashInventory struct {
+	AmountValue uint64
+	Quantity    uint64
+}
 
 type MintDB interface {
 	GetTx(ctx context.Context) (pgx.Tx, error)
@@ -72,9 +77,11 @@ type MintDB interface {
 	GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
 
-	GetProofsMintReserve() (templates.MintReserve, error)
-	GetBlindSigsMintReserve() (templates.MintReserve, error)
+	GetProofsInventory(since time.Time, until *time.Time) (EcashInventory, error)
+	GetBlindSigsInventory(since time.Time, until *time.Time) (EcashInventory, error)
 
+	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
+	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	GetConfig() (utils.Config, error)
 	SetConfig(config utils.Config) error
 	UpdateConfig(config utils.Config) error

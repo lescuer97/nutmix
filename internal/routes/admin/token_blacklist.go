@@ -29,7 +29,7 @@ func (tb *TokenBlacklist) AddToken(token string, expiration time.Time) {
 func (tb *TokenBlacklist) IsTokenBlacklisted(token string) bool {
 	tb.mutex.RLock()
 	defer tb.mutex.RUnlock()
-	
+
 	if exp, exists := tb.tokens[token]; exists {
 		// Check if token has expired
 		if time.Now().After(exp) {
@@ -44,7 +44,7 @@ func (tb *TokenBlacklist) IsTokenBlacklisted(token string) bool {
 func (tb *TokenBlacklist) CleanupExpiredTokens() {
 	tb.mutex.Lock()
 	defer tb.mutex.Unlock()
-	
+
 	now := time.Now()
 	for token, exp := range tb.tokens {
 		if now.After(exp) {
