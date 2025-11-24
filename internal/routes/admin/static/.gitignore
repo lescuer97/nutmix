@@ -1,0 +1,15 @@
+# Node.js/npm build artifacts
+dist/
+
+# npm dependencies
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db

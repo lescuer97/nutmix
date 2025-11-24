@@ -61,21 +61,18 @@ help:
     @echo "  version-patch    - Bump patch version"
 
 # Run recipe
-run:
+run: build
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running {{APP_NAME}} v{{VERSION}} locally..."
-    just build
     ./{{BUILD_DIR}}/{{APP_NAME}} {{RUN_ARGS}}
 
 # Build recipe
-build:
+build gen-proto gen-templ web-build-prod:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Building {{APP_NAME}} v{{VERSION}}..."
     mkdir -p {{BUILD_DIR}}
-    just gen-proto
-    just gen-templ
     go build -ldflags="-s -w \
         -X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
         -X '{{MODULE}}/internal/utils.BuildTime={{BUILD_TIME}}' \
@@ -119,6 +116,13 @@ install-deps:
       echo "Go modules up to date"
     fi
 
+    echo "Installing bun..."
+    curl -fsSL https://bun.sh/install | bash
+
+    echo "Installing web dependencies"
+    just web-install
+
+
     echo "Dependencies check completed"
 
 # Generate protobuf code
@@ -128,6 +132,10 @@ gen-proto:
     echo "Generating protobuf code..."
     protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
 
+# ============================
+# Web Dashaboard
+# ============================
+
 # Generate Go code from templ files
 gen-templ:
     #!/usr/bin/env bash
@@ -135,6 +143,15 @@ gen-templ:
     echo "Generating Go code from templ files..."
     templ generate .
 
+web-install:
+    set -euo pipefail
+    echo "Intalling npm dependencies"
+    cd internal/routes/admin/static && bun install
+
+web-build-prod:
+    set -euo pipefail
+    echo "Building web packages"
+    cd internal/routes/admin/static && bun build
 
 # Dev recipe
 dev:

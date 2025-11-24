@@ -1,0 +1,24 @@
+{
+  "name": "admin-static",
+  "version": "1.0.0",
+  "description": "Frontend static assets for Nutmix Admin Dashboard",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --minify --outdir=dist/js/ && cp *.css dist/css/",
+    "dev": "esbuild src/index.js --bundle --outdir=dist/js/ && cp *.css dist/css/",
+    "clean": "rm -rf dist/*"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  },
+  "dependencies": {
+    "htmx.org": "^2.0.8",
+    "htmx-ext-preload": "^2.1.2",
+    "htmx-ext-remove-me": "^2.0.2"
+  },
+  "packageManager": "pnpm@9.0.0+"
+}
