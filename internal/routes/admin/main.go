@@ -143,6 +143,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 	// I use the first active keyset as secret for jwt token signing
 	adminRoute.Use(AuthMiddleware(loginKey.Serialize(), tokenBlacklist))
 
+	adminHandler := newAdminHandler(mint)
+
 	// PAGES SETUP
 	// This is /admin pages
 	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
@@ -156,13 +158,13 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
 		adminRoute.POST("/mintsettings", MintSettingsForm(mint))
 		adminRoute.POST("/bolt11", Bolt11Post(mint))
-		adminRoute.POST("/rotate/sats", RotateSatsSeed(mint))
+		adminRoute.POST("/rotate/sats", RotateSatsSeed(&adminHandler))
 		adminRoute.POST("/logout", LogoutHandler(tokenBlacklist))
 
 		// fractional html components
-		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint))
+		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(&adminHandler))
 		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
-		adminRoute.GET("/mint-balance", MintBalance(mint))
+		adminRoute.GET("/mint-balance", MintBalance(&adminHandler))
 		adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint))
 		adminRoute.GET("/mint-melt-list", MintMeltList(mint))
 		adminRoute.GET("/logs", LogsTab())
@@ -258,7 +260,6 @@ func LogsTab() gin.HandlerFunc {
 		}
 
 		file, err := os.Open(logsdir + "/" + m.LogFileName)
-		defer file.Close()
 		if err != nil {
 			slog.Warn(
 				"os.Open(logsdir ",
@@ -271,6 +272,7 @@ func LogsTab() gin.HandlerFunc {
 			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
+		defer file.Close()
 
 		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo}, timeRequestDuration.RollBackFromNow())
 

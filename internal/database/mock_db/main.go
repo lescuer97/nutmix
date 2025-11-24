@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
-	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -312,23 +311,34 @@ func (m *MockDB) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) e
 
 }
 
-func (m *MockDB) GetProofsMintReserve() (templates.MintReserve, error) {
-	var mintReserve templates.MintReserve
+func (m *MockDB) GetProofsMintReserve(since time.Time, until *time.Time) (database.EcashInventory, error) {
+	var mintReserve database.EcashInventory
 
 	for _, p := range m.Proofs {
-		mintReserve.SatAmount += p.Amount
-		mintReserve.Amount += 1
+		if p.SeenAt < since.Unix() {
+			continue
+		}
+		if until != nil && p.SeenAt > until.Unix() {
+			continue
+		}
+		mintReserve.AmountValue += p.Amount
+		mintReserve.Quantity += 1
 	}
 
 	return mintReserve, nil
 }
-func (m *MockDB) GetBlindSigsMintReserve() (templates.MintReserve, error) {
+func (m *MockDB) GetBlindSigsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
+	var mintReserve database.EcashInventory
 
-	var mintReserve templates.MintReserve
-
-	for _, p := range m.RecoverSigDB {
-		mintReserve.SatAmount += p.Amount
-		mintReserve.Amount += 1
+	for _, p := range m.Proofs {
+		if p.SeenAt < since.Unix() {
+			continue
+		}
+		if until != nil && p.SeenAt > until.Unix() {
+			continue
+		}
+		mintReserve.AmountValue += p.Amount
+		mintReserve.Quantity += 1
 	}
 	return mintReserve, nil
 }

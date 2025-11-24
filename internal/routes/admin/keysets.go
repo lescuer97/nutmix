@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -32,79 +31,9 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 
 	}
 }
-func KeysetsLayoutPage(mint *m.Mint) gin.HandlerFunc {
+func KeysetsLayoutPage(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		keysets, err := mint.Signer.GetKeysets()
-		if err != nil {
-			slog.Error("mint.Signer.GetKeysets()", slog.Any("error", err))
-			c.JSON(500, "Server side error")
-			return
-		}
-		authKeysets, err := mint.Signer.GetAuthKeys()
-		if err != nil {
-			slog.Error("mint.Signer.GetAuthKeys()", slog.Any("error", err))
-			c.JSON(500, "Server side error")
-			return
-		}
-
-		keysetMap := make(map[string][]templates.KeysetData)
-		for _, seed := range keysets.Keysets {
-			val, exits := keysetMap[seed.Unit]
-			if exits {
-				val = append(val, templates.KeysetData{
-					Id:      seed.Id,
-					Active:  seed.Active,
-					Unit:    seed.Unit,
-					Fees:    seed.InputFeePpk,
-					Version: seed.Version,
-				})
-
-				keysetMap[seed.Unit] = val
-
-			} else {
-				keysetMap[seed.Unit] = []templates.KeysetData{
-					{
-						Id:      seed.Id,
-						Active:  seed.Active,
-						Unit:    seed.Unit,
-						Fees:    seed.InputFeePpk,
-						Version: seed.Version,
-					},
-				}
-			}
-		}
-		for _, seed := range authKeysets.Keysets {
-			val, exits := keysetMap[seed.Unit]
-			if exits {
-				val = append(val, templates.KeysetData{
-					Id:      seed.Id,
-					Active:  seed.Active,
-					Unit:    seed.Unit,
-					Fees:    seed.InputFeePpk,
-					Version: seed.Version,
-				})
-
-				keysetMap[seed.Unit] = val
-
-			} else {
-				keysetMap[seed.Unit] = []templates.KeysetData{
-					{
-						Id:      seed.Id,
-						Active:  seed.Active,
-						Unit:    seed.Unit,
-						Fees:    seed.InputFeePpk,
-						Version: seed.Version,
-					},
-				}
-			}
-		}
-
-		// order the keysets by version
-		for unit, ranges := range keysetMap {
-			sort.Slice(ranges, func(i, j int) bool { return ranges[i].Version > ranges[j].Version })
-			keysetMap[unit] = ranges
-		}
-
+		keysetMap, err := adminHandler.getKeysets(nil)
 		ctx := context.Background()
 		err = templates.KeysetsList(keysetMap).Render(ctx, c.Writer)
 
@@ -121,7 +50,7 @@ type RotateRequest struct {
 	ExpireLimitHours uint
 }
 
-func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
+func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rotateRequest RotateRequest
 		if c.ContentType() == gin.MIMEJSON {
@@ -185,8 +114,7 @@ func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
 			rotateRequest.ExpireLimitHours = uint(expiryLimit)
 		}
 
-		err := mint.Signer.RotateKeyset(rotateRequest.Unit, rotateRequest.Fee, rotateRequest.ExpireLimitHours)
-
+		err := adminHandler.rotateKeyset(rotateRequest.Unit, rotateRequest.Fee, rotateRequest.ExpireLimitHours)
 		if err != nil {
 			slog.Error(
 				"mint.Signer.RotateKeyset(cashu.Sat, rotateRequest.Fee)",

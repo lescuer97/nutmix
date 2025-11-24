@@ -15,33 +15,27 @@ css progressBarColor(percent string) {
 	--progress: { percent };
 }
 
-templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs MintReserve) {
-	{{ proofAmount := strconv.FormatUint(proofs.Amount, 10) }}
-	{{ proofSatAmount := strconv.FormatUint(proofs.SatAmount, 10) }}
-	{{ sigsAmount := strconv.FormatUint(sigs.Amount, 10) }}
-	{{ sigsSatAmount := strconv.FormatUint(sigs.SatAmount, 10) }}
-	{{ balanceString := strconv.FormatUint(balance, 10) }}
-	{{ neededBalance := sigs.SatAmount - proofs.SatAmount }}
-	{{ neededBalanceString := strconv.FormatUint(neededBalance, 10) }}
-	{{ enoughLiquidity := balance < neededBalance }}
-	{{ percentageOfLiquidity := (float64(balance) / float64(neededBalance)) * 100 }}
-	{{ percentageOfLiquidityStr := strconv.FormatFloat(percentageOfLiquidity, 'f', 2, 64) }}
-	{{ ratioProofSigAmount := (float64(proofs.Amount) / float64(sigs.Amount)) * 100 }}
-	{{ ratioProofSigAmountStr := strconv.FormatFloat(ratioProofSigAmount, 'f', 2, 64) }}
-	{{ ratioProofSigAmountSats := (float64(proofs.SatAmount) / float64(sigs.SatAmount)) * 100 }}
-	{{ ratioProofSigAmountSatsStr := strconv.FormatFloat(ratioProofSigAmountSats, 'f', 2, 64) }}
+type Balance struct {
+	ProofsAmount      uint64
+	ProofsQuantity    uint64
+	BlindSigsAmount   uint64
+	BlindSigsQuantity uint64
+	NeededBalance     uint64
+	Ratio             float64
+}
+
+templ MintBalance(lnBalance uint64, fakeWallet bool, balance Balance) {
 	<div class="flex-card">
 		<div class="card">
 			if fakeWallet {
 				<h2>Fake Wallet doesn't have a balance</h2>
 			} else {
 				<h2>Node Balance:</h2>
-				<h3><b>{ balanceString }</b> Sats</h3>
-				<p>Your node has <b>{ percentageOfLiquidityStr } %</b> of liquidity needed.</p>
+				<h3><b>{ lnBalance }</b> Sats</h3>
 			}
 		</div>
 		<div class="card">
-			<div class={ "reserves-data", templ.KV("iliquid", enoughLiquidity) }>
+			<div class={ "reserves-data" , templ.KV("iliquid", lnBalance < balance.NeededBalance && !fakeWallet) }>
 				<div class="reserve-titles">
 					<h3>
 						Proofs
@@ -52,24 +46,22 @@ templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs Mint
 				</div>
 				<div class="data">
 					<span>
-						{  proofAmount }
+						{ balance.BlindSigsQuantity }
 					</span>
-					<meter min="0" max="100" value={ ratioProofSigAmountStr }></meter>
 					<span>
-						{ sigsAmount }
+						{ balance.ProofsQuantity }
 					</span>
 				</div>
 				<div class="data">
 					<span>
-						{ proofSatAmount } <small>Sats</small>
+						{ balance.BlindSigsAmount } <small>Sats</small>
 					</span>
-					<meter min="0" max="100" value={ ratioProofSigAmountSatsStr }></meter>
 					<span>
-						{  sigsSatAmount } <small>Sats</small>
+						{ balance.ProofsAmount } <small>Sats</small>
 					</span>
 				</div>
 				<h3>
-					Needed Balance: { neededBalanceString }(Sats)
+					Needed Balance: { balance.NeededBalance }(Sats)
 				</h3>
 			</div>
 		</div>

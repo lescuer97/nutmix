@@ -6,14 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/database/goose"
-	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 )
 
 var DBError = errors.New("ERROR DATABASE")
@@ -583,49 +584,83 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSig
 	}
 }
 
-func (pql Postgresql) GetProofsMintReserve() (templates.MintReserve, error) {
-	var mintReserve templates.MintReserve
+func (pql Postgresql) GetProofsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
+	var mintReserve database.EcashInventory
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT COALESCE(SUM(amount), 0) , COALESCE(COUNT(*), 0)  FROM proofs`)
-	defer rows.Close()
+	var query string
+	var args []any
+
+	if until != nil {
+		// Both since and until are provided
+		query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
+				 FROM proofs 
+				 WHERE seen_at >= $1 AND seen_at < $2`
+		args = []any{since.Unix(), until.Unix()}
+	} else {
+		// Only since is provided
+		query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
+				 FROM proofs 
+				 WHERE seen_at >= $1`
+		args = []any{since.Unix()}
+	}
+
+	rows, err := pql.pool.Query(context.Background(), query, args...)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return mintReserve, nil
 		}
-		return mintReserve, databaseError(fmt.Errorf("Error checking for  recovery_signature and proofs: %w", err))
+		return mintReserve, databaseError(fmt.Errorf("Error checking for recovery_signature and proofs: %w", err))
 	}
+	defer rows.Close()
 
 	for rows.Next() {
-		err := rows.Scan(&mintReserve.SatAmount, &mintReserve.Amount)
+		err := rows.Scan(&mintReserve.AmountValue, &mintReserve.Quantity)
 		if err != nil {
-			return mintReserve, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
+			return mintReserve, databaseError(fmt.Errorf("rows.Scan(&mintReserve.AmountValue, &mintReserve.Quantity): %w", err))
 		}
-
 	}
+
 	return mintReserve, nil
 }
-func (pql Postgresql) GetBlindSigsMintReserve() (templates.MintReserve, error) {
 
-	var mintReserve templates.MintReserve
+func (pql Postgresql) GetBlindSigsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
+	var mintReserve database.EcashInventory
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT COALESCE(SUM(amount), 0) , COALESCE(COUNT(*), 0)  FROM recovery_signature`)
-	defer rows.Close()
+	var query string
+	var args []any
+
+	if until != nil {
+		// Both since and until are provided
+		query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
+				 FROM recovery_signature 
+				 WHERE created_at >= $1 AND created_at < $2`
+		args = []any{since.Unix(), until.Unix()}
+	} else {
+		// Only since is provided
+		query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
+				 FROM recovery_signature 
+				 WHERE created_at >= $1`
+		args = []any{since.Unix()}
+	}
+
+	rows, err := pql.pool.Query(context.Background(), query, args...)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return mintReserve, nil
 		}
-		return mintReserve, databaseError(fmt.Errorf("Error checking for  recovery_signature and proofs: %w", err))
+		return mintReserve, databaseError(fmt.Errorf("Error checking for recovery_signature and proofs: %w", err))
 	}
+	defer rows.Close()
 
 	for rows.Next() {
-		err := rows.Scan(&mintReserve.SatAmount, &mintReserve.Amount)
+		err := rows.Scan(&mintReserve.AmountValue, &mintReserve.Quantity)
 		if err != nil {
-			return mintReserve, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
+			return mintReserve, databaseError(fmt.Errorf("rows.Scan(&mintReserve.AmountValue, &mintReserve.Quantity): %w", err))
 		}
-
 	}
+
 	return mintReserve, nil
 }
 
