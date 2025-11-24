@@ -71,23 +71,27 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 	}
 }
 
-//go:embed static/*.css static/*.js
-var static embed.FS
+//go:embed static/dist/js/*.js static/dist/css/*.css
+var staticEmbed embed.FS
 
 //go:embed templates/*.html
 var templatesFs embed.FS
 
 func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
-	contentStatic, err := fs.Sub(static, "static")
+	// Create a file server for the embedded static files
+	// The embed contains files at: static/dist/js/*.js and static/dist/css/*.css
+	// We need to serve them at /js and /css routes
+	jsFS, err := fs.Sub(staticEmbed, "static/dist/js")
 	if err != nil {
-		slog.Error(
-			`fs.Sub(static, "static")`,
-			slog.String(utils.LogExtraInfo, err.Error()),
-		)
-		panic(err)
+		log.Panicf("could not create correct /dist/js directory")
 	}
-	httpFs := http.FS(contentStatic)
-	r.StaticFS("/static", httpFs)
+	cssFS, err := fs.Sub(staticEmbed, "static/dist/css")
+	if err != nil {
+		log.Panicf("could not create correct /dist/css directory")
+	}
+
+	r.StaticFS("/js", http.FS(jsFS))
+	r.StaticFS("/css", http.FS(cssFS))
 
 	templ := template.Must(template.ParseFS(templatesFs, "templates/*.html"))
 	r.SetHTMLTemplate(templ)
