@@ -52,25 +52,23 @@ export function initAuth() {
           });
 
           fetch(loginRequest)
-            .then((res) => {
-              if (res.ok) {
-                window.location.href = "/admin";
-              } else {
-                const targetHeader = res.headers.get("HX-RETARGET");
+            .then(async (res) => {
 
-                if (window.htmx && targetHeader) {
-                  res
-                    .text()
-                    .then((text) => {
-                    window.htmx.swap(targetHeader, text, {
-                      swapStyle: "innerHTML",
-                    });
-                  })
-                  .catch((err) => {
-                    console.log({ errText: err });
-                  });
-                }
-              }
+      const text = await res.text();
+      if (res.ok) {
+        const targetHeader = res.headers.get("HX-RETARGET");
+        if (targetHeader) {
+          window.htmx.swap(`${targetHeader}`, text, { swapStyle: "innerHTML" });
+          return
+        }
+
+          window.location.href = "/admin";
+      } else {
+        const targetHeader = res.headers.get("HX-RETARGET");
+        if (window.htmx && targetHeader) {
+          window.htmx.swap(`#${targetHeader}`, text, { swapStyle: "innerHTML" });
+        }
+      }
             })
             .catch((err) => {
               console.log("Error message");
