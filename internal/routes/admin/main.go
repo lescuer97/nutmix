@@ -36,7 +36,7 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 		c.Next()
 
 		if len(c.Errors) > 0 {
-			message := "Unknown Problem"
+			message := "Something went wrong"
 			for _, e := range c.Errors {
 				switch {
 				case errors.Is(e, utils.ErrAlreadyLNPaying):
@@ -53,7 +53,10 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 					message = ErrInvalidStrikeCheck.Error()
 				case errors.Is(e, ErrIncorrectNpub):
 					message = ErrIncorrectNpub.Error()
-					c.Status(http.StatusBadRequest)
+				case errors.Is(e, ErrCouldNotParseLogin):
+					message = ErrCouldNotParseLogin.Error()
+				case errors.Is(e, ErrInvalidNostrSignature):
+					message = ErrInvalidNostrSignature.Error()
 				}
 			}
 			slog.Error("Error from calls", slog.String("errors", c.Errors.String()))
