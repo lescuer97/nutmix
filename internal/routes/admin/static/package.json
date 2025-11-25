@@ -5,8 +5,8 @@
   "main": "app.js",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/index.js --bundle --minify --outdir=dist/js/ && cp *.css dist/css/",
-    "dev": "esbuild src/index.js --bundle --outdir=dist/js/ && cp *.css dist/css/",
+    "build": "esbuild src/index.js --bundle --minify --outdir=dist/js/ && mkdir -p dist/css/ && cp *.css dist/css/",
+    "dev": "esbuild src/index.js --bundle --outdir=dist/js/ && mkdir -p dist/css/ && cp *.css dist/css/",
     "clean": "rm -rf dist/*"
   },
   "keywords": [],

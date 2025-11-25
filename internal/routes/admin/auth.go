@@ -133,11 +133,7 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 
 		nostrLogin, err := mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)
 		if err != nil {
-			slog.Error(
-				"mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)",
-				slog.Any("error", err),
-			)
-			c.JSON(400, "Content is not available")
+			c.Error(errors.Join(ErrCouldNotParseLogin, err))
 			return
 		}
 
@@ -149,57 +145,45 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 		// check valid signature
 		validSig, err := nostrEvent.CheckSignature()
 		if err != nil {
-			slog.Info("nostrEvent.CheckSignature()", slog.Any("error", err))
-			c.JSON(400, "Invalid signature")
+			c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		if !validSig {
-			slog.Warn("Invalid Signature")
-			c.JSON(403, "Invalid signature")
+			c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		// check signature happened with the correct private key.
 		sigBytes, err := hex.DecodeString(nostrEvent.Sig)
 		if err != nil {
-			slog.Info("hex.DecodeString(nostrEvent.Sig)", slog.Any("error", err))
-			c.JSON(500, "Something happend!")
+			c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		sig, err := schnorr.ParseSignature(sigBytes)
 		if err != nil {
-			slog.Info("schnorr.ParseSignature(sigBytes)", slog.Any("error", err))
-			c.JSON(500, "Something happend!")
+			c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		eventHash := sha256.Sum256(nostrEvent.Serialize())
 		verified := sig.Verify(eventHash[:], adminNostrPubkey)
 		if !verified {
-			if c.ContentType() == gin.MIMEJSON {
-				c.JSON(400, "Private key used is not correct")
-				return
-			} else {
-				c.Error(ErrIncorrectNpub)
-				return
-			}
+			c.Error(ErrIncorrectNpub)
+			return
 		}
 
 		nostrLogin.Activated = verified
 		err = mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated)
 		if err != nil {
-			slog.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.Any("error", err))
-			c.JSON(500, "Opps!, something wrong happened")
+			c.Error(errors.Join(ErrCouldNotParseLogin, fmt.Errorf("mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated). %w", err)))
 			return
 		}
 
 		token, err := makeJWTToken(loginKey.Serialize())
-
 		if err != nil {
-			slog.Warn("Could not makeJWTToken", slog.Any("error", err))
-			c.JSON(500, nil)
+			c.Error(fmt.Errorf("makeJWTToken(loginKey.Serialize()). %w", err))
 			return
 		}
 

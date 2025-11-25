@@ -1,7 +1,13 @@
 package templates 
 
 templ ErrorNotif(message string) {
-	<div remove-me="3s" class="error">
+	<div id="snackbar" remove-me="3s" class="error">
+		<span>{ message }</span>
+	</div>
+}
+
+templ SuccessNotif(message string) {
+	<div id="snackbar" remove-me="3s" class="success">
 		<span>{ message }</span>
 	</div>
 }

@@ -220,26 +220,61 @@ option {
 }
 
 #notifications {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
   display: flex;
-  justify-content: center;
-  color: black;
-  min-height: 40px;
-  margin: 10px 0px;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
 }
 
-#notifications > .success {
-  background-color: #90ef6e;
-  margin-top: 15px;
-  margin-bottom: -15px;
-  padding: 10px 25px;
-  border-radius: 25px;
+#snackbar {
+  position: relative;
+  background-color: #323232;
+  color: #fff;
+  padding: 16px 24px;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  min-width: 200px;
+  max-width: 300px;
+  opacity: 0;
+  transform: translateX(120%);
+  animation: slideInOut 3s ease-in-out forwards;
+  pointer-events: auto;
 }
-#notifications > .error {
+
+#snackbar.success {
+  background-color: #90ef6e;
+  color: #000000;
+  border: 1px solid #7dd87a;
+}
+
+#snackbar.error {
   background-color: #ff6666;
-  margin-top: 15px;
-  margin-bottom: -15px;
-  padding: 10px 25px;
-  border-radius: 25px;
+  color: #000000;
+  border: 1px solid #ff4444;
+}
+
+@keyframes slideInOut {
+  0% {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  10% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  90% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(120%);
+    opacity: 0;
+  }
 }
 
 .login {
