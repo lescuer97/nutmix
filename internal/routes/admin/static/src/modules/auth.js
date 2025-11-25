@@ -25,6 +25,16 @@ export function initAuth() {
   nip07form?.addEventListener("submit", (e) => {
     e.preventDefault();
 
+    // Check if NIP-07 extension is available
+    if (!window.nostr) {
+      window.htmx.swap(
+        "#notifications",
+        '<div id="snackbar" remove-me="3s" class="warning"><span>You don\'t have a browser extension installed</span></div>',
+        { swapStyle: "innerHTML" }
+      );
+      return;
+    }
+
     let formValues = Object.values(e.target).reduce((obj, field) => {
       obj[field.name] = field.value;
       return obj;

@@ -9,16 +9,15 @@ templ LayoutEmpty() {
 }
 
 
-templ KeylockSvgIcon() {
-	<div class="m-md">
-		<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 3v3a2 2 0 0 0 2 2h3"/><circle cx="18" cy="7" r="3"/></svg>
+templ LockedLockSvgIcon() {
+	<div class="w-10 h-10">
+		<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
 	</div>
 }
 
 templ LoginPage(nonce string, adminNpubActive bool) {
 	@LayoutEmpty() {
 		<main class="main-content-full">
-			// @KeylockSvgIcon()
 			if !adminNpubActive {
 				<div class="p-6 card">
 					<h2>
@@ -32,9 +31,10 @@ templ LoginPage(nonce string, adminNpubActive bool) {
 			} else {
 				<div class="card p-6 flex flex-col items-center justify-center text-center gap-6">
 					<form id="nip07-form" class="flex flex-col items-center gap-4">
-						<h3 class="text-lg">Please make sure that you have a NIP-07 Browser add on.</h3>
+						@LockedLockSvgIcon()
+						<h3 class="text-lg">Please make sure that you have a NIP-07 Browser Extension installed.</h3>
 						<input name="passwordNonce" hidden value={ nonce }/>
-						<button class="btn btn-secondary" type="submit">Login with Browser Add-On</button>
+						<button class="btn btn-secondary" type="submit">Login with Browser Extension</button>
 					</form>
 				</div>
 			}
