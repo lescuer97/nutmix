@@ -2,17 +2,25 @@ package templates
 
 templ LayoutEmpty() {
 	@head()
-	<body>
+	<body class="app-layout">
 		<div hx-ext="remove-me" id="notifications"></div>
 		{ children... }
 	</body>
 }
 
+
+templ KeylockSvgIcon() {
+	<div class="m-md">
+		<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 3v3a2 2 0 0 0 2 2h3"/><circle cx="18" cy="7" r="3"/></svg>
+	</div>
+}
+
 templ LoginPage(nonce string, adminNpubActive bool) {
 	@LayoutEmpty() {
-		<main class="login">
+		<main class="main-content-full">
+			// @KeylockSvgIcon()
 			if !adminNpubActive {
-				<div class="admin-notif">
+				<div class="p-6 card">
 					<h2>
 						Please set the <b>ADMIN_NOSTR_NPUB</b> enviroment variable to be able to access the
 						Admin dashboard. 
@@ -22,11 +30,11 @@ templ LoginPage(nonce string, adminNpubActive bool) {
 					</h3>
 				</div>
 			} else {
-				<div class="login-form">
-					<form id="nip07-form">
-						<h3>Please make sure that you have a NIP-07 Browser add on.</h3>
+				<div class="card p-6 flex flex-col items-center justify-center text-center gap-6">
+					<form id="nip07-form" class="flex flex-col items-center gap-4">
+						<h3 class="text-lg">Please make sure that you have a NIP-07 Browser add on.</h3>
 						<input name="passwordNonce" hidden value={ nonce }/>
-						<button type="submit">Login with Browser Add-On</button>
+						<button class="btn btn-secondary" type="submit">Login with Browser Add-On</button>
 					</form>
 				</div>
 			}

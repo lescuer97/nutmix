@@ -24,7 +24,7 @@ clean:
     rm -f nutmix
 
 # Run Go application in development mode with hot reload (requires air)
-run-dev:
+run-dev: dev
     air
 
 # Build everything and run
