@@ -1,6 +1,6 @@
 {
   "name": "admin-static",
-  "version": "1.0.0",
+  "version": "",
   "description": "Frontend static assets for Nutmix Admin Dashboard",
   "main": "app.js",
   "type": "module",
@@ -11,7 +11,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "esbuild": "^0.24.0"
   },
