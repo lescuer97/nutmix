@@ -4,28 +4,28 @@
    ============================================ */
 :root {
   /* Background Colors */
-  --bg-primary: #0a0b0d;
-  --bg-secondary: #0f1114;
-  --bg-card: #12151a;
-  --bg-card-hover: #181c22;
-  --bg-sidebar: #0d0f12;
-  --bg-input: #0a0c0f;
+  --bg-primary: #0d1117;
+  --bg-secondary: #0d1117;
+  --bg-card: #161b22;
+  --bg-card-hover: #1c2128;
+  --bg-sidebar: #0d1117;
+  --bg-input: #0d1117;
   
   /* Border Colors */
-  --border-primary: #1e2228;
-  --border-secondary: #2a2f38;
+  --border-primary: #1c2128;
+  --border-secondary: #2d333b;
   --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-active: #3a4048;
+  --border-active: #3d444d;
   
   /* Text Colors */
   --text-primary: #ffffff;
-  --text-secondary: #9ca3af;
-  --text-tertiary: #6b7280;
-  --text-muted: #4b5563;
+  --text-secondary: #8b939f;
+  --text-tertiary: #5c6370;
+  --text-muted: #3d4450;
   
   /* Accent Colors */
-  --accent-cyan: #00d4aa;
-  --accent-cyan-dim: #00b894;
+  --accent-cyan: #00d9b1;
+  --accent-cyan-dim: #00c4a0;
   --accent-green: #10b981;
   --accent-red: #ef4444;
   --accent-yellow: #f59e0b;
@@ -38,10 +38,10 @@
   --eth-badge-bg: rgba(98, 126, 234, 0.15);
   
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
-  --shadow-glow-cyan: 0 0 20px rgba(0, 212, 170, 0.15);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.6);
+  --shadow-glow-cyan: 0 0 24px rgba(0, 217, 177, 0.12);
   
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -76,9 +76,9 @@
   
   /* Border Radius */
   --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
   
   /* Transitions */
