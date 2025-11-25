@@ -1,0 +1,56 @@
+/* ============================================
+   BASE CARD FOUNDATION
+   ============================================ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
+}
+
+.card:hover {
+  border-color: var(--border-secondary);
+  background: var(--bg-card-hover);
+}
+
+/* Card with subtle glow on hover */
+.card-glow:hover {
+  box-shadow: var(--shadow-glow-cyan);
+}
+
+/* Card Sizes */
+.card-sm {
+  padding: var(--space-3) var(--space-4);
+}
+
+.card-md {
+  padding: var(--space-5) var(--space-6);
+}
+
+.card-lg {
+  padding: var(--space-6) var(--space-8);
+}
+
+/* Card with header section */
+.card-header {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-header-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.card-body {
+  padding: var(--space-5);
+}
+
+.card-footer {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border-primary);
+}
