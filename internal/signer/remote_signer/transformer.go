@@ -11,11 +11,11 @@ import (
 	sig "github.com/lescuer97/nutmix/internal/gen"
 )
 
-func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) []cashu.BlindSignature {
+func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) ([]cashu.BlindSignature, error) {
 	blindSigs := []cashu.BlindSignature{}
 
 	if sigs == nil {
-		return blindSigs
+		return blindSigs, nil
 	}
 
 	blindSigs = []cashu.BlindSignature{}
@@ -25,10 +25,15 @@ func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) []ca
 			E: secp256k1.PrivKeyFromBytes(val.Dleq.E),
 			S: secp256k1.PrivKeyFromBytes(val.Dleq.S),
 		}
-		blindSigs = append(blindSigs, cashu.BlindSignature{Amount: val.Amount, C_: hex.EncodeToString(val.BlindedSecret), Id: hex.EncodeToString(val.KeysetId), Dleq: &dleq})
+
+		C_, err := secp256k1.ParsePubKey(val.BlindedSecret)
+		if err != nil {
+			return blindSigs, fmt.Errorf("secp.secp256k1(ParsePubKey(val.BlindedSecret) %w", err)
+		}
+		blindSigs = append(blindSigs, cashu.BlindSignature{Amount: val.Amount, C_: cashu.WrappedPublicKey{PublicKey: C_}, Id: hex.EncodeToString(val.KeysetId), Dleq: &dleq})
 	}
 
-	return blindSigs
+	return blindSigs, nil
 }
 
 func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.BlindedMessages, error) {
@@ -37,10 +42,8 @@ func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.Blinded
 	}
 
 	for i, val := range messages {
-		B_, err := hex.DecodeString(val.B_)
-		if err != nil {
-			return &messagesGrpc, fmt.Errorf("hex.DecodeString(val.B_). %w", err)
-		}
+		B_ := val.B_.SerializeCompressed()
+
 		idBytes, err := hex.DecodeString(val.Id)
 		if err != nil {
 			return &messagesGrpc, fmt.Errorf("hex.DecodeString(val.Id). %w", err)

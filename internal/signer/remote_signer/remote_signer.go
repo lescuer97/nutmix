@@ -196,10 +196,8 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 
 	blindedMessageRequest.BlindedMessages = []*sig.BlindedMessage{}
 	for _, val := range messages {
-		B_, err := hex.DecodeString(val.B_)
-		if err != nil {
-			return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("hex.DecodeString(val.B_). %w", err)
-		}
+		B_ := val.B_.SerializeCompressed()
+
 		bytesId, err := hex.DecodeString(val.Id)
 		if err != nil {
 			return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("hex.DecodeString(val.Id). %w", err)
@@ -222,7 +220,10 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("CheckIfSignerErrorExists(blindSigsResponse.GetError()). %w", err)
 	}
 
-	blindSigs := ConvertSigBlindSignaturesToCashuBlindSigs(blindSigsResponse)
+	blindSigs, err := ConvertSigBlindSignaturesToCashuBlindSigs(blindSigsResponse)
+	if err != nil {
+		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("CheckIfSignerErrorExists(blindSigsResponse.GetError()). %w", err)
+	}
 	// verify we have the same amount of blindedmessages than BlindSignatures
 	if len(blindSigs) != len(messages) {
 		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("Not the correct amount of blind signatures")
@@ -254,10 +255,7 @@ func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {
 	proofsVericationRequest.Proof = make([]*sig.Proof, len(proofs))
 	for i, val := range proofs {
 
-		C, err := hex.DecodeString(val.C)
-		if err != nil {
-			return fmt.Errorf("hex.DecodeString(val.C). %w", err)
-		}
+		C := val.C.SerializeCompressed()
 
 		bytesId, err := hex.DecodeString(val.Id)
 		if err != nil {

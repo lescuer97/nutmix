@@ -135,7 +135,7 @@ func (p *PostSwapRequest) makeSigAllMsg() string {
 		message = message + proof.Secret
 	}
 	for _, blindMessage := range p.Outputs {
-		message = message + blindMessage.B_
+		message = message + blindMessage.B_.String()
 	}
 	return message
 }
