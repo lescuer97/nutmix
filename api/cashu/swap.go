@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 )
 
 type PostSwapRequest struct {
@@ -135,7 +134,7 @@ func (p *PostSwapRequest) firstProofValues() error {
 func (p *PostSwapRequest) makeSigAllMsg() string {
 	message := ""
 	for _, proof := range p.Inputs {
-		message = message + proof.Secret + proof.C
+		message = message + proof.Secret + proof.C.String()
 	}
 	for _, blindMessage := range p.Outputs {
 		message = message + blindMessage.B_.String()
