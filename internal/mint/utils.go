@@ -149,16 +149,18 @@ func (m *Mint) VerifyInputsAndOutputs(tx pgx.Tx, proofs cashu.Proofs, outputs []
 		return fmt.Errorf("(proofs.Amount() - (uint64(fee) + AmountSignature)). %w", cashu.ErrUnbalanced)
 	}
 
-	err = m.verifyProofs(proofs)
+	// Only verify BDHKE here since spend conditions are verified separately before calling this function
+	err = m.VerifyProofsBDHKE(proofs)
 	if err != nil {
-		return fmt.Errorf("m.verifyProofs(proofs). %w", err)
+		return fmt.Errorf("m.VerifyProofsBDHKE(proofs). %w", err)
 	}
 
 	return nil
 }
 
-func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
-
+// VerifyProofsSpendConditions verifies P2PK and HTLC conditions for each proof individually.
+// This should NOT be called when SIG_ALL is present - use ValidateSigflag() instead.
+func (m *Mint) VerifyProofsSpendConditions(proofs cashu.Proofs) error {
 	for _, proof := range proofs {
 		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
 		if err != nil {
@@ -174,7 +176,7 @@ func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
 			case cashu.P2PK:
 				valid, err := proof.VerifyP2PK(spendCondition)
 				if err != nil {
-					return fmt.Errorf("proof.VerifyP2PK(spendCondition, witness). %w", err)
+					return fmt.Errorf("proof.VerifyP2PK(spendCondition). %w", err)
 				}
 				if !valid {
 					return cashu.ErrInvalidSpendCondition
@@ -182,7 +184,7 @@ func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
 			case cashu.HTLC:
 				valid, err := proof.VerifyHTLC(spendCondition)
 				if err != nil {
-					return fmt.Errorf("proof.VerifyP2PK(spendCondition, witness). %w", err)
+					return fmt.Errorf("proof.VerifyHTLC(spendCondition). %w", err)
 				}
 				if !valid {
 					return cashu.ErrInvalidSpendCondition
@@ -196,13 +198,19 @@ func (m *Mint) verifyProofs(proofs cashu.Proofs) error {
 			}
 		}
 	}
+	return nil
+}
+
+// VerifyProofsBDHKE verifies the BDHKE cryptographic signatures of the proofs.
+// This should always be called regardless of SIG_ALL.
+func (m *Mint) VerifyProofsBDHKE(proofs cashu.Proofs) error {
 	err := m.Signer.VerifyProofs(proofs)
 	if err != nil {
 		return fmt.Errorf("m.Signer.VerifyProofs(proofs). %w", err)
 	}
-
 	return nil
 }
+
 func (m *Mint) IsInternalTransaction(request string) (bool, error) {
 	ctx := context.Background()
 	tx, err := m.MintDB.GetTx(context.Background())
