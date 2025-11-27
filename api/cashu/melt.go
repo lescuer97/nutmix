@@ -2,6 +2,7 @@ package cashu
 
 import (
 	"fmt"
+	"strconv"
 )
 
 type ACTION_STATE string
@@ -161,13 +162,15 @@ func (p *PostMeltBolt11Request) verifyConditions() error {
 	return nil
 }
 
+// makeSigAllMsg creates the message for SIG_ALL signature verification
+// Format: secret_0 || C_0 || ... || secret_n || C_n || amount_0 || B_0 || ... || amount_m || B_m || quote_id
 func (p *PostMeltBolt11Request) makeSigAllMsg() string {
 	message := ""
 	for _, proof := range p.Inputs {
 		message = message + proof.Secret + proof.C.String()
 	}
 	for _, blindMessage := range p.Outputs {
-		message = message + blindMessage.B_.String()
+		message = message + strconv.FormatUint(blindMessage.Amount, 10) + blindMessage.B_.String()
 	}
 	message = message + p.Quote
 	return message

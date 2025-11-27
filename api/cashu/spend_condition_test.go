@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
@@ -458,3 +459,645 @@ func TestVectorRefundSigInvalidFromFuture(t *testing.T) {
 // 		t.Errorf("Error should be ErrNotEnoughSignatures. %+v", err)
 // 	}
 // }
+
+// =====================================================
+// Marshalling and Constant Tests
+// =====================================================
+
+// TestSpendConditionTypeConstants verifies the correct iota values for SpendConditionType
+func TestSpendConditionTypeConstants(t *testing.T) {
+	if AnyOneCanSpend != 0 {
+		t.Errorf("AnyOneCanSpend should be 0, got %d", AnyOneCanSpend)
+	}
+	if P2PK != 1 {
+		t.Errorf("P2PK should be 1, got %d", P2PK)
+	}
+	if HTLC != 2 {
+		t.Errorf("HTLC should be 2, got %d", HTLC)
+	}
+}
+
+// TestTagsConstants verifies the correct iota values for Tags
+func TestTagsConstants(t *testing.T) {
+	if Sigflag != 1 {
+		t.Errorf("Sigflag should be 1, got %d", Sigflag)
+	}
+	if Pubkeys != 2 {
+		t.Errorf("Pubkeys should be 2, got %d", Pubkeys)
+	}
+	if NSigs != 3 {
+		t.Errorf("NSigs should be 3, got %d", NSigs)
+	}
+	if Locktime != 4 {
+		t.Errorf("Locktime should be 4, got %d", Locktime)
+	}
+	if Refund != 5 {
+		t.Errorf("Refund should be 5, got %d", Refund)
+	}
+	if NSigRefund != 6 {
+		t.Errorf("NSigRefund should be 6, got %d", NSigRefund)
+	}
+}
+
+// TestSigFlagConstants verifies the correct iota values for SigFlag
+func TestSigFlagConstants(t *testing.T) {
+	if SigAll != 1 {
+		t.Errorf("SigAll should be 1, got %d", SigAll)
+	}
+	if SigInputs != 2 {
+		t.Errorf("SigInputs should be 2, got %d", SigInputs)
+	}
+}
+
+// TestNSigRefundString verifies NSigRefund.String() returns "n_sigs_refund"
+func TestNSigRefundString(t *testing.T) {
+	if NSigRefund.String() != "n_sigs_refund" {
+		t.Errorf("NSigRefund.String() should be 'n_sigs_refund', got '%s'", NSigRefund.String())
+	}
+}
+
+// TestSpendConditionMarshalRoundTrip tests unmarshal -> marshal -> unmarshal produces consistent results
+func TestSpendConditionMarshalRoundTrip(t *testing.T) {
+	// Parse original P2PK secret
+	var proof Proof
+	err := json.Unmarshal([]byte(singleProofWithP2PK), &proof)
+	if err != nil {
+		t.Fatalf("failed to unmarshal proof: %v", err)
+	}
+
+	var original SpendCondition
+	err = json.Unmarshal([]byte(proof.Secret), &original)
+	if err != nil {
+		t.Fatalf("failed to unmarshal spend condition: %v", err)
+	}
+
+	// Verify original parsed correctly
+	if original.Type != P2PK {
+		t.Errorf("expected P2PK type, got %d", original.Type)
+	}
+	if original.Data.Tags.Sigflag != SigAll {
+		t.Errorf("expected SigAll flag, got %d", original.Data.Tags.Sigflag)
+	}
+
+	// Marshal back to JSON
+	marshalled, err := original.MarshalJSON()
+	if err != nil {
+		t.Fatalf("failed to marshal spend condition: %v", err)
+	}
+
+	// Unmarshal the marshalled JSON
+	var roundTrip SpendCondition
+	err = json.Unmarshal(marshalled, &roundTrip)
+	if err != nil {
+		t.Fatalf("failed to unmarshal marshalled spend condition: %v", err)
+	}
+
+	// Verify round-trip consistency
+	if roundTrip.Type != original.Type {
+		t.Errorf("type mismatch: original=%d, roundTrip=%d", original.Type, roundTrip.Type)
+	}
+	if roundTrip.Data.Nonce != original.Data.Nonce {
+		t.Errorf("nonce mismatch: original=%s, roundTrip=%s", original.Data.Nonce, roundTrip.Data.Nonce)
+	}
+	if roundTrip.Data.Data != original.Data.Data {
+		t.Errorf("data mismatch: original=%s, roundTrip=%s", original.Data.Data, roundTrip.Data.Data)
+	}
+	if roundTrip.Data.Tags.Sigflag != original.Data.Tags.Sigflag {
+		t.Errorf("sigflag mismatch: original=%d, roundTrip=%d", original.Data.Tags.Sigflag, roundTrip.Data.Tags.Sigflag)
+	}
+	if roundTrip.Data.Tags.NSigs != original.Data.Tags.NSigs {
+		t.Errorf("n_sigs mismatch: original=%d, roundTrip=%d", original.Data.Tags.NSigs, roundTrip.Data.Tags.NSigs)
+	}
+	if roundTrip.Data.Tags.Locktime != original.Data.Tags.Locktime {
+		t.Errorf("locktime mismatch: original=%d, roundTrip=%d", original.Data.Tags.Locktime, roundTrip.Data.Tags.Locktime)
+	}
+	if len(roundTrip.Data.Tags.Pubkeys) != len(original.Data.Tags.Pubkeys) {
+		t.Errorf("pubkeys length mismatch: original=%d, roundTrip=%d", len(original.Data.Tags.Pubkeys), len(roundTrip.Data.Tags.Pubkeys))
+	}
+	if len(roundTrip.Data.Tags.Refund) != len(original.Data.Tags.Refund) {
+		t.Errorf("refund length mismatch: original=%d, roundTrip=%d", len(original.Data.Tags.Refund), len(roundTrip.Data.Tags.Refund))
+	}
+}
+
+// TestTagsInfoMarshalJSON tests TagsInfo marshalling produces correct format
+func TestTagsInfoMarshalJSON(t *testing.T) {
+	// Parse a proof with tags
+	var proof Proof
+	err := json.Unmarshal([]byte(singleProofWithP2PK), &proof)
+	if err != nil {
+		t.Fatalf("failed to unmarshal proof: %v", err)
+	}
+
+	var sc SpendCondition
+	err = json.Unmarshal([]byte(proof.Secret), &sc)
+	if err != nil {
+		t.Fatalf("failed to unmarshal spend condition: %v", err)
+	}
+
+	// Marshal tags
+	tagsJSON, err := sc.Data.Tags.MarshalJSON()
+	if err != nil {
+		t.Fatalf("failed to marshal tags: %v", err)
+	}
+
+	// Verify it's valid JSON array
+	var parsed [][]string
+	err = json.Unmarshal(tagsJSON, &parsed)
+	if err != nil {
+		t.Fatalf("marshalled tags is not valid JSON array: %v", err)
+	}
+
+	// Verify sigflag tag exists and has correct format
+	foundSigflag := false
+	for _, tag := range parsed {
+		if len(tag) >= 2 && tag[0] == "sigflag" {
+			foundSigflag = true
+			if tag[1] != "SIG_ALL" {
+				t.Errorf("expected SIG_ALL, got %s", tag[1])
+			}
+		}
+	}
+	if !foundSigflag {
+		t.Error("sigflag tag not found in marshalled output")
+	}
+}
+
+// TestHasSigAllMethod tests the HasSigAll() method
+func TestHasSigAllMethod(t *testing.T) {
+	// Test with SIG_ALL
+	var proofSigAll Proof
+	err := json.Unmarshal([]byte(singleProofWithP2PK), &proofSigAll)
+	if err != nil {
+		t.Fatalf("failed to unmarshal proof: %v", err)
+	}
+
+	var scSigAll SpendCondition
+	err = json.Unmarshal([]byte(proofSigAll.Secret), &scSigAll)
+	if err != nil {
+		t.Fatalf("failed to unmarshal spend condition: %v", err)
+	}
+
+	if !scSigAll.HasSigAll() {
+		t.Error("HasSigAll() should return true for SIG_ALL condition")
+	}
+
+	// Test with SIG_INPUTS
+	var proofSigInputs Proof
+	err = json.Unmarshal([]byte(singleProofWithHTLC), &proofSigInputs)
+	if err != nil {
+		t.Fatalf("failed to unmarshal proof: %v", err)
+	}
+
+	var scSigInputs SpendCondition
+	err = json.Unmarshal([]byte(proofSigInputs.Secret), &scSigInputs)
+	if err != nil {
+		t.Fatalf("failed to unmarshal spend condition: %v", err)
+	}
+
+	if scSigInputs.HasSigAll() {
+		t.Error("HasSigAll() should return false for SIG_INPUTS condition")
+	}
+}
+
+// TestAnyOneCanSpendDetection tests that non-JSON 64-byte secrets are identified correctly
+func TestAnyOneCanSpendDetection(t *testing.T) {
+	// Create a proof with a 64-byte hex secret (not JSON structured)
+	plainSecret := "a3d98f6b2c1e4f5d8c7b6a9e0f1d2c3b4a5e6f7d8c9b0a1e2f3d4c5b6a7e8f9d"
+	proofWithPlainSecret := Proof{
+		Amount: 1,
+		Id:     "009a1f293253e41e",
+		Secret: plainSecret,
+	}
+
+	// IsProofSpendConditioned should return false for plain secrets
+	isLocked, spendCondition, err := proofWithPlainSecret.IsProofSpendConditioned()
+	if err != nil {
+		// Plain secrets that aren't valid JSON should not return an error
+		// They should simply return false, nil, nil
+		t.Logf("Note: plain secret returned error (expected for non-JSON): %v", err)
+	}
+
+	if isLocked {
+		t.Error("plain 64-byte secret should not be detected as spend conditioned")
+	}
+	if spendCondition != nil {
+		t.Error("spendCondition should be nil for plain secret")
+	}
+}
+
+// TestProofsHaveSigAll tests the ProofsHaveSigAll helper function
+func TestProofsHaveSigAll(t *testing.T) {
+	// Test with proof that has SIG_ALL
+	var proofSigAll Proof
+	err := json.Unmarshal([]byte(singleProofWithP2PK), &proofSigAll)
+	if err != nil {
+		t.Fatalf("failed to unmarshal proof: %v", err)
+	}
+
+	proofs := Proofs{proofSigAll}
+	hasSigAll, err := ProofsHaveSigAll(proofs)
+	if err != nil {
+		t.Fatalf("ProofsHaveSigAll returned error: %v", err)
+	}
+	if !hasSigAll {
+		t.Error("ProofsHaveSigAll should return true for proofs with SIG_ALL")
+	}
+
+	// Test with proof that has SIG_INPUTS
+	var proofSigInputs Proof
+	err = json.Unmarshal([]byte(singleProofWithHTLC), &proofSigInputs)
+	if err != nil {
+		t.Fatalf("failed to unmarshal proof: %v", err)
+	}
+
+	proofsSigInputs := Proofs{proofSigInputs}
+	hasSigAll, err = ProofsHaveSigAll(proofsSigInputs)
+	if err != nil {
+		t.Fatalf("ProofsHaveSigAll returned error: %v", err)
+	}
+	if hasSigAll {
+		t.Error("ProofsHaveSigAll should return false for proofs with SIG_INPUTS")
+	}
+
+	// Test with mixed proofs - should return true if any has SIG_ALL
+	mixedProofs := Proofs{proofSigInputs, proofSigAll}
+	hasSigAll, err = ProofsHaveSigAll(mixedProofs)
+	if err != nil {
+		t.Fatalf("ProofsHaveSigAll returned error: %v", err)
+	}
+	if !hasSigAll {
+		t.Error("ProofsHaveSigAll should return true if any proof has SIG_ALL")
+	}
+}
+
+// TestSpendConditionTypeIsSpendConditioned tests the IsSpendConditioned helper method
+func TestSpendConditionTypeIsSpendConditioned(t *testing.T) {
+	if AnyOneCanSpend.IsSpendConditioned() {
+		t.Error("AnyOneCanSpend should not be spend conditioned")
+	}
+	if !P2PK.IsSpendConditioned() {
+		t.Error("P2PK should be spend conditioned")
+	}
+	if !HTLC.IsSpendConditioned() {
+		t.Error("HTLC should be spend conditioned")
+	}
+}
+
+// =====================================================
+// Negative Tests - Invalid Inputs and Error Cases
+// =====================================================
+
+// TestInvalidSpendConditionTypeString tests unmarshalling with invalid type string
+func TestInvalidSpendConditionTypeString(t *testing.T) {
+	invalidJSON := `["INVALID_TYPE",{"nonce":"test","data":"test","tags":[]}]`
+	var sc SpendCondition
+	err := json.Unmarshal([]byte(invalidJSON), &sc)
+	if err != nil {
+		t.Fatalf("unmarshal should not fail for invalid type (should default to AnyOneCanSpend): %v", err)
+	}
+	// Should default to AnyOneCanSpend (0) for invalid types
+	if sc.Type != AnyOneCanSpend {
+		t.Errorf("expected AnyOneCanSpend for invalid type, got %d", sc.Type)
+	}
+}
+
+// TestInvalidTagName tests unmarshalling with invalid tag name
+func TestInvalidTagName(t *testing.T) {
+	invalidTagsJSON := `[["invalid_tag","value"]]`
+	var tags TagsInfo
+	err := json.Unmarshal([]byte(invalidTagsJSON), &tags)
+	if err == nil {
+		t.Error("expected error for invalid tag name, got nil")
+	}
+	if !errors.Is(err, ErrInvalidTagName) {
+		t.Errorf("expected ErrInvalidTagName, got %v", err)
+	}
+}
+
+// TestInvalidSigFlagValue tests unmarshalling with invalid sigflag value
+func TestInvalidSigFlagValue(t *testing.T) {
+	invalidSigFlagJSON := `[["sigflag","INVALID_SIG_FLAG"]]`
+	var tags TagsInfo
+	err := json.Unmarshal([]byte(invalidSigFlagJSON), &tags)
+	if err == nil {
+		t.Error("expected error for invalid sigflag value, got nil")
+	}
+	if !errors.Is(err, ErrInvalidSigFlag) {
+		t.Errorf("expected ErrInvalidSigFlag, got %v", err)
+	}
+}
+
+// TestMalformedTagArray tests unmarshalling with malformed tag arrays
+func TestMalformedTagArray(t *testing.T) {
+	testCases := []struct {
+		name      string
+		json      string
+		expectErr bool
+	}{
+		{
+			name:      "empty tag array",
+			json:      `[[]]`,
+			expectErr: true,
+		},
+		{
+			name:      "tag with only name, no value",
+			json:      `[["sigflag"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "sigflag with multiple values",
+			json:      `[["sigflag","SIG_ALL","extra"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "n_sigs with no value",
+			json:      `[["n_sigs"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "pubkeys with no values",
+			json:      `[["pubkeys"]]`,
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var tags TagsInfo
+			err := json.Unmarshal([]byte(tc.json), &tags)
+			if tc.expectErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestInvalidPublicKeyFormat tests unmarshalling with invalid public key hex strings
+func TestInvalidPublicKeyFormat(t *testing.T) {
+	testCases := []struct {
+		name      string
+		json      string
+		expectErr bool
+	}{
+		{
+			name:      "invalid hex in pubkeys",
+			json:      `[["pubkeys","not_hex_string"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "invalid hex in refund",
+			json:      `[["refund","not_hex_string"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "too short hex string",
+			json:      `[["pubkeys","0123"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "invalid public key bytes",
+			json:      `[["pubkeys","0000000000000000000000000000000000000000000000000000000000000000"]]`,
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var tags TagsInfo
+			err := json.Unmarshal([]byte(tc.json), &tags)
+			if tc.expectErr && err == nil {
+				t.Error("expected error for invalid public key, got nil")
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestInvalidNumericValues tests unmarshalling with invalid numeric tag values
+func TestInvalidNumericValues(t *testing.T) {
+	testCases := []struct {
+		name      string
+		json      string
+		expectErr bool
+	}{
+		{
+			name:      "n_sigs with non-numeric value",
+			json:      `[["n_sigs","not_a_number"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "n_sigs_refund with non-numeric value",
+			json:      `[["n_sigs_refund","not_a_number"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "locktime with non-numeric value",
+			json:      `[["locktime","not_a_number"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "n_sigs with negative number string",
+			json:      `[["n_sigs","-1"]]`,
+			expectErr: true, // strconv.ParseUint fails on negative numbers
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var tags TagsInfo
+			err := json.Unmarshal([]byte(tc.json), &tags)
+			if tc.expectErr && err == nil {
+				t.Error("expected error for invalid numeric value, got nil")
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestInvalidSpendConditionJSONStructure tests unmarshalling with invalid JSON structures
+func TestInvalidSpendConditionJSONStructure(t *testing.T) {
+	testCases := []struct {
+		name      string
+		json      string
+		expectErr bool
+		validate  func(*testing.T, SpendCondition) // Optional validation function
+	}{
+		{
+			name:      "not an array",
+			json:      `{"type":"P2PK"}`,
+			expectErr: true,
+		},
+		{
+			name:      "array with only one element",
+			json:      `["P2PK"]`,
+			expectErr: false, // JSON unmarshal succeeds but Data may be incomplete
+			validate: func(t *testing.T, sc SpendCondition) {
+				// Verify that unmarshalling with incomplete data doesn't crash
+				if sc.Type != P2PK {
+					t.Errorf("expected P2PK type, got %d", sc.Type)
+				}
+			},
+		},
+		{
+			name:      "array with more than two elements",
+			json:      `["P2PK",{"nonce":"test"},"extra"]`,
+			expectErr: false, // JSON unmarshal may succeed but ignore extra elements
+			validate: func(t *testing.T, sc SpendCondition) {
+				// Verify that extra elements are ignored
+				if sc.Type != P2PK {
+					t.Errorf("expected P2PK type, got %d", sc.Type)
+				}
+			},
+		},
+		{
+			name:      "second element not an object",
+			json:      `["P2PK","not_an_object"]`,
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var sc SpendCondition
+			err := json.Unmarshal([]byte(tc.json), &sc)
+			if tc.expectErr && err == nil {
+				t.Error("expected error for invalid JSON structure, got nil")
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !tc.expectErr && err == nil && tc.validate != nil {
+				tc.validate(t, sc)
+			}
+		})
+	}
+}
+
+// TestMarshalAnyOneCanSpendError tests that marshalling AnyOneCanSpend returns an error
+func TestMarshalAnyOneCanSpendError(t *testing.T) {
+	sc := SpendCondition{
+		Type: AnyOneCanSpend,
+		Data: SpendConditionData{
+			Nonce: "test",
+			Data:  "test",
+		},
+	}
+
+	_, err := sc.MarshalJSON()
+	if err == nil {
+		t.Error("expected error when marshalling AnyOneCanSpend, got nil")
+	}
+	if !errors.Is(err, ErrInvalidSpendCondition) {
+		t.Errorf("expected ErrInvalidSpendCondition, got %v", err)
+	}
+}
+
+// TestCheckValidWithTooManyPubkeys tests CheckValid with too many pubkeys
+func TestCheckValidWithTooManyPubkeys(t *testing.T) {
+	// Create a spend condition with more than 10 total pubkeys (pubkeys + refund)
+	sc := SpendCondition{
+		Type: P2PK,
+		Data: SpendConditionData{
+			Tags: TagsInfo{
+				Pubkeys: make([]*btcec.PublicKey, 6),
+				Refund:  make([]*btcec.PublicKey, 5), // Total = 11 > 10
+			},
+		},
+	}
+
+	// Create dummy pubkeys (we'll use nil for testing, but in real scenario they'd be valid)
+	// For this test, we just check the count logic
+	err := sc.CheckValid()
+	if err == nil {
+		t.Error("expected error for too many pubkeys, got nil")
+	}
+	if !errors.Is(err, ErrInvalidSpendCondition) {
+		t.Errorf("expected ErrInvalidSpendCondition, got %v", err)
+	}
+}
+
+// TestTagFromStringInvalid tests TagFromString with invalid tag names
+func TestTagFromStringInvalid(t *testing.T) {
+	invalidTags := []string{
+		"",
+		"invalid",
+		"sig_flag",  // wrong format
+		"pubkey",    // singular instead of plural
+		"n_sig",     // singular instead of plural
+		"lock_time", // wrong format
+		"refunds",   // plural instead of singular
+	}
+
+	for _, tag := range invalidTags {
+		t.Run(tag, func(t *testing.T) {
+			result, err := TagFromString(tag)
+			if err == nil {
+				t.Errorf("expected error for tag '%s', got nil (result: %d)", tag, result)
+			}
+			if !errors.Is(err, ErrInvalidTagName) {
+				t.Errorf("expected ErrInvalidTagName for tag '%s', got %v", tag, err)
+			}
+		})
+	}
+}
+
+// TestSigFlagFromStringInvalid tests SigFlagFromString with invalid flag values
+func TestSigFlagFromStringInvalid(t *testing.T) {
+	invalidFlags := []string{
+		"",
+		"INVALID",
+		"SIG_ALL_INPUTS",
+		"SIG_NONE",
+		"sig_all", // lowercase
+		"Sig_All", // mixed case
+	}
+
+	for _, flag := range invalidFlags {
+		t.Run(flag, func(t *testing.T) {
+			result, err := SigFlagFromString(flag)
+			if err == nil {
+				t.Errorf("expected error for flag '%s', got nil (result: %d)", flag, result)
+			}
+		})
+	}
+}
+
+// TestSpendConditionTypeStringInvalid tests String() with invalid type
+func TestSpendConditionTypeStringInvalid(t *testing.T) {
+	invalidType := SpendConditionType(999)
+	str, err := invalidType.String()
+	if err == nil {
+		t.Errorf("expected error for invalid type, got nil (string: %s)", str)
+	}
+	if !errors.Is(err, ErrConvertSpendConditionToString) {
+		t.Errorf("expected ErrConvertSpendConditionToString, got %v", err)
+	}
+}
+
+// TestProofsHaveSigAllWithInvalidProof tests ProofsHaveSigAll with proof that fails to parse
+func TestProofsHaveSigAllWithInvalidProof(t *testing.T) {
+	// Create a proof with invalid secret that will cause parse error
+	invalidProof := Proof{
+		Amount: 1,
+		Id:     "test",
+		Secret: `["INVALID",{"malformed":true}]`, // Invalid structure
+	}
+
+	proofs := Proofs{invalidProof}
+	_, err := ProofsHaveSigAll(proofs)
+	// Should handle gracefully - either return false or error
+	if err == nil {
+		// If no error, should return false for invalid proof
+		hasSigAll, _ := ProofsHaveSigAll(proofs)
+		if hasSigAll {
+			t.Error("ProofsHaveSigAll should return false for invalid proof")
+		}
+	}
+}
