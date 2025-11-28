@@ -36,7 +36,7 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 		c.Next()
 
 		if len(c.Errors) > 0 {
-			message := "Unknown Problem"
+			message := "Something went wrong"
 			for _, e := range c.Errors {
 				switch {
 				case errors.Is(e, utils.ErrAlreadyLNPaying):
@@ -53,7 +53,10 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 					message = ErrInvalidStrikeCheck.Error()
 				case errors.Is(e, ErrIncorrectNpub):
 					message = ErrIncorrectNpub.Error()
-					c.Status(http.StatusBadRequest)
+				case errors.Is(e, ErrCouldNotParseLogin):
+					message = ErrCouldNotParseLogin.Error()
+				case errors.Is(e, ErrInvalidNostrSignature):
+					message = ErrInvalidNostrSignature.Error()
 				}
 			}
 			slog.Error("Error from calls", slog.String("errors", c.Errors.String()))
@@ -71,23 +74,27 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 	}
 }
 
-//go:embed static/*.css static/*.js
-var static embed.FS
+//go:embed static/dist/js/*.js static/dist/css/*.css
+var staticEmbed embed.FS
 
 //go:embed templates/*.html
 var templatesFs embed.FS
 
 func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
-	contentStatic, err := fs.Sub(static, "static")
+	// Create a file server for the embedded static files
+	// The embed contains files at: static/dist/js/*.js and static/dist/css/*.css
+	// We need to serve them at /js and /css routes
+	jsFS, err := fs.Sub(staticEmbed, "static/dist/js")
 	if err != nil {
-		slog.Error(
-			`fs.Sub(static, "static")`,
-			slog.String(utils.LogExtraInfo, err.Error()),
-		)
-		panic(err)
+		log.Panicf("could not create correct /dist/js directory")
 	}
-	httpFs := http.FS(contentStatic)
-	r.StaticFS("/static", httpFs)
+	cssFS, err := fs.Sub(staticEmbed, "static/dist/css")
+	if err != nil {
+		log.Panicf("could not create correct /dist/css directory")
+	}
+
+	r.StaticFS("/js", http.FS(jsFS))
+	r.StaticFS("/css", http.FS(cssFS))
 
 	templ := template.Must(template.ParseFS(templatesFs, "templates/*.html"))
 	r.SetHTMLTemplate(templ)
@@ -136,10 +143,15 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 			c.Abort()
 		}
 	})
+	// Create token blacklist
+	tokenBlacklist := NewTokenBlacklist()
 
 	adminRoute.Use(ErrorHtmlMessageMiddleware())
 	// I use the first active keyset as secret for jwt token signing
-	adminRoute.Use(AuthMiddleware(loginKey.Serialize()))
+	adminRoute.Use(AuthMiddleware(loginKey.Serialize(), tokenBlacklist))
+
+	adminHandler := newAdminHandler(mint)
+
 	// PAGES SETUP
 	// This is /admin pages
 	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
@@ -153,12 +165,13 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
 		adminRoute.POST("/mintsettings", MintSettingsForm(mint))
 		adminRoute.POST("/bolt11", Bolt11Post(mint))
-		adminRoute.POST("/rotate/sats", RotateSatsSeed(mint))
+		adminRoute.POST("/rotate/sats", RotateSatsSeed(&adminHandler))
+		adminRoute.POST("/logout", LogoutHandler(tokenBlacklist))
 
 		// fractional html components
-		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint))
+		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(&adminHandler))
 		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
-		adminRoute.GET("/mint-balance", MintBalance(mint))
+		adminRoute.GET("/mint-balance", MintBalance(&adminHandler))
 		adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint))
 		adminRoute.GET("/mint-melt-list", MintMeltList(mint))
 		adminRoute.GET("/logs", LogsTab())
@@ -254,7 +267,6 @@ func LogsTab() gin.HandlerFunc {
 		}
 
 		file, err := os.Open(logsdir + "/" + m.LogFileName)
-		defer file.Close()
 		if err != nil {
 			slog.Warn(
 				"os.Open(logsdir ",
@@ -267,6 +279,7 @@ func LogsTab() gin.HandlerFunc {
 			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
+		defer file.Close()
 
 		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo}, timeRequestDuration.RollBackFromNow())
 
