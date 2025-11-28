@@ -272,7 +272,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 
 }
 
-func CreateHTLCBlindedMessages(amount uint64, keyset signer.GetKeysResponse, preimage string, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
+func CreateHTLCBlindedMessages(amount uint64, keyset signer.GetKeysResponse, preimage string, nSigs uint, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime uint, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
 	splitAmounts := cashu.AmountSplit(amount)
 	splitLen := len(splitAmounts)
 
@@ -318,7 +318,7 @@ func CreateHTLCBlindedMessages(amount uint64, keyset signer.GetKeysResponse, pre
 	return blindedMessages, secrets, rs, nil
 }
 
-func makeHTLCSpendCondition(preimage string, nSigs int, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime int, sigflag cashu.SigFlag) (cashu.SpendCondition, error) {
+func makeHTLCSpendCondition(preimage string, nSigs uint, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime uint, sigflag cashu.SigFlag) (cashu.SpendCondition, error) {
 
 	bytesPreimage, err := hex.DecodeString(preimage)
 	if err != nil {
@@ -592,7 +592,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 	currentPlus15 := time.Now().Add(15 * time.Minute).Unix()
 
 	// generate new blind signatures with timelock over 15 minutes of current time
-	swapBlindedMessagesHTLCWrongSigsOverlock, swapSecretsHTLC, swapSecretKeyHTLC, err := CreateHTLCBlindedMessages(1000, activeKeys, correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyOne.PubKey(), lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, int(currentPlus15), cashu.SigInputs)
+	swapBlindedMessagesHTLCWrongSigsOverlock, swapSecretsHTLC, swapSecretKeyHTLC, err := CreateHTLCBlindedMessages(1000, activeKeys, correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyOne.PubKey(), lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, uint(currentPlus15), cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("Error generating proofs: %v", err)

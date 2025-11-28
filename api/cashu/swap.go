@@ -1,8 +1,9 @@
 package cashu
 
 import (
-	"encoding/json"
 	"fmt"
+	"log"
+	"strconv"
 )
 
 type PostSwapRequest struct {
@@ -15,6 +16,7 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 	if err != nil {
 		return fmt.Errorf("checkForSigAll(p.Inputs). %w", err)
 	}
+	log.Println("sigflagValidation: ", sigFlagValidation.sigFlag)
 	if sigFlagValidation.sigFlag == SigAll {
 
 		firstSpendCondition, err := p.Inputs[0].parseSpendCondition()
@@ -33,11 +35,6 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 			return ErrNoValidSignatures
 		}
 
-		err = firstSpendCondition.CheckValid()
-		if err != nil {
-			return fmt.Errorf("firstSpendCondition.CheckValid(). %w", err)
-		}
-
 		// check tha conditions are met
 		err = p.verifyConditions()
 		if err != nil {
@@ -47,7 +44,9 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		// makes message
 		msg := p.makeSigAllMsg()
 
-		pubkeys, err := p.Inputs[0].Pubkeys()
+		log.Println("\n msg: ", msg)
+
+		pubkeys, err := p.Inputs[0].PubkeysForVerification()
 		if err != nil {
 			return fmt.Errorf("p.Inputs[0].Pubkeys(). %w", err)
 		}
@@ -56,6 +55,9 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		if err != nil {
 			return err
 		}
+
+		log.Println("amountOfSigs: ", amountOfSigs)
+		log.Println("sigFlagValidation.signaturesRequired: ", sigFlagValidation.signaturesRequired)
 
 		if amountOfSigs >= sigFlagValidation.signaturesRequired {
 			return nil
@@ -91,51 +93,15 @@ func (p *PostSwapRequest) verifyConditions() error {
 	return nil
 }
 
-func (p *PostSwapRequest) firstProofValues() error {
-	firstProof := p.Inputs[0]
-	firstSpendCondition, err := firstProof.parseSpendCondition()
-	if err != nil {
-		return nil
-	}
-
-	firstTagString, err := json.Marshal(firstSpendCondition.Data.Tags)
-	if err != nil {
-		return nil
-	}
-
-	for _, proof := range p.Inputs {
-		spendCondition, err := proof.parseSpendCondition()
-		if err != nil {
-			return nil
-		}
-
-		if spendCondition.Data.Data != firstSpendCondition.Data.Data {
-			return ErrInvalidSpendCondition
-		}
-		if spendCondition.Data.Tags.NSigRefund != firstSpendCondition.Data.Tags.NSigRefund {
-			return ErrInvalidSpendCondition
-		}
-
-		tagString, err := json.Marshal(spendCondition.Data.Tags)
-		if err != nil {
-			return nil
-		}
-
-		if string(tagString) != string(firstTagString) {
-			return ErrInvalidSpendCondition
-		}
-
-	}
-	return nil
-}
-
+// makeSigAllMsg creates the message for SIG_ALL signature verification
+// Format: secret_0 || C_0 || ... || secret_n || C_n || amount_0 || B_0 || ... || amount_m || B_m
 func (p *PostSwapRequest) makeSigAllMsg() string {
 	message := ""
 	for _, proof := range p.Inputs {
-		message = message + proof.Secret
+		message = message + proof.Secret + proof.C.String()
 	}
 	for _, blindMessage := range p.Outputs {
-		message = message + blindMessage.B_.String()
+		message = message + strconv.FormatUint(blindMessage.Amount, 10) + blindMessage.B_.String()
 	}
 	return message
 }

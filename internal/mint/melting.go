@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 
 	"github.com/jackc/pgconn"
@@ -268,16 +269,35 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w", cashu.ErrNotEnoughtProofs)
 	}
 
-	err = m.verifyProofs(meltRequest.Inputs)
+	log.Printf("\n meltRequest.Inputs: %+v", meltRequest.Inputs)
+
+	// Verify spending conditions
+	hasSigAll, err := cashu.ProofsHaveSigAll(meltRequest.Inputs)
 	if err != nil {
-		slog.Debug("m.verifyProofs(meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.verifyProofs(meltRequest.Inputs) %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("cashu.ProofsHaveSigAll(meltRequest.Inputs) %w", err)
 	}
 
-	err = meltRequest.ValidateSigflag()
+	if hasSigAll {
+		// SIG_ALL path: verify all conditions match and signature is valid against combined message
+		err = meltRequest.ValidateSigflag()
+		if err != nil {
+			slog.Debug("meltRequest.ValidateSigflag()", slog.String(utils.LogExtraInfo, err.Error()))
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("meltRequest.ValidateSigflag() %w", err)
+		}
+	} else {
+		// Individual verification path: verify each proof's P2PK/HTLC spend conditions
+		err = m.VerifyProofsSpendConditions(meltRequest.Inputs)
+		if err != nil {
+			slog.Debug("m.VerifyProofsSpendConditions(meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.VerifyProofsSpendConditions(meltRequest.Inputs) %w", err)
+		}
+	}
+
+	// Always verify BDHKE cryptographic signatures (regardless of SIG_ALL)
+	err = m.VerifyProofsBDHKE(meltRequest.Inputs)
 	if err != nil {
-		slog.Debug("meltRequest.ValidateSigflag()", slog.String(utils.LogExtraInfo, err.Error()))
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("meltRequest.ValidateSigflag() %w", err)
+		slog.Debug("m.VerifyProofsBDHKE(meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.VerifyProofsBDHKE(meltRequest.Inputs) %w", err)
 	}
 
 	ctx := context.Background()

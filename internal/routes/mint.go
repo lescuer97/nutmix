@@ -255,9 +255,40 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			c.JSON(400, "Problem processing proofs")
 			return
 		}
-		err = swapRequest.ValidateSigflag()
+
+		// Verify spending conditions - EXCLUSIVE paths following CDK pattern
+		hasSigAll, err := cashu.ProofsHaveSigAll(swapRequest.Inputs)
 		if err != nil {
-			slog.Error(fmt.Errorf("swapRequest.ValidateSigflag(). %w", err).Error())
+			slog.Error(fmt.Errorf("cashu.ProofsHaveSigAll(swapRequest.Inputs). %w", err).Error())
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+
+		if hasSigAll {
+			// SIG_ALL path: verify all conditions match and signature is valid against combined message
+			err = swapRequest.ValidateSigflag()
+			if err != nil {
+				slog.Error(fmt.Errorf("swapRequest.ValidateSigflag(). %w", err).Error())
+				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+				return
+			}
+		} else {
+			// Individual verification path: verify each proof's P2PK/HTLC spend conditions
+			err = mint.VerifyProofsSpendConditions(swapRequest.Inputs)
+			if err != nil {
+				slog.Error(fmt.Errorf("mint.VerifyProofsSpendConditions(swapRequest.Inputs). %w", err).Error())
+				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+				return
+			}
+		}
+
+		// Always verify BDHKE cryptographic signatures (regardless of SIG_ALL)
+		err = mint.VerifyProofsBDHKE(swapRequest.Inputs)
+		if err != nil {
+			slog.Error(fmt.Errorf("mint.VerifyProofsBDHKE(swapRequest.Inputs). %w", err).Error())
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -271,6 +302,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 		defer mint.MintDB.Rollback(ctx, preparationTx)
 
+		// VerifyInputsAndOutputs now only checks balance/unit and BDHKE (spend conditions already verified)
 		err = mint.VerifyInputsAndOutputs(preparationTx, swapRequest.Inputs, swapRequest.Outputs)
 		if err != nil {
 			slog.Error(fmt.Errorf("mint.VerifyInputsAndOutputs(swapRequest.Inputs, swapRequest.Outputs). %w", err).Error())
