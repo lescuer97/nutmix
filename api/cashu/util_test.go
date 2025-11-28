@@ -12,11 +12,16 @@ func TestOrderKeysetByUnit(t *testing.T) {
 		t.Errorf("could not setup master key %+v", err)
 	}
 
-	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), "id", Sat, 0, true)
+	seed := Seed{
+		Id:          "id",
+		Unit:        Sat.String(),
+		Version:     0,
+		InputFeePpk: 0,
+	}
 
+	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), seed)
 	if err != nil {
 		t.Errorf("could not generate keyset %+v", err)
-
 	}
 
 	orderedKeys := OrderKeysetByUnit(generatedKeysets)
