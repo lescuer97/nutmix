@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -109,14 +108,7 @@ func main() {
 		slog.Warn("SetUpMint", slog.Any("error", err))
 		return
 	}
-	if config.MINT_REQUIRE_AUTH {
-		oidcClient, err := oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL)
-		if err != nil {
-			slog.Warn("oidc.NewProvider(ctx, config.MINT_AUTH_OICD_URL)", slog.Any("error", err))
-			return
-		}
-		mint.OICDClient = oidcClient
-	}
+
 
 	r := gin.Default()
 

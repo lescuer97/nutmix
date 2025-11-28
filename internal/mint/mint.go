@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -153,13 +154,24 @@ func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig
 	if err != nil {
 		return &mint, fmt.Errorf("sig.GetSignerPubkey() %w", err)
 	}
-
 	mint.MintPubkey = pubkey
+
 	observer := Observer{}
+	mint.Observer = &observer
+
 	observer.Proofs = make(map[string][]ProofWatchChannel)
 	observer.MeltQuote = make(map[string][]MeltQuoteChannel)
 	observer.MintQuote = make(map[string][]MintQuoteChannel)
 
-	mint.Observer = &observer
+	if config.MINT_REQUIRE_AUTH {
+		if config.MINT_AUTH_OICD_URL == "" {
+			return nil, fmt.Errorf("There is no oidc url for stepup")
+		}
+		err = mint.SetupOidcService(ctx, config.MINT_AUTH_OICD_URL)
+		if err != nil {
+			slog.Error("Could not setup the oidc provider. This could cause problems later when trying to authenticate tokens")
+		}
+	}
+
 	return &mint, nil
 }
