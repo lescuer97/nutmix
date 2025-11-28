@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
 	"regexp"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -17,9 +19,6 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
-		if !mint.Config.MINT_REQUIRE_AUTH {
-			c.Next()
-		}
 		if mint.Config.MINT_REQUIRE_AUTH {
 			// Check if current path matches any of the patterns
 			for _, pattern := range mint.Config.MINT_AUTH_CLEAR_AUTH_URLS {
@@ -32,6 +31,17 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 					log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
 				}
 				if matches {
+					if mint.OICDClient == nil {
+						ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+						defer cancel()
+						err := mint.SetupOidcService(ctx, mint.Config.MINT_AUTH_OICD_URL)
+						if err != nil {
+							slog.Error("Could not setup oidc service during middleware.", slog.Any("error", err))
+							errMsg := "This is a mint connectin error with the oidc service"
+							c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, &errMsg))
+							return
+						}
+					}
 					slog.Info("Trying to access restricted route")
 					// For paths matching the pattern, check for the "clear auth" header
 					clearAuth := c.GetHeader("Clear-auth")
