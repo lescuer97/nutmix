@@ -284,12 +284,27 @@ function initializeChartFromDOM() {
  * Set up HTMX event listener to reinitialize chart after content swap
  */
 function setupHtmxListener() {
-  // Listen for HTMX afterSwap event on the chart wrapper
+  // Listen for HTMX afterSwap event
   document.body.addEventListener('htmx:afterSwap', (event) => {
-    // Check if the swap target is our chart wrapper
-    if (event.detail.target && event.detail.target.id === 'chart-wrapper') {
+    const targetId = event.detail.target?.id;
+    
+    // Reinitialize when chart wrapper is updated (date picker changes)
+    // or when the chart card is loaded initially via HTMX
+    if (targetId === 'chart-wrapper' || 
+        targetId === 'proofs-chart-placeholder' ||
+        targetId === 'proofs-chart-card') {
       console.log('Chart content swapped, reinitializing...');
       // Small delay to ensure DOM is fully updated
+      setTimeout(initializeChartFromDOM, 50);
+    }
+  });
+
+  // Also listen for htmx:afterSettle for initial HTMX loads
+  document.body.addEventListener('htmx:afterSettle', (event) => {
+    const targetId = event.detail.target?.id;
+    
+    if (targetId === 'proofs-chart-placeholder') {
+      console.log('Chart card settled, initializing...');
       setTimeout(initializeChartFromDOM, 50);
     }
   });
@@ -299,18 +314,19 @@ function setupHtmxListener() {
  * Initialize charts on page load
  */
 export function initCharts() {
+  // Set up HTMX listener for dynamic updates (do this first)
+  setupHtmxListener();
+
   const canvas = document.getElementById('proofsChart');
   const dataElement = document.getElementById('proofsChartData');
 
   if (!canvas || !dataElement) {
-    // Chart elements not present on this page
+    // Chart elements not present on this page - they may be loaded via HTMX
+    console.log('Chart elements not found on initial load, waiting for HTMX...');
     return;
   }
 
-  // Initialize the chart from current DOM
+  // Initialize the chart from current DOM (for pages that have it pre-rendered)
   initializeChartFromDOM();
-
-  // Set up HTMX listener for dynamic updates
-  setupHtmxListener();
 }
 
