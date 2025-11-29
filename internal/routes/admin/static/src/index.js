@@ -9,6 +9,9 @@ import { initAuth } from './modules/auth.js';
 // 3. Time controls module
 import { initTimeControls } from './modules/time-controls.js';
 
+// 4. Chart module
+import { initCharts } from './modules/chart.js';
+
 /**
  * Initialize the application
  * Called when DOM is ready
@@ -22,6 +25,9 @@ function initializeApp() {
   
   // Initialize time controls
   initTimeControls();
+  
+  // Initialize charts (will only render if chart elements exist on the page)
+  initCharts();
   
   console.log('App fully initialized');
 }

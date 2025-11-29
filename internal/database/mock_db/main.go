@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -311,7 +313,7 @@ func (m *MockDB) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) e
 
 }
 
-func (m *MockDB) GetProofsMintReserve(since time.Time, until *time.Time) (database.EcashInventory, error) {
+func (m *MockDB) GetProofsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
 	var mintReserve database.EcashInventory
 
 	for _, p := range m.Proofs {
@@ -341,4 +343,50 @@ func (m *MockDB) GetBlindSigsInventory(since time.Time, until *time.Time) (datab
 		mintReserve.Quantity += 1
 	}
 	return mintReserve, nil
+}
+
+func (m *MockDB) GetProofsTimeSeries(since int64, until *int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+	bucketSeconds := int64(bucketMinutes * 60)
+
+	// Determine upper bound
+	upperBound := time.Now().Unix()
+	if until != nil {
+		upperBound = *until
+	}
+
+	// Group proofs by time bucket
+	buckets := make(map[int64]*database.ProofTimeSeriesPoint)
+
+	for _, p := range m.Proofs {
+		if p.SeenAt < since || p.SeenAt >= upperBound {
+			continue
+		}
+
+		// Calculate bucket timestamp using floor division
+		bucketTimestamp := (p.SeenAt / bucketSeconds) * bucketSeconds
+
+		if _, exists := buckets[bucketTimestamp]; !exists {
+			buckets[bucketTimestamp] = &database.ProofTimeSeriesPoint{
+				Timestamp:   bucketTimestamp,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		buckets[bucketTimestamp].TotalAmount += p.Amount
+		buckets[bucketTimestamp].Count++
+	}
+
+	// Convert map to sorted slice
+	var points []database.ProofTimeSeriesPoint
+	for _, point := range buckets {
+		points = append(points, *point)
+	}
+
+	// Sort by timestamp
+	sort.Slice(points, func(i, j int) bool {
+		return points[i].Timestamp < points[j].Timestamp
+	})
+
+	return points, nil
 }

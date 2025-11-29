@@ -40,6 +40,13 @@ type EcashInventory struct {
 	Quantity    uint64
 }
 
+// ProofTimeSeriesPoint represents a single data point for charting proofs over time
+type ProofTimeSeriesPoint struct {
+	Timestamp   int64  `json:"timestamp"`   // Unix timestamp (seconds) for the bucket start
+	TotalAmount uint64 `json:"totalAmount"` // Sum of proof amounts in this bucket
+	Count       uint64 `json:"count"`       // Number of proofs in this bucket
+}
+
 type MintDB interface {
 	GetTx(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context, tx pgx.Tx) error
@@ -79,6 +86,11 @@ type MintDB interface {
 
 	GetProofsInventory(since time.Time, until *time.Time) (EcashInventory, error)
 	GetBlindSigsInventory(since time.Time, until *time.Time) (EcashInventory, error)
+	// GetProofsTimeSeries returns proofs aggregated by time buckets for charting
+	// since: lower bound unix timestamp (inclusive)
+	// until: upper bound unix timestamp (exclusive), nil means current time
+	// bucketMinutes: size of each time bucket in minutes
+	GetProofsTimeSeries(since int64, until *int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
 
 	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
