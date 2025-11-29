@@ -8,7 +8,7 @@ prod: build-assets-prod build-go
 
 # Build frontend assets in development mode (watch mode)
 build-assets-dev:
-    cd internal/routes/admin/static && pnpm dev
+    cd internal/routes/admin/static && pnpm dev 
 
 # Build frontend assets in production mode (minified)
 build-assets-prod:
@@ -25,7 +25,7 @@ clean:
 
 # Run Go application in development mode with hot reload (requires air)
 run-dev: dev
-    air
+    ./nutmix
 
 # Build everything and run
 run: prod run-dev
