@@ -9,23 +9,10 @@ templ head() {
 	</head>
 }
 
-templ navigation() {
-	<header>
-		<h2><a href="/admin">Nutmix Dashboard</a></h2>
-		<nav>
-			<a href="/admin">Mint Activity</a>
-			<a href="/admin/keysets">Keysets</a>
-			<a href="/admin/settings">Mint settings</a>
-			<a href="/admin/bolt11">Lightning Backend</a>
-			<button hx-post="/admin/logout" class="logout-button">Logout</button>
-		</nav>
-	</header>
-}
-
-templ Layout() {
+templ Layout(route string) {
 	@head()
-	@navigation()
-	<body>
+	@Header()
+	<body data-route={ route }>
 		<div hx-ext="remove-me" id="notifications"></div>
 		{ children... }
 	</body>
