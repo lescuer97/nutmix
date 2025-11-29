@@ -14,7 +14,7 @@ type KeysetData struct {
 }
 
 templ KeysetsPage() {
-	@Layout() {
+	@Layout("stats") {
 		<main class="keysets">
 			<div hx-ext="remove-me" id="notifications"></div>
 			<form

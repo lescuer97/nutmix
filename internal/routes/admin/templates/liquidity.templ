@@ -16,7 +16,7 @@ templ LiquidityButton() {
 }
 
 templ LiquidityDashboard(swapForm string, nodeBalance string) {
-	@Layout() {
+	@Layout("lightning") {
 		<main class="liquidity-dashboard">
 			<div class="actions-container">
 				<div class="liquidity-actions">
@@ -194,7 +194,7 @@ templ SwapState(state utils.SwapState, swapId string) {
 }
 
 templ SwapStatusPage(summary templ.Component) {
-	@Layout() {
+	@Layout("lightning") {
 		<main class="liquidity-dashboard">
 			<div class="actions-container">
 				@summary

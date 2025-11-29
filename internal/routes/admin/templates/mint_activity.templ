@@ -154,7 +154,7 @@ templ MintMeltEventList(eventList []MintMeltRequestVisual) {
 }
 
 templ MintActivityLayout(liquidityManagerAvailable bool) {
-	@Layout() {
+	@Layout("stats") {
 		<main class="activity">
 			<div class="time-select">
 				<button class="time-button selected" value="24h" hx-target="#mint-summary" hx-trigger="click" type="button">24h</button>
