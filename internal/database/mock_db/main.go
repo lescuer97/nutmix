@@ -390,3 +390,49 @@ func (m *MockDB) GetProofsTimeSeries(since int64, until *int64, bucketMinutes in
 
 	return points, nil
 }
+
+func (m *MockDB) GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+	bucketSeconds := int64(bucketMinutes * 60)
+
+	// Determine upper bound
+	upperBound := time.Now().Unix()
+	if until != nil {
+		upperBound = *until
+	}
+
+	// Group blind sigs by time bucket
+	buckets := make(map[int64]*database.ProofTimeSeriesPoint)
+
+	for _, sig := range m.RecoverSigDB {
+		if sig.CreatedAt < since || sig.CreatedAt >= upperBound {
+			continue
+		}
+
+		// Calculate bucket timestamp using floor division
+		bucketTimestamp := (sig.CreatedAt / bucketSeconds) * bucketSeconds
+
+		if _, exists := buckets[bucketTimestamp]; !exists {
+			buckets[bucketTimestamp] = &database.ProofTimeSeriesPoint{
+				Timestamp:   bucketTimestamp,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		buckets[bucketTimestamp].TotalAmount += sig.Amount
+		buckets[bucketTimestamp].Count++
+	}
+
+	// Convert map to sorted slice
+	var points []database.ProofTimeSeriesPoint
+	for _, point := range buckets {
+		points = append(points, *point)
+	}
+
+	// Sort by timestamp
+	sort.Slice(points, func(i, j int) bool {
+		return points[i].Timestamp < points[j].Timestamp
+	})
+
+	return points, nil
+}

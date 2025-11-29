@@ -156,7 +156,9 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 	// This is /admin pages
 	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
 	adminRoute.GET("/proofs-chart", ProofsChartCard(mint))
-	adminRoute.GET("/api/chart-data", ChartDataAPI(mint))
+	adminRoute.GET("/api/proofs-chart-data", ProofsChartDataAPI(mint))
+	adminRoute.GET("/blindsigs-chart", BlindSigsChartCard(mint))
+	adminRoute.GET("/api/blindsigs-chart-data", BlindSigsChartDataAPI(mint))
 
 	if nostrPubkey != nil {
 		adminRoute.GET("", InitPage(mint))

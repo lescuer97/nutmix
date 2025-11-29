@@ -169,6 +169,19 @@ templ MintActivityLayout(liquidityManagerAvailable bool) {
 					</div>
 				</div>
 			</div>
+			<div
+				id="blindsigs-chart-placeholder"
+				hx-get="/admin/blindsigs-chart"
+				hx-trigger="load"
+				hx-swap="outerHTML"
+			>
+				<div class="card card-md">
+					<div class="chart-loading-placeholder">
+						<span class="loading-spinner"></span>
+						<span>Loading chart...</span>
+					</div>
+				</div>
+			</div>
 		</main>
 	}
 }

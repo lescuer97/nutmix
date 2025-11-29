@@ -1,4 +1,4 @@
-// Chart.js module for proofs time-series visualization
+// Chart.js module for time-series visualization
 import {
   Chart,
   LineController,
@@ -37,20 +37,18 @@ const COLORS = {
   textPrimary: '#ffffff'
 };
 
-// Store chart instance for updates
-let proofsChartInstance = null;
+// Store chart instances
+const chartInstances = {
+  proofs: null,
+  blindSigs: null
+};
 
 /**
- * Initialize the proofs chart
- * @param {HTMLCanvasElement} canvas - The canvas element to render the chart
+ * Create chart configuration
  * @param {Array} data - Array of {timestamp, totalAmount, count} objects
+ * @param {string} countLabel - Label for the count axis (e.g., 'Proof Count' or 'Signature Count')
  */
-export function initProofsChart(canvas, data) {
-  if (!canvas || !data) {
-    console.warn('Chart initialization skipped: missing canvas or data');
-    return null;
-  }
-
+function createChartConfig(data, countLabel) {
   // Transform data for Chart.js
   const chartData = data.map(point => ({
     x: new Date(point.timestamp * 1000), // Convert Unix timestamp to Date
@@ -58,7 +56,7 @@ export function initProofsChart(canvas, data) {
     count: point.count
   }));
 
-  const chart = new Chart(canvas, {
+  return {
     type: 'line',
     data: {
       datasets: [
@@ -77,7 +75,7 @@ export function initProofsChart(canvas, data) {
           yAxisID: 'y'
         },
         {
-          label: 'Proof Count',
+          label: countLabel,
           data: chartData.map(d => ({ x: d.x, y: d.count })),
           borderColor: COLORS.cyan,
           backgroundColor: COLORS.cyanLight,
@@ -135,7 +133,7 @@ export function initProofsChart(canvas, data) {
                 if (context.dataset.label === 'Sats Value') {
                   label += context.parsed.y.toLocaleString() + ' sats';
                 } else {
-                  label += context.parsed.y.toLocaleString() + ' proofs';
+                  label += context.parsed.y.toLocaleString();
                 }
               }
               return label;
@@ -216,7 +214,7 @@ export function initProofsChart(canvas, data) {
           position: 'right',
           title: {
             display: true,
-            text: 'Proof Count',
+            text: countLabel,
             color: COLORS.cyan,
             font: {
               family: "'Inter', sans-serif",
@@ -241,61 +239,99 @@ export function initProofsChart(canvas, data) {
         }
       }
     }
-  });
-
-  return chart;
+  };
 }
 
 /**
- * Destroy the current chart instance if it exists
+ * Initialize a chart
+ * @param {HTMLCanvasElement} canvas - The canvas element to render the chart
+ * @param {Array} data - Array of {timestamp, totalAmount, count} objects
+ * @param {string} countLabel - Label for the count axis
  */
-function destroyChart() {
-  if (proofsChartInstance) {
-    proofsChartInstance.destroy();
-    proofsChartInstance = null;
+function initChart(canvas, data, countLabel) {
+  if (!canvas || !data) {
+    console.warn('Chart initialization skipped: missing canvas or data');
+    return null;
   }
+
+  const config = createChartConfig(data, countLabel);
+  return new Chart(canvas, config);
 }
 
 /**
- * Initialize or reinitialize the chart from the current DOM
+ * Initialize or reinitialize the proofs chart from the current DOM
  */
-function initializeChartFromDOM() {
+function initializeProofsChartFromDOM() {
   const canvas = document.getElementById('proofsChart');
   const dataElement = document.getElementById('proofsChartData');
 
   if (!canvas || !dataElement) {
-    console.warn('Chart elements not found in DOM');
     return;
   }
 
   // Destroy existing chart if any
-  destroyChart();
+  if (chartInstances.proofs) {
+    chartInstances.proofs.destroy();
+    chartInstances.proofs = null;
+  }
 
   try {
     const data = JSON.parse(dataElement.textContent);
-    proofsChartInstance = initProofsChart(canvas, data);
-    console.log('Chart initialized with', data.length, 'data points');
+    chartInstances.proofs = initChart(canvas, data, 'Proof Count');
+    console.log('Proofs chart initialized with', data.length, 'data points');
   } catch (error) {
-    console.error('Failed to initialize chart:', error);
+    console.error('Failed to initialize proofs chart:', error);
   }
 }
 
 /**
- * Set up HTMX event listener to reinitialize chart after content swap
+ * Initialize or reinitialize the blind sigs chart from the current DOM
+ */
+function initializeBlindSigsChartFromDOM() {
+  const canvas = document.getElementById('blindSigsChart');
+  const dataElement = document.getElementById('blindSigsChartData');
+
+  if (!canvas || !dataElement) {
+    return;
+  }
+
+  // Destroy existing chart if any
+  if (chartInstances.blindSigs) {
+    chartInstances.blindSigs.destroy();
+    chartInstances.blindSigs = null;
+  }
+
+  try {
+    const data = JSON.parse(dataElement.textContent);
+    chartInstances.blindSigs = initChart(canvas, data, 'Signature Count');
+    console.log('Blind sigs chart initialized with', data.length, 'data points');
+  } catch (error) {
+    console.error('Failed to initialize blind sigs chart:', error);
+  }
+}
+
+/**
+ * Set up HTMX event listener to reinitialize charts after content swap
  */
 function setupHtmxListener() {
   // Listen for HTMX afterSwap event
   document.body.addEventListener('htmx:afterSwap', (event) => {
     const targetId = event.detail.target?.id;
     
-    // Reinitialize when chart wrapper is updated (date picker changes)
-    // or when the chart card is loaded initially via HTMX
+    // Proofs chart updates
     if (targetId === 'chart-wrapper' || 
         targetId === 'proofs-chart-placeholder' ||
         targetId === 'proofs-chart-card') {
-      console.log('Chart content swapped, reinitializing...');
-      // Small delay to ensure DOM is fully updated
-      setTimeout(initializeChartFromDOM, 50);
+      console.log('Proofs chart content swapped, reinitializing...');
+      setTimeout(initializeProofsChartFromDOM, 50);
+    }
+    
+    // Blind sigs chart updates
+    if (targetId === 'blindsigs-chart-wrapper' || 
+        targetId === 'blindsigs-chart-placeholder' ||
+        targetId === 'blindsigs-chart-card') {
+      console.log('Blind sigs chart content swapped, reinitializing...');
+      setTimeout(initializeBlindSigsChartFromDOM, 50);
     }
   });
 
@@ -304,8 +340,13 @@ function setupHtmxListener() {
     const targetId = event.detail.target?.id;
     
     if (targetId === 'proofs-chart-placeholder') {
-      console.log('Chart card settled, initializing...');
-      setTimeout(initializeChartFromDOM, 50);
+      console.log('Proofs chart card settled, initializing...');
+      setTimeout(initializeProofsChartFromDOM, 50);
+    }
+    
+    if (targetId === 'blindsigs-chart-placeholder') {
+      console.log('Blind sigs chart card settled, initializing...');
+      setTimeout(initializeBlindSigsChartFromDOM, 50);
     }
   });
 }
@@ -317,16 +358,23 @@ export function initCharts() {
   // Set up HTMX listener for dynamic updates (do this first)
   setupHtmxListener();
 
-  const canvas = document.getElementById('proofsChart');
-  const dataElement = document.getElementById('proofsChartData');
+  // Try to initialize proofs chart if elements are present
+  const proofsCanvas = document.getElementById('proofsChart');
+  const proofsDataElement = document.getElementById('proofsChartData');
 
-  if (!canvas || !dataElement) {
-    // Chart elements not present on this page - they may be loaded via HTMX
-    console.log('Chart elements not found on initial load, waiting for HTMX...');
-    return;
+  if (proofsCanvas && proofsDataElement) {
+    initializeProofsChartFromDOM();
+  } else {
+    console.log('Proofs chart elements not found on initial load, waiting for HTMX...');
   }
 
-  // Initialize the chart from current DOM (for pages that have it pre-rendered)
-  initializeChartFromDOM();
-}
+  // Try to initialize blind sigs chart if elements are present
+  const blindSigsCanvas = document.getElementById('blindSigsChart');
+  const blindSigsDataElement = document.getElementById('blindSigsChartData');
 
+  if (blindSigsCanvas && blindSigsDataElement) {
+    initializeBlindSigsChartFromDOM();
+  } else {
+    console.log('Blind sigs chart elements not found on initial load, waiting for HTMX...');
+  }
+}
