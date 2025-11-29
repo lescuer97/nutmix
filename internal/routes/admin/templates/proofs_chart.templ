@@ -1,0 +1,75 @@
+package templates
+
+import "github.com/lescuer97/nutmix/internal/database"
+
+type ProofsChartData struct {
+	Data      []database.ProofTimeSeriesPoint
+	StartDate string // Format: YYYY-MM-DD
+	EndDate   string // Format: YYYY-MM-DD
+}
+
+// ProofsChartContent renders just the chart canvas and data - used for HTMX date updates
+templ ProofsChartContent(data []database.ProofTimeSeriesPoint) {
+	<div id="chart-container" style="position: relative; height: 400px; width: 100%;">
+		<canvas id="proofsChart"></canvas>
+	</div>
+	@templ.JSONScript("proofsChartData", data)
+}
+
+// ProofsChartCard renders the complete chart card with date picker - used for initial load via HTMX
+templ ProofsChartCard(chartData ProofsChartData) {
+	<div id="proofs-chart-card" class="card card-md">
+		<div class="chart-header">
+			<div class="chart-title-section">
+				<h2 class="text-xl font-semibold">Proofs Over Time</h2>
+				<p class="text-secondary text-sm">Time-series visualization of proof activity</p>
+			</div>
+			<div class="date-picker-container">
+				<div class="date-picker-group">
+					<label for="startDate" class="date-label">From</label>
+					<input
+						type="date"
+						id="startDate"
+						name="start"
+						class="date-input"
+						value={ chartData.StartDate }
+						hx-get="/admin/api/chart-data"
+						hx-include="#startDate, #endDate"
+						hx-target="#chart-wrapper"
+						hx-swap="innerHTML"
+						hx-trigger="change"
+						hx-indicator="#chart-loading"
+					/>
+				</div>
+				<div class="date-picker-group">
+					<label for="endDate" class="date-label">To</label>
+					<input
+						type="date"
+						id="endDate"
+						name="end"
+						class="date-input"
+						value={ chartData.EndDate }
+						hx-get="/admin/api/chart-data"
+						hx-include="#startDate, #endDate"
+						hx-target="#chart-wrapper"
+						hx-swap="innerHTML"
+						hx-trigger="change"
+						hx-indicator="#chart-loading"
+					/>
+				</div>
+			</div>
+		</div>
+		<div class="chart-legend-info">
+			<span class="legend-item legend-purple">Sats Value</span>
+			<span class="legend-item legend-cyan">Proof Count</span>
+		</div>
+		<div id="chart-loading" class="htmx-indicator chart-loading">
+			<span class="loading-spinner"></span>
+			<span>Loading chart data...</span>
+		</div>
+		<div id="chart-wrapper">
+			@ProofsChartContent(chartData.Data)
+		</div>
+	</div>
+}
+
