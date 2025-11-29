@@ -16,6 +16,9 @@
     "esbuild": "^0.24.0"
   },
   "dependencies": {
+    "chart.js": "^4.4.0",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "date-fns": "^3.6.0",
     "htmx.org": "^2.0.8",
     "htmx-ext-preload": "^2.1.2",
     "htmx-ext-remove-me": "^2.0.2"
