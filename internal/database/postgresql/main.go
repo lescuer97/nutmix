@@ -719,6 +719,61 @@ func (pql Postgresql) GetProofsTimeSeries(since int64, until *int64, bucketMinut
 	return points, nil
 }
 
+func (pql Postgresql) GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+	var points []database.ProofTimeSeriesPoint
+
+	bucketSeconds := int64(bucketMinutes * 60)
+
+	var query string
+	var args []any
+
+	// Use floor division to group blind sigs into time buckets
+	// (created_at / bucket_seconds) * bucket_seconds gives us the bucket start timestamp
+	if until != nil {
+		query = `SELECT 
+					(created_at / $3) * $3 as bucket_timestamp,
+					COALESCE(SUM(amount), 0) as total_amount,
+					COUNT(*) as count
+				 FROM recovery_signature 
+				 WHERE created_at >= $1 AND created_at < $2
+				 GROUP BY bucket_timestamp
+				 ORDER BY bucket_timestamp ASC`
+		args = []any{since, *until, bucketSeconds}
+	} else {
+		// Use current time as upper bound
+		now := time.Now().Unix()
+		query = `SELECT 
+					(created_at / $3) * $3 as bucket_timestamp,
+					COALESCE(SUM(amount), 0) as total_amount,
+					COUNT(*) as count
+				 FROM recovery_signature 
+				 WHERE created_at >= $1 AND created_at < $2
+				 GROUP BY bucket_timestamp
+				 ORDER BY bucket_timestamp ASC`
+		args = []any{since, now, bucketSeconds}
+	}
+
+	rows, err := pql.pool.Query(context.Background(), query, args...)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return points, nil
+		}
+		return points, databaseError(fmt.Errorf("GetBlindSigsTimeSeries query error: %w", err))
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var point database.ProofTimeSeriesPoint
+		err := rows.Scan(&point.Timestamp, &point.TotalAmount, &point.Count)
+		if err != nil {
+			return points, databaseError(fmt.Errorf("GetBlindSigsTimeSeries scan error: %w", err))
+		}
+		points = append(points, point)
+	}
+
+	return points, nil
+}
+
 func (pql Postgresql) Close() {
 	pql.pool.Close()
 }

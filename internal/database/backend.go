@@ -91,6 +91,11 @@ type MintDB interface {
 	// until: upper bound unix timestamp (exclusive), nil means current time
 	// bucketMinutes: size of each time bucket in minutes
 	GetProofsTimeSeries(since int64, until *int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
+	// GetBlindSigsTimeSeries returns blind signatures aggregated by time buckets for charting
+	// since: lower bound unix timestamp (inclusive)
+	// until: upper bound unix timestamp (exclusive), nil means current time
+	// bucketMinutes: size of each time bucket in minutes
+	GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
 
 	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)

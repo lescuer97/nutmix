@@ -33,7 +33,7 @@ templ ProofsChartCard(chartData ProofsChartData) {
 						name="start"
 						class="date-input"
 						value={ chartData.StartDate }
-						hx-get="/admin/api/chart-data"
+						hx-get="/admin/api/proofs-chart-data"
 						hx-include="#startDate, #endDate"
 						hx-target="#chart-wrapper"
 						hx-swap="innerHTML"
@@ -49,7 +49,7 @@ templ ProofsChartCard(chartData ProofsChartData) {
 						name="end"
 						class="date-input"
 						value={ chartData.EndDate }
-						hx-get="/admin/api/chart-data"
+						hx-get="/admin/api/proofs-chart-data"
 						hx-include="#startDate, #endDate"
 						hx-target="#chart-wrapper"
 						hx-swap="innerHTML"
