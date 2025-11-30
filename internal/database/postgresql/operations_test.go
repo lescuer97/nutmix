@@ -620,6 +620,233 @@ func TestSaveProofAndGetBySecretCurve_ValidPubkey(t *testing.T) {
 	}
 }
 
+func TestSaveRestoreSigsAndGet_ValidPubkeys(t *testing.T) {
+	db, ctx := setupTestDB(t)
+
+	// Create valid public keys for B_ and C_ fields (using different keys)
+	b_PubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
+	b_PubkeyBytes, err := hex.DecodeString(b_PubkeyStr)
+	if err != nil {
+		t.Fatalf("could not decode B_ hex string. %v", err)
+	}
+	b_Pubkey, err := secp256k1.ParsePubKey(b_PubkeyBytes)
+	if err != nil {
+		t.Fatalf("could not parse B_ pubkey bytes correctly. %v", err)
+	}
+	wrappedB := cashu.WrappedPublicKey{PublicKey: b_Pubkey}
+
+	// Use a different pubkey for C_
+	c_PubkeyStr := "02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2"
+	c_PubkeyBytes, err := hex.DecodeString(c_PubkeyStr)
+	if err != nil {
+		t.Fatalf("could not decode C_ hex string. %v", err)
+	}
+	c_Pubkey, err := secp256k1.ParsePubKey(c_PubkeyBytes)
+	if err != nil {
+		t.Fatalf("could not parse C_ pubkey bytes correctly. %v", err)
+	}
+	wrappedC := cashu.WrappedPublicKey{PublicKey: c_Pubkey}
+
+	// Create DLEQ with valid private keys (using dummy 32-byte values)
+	eBytes, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000001")
+	sBytes, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000002")
+	dleq := &cashu.BlindSignatureDLEQ{
+		E: secp256k1.PrivKeyFromBytes(eBytes),
+		S: secp256k1.PrivKeyFromBytes(sBytes),
+	}
+
+	now := time.Now().Unix()
+
+	recoverSig := cashu.RecoverSigDB{
+		Amount:    100,
+		Id:        "test_keyset_id",
+		B_:        wrappedB,
+		C_:        wrappedC,
+		CreatedAt: now,
+		Dleq:      dleq,
+	}
+
+	// Save the recovery signature
+	tx, err := db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction. %v", err)
+	}
+	err = db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{recoverSig})
+	if err != nil {
+		t.Fatalf("db.SaveRestoreSigs failed: %v", err)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("could not commit transaction. %v", err)
+	}
+
+	// Retrieve the recovery signature by B_
+	tx, err = db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction. %v", err)
+	}
+	sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []string{b_PubkeyStr})
+	if err != nil {
+		t.Fatalf("db.GetRestoreSigsFromBlindedMessages failed: %v", err)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("could not commit transaction. %v", err)
+	}
+
+	// Verify we got exactly one signature
+	if len(sigs) != 1 {
+		t.Fatalf("expected 1 recovery signature, got %d", len(sigs))
+	}
+
+	retrievedSig := sigs[0]
+
+	// Verify the B_ (WrappedPublicKey) field matches
+	if retrievedSig.B_.PublicKey == nil {
+		t.Fatal("B_ field should not be nil after retrieval")
+	}
+	retrievedB_Str := hex.EncodeToString(retrievedSig.B_.SerializeCompressed())
+	if retrievedB_Str != b_PubkeyStr {
+		t.Errorf("B_ field mismatch: saved %s, got %s", b_PubkeyStr, retrievedB_Str)
+	}
+
+	// Verify the C_ (WrappedPublicKey) field matches
+	if retrievedSig.C_.PublicKey == nil {
+		t.Fatal("C_ field should not be nil after retrieval")
+	}
+	retrievedC_Str := hex.EncodeToString(retrievedSig.C_.SerializeCompressed())
+	if retrievedC_Str != c_PubkeyStr {
+		t.Errorf("C_ field mismatch: saved %s, got %s", c_PubkeyStr, retrievedC_Str)
+	}
+
+	// Verify other fields
+	if retrievedSig.Amount != recoverSig.Amount {
+		t.Errorf("Amount mismatch: saved %d, got %d", recoverSig.Amount, retrievedSig.Amount)
+	}
+	if retrievedSig.Id != recoverSig.Id {
+		t.Errorf("Id mismatch: saved %s, got %s", recoverSig.Id, retrievedSig.Id)
+	}
+}
+
+func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
+	db, ctx := setupTestDB(t)
+
+	// Create first signature with its own B_ and C_
+	b1_PubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
+	b1_PubkeyBytes, _ := hex.DecodeString(b1_PubkeyStr)
+	b1_Pubkey, _ := secp256k1.ParsePubKey(b1_PubkeyBytes)
+	wrappedB1 := cashu.WrappedPublicKey{PublicKey: b1_Pubkey}
+
+	c1_PubkeyStr := "02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2"
+	c1_PubkeyBytes, _ := hex.DecodeString(c1_PubkeyStr)
+	c1_Pubkey, _ := secp256k1.ParsePubKey(c1_PubkeyBytes)
+	wrappedC1 := cashu.WrappedPublicKey{PublicKey: c1_Pubkey}
+
+	// Create second signature with different B_ and C_
+	b2_PubkeyStr := "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+	b2_PubkeyBytes, _ := hex.DecodeString(b2_PubkeyStr)
+	b2_Pubkey, _ := secp256k1.ParsePubKey(b2_PubkeyBytes)
+	wrappedB2 := cashu.WrappedPublicKey{PublicKey: b2_Pubkey}
+
+	c2_PubkeyStr := "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+	c2_PubkeyBytes, _ := hex.DecodeString(c2_PubkeyStr)
+	c2_Pubkey, _ := secp256k1.ParsePubKey(c2_PubkeyBytes)
+	wrappedC2 := cashu.WrappedPublicKey{PublicKey: c2_Pubkey}
+
+	// Create DLEQ values
+	eBytes, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000001")
+	sBytes, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000002")
+	dleq := &cashu.BlindSignatureDLEQ{
+		E: secp256k1.PrivKeyFromBytes(eBytes),
+		S: secp256k1.PrivKeyFromBytes(sBytes),
+	}
+
+	now := time.Now().Unix()
+
+	sig1 := cashu.RecoverSigDB{
+		Amount:    100,
+		Id:        "keyset1",
+		B_:        wrappedB1,
+		C_:        wrappedC1,
+		CreatedAt: now,
+		Dleq:      dleq,
+	}
+
+	sig2 := cashu.RecoverSigDB{
+		Amount:    200,
+		Id:        "keyset2",
+		B_:        wrappedB2,
+		C_:        wrappedC2,
+		CreatedAt: now,
+		Dleq:      dleq,
+	}
+
+	// Save both recovery signatures
+	tx, err := db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction. %v", err)
+	}
+	err = db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{sig1, sig2})
+	if err != nil {
+		t.Fatalf("db.SaveRestoreSigs failed: %v", err)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("could not commit transaction. %v", err)
+	}
+
+	// Retrieve both signatures by their B_ values
+	tx, err = db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction. %v", err)
+	}
+	sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []string{b1_PubkeyStr, b2_PubkeyStr})
+	if err != nil {
+		t.Fatalf("db.GetRestoreSigsFromBlindedMessages failed: %v", err)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("could not commit transaction. %v", err)
+	}
+
+	// Verify we got exactly two signatures
+	if len(sigs) != 2 {
+		t.Fatalf("expected 2 recovery signatures, got %d", len(sigs))
+	}
+
+	// Check each signature
+	var foundSig1, foundSig2 bool
+	for _, sig := range sigs {
+		b_Str := hex.EncodeToString(sig.B_.SerializeCompressed())
+		c_Str := hex.EncodeToString(sig.C_.SerializeCompressed())
+
+		if b_Str == b1_PubkeyStr {
+			foundSig1 = true
+			if c_Str != c1_PubkeyStr {
+				t.Errorf("Sig1 C_ mismatch: expected %s, got %s", c1_PubkeyStr, c_Str)
+			}
+			if sig.Amount != 100 {
+				t.Errorf("Sig1 Amount mismatch: expected 100, got %d", sig.Amount)
+			}
+		} else if b_Str == b2_PubkeyStr {
+			foundSig2 = true
+			if c_Str != c2_PubkeyStr {
+				t.Errorf("Sig2 C_ mismatch: expected %s, got %s", c2_PubkeyStr, c_Str)
+			}
+			if sig.Amount != 200 {
+				t.Errorf("Sig2 Amount mismatch: expected 200, got %d", sig.Amount)
+			}
+		}
+	}
+
+	if !foundSig1 {
+		t.Error("Did not find signature 1")
+	}
+	if !foundSig2 {
+		t.Error("Did not find signature 2")
+	}
+}
+
 func setupTestDB(t *testing.T) (Postgresql, context.Context) {
 	const posgrespassword = "password"
 	const postgresuser = "user"
