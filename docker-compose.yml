@@ -47,7 +47,7 @@ services:
         required: true
     environment:
       DOCKER: "true"
-    build: ./
+    image: nutmixbtc/nutmix:latest
     restart: on-failure:10
     depends_on:
       - db
