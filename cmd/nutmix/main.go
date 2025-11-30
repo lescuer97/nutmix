@@ -63,7 +63,7 @@ func main() {
 
 	err = godotenv.Load(".env")
 	if err != nil {
-		log.Panic("ERROR: no .env file found and not running in docker")
+		log.Printf("Did not find any .env file using enviroment variables!")
 	}
 
 	if os.Getenv("DEBUG") == "true" {
