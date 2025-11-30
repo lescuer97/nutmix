@@ -224,9 +224,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			Motd:            mint.Config.MOTD,
 			Contact:         contacts,
 			Nuts:            nuts,
-			IconUrl: mint.Config.IconUrl,
-			TosUrl: mint.Config.TosUrl,
-			Time: time.Now().Unix() ,
+			IconUrl:         mint.Config.IconUrl,
+			TosUrl:          mint.Config.TosUrl,
+			Time:            time.Now().Unix(),
 		}
 
 		c.JSON(200, response)

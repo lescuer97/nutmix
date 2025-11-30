@@ -367,7 +367,7 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 		SeenAt:      entryNewTime,
 		Amount:      ptr(400),
 		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
-		Request:     "reqNoKey",
+		Request:     "reqNokey",
 		Unit:        cashu.Sat.String(),
 		Expiry:      now + 10000,
 		RequestPaid: true,
