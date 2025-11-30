@@ -229,8 +229,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		if mintRequestDB.Pubkey != nil {
-			valid, err := mintRequest.VerifyPubkey(mintRequestDB.Pubkey)
+		if mintRequestDB.Pubkey.PublicKey != nil {
+			valid, err := mintRequest.VerifyPubkey(mintRequestDB.Pubkey.PublicKey)
 			if err != nil {
 				slog.Error("Cold not verify signature", slog.Any("error", err))
 				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
