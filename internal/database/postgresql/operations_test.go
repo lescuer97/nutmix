@@ -107,8 +107,13 @@ func TestAddAndRequestMintRequestValidPubkey(t *testing.T) {
 		t.Fatalf("db.GetMintRequestById(tx, mintRequestDB). %v", err)
 	}
 
-	if hex.EncodeToString(mintRequest.Pubkey.SerializeCompressed()) != "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac" {
-		t.Errorf("pubkey from mint request is not correct. %x", mintRequest.Pubkey.SerializeCompressed())
+	// Verify that the pubkey retrieved from DB matches the one we saved
+	if mintRequest.Pubkey.PublicKey == nil {
+		t.Fatal("pubkey should not be nil after retrieval")
+	}
+	retrievedPubkeyStr := hex.EncodeToString(mintRequest.Pubkey.SerializeCompressed())
+	if retrievedPubkeyStr != pubkeyStr {
+		t.Errorf("pubkey mismatch: saved %s, got %s", pubkeyStr, retrievedPubkeyStr)
 	}
 
 	err = tx.Commit(ctx)
@@ -446,6 +451,172 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 		if res.Melt[0].Quote != "melt1" {
 			t.Errorf("Expected melt1, got %s", res.Melt[0].Quote)
 		}
+	}
+}
+
+func TestSaveProofAndGetBySecret_ValidPubkey(t *testing.T) {
+	db, ctx := setupTestDB(t)
+
+	// Create a valid public key for the C field
+	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
+	pubkeyBytes, err := hex.DecodeString(pubkeyStr)
+	if err != nil {
+		t.Fatalf("could not decode hex string. %v", err)
+	}
+	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
+	if err != nil {
+		t.Fatalf("could not parse pubkey bytes correctly. %v", err)
+	}
+	wrappedPubkey := cashu.WrappedPublicKey{PublicKey: pubkey}
+
+	now := time.Now().Unix()
+	secret := "test_secret_1"
+	yValue := "test_y_value_1"
+
+	proof := cashu.Proof{
+		Amount:  100,
+		Id:      "test_keyset_id",
+		Secret:  secret,
+		C:       wrappedPubkey,
+		Y:       yValue,
+		Witness: "",
+		SeenAt:  now,
+		State:   cashu.PROOF_UNSPENT,
+		Quote:   nil,
+	}
+
+	// Save the proof
+	tx, err := db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction. %v", err)
+	}
+	err = db.SaveProof(tx, []cashu.Proof{proof})
+	if err != nil {
+		t.Fatalf("db.SaveProof failed: %v", err)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("could not commit transaction. %v", err)
+	}
+
+	// Retrieve the proof by secret
+	tx, err = db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction. %v", err)
+	}
+	proofs, err := db.GetProofsFromSecret(tx, []string{secret})
+	if err != nil {
+		t.Fatalf("db.GetProofsFromSecret failed: %v", err)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("could not commit transaction. %v", err)
+	}
+
+	// Verify we got exactly one proof
+	if len(proofs) != 1 {
+		t.Fatalf("expected 1 proof, got %d", len(proofs))
+	}
+
+	// Verify the C (WrappedPublicKey) field matches
+	retrievedProof := proofs[0]
+	if retrievedProof.C.PublicKey == nil {
+		t.Fatal("C field (pubkey) should not be nil after retrieval")
+	}
+	retrievedPubkeyStr := hex.EncodeToString(retrievedProof.C.SerializeCompressed())
+	if retrievedPubkeyStr != pubkeyStr {
+		t.Errorf("C field mismatch: saved %s, got %s", pubkeyStr, retrievedPubkeyStr)
+	}
+
+	// Also verify other fields
+	if retrievedProof.Amount != proof.Amount {
+		t.Errorf("Amount mismatch: saved %d, got %d", proof.Amount, retrievedProof.Amount)
+	}
+	if retrievedProof.Secret != proof.Secret {
+		t.Errorf("Secret mismatch: saved %s, got %s", proof.Secret, retrievedProof.Secret)
+	}
+}
+
+func TestSaveProofAndGetBySecretCurve_ValidPubkey(t *testing.T) {
+	db, ctx := setupTestDB(t)
+
+	// Create a valid public key for the C field
+	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
+	pubkeyBytes, err := hex.DecodeString(pubkeyStr)
+	if err != nil {
+		t.Fatalf("could not decode hex string. %v", err)
+	}
+	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
+	if err != nil {
+		t.Fatalf("could not parse pubkey bytes correctly. %v", err)
+	}
+	wrappedPubkey := cashu.WrappedPublicKey{PublicKey: pubkey}
+
+	now := time.Now().Unix()
+	secret := "test_secret_2"
+	yValue := "test_y_value_2"
+
+	proof := cashu.Proof{
+		Amount:  200,
+		Id:      "test_keyset_id",
+		Secret:  secret,
+		C:       wrappedPubkey,
+		Y:       yValue,
+		Witness: "",
+		SeenAt:  now,
+		State:   cashu.PROOF_UNSPENT,
+		Quote:   nil,
+	}
+
+	// Save the proof
+	tx, err := db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction. %v", err)
+	}
+	err = db.SaveProof(tx, []cashu.Proof{proof})
+	if err != nil {
+		t.Fatalf("db.SaveProof failed: %v", err)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("could not commit transaction. %v", err)
+	}
+
+	// Retrieve the proof by Y (secret curve)
+	tx, err = db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction. %v", err)
+	}
+	proofs, err := db.GetProofsFromSecretCurve(tx, []string{yValue})
+	if err != nil {
+		t.Fatalf("db.GetProofsFromSecretCurve failed: %v", err)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatalf("could not commit transaction. %v", err)
+	}
+
+	// Verify we got exactly one proof
+	if len(proofs) != 1 {
+		t.Fatalf("expected 1 proof, got %d", len(proofs))
+	}
+
+	// Verify the C (WrappedPublicKey) field matches
+	retrievedProof := proofs[0]
+	if retrievedProof.C.PublicKey == nil {
+		t.Fatal("C field (pubkey) should not be nil after retrieval")
+	}
+	retrievedPubkeyStr := hex.EncodeToString(retrievedProof.C.SerializeCompressed())
+	if retrievedPubkeyStr != pubkeyStr {
+		t.Errorf("C field mismatch: saved %s, got %s", pubkeyStr, retrievedPubkeyStr)
+	}
+
+	// Also verify other fields
+	if retrievedProof.Amount != proof.Amount {
+		t.Errorf("Amount mismatch: saved %d, got %d", proof.Amount, retrievedProof.Amount)
+	}
+	if retrievedProof.Y != proof.Y {
+		t.Errorf("Y mismatch: saved %s, got %s", proof.Y, retrievedProof.Y)
 	}
 }
 
