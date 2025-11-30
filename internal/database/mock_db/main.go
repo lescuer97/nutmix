@@ -247,7 +247,7 @@ func (m *MockDB) SaveProof(tx pgx.Tx, proofs []cashu.Proof) error {
 
 }
 
-func (m *MockDB) GetProofsFromSecretCurve(tx pgx.Tx, Ys []string) (cashu.Proofs, error) {
+func (m *MockDB) GetProofsFromSecretCurve(tx pgx.Tx, Ys []cashu.WrappedPublicKey) (cashu.Proofs, error) {
 	var proofs cashu.Proofs
 	for i := 0; i < len(Ys); i++ {
 

@@ -64,7 +64,7 @@ type MintDB interface {
 
 	SaveProof(tx pgx.Tx, proofs []cashu.Proof) error
 	GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu.Proofs, error)
-	GetProofsFromSecretCurve(tx pgx.Tx, Ys []string) (cashu.Proofs, error)
+	GetProofsFromSecretCurve(tx pgx.Tx, Ys []cashu.WrappedPublicKey) (cashu.Proofs, error)
 	GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs, error)
 	SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error
 	DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error

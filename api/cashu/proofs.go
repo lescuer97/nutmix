@@ -53,7 +53,7 @@ type Proof struct {
 	Id      string           `json:"id"`
 	Secret  string           `json:"secret"`
 	C       WrappedPublicKey `json:"C" db:"c"`
-	Y       string           `json:"Y" db:"y"`
+	Y       WrappedPublicKey `json:"Y" db:"y"`
 	Witness string           `json:"witness" db:"witness"`
 	SeenAt  int64            `json:"seen_at"`
 	State   ProofState       `json:"state"`
@@ -308,8 +308,7 @@ func (p Proof) HashSecretToCurve() (Proof, error) {
 		return p, fmt.Errorf("crypto.HashToCurve: %+v", err)
 	}
 
-	Y_hex := hex.EncodeToString(y.SerializeCompressed())
-	p.Y = Y_hex
+	p.Y = WrappedPublicKey{y}
 	return p, nil
 }
 func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
