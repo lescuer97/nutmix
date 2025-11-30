@@ -689,28 +689,27 @@ func (p WrappedPublicKey) Value() (driver.Value, error) {
 	return hex.EncodeToString(p.PublicKey.SerializeCompressed()), nil
 }
 
-func (p *WrappedPublicKey) Scan(value interface{}) error {
+func (p *WrappedPublicKey) Scan(value any) error {
 	if value == nil {
 		p.PublicKey = nil
 		return nil
 	}
 
-	var strValue string
+	var bytesValue []byte
 	switch v := value.(type) {
 	case string:
-		strValue = v
+		bytesFromHex, err := hex.DecodeString(v)
+		if err != nil {
+			return fmt.Errorf("failed to decode hex string: %w", err)
+		}
+		bytesValue = bytesFromHex
 	case []byte:
-		strValue = string(v)
+		bytesValue = v
 	default:
 		return fmt.Errorf("failed to scan PublicKey: value is not a string or []byte")
 	}
 
-	decoded, err := hex.DecodeString(strValue)
-	if err != nil {
-		return fmt.Errorf("failed to decode hex string: %w", err)
-	}
-
-	pubKey, err := secp256k1.ParsePubKey(decoded)
+	pubKey, err := btcec.ParsePubKey(bytesValue)
 	if err != nil {
 		return fmt.Errorf("failed to parse public key: %w", err)
 	}
@@ -749,7 +748,7 @@ func (p *WrappedPublicKey) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return errors.Join(ErrCouldNotParsePublicKey, err)
 	}
-	pubKey, err := secp256k1.ParsePubKey(decoded)
+	pubKey, err := btcec.ParsePubKey(decoded)
 	if err != nil {
 		return errors.Join(ErrCouldNotParsePublicKey, err)
 	}
@@ -763,8 +762,8 @@ func (p WrappedPublicKey) MarshalText() ([]byte, error) {
 	if p.PublicKey == nil {
 		return nil, nil
 	}
-	s := hex.EncodeToString(p.PublicKey.SerializeCompressed())
-	return []byte(s), nil
+
+	return p.PublicKey.SerializeCompressed(), nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
@@ -773,11 +772,7 @@ func (p *WrappedPublicKey) UnmarshalText(text []byte) error {
 		p.PublicKey = nil
 		return nil
 	}
-	decoded, err := hex.DecodeString(string(text))
-	if err != nil {
-		return errors.Join(ErrCouldNotParsePublicKey, err)
-	}
-	pubKey, err := secp256k1.ParsePubKey(decoded)
+	pubKey, err := btcec.ParsePubKey(text)
 	if err != nil {
 		return errors.Join(ErrCouldNotParsePublicKey, err)
 	}

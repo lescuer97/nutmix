@@ -170,13 +170,13 @@ func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) err
 	defer results.Close()
 
 	rows, err := results.Query()
-	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return err
 		}
 		return databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
+	defer rows.Close()
 
 	return nil
 
@@ -185,7 +185,14 @@ func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) err
 func (pql Postgresql) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error {
 	ctx := context.Background()
 
-	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId, request.Pubkey, request.Description)
+	// WARN: WrappedPubkey needs to not used it's Value function here because there are columns that are different
+	// columns with string and bytea.
+	var pubkeyBytes []byte
+	if request.Pubkey.PublicKey != nil {
+		pubkeyBytes = request.Pubkey.SerializeCompressed()
+	}
+
+	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId, pubkeyBytes, request.Description)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 

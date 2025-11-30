@@ -109,7 +109,6 @@ func main() {
 		return
 	}
 
-
 	r := gin.Default()
 
 	r.Use(gin.LoggerWithWriter(w))
