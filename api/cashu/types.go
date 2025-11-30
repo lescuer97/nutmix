@@ -238,74 +238,21 @@ type Keyset struct {
 }
 
 type PostMintQuoteBolt11Request struct {
-	Amount      uint64               `json:"amount"`
-	Unit        string               `json:"unit"`
-	Description *string              `json:"description,omitempty"`
-	Pubkey      *secp256k1.PublicKey `json:"pubkey,omitempty"`
-}
-
-func (r *PostMintQuoteBolt11Request) UnmarshalJSON(data []byte) error {
-	type Alias struct {
-		Amount      uint64  `json:"amount"`
-		Unit        string  `json:"unit"`
-		Description *string `json:"description,omitempty"`
-		Pubkey      *string `json:"pubkey,omitempty"`
-	}
-
-	var alias Alias
-	if err := json.Unmarshal(data, &alias); err != nil {
-		return err
-	}
-	r.Amount = alias.Amount
-	r.Unit = alias.Unit
-	r.Description = alias.Description
-
-	if alias.Pubkey != nil {
-		pubkeyBytes, err := hex.DecodeString(*alias.Pubkey)
-		if err != nil {
-			return fmt.Errorf("invalid pubkey hex string: %w", err)
-		}
-		pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
-		if err != nil {
-			return fmt.Errorf("invalid pubkey: %w", err)
-		}
-
-		r.Pubkey = pubkey
-	}
-
-	return nil
-}
-
-func (r *PostMintQuoteBolt11Request) MarshalJSON() ([]byte, error) {
-	type Alias struct {
-		Amount      uint64  `json:"amount"`
-		Unit        string  `json:"unit"`
-		Description *string `json:"description,omitempty"`
-		Pubkey      *string `json:"pubkey,omitempty"`
-	}
-
-	var alias Alias
-	alias.Amount = r.Amount
-	alias.Unit = r.Unit
-	alias.Description = r.Description
-
-	if r.Pubkey != nil {
-		hexStr := hex.EncodeToString(r.Pubkey.SerializeCompressed())
-		alias.Pubkey = &hexStr
-	}
-
-	return json.Marshal(alias)
+	Amount      uint64           `json:"amount"`
+	Unit        string           `json:"unit"`
+	Description *string          `json:"description,omitempty"`
+	Pubkey      WrappedPublicKey `json:"pubkey"`
 }
 
 type PostMintQuoteBolt11Response struct {
-	Quote   string               `json:"quote"`
-	Request string               `json:"request"`
-	Expiry  int64                `json:"expiry"`
-	Unit    string               `json:"unit"`
-	Minted  bool                 `json:"minted"`
-	State   ACTION_STATE         `json:"state"`
-	Amount  *uint64              `json:"amount,omitempty"`
-	Pubkey  *secp256k1.PublicKey `json:"pubkey,omitempty"`
+	Quote   string           `json:"quote"`
+	Request string           `json:"request"`
+	Expiry  int64            `json:"expiry"`
+	Unit    string           `json:"unit"`
+	Minted  bool             `json:"minted"`
+	State   ACTION_STATE     `json:"state"`
+	Amount  *uint64          `json:"amount,omitempty"`
+	Pubkey  WrappedPublicKey `json:"pubkey"`
 }
 
 func (r PostMintQuoteBolt11Response) MarshalJSON() ([]byte, error) {
@@ -328,11 +275,8 @@ func (r PostMintQuoteBolt11Response) MarshalJSON() ([]byte, error) {
 	alias.Minted = r.Minted
 	alias.State = r.State
 	alias.Amount = r.Amount
-
-	if r.Pubkey != nil {
-		hexStr := hex.EncodeToString(r.Pubkey.SerializeCompressed())
-		alias.Pubkey = &hexStr
-	}
+	pubkeyStr := r.Pubkey.ToHex()
+	alias.Pubkey = &pubkeyStr
 
 	return json.Marshal(&alias)
 }
@@ -341,16 +285,16 @@ type MintRequestDB struct {
 	Quote   string `json:"quote"`
 	Request string `json:"request"`
 	// Deprecated: Should be removed after all main wallets change to the new State format
-	RequestPaid bool                 `json:"paid" db:"request_paid"`
-	Expiry      int64                `json:"expiry"`
-	Unit        string               `json:"unit"`
-	Minted      bool                 `json:"minted"`
-	State       ACTION_STATE         `json:"state"`
-	SeenAt      int64                `json:"seen_at"`
-	Amount      *uint64              `json:"amount"`
-	CheckingId  string               `json:"checking_id"`
-	Pubkey      *secp256k1.PublicKey `json:"pubkey"`
-	Description *string              `json:"description,omitempty"`
+	RequestPaid bool             `json:"paid" db:"request_paid"`
+	Expiry      int64            `json:"expiry"`
+	Unit        string           `json:"unit"`
+	Minted      bool             `json:"minted"`
+	State       ACTION_STATE     `json:"state"`
+	SeenAt      int64            `json:"seen_at"`
+	Amount      *uint64          `json:"amount"`
+	CheckingId  string           `json:"checking_id"`
+	Pubkey      WrappedPublicKey `json:"pubkey"`
+	Description *string          `json:"description,omitempty"`
 }
 
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
@@ -751,9 +695,14 @@ func (p *WrappedPublicKey) Scan(value interface{}) error {
 		return nil
 	}
 
-	strValue, ok := value.(string)
-	if !ok {
-		return fmt.Errorf("failed to scan PublicKey: value is not a string")
+	var strValue string
+	switch v := value.(type) {
+	case string:
+		strValue = v
+	case []byte:
+		strValue = string(v)
+	default:
+		return fmt.Errorf("failed to scan PublicKey: value is not a string or []byte")
 	}
 
 	decoded, err := hex.DecodeString(strValue)

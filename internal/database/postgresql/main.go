@@ -185,12 +185,7 @@ func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) err
 func (pql Postgresql) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error {
 	ctx := context.Background()
 
-	var pubkey []byte
-	if request.Pubkey != nil {
-		pubkey = request.Pubkey.SerializeCompressed()
-	}
-
-	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId, pubkey, request.Description)
+	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId, request.Pubkey, request.Description)
 	if err != nil {
 		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
 
@@ -210,32 +205,22 @@ func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool,
 
 func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintRequestDB, error) {
 	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote = $1 FOR UPDATE", id)
-	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.MintRequestDB{}, err
 		}
 	}
+	defer rows.Close()
 
 	var mintRequest cashu.MintRequestDB
 	for rows.Next() {
-		var pubkeyBytes []byte
 		var amount *uint64
-		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &pubkeyBytes, &mintRequest.Description)
+		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
 		if err != nil {
 			return mintRequest, databaseError(fmt.Errorf("rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, pubkeyBytes, &mintRequest.Description ): %w", err))
 		}
 
 		mintRequest.Amount = amount
-
-		if pubkeyBytes != nil || len(pubkeyBytes) > 0 {
-			pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
-			if err != nil {
-				return mintRequest, databaseError(fmt.Errorf("secp256k1.ParsePubKey(pubkeyBytes). %w", err))
-			}
-
-			mintRequest.Pubkey = pubkey
-		}
 	}
 
 	return mintRequest, nil
@@ -243,32 +228,23 @@ func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintReques
 
 func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error) {
 	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE request = $1 FOR UPDATE", request)
-	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.MintRequestDB{}, err
 		}
 	}
+	defer rows.Close()
 
 	var mintRequest cashu.MintRequestDB
 	for rows.Next() {
-		var pubkeyBytes []byte
 		var amount *uint64
-		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &pubkeyBytes, &mintRequest.Description)
+		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
 		if err != nil {
 			return mintRequest, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
 		}
 
 		mintRequest.Amount = amount
 
-		if pubkeyBytes != nil {
-			pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
-			if err != nil {
-				return mintRequest, databaseError(fmt.Errorf("secp256k1.ParsePubKey(pubkeyBytes). %w", err))
-			}
-
-			mintRequest.Pubkey = pubkey
-		}
 	}
 
 	return mintRequest, nil
@@ -276,12 +252,12 @@ func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.
 
 func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, error) {
 	rows, err := tx.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
-	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return cashu.MeltRequestDB{}, err
 		}
 	}
+	defer rows.Close()
 
 	quote, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
 
@@ -299,12 +275,12 @@ func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltReques
 func (pql Postgresql) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
 
 	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE state = $1", state)
-	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return []cashu.MeltRequestDB{}, err
 		}
 	}
+	defer rows.Close()
 
 	quote, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
 
