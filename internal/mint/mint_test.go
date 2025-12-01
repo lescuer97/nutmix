@@ -110,6 +110,7 @@ func SetupDataOnDB(mint *Mint) error {
 	if err != nil {
 		return fmt.Errorf("secp256k1.GeneratePrivateKey: %+v ", err)
 	}
+
 	c2 := c2Priv.PubKey()
 	proofs := cashu.Proofs{
 		cashu.Proof{
@@ -117,7 +118,6 @@ func SetupDataOnDB(mint *Mint) error {
 			Id:     "00bfa73302d12ffd",
 			Secret: "secret1",
 			C:      cashu.WrappedPublicKey{PublicKey: c1},
-			Y:      "y1",
 			SeenAt: now,
 			State:  cashu.PROOF_PENDING,
 			Quote:  &melt_quote.Quote,
@@ -127,12 +127,20 @@ func SetupDataOnDB(mint *Mint) error {
 			Id:     "00bfa73302d12ffd",
 			Secret: "secret2",
 			C:      cashu.WrappedPublicKey{PublicKey: c2},
-			Y:      "y2",
 			SeenAt: now,
 			State:  cashu.PROOF_PENDING,
 			Quote:  &melt_quote.Quote,
 		},
 	}
+
+	for i := range proofs {
+		p, err := proofs[i].HashSecretToCurve()
+		if err != nil {
+			return fmt.Errorf("proofs[p].HashSecretToCurve()")
+		}
+		proofs[i] = p
+	}
+
 	// Sets proofs and quotes to pending
 	ctx := context.Background()
 
