@@ -2,7 +2,6 @@ package cashu
 
 import (
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,21 +37,21 @@ type AuthProof struct {
 	Amount uint64           `json:"amount" db:"amount"`
 }
 
-func (a AuthProof) Y() (string, error) {
+func (a AuthProof) Y() (WrappedPublicKey, error) {
 	// Get Hash to curve of secret
 	parsedSecret := []byte(a.Secret)
 
 	y, err := gonutsCrypto.HashToCurve(parsedSecret)
 
 	if err != nil {
-		return "", fmt.Errorf("crypto.HashToCurve: %+v", err)
+		return WrappedPublicKey{}, fmt.Errorf("crypto.HashToCurve: %+v", err)
 	}
 
-	return hex.EncodeToString(y.SerializeCompressed()), nil
+	return WrappedPublicKey{y}, nil
 }
 
 // creates a normal proof for storage
-func (a AuthProof) Proof(y string, state ProofState) Proof {
+func (a AuthProof) Proof(y WrappedPublicKey, state ProofState) Proof {
 	var proof Proof
 
 	proof.Amount = a.Amount

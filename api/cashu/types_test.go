@@ -67,7 +67,6 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		C:      WrappedPublicKey{PublicKey: unblindedFactor},
 		Secret: "secret",
 		Id:     keysetId,
-		Y:      "",
 	}
 
 	proof, err = proof.HashSecretToCurve()
@@ -75,7 +74,7 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		t.Errorf("could not proof.HashSecretToCurve %+v", err)
 	}
 
-	if proof.Y != "025dccd27047d10d4900b8d2c4ea6795702c2d1fbe1d3fd0d1cd4b18776b12ddc0" {
+	if proof.Y.ToHex() != "025dccd27047d10d4900b8d2c4ea6795702c2d1fbe1d3fd0d1cd4b18776b12ddc0" {
 		t.Errorf("proof.Y is not correct")
 	}
 

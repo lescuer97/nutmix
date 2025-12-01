@@ -458,27 +458,38 @@ func TestSaveProofAndGetBySecret_ValidPubkey(t *testing.T) {
 	db, ctx := setupTestDB(t)
 
 	// Create a valid public key for the C field
-	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
-	pubkeyBytes, err := hex.DecodeString(pubkeyStr)
+	cPubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
+	cPubkeyBytes, err := hex.DecodeString(cPubkeyStr)
 	if err != nil {
-		t.Fatalf("could not decode hex string. %v", err)
+		t.Fatalf("could not decode C hex string. %v", err)
 	}
-	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
+	cPubkey, err := secp256k1.ParsePubKey(cPubkeyBytes)
 	if err != nil {
-		t.Fatalf("could not parse pubkey bytes correctly. %v", err)
+		t.Fatalf("could not parse C pubkey bytes correctly. %v", err)
 	}
-	wrappedPubkey := cashu.WrappedPublicKey{PublicKey: pubkey}
+	wrappedC := cashu.WrappedPublicKey{PublicKey: cPubkey}
+
+	// Create a valid public key for the Y field (using a different key)
+	yPubkeyStr := "02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2"
+	yPubkeyBytes, err := hex.DecodeString(yPubkeyStr)
+	if err != nil {
+		t.Fatalf("could not decode Y hex string. %v", err)
+	}
+	yPubkey, err := secp256k1.ParsePubKey(yPubkeyBytes)
+	if err != nil {
+		t.Fatalf("could not parse Y pubkey bytes correctly. %v", err)
+	}
+	wrappedY := cashu.WrappedPublicKey{PublicKey: yPubkey}
 
 	now := time.Now().Unix()
 	secret := "test_secret_1"
-	yValue := "test_y_value_1"
 
 	proof := cashu.Proof{
 		Amount:  100,
 		Id:      "test_keyset_id",
 		Secret:  secret,
-		C:       wrappedPubkey,
-		Y:       yValue,
+		C:       wrappedC,
+		Y:       wrappedY,
 		Witness: "",
 		SeenAt:  now,
 		State:   cashu.PROOF_UNSPENT,
@@ -518,14 +529,24 @@ func TestSaveProofAndGetBySecret_ValidPubkey(t *testing.T) {
 		t.Fatalf("expected 1 proof, got %d", len(proofs))
 	}
 
-	// Verify the C (WrappedPublicKey) field matches
 	retrievedProof := proofs[0]
+
+	// Verify the C (WrappedPublicKey) field matches
 	if retrievedProof.C.PublicKey == nil {
 		t.Fatal("C field (pubkey) should not be nil after retrieval")
 	}
-	retrievedPubkeyStr := hex.EncodeToString(retrievedProof.C.SerializeCompressed())
-	if retrievedPubkeyStr != pubkeyStr {
-		t.Errorf("C field mismatch: saved %s, got %s", pubkeyStr, retrievedPubkeyStr)
+	retrievedCStr := hex.EncodeToString(retrievedProof.C.SerializeCompressed())
+	if retrievedCStr != cPubkeyStr {
+		t.Errorf("C field mismatch: saved %s, got %s", cPubkeyStr, retrievedCStr)
+	}
+
+	// Verify the Y (WrappedPublicKey) field matches
+	if retrievedProof.Y.PublicKey == nil {
+		t.Fatal("Y field (pubkey) should not be nil after retrieval")
+	}
+	retrievedYStr := hex.EncodeToString(retrievedProof.Y.SerializeCompressed())
+	if retrievedYStr != yPubkeyStr {
+		t.Errorf("Y field mismatch: saved %s, got %s", yPubkeyStr, retrievedYStr)
 	}
 
 	// Also verify other fields
@@ -541,27 +562,38 @@ func TestSaveProofAndGetBySecretCurve_ValidPubkey(t *testing.T) {
 	db, ctx := setupTestDB(t)
 
 	// Create a valid public key for the C field
-	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
-	pubkeyBytes, err := hex.DecodeString(pubkeyStr)
+	cPubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
+	cPubkeyBytes, err := hex.DecodeString(cPubkeyStr)
 	if err != nil {
-		t.Fatalf("could not decode hex string. %v", err)
+		t.Fatalf("could not decode C hex string. %v", err)
 	}
-	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
+	cPubkey, err := secp256k1.ParsePubKey(cPubkeyBytes)
 	if err != nil {
-		t.Fatalf("could not parse pubkey bytes correctly. %v", err)
+		t.Fatalf("could not parse C pubkey bytes correctly. %v", err)
 	}
-	wrappedPubkey := cashu.WrappedPublicKey{PublicKey: pubkey}
+	wrappedC := cashu.WrappedPublicKey{PublicKey: cPubkey}
+
+	// Create a valid public key for the Y field (using a different key)
+	yPubkeyStr := "02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2"
+	yPubkeyBytes, err := hex.DecodeString(yPubkeyStr)
+	if err != nil {
+		t.Fatalf("could not decode Y hex string. %v", err)
+	}
+	yPubkey, err := secp256k1.ParsePubKey(yPubkeyBytes)
+	if err != nil {
+		t.Fatalf("could not parse Y pubkey bytes correctly. %v", err)
+	}
+	wrappedY := cashu.WrappedPublicKey{PublicKey: yPubkey}
 
 	now := time.Now().Unix()
 	secret := "test_secret_2"
-	yValue := "test_y_value_2"
 
 	proof := cashu.Proof{
 		Amount:  200,
 		Id:      "test_keyset_id",
 		Secret:  secret,
-		C:       wrappedPubkey,
-		Y:       yValue,
+		C:       wrappedC,
+		Y:       wrappedY,
 		Witness: "",
 		SeenAt:  now,
 		State:   cashu.PROOF_UNSPENT,
@@ -582,12 +614,12 @@ func TestSaveProofAndGetBySecretCurve_ValidPubkey(t *testing.T) {
 		t.Fatalf("could not commit transaction. %v", err)
 	}
 
-	// Retrieve the proof by Y (secret curve)
+	// Retrieve the proof by Y (secret curve) - pass the WrappedPublicKey
 	tx, err = db.GetTx(ctx)
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	proofs, err := db.GetProofsFromSecretCurve(tx, []string{yValue})
+	proofs, err := db.GetProofsFromSecretCurve(tx, []cashu.WrappedPublicKey{wrappedY})
 	if err != nil {
 		t.Fatalf("db.GetProofsFromSecretCurve failed: %v", err)
 	}
@@ -601,22 +633,29 @@ func TestSaveProofAndGetBySecretCurve_ValidPubkey(t *testing.T) {
 		t.Fatalf("expected 1 proof, got %d", len(proofs))
 	}
 
-	// Verify the C (WrappedPublicKey) field matches
 	retrievedProof := proofs[0]
+
+	// Verify the C (WrappedPublicKey) field matches
 	if retrievedProof.C.PublicKey == nil {
 		t.Fatal("C field (pubkey) should not be nil after retrieval")
 	}
-	retrievedPubkeyStr := hex.EncodeToString(retrievedProof.C.SerializeCompressed())
-	if retrievedPubkeyStr != pubkeyStr {
-		t.Errorf("C field mismatch: saved %s, got %s", pubkeyStr, retrievedPubkeyStr)
+	retrievedCStr := hex.EncodeToString(retrievedProof.C.SerializeCompressed())
+	if retrievedCStr != cPubkeyStr {
+		t.Errorf("C field mismatch: saved %s, got %s", cPubkeyStr, retrievedCStr)
+	}
+
+	// Verify the Y (WrappedPublicKey) field matches
+	if retrievedProof.Y.PublicKey == nil {
+		t.Fatal("Y field (pubkey) should not be nil after retrieval")
+	}
+	retrievedYStr := hex.EncodeToString(retrievedProof.Y.SerializeCompressed())
+	if retrievedYStr != yPubkeyStr {
+		t.Errorf("Y field mismatch: saved %s, got %s", yPubkeyStr, retrievedYStr)
 	}
 
 	// Also verify other fields
 	if retrievedProof.Amount != proof.Amount {
 		t.Errorf("Amount mismatch: saved %d, got %d", proof.Amount, retrievedProof.Amount)
-	}
-	if retrievedProof.Y != proof.Y {
-		t.Errorf("Y mismatch: saved %s, got %s", proof.Y, retrievedProof.Y)
 	}
 }
 

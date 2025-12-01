@@ -105,24 +105,24 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 }
 
 // Sets some values being used by the mint like seen, secretY, seen, and pending state
-func GetAndCalculateProofsValues(proofs *cashu.Proofs) (uint64, []string, error) {
+func GetAndCalculateProofsValues(proofs *cashu.Proofs) (uint64, []cashu.WrappedPublicKey, error) {
 	now := time.Now().Unix()
 	var totalAmount uint64
-	var SecretsList []string
+	secretsList := make([]cashu.WrappedPublicKey, len(*proofs))
 	for i, proof := range *proofs {
 		totalAmount += proof.Amount
 
 		p, err := proof.HashSecretToCurve()
 
 		if err != nil {
-			return 0, SecretsList, fmt.Errorf("proof.HashSecretToCurve(). %w", err)
+			return 0, secretsList, fmt.Errorf("proof.HashSecretToCurve(). %w", err)
 		}
-		SecretsList = append(SecretsList, p.Y)
+		secretsList[i] = p.Y
 		(*proofs)[i] = p
 		(*proofs)[i].SeenAt = now
 	}
 
-	return totalAmount, SecretsList, nil
+	return totalAmount, secretsList, nil
 }
 func GetMessagesForChange(overpaidFees uint64, outputs []cashu.BlindedMessage) []cashu.BlindedMessage {
 	amounts := cashu.AmountSplit(overpaidFees)

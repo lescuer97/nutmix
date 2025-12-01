@@ -92,7 +92,7 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 	}
 	defer m.MintDB.Rollback(ctx, tx)
 
-	proofsList, err := m.MintDB.GetProofsFromSecretCurve(tx, []string{y})
+	proofsList, err := m.MintDB.GetProofsFromSecretCurve(tx, []cashu.WrappedPublicKey{y})
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetProofsFromSecretCurve(tx, []string{y} ). %w", err)
 	}

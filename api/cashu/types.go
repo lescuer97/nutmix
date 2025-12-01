@@ -406,13 +406,13 @@ type BasicKeysetResponse struct {
 }
 
 type PostCheckStateRequest struct {
-	Ys []string `json:"Ys"`
+	Ys []WrappedPublicKey `json:"Ys"`
 }
 
 type CheckState struct {
-	Y       string     `json:"Y"`
-	State   ProofState `json:"state"`
-	Witness *string    `json:"witness,omitempty"`
+	Y       WrappedPublicKey `json:"Y"`
+	State   ProofState       `json:"state"`
+	Witness *string          `json:"witness,omitempty"`
 }
 
 type PostCheckStateResponse struct {

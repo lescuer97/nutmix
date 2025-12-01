@@ -289,7 +289,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 
 		if len(knownProofs) != 0 {
-			slog.Warn("Proofs already spent", slog.Any("known_proofs", knownProofs))
+			slog.Debug("Proofs already spent", slog.Any("known_proofs", knownProofs))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_SPENT, nil))
 			return
 		}

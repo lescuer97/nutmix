@@ -2,11 +2,13 @@ package routes
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -298,7 +300,19 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 			}
 
 		case cashu.ProofStateWs:
-			proofsState, err := m.CheckProofState(mint, []string{filter})
+
+			hexBytes, err := hex.DecodeString(filter)
+			if err != nil {
+				return fmt.Errorf("hex.DecodeString(filter). %w", err)
+			}
+			pubkey, err := btcec.ParsePubKey(hexBytes)
+			if err != nil {
+				return fmt.Errorf("btcec.ParsePubKey(hexBytes). %w", err)
+			}
+
+			wrappedPubkey := cashu.WrappedPublicKey{pubkey}
+
+			proofsState, err := m.CheckProofState(mint, []cashu.WrappedPublicKey{wrappedPubkey})
 			if err != nil {
 				return fmt.Errorf("m.CheckProofState(mint, []string{filter}). %w", err)
 			}

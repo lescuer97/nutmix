@@ -118,7 +118,7 @@ func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 	defer o.Unlock()
 
 	for _, proof := range proofs {
-		watchArray, exists := o.Proofs[proof.Y]
+		watchArray, exists := o.Proofs[proof.Y.ToHex()]
 		if exists {
 			for _, v := range watchArray {
 				v.Channel <- proof

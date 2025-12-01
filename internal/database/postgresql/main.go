@@ -390,7 +390,7 @@ func (pql Postgresql) SaveProof(tx pgx.Tx, proofs []cashu.Proof) error {
 	return nil
 }
 
-func (pql Postgresql) GetProofsFromSecretCurve(tx pgx.Tx, Ys []string) (cashu.Proofs, error) {
+func (pql Postgresql) GetProofsFromSecretCurve(tx pgx.Tx, Ys []cashu.WrappedPublicKey) (cashu.Proofs, error) {
 
 	var proofList cashu.Proofs
 

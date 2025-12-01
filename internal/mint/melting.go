@@ -313,7 +313,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 	}
 
 	if len(knownProofs) != 0 {
-		slog.Info("Proofs already used", slog.String(utils.LogExtraInfo, fmt.Sprintf("knownproofs:  %+v", knownProofs)))
+		slog.Debug("Proofs already used", slog.String(utils.LogExtraInfo, fmt.Sprintf("knownproofs:  %+v", knownProofs)))
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w: len(knownProofs) != 0", cashu.ErrProofSpent)
 	}
 	if len(meltRequest.Outputs) > 0 {
