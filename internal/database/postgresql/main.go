@@ -476,7 +476,7 @@ func privateKeysToDleq(s_key []byte, e_key []byte, sig *cashu.RecoverSigDB) erro
 	return nil
 }
 
-func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error) {
+func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error) {
 
 	signaturesList := make([]cashu.RecoverSigDB, 0)
 
