@@ -679,7 +679,7 @@ func (p WrappedPublicKey) Value() (driver.Value, error) {
 	if p.PublicKey == nil {
 		return nil, nil
 	}
-	return hex.EncodeToString(p.SerializeCompressed()), nil
+	return p.PublicKey.SerializeCompressed(), nil
 }
 
 func (p *WrappedPublicKey) Scan(value any) error {

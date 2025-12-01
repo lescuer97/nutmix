@@ -2,7 +2,6 @@ package postgresql
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -190,14 +189,7 @@ func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) err
 func (pql Postgresql) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error {
 	ctx := context.Background()
 
-	// WARN: WrappedPubkey needs to not used it's Value function here because there are columns that are different
-	// columns with string and bytea.
-	var pubkeyBytes []byte
-	if request.Pubkey.PublicKey != nil {
-		pubkeyBytes = request.Pubkey.SerializeCompressed()
-	}
-
-	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId, pubkeyBytes, request.Description)
+	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId, request.Pubkey, request.Description)
 	if err != nil {
 		return databaseError(fmt.Errorf("inserting to mint_request: %w", err))
 
@@ -355,8 +347,7 @@ func (pql Postgresql) SaveProof(tx pgx.Tx, proofs []cashu.Proof) error {
 	tableName := "proofs"
 
 	for _, proof := range proofs {
-		C := proof.C.String()
-		entries = append(entries, []any{C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness, proof.SeenAt, proof.State, proof.Quote})
+		entries = append(entries, []any{proof.C, proof.Secret, proof.Amount, proof.Id, proof.Y, proof.Witness, proof.SeenAt, proof.State, proof.Quote})
 	}
 
 	_, err := tx.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
@@ -468,30 +459,18 @@ func (pql Postgresql) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
 
 }
 
-func privateKeysToDleq(s_key *string, e_key *string, sig *cashu.RecoverSigDB) error {
+func privateKeysToDleq(s_key []byte, e_key []byte, sig *cashu.RecoverSigDB) error {
 	if s_key == nil || e_key == nil {
 		return nil
 	}
-	if *s_key == "" || *e_key == "" {
-		return nil
-	}
 
-	sBytes, err := hex.DecodeString(*s_key)
-	if err != nil {
-		return errors.New("failed to decode 's' field")
-	}
 	dleqTmp := &cashu.BlindSignatureDLEQ{
 		S: nil,
 		E: nil,
 	}
 
-	dleqTmp.S = secp256k1.PrivKeyFromBytes(sBytes)
-
-	eBytes, err := hex.DecodeString(*e_key)
-	if err != nil {
-		return errors.New("failed to decode '' field")
-	}
-	dleqTmp.E = secp256k1.PrivKeyFromBytes(eBytes)
+	dleqTmp.S = secp256k1.PrivKeyFromBytes(s_key)
+	dleqTmp.E = secp256k1.PrivKeyFromBytes(e_key)
 
 	sig.Dleq = dleqTmp
 	return nil
@@ -515,14 +494,14 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) 
 		var sig cashu.RecoverSigDB
 		sig.Dleq = nil
 
-		var dleq_s_str *string
-		var dleq_e_str *string
-		err := rows.Scan(&sig.Id, &sig.Amount, &sig.C_, &sig.B_, &sig.CreatedAt, &dleq_e_str, &dleq_s_str)
+		var dleq_s_bytes []byte
+		var dleq_e_bytes []byte
+		err := rows.Scan(&sig.Id, &sig.Amount, &sig.C_, &sig.B_, &sig.CreatedAt, &dleq_e_bytes, &dleq_s_bytes)
 		if err != nil {
 			return nil, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
 		}
 
-		err = privateKeysToDleq(dleq_s_str, dleq_e_str, &sig)
+		err = privateKeysToDleq(dleq_s_bytes, dleq_e_bytes, &sig)
 		if err != nil {
 			return nil, databaseError(fmt.Errorf("privateKeysToDleq(dleq_s_str, dleq_e_str, sig.Dleq). %w", err))
 		}
@@ -544,7 +523,7 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSig
 	for _, sig := range recover_sigs {
 		dleq_e_bytes := sig.Dleq.E.Key.Bytes()
 		dleq_s_bytes := sig.Dleq.S.Key.Bytes()
-		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, hex.EncodeToString(dleq_e_bytes[:]), hex.EncodeToString(dleq_s_bytes[:])})
+		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, dleq_e_bytes[:], dleq_s_bytes[:]})
 	}
 
 	for {
