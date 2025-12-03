@@ -20,12 +20,12 @@ type MintPublicKeyset struct {
 	Active      bool
 	Keys        map[uint64]string
 	InputFeePpk uint
-	Version     uint64
+	Version     uint32
 	FinalExpiry *uint64
 }
 
 type RemoteSigner struct {
-	grpcClient    sig.SignerServiceClient
+	grpcClient    sig.SignatoryClient
 	activeKeysets map[string]MintPublicKeyset
 	keysets       map[string]MintPublicKeyset
 	pubkey        []byte
@@ -53,7 +53,7 @@ func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (RemoteSign
 		log.Fatalf("grpc connection failed: %v", err)
 	}
 
-	client := sig.NewSignerServiceClient(conn)
+	client := sig.NewSignatoryClient(conn)
 
 	socketSigner.grpcClient = client
 	socketSigner.keysets = make(map[string]MintPublicKeyset)
@@ -125,6 +125,7 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 
 		s.keysets[hex.EncodeToString(mintKeyset.Id)] = mintKeyset
 	}
+
 	return nil
 }
 
@@ -150,7 +151,9 @@ func (s *RemoteSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 
 	var response signer.GetKeysetsResponse
 	for _, seed := range s.keysets {
-		response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(seed.Id), Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: seed.Version})
+		if seed.Unit != cashu.AUTH.String() {
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(seed.Id), Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: seed.Version})
+		}
 	}
 	return response, nil
 }
@@ -167,13 +170,17 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hour
 	now := time.Now()
 	now = now.Add(time.Duration(expiry_limit_hours) * time.Hour)
 
-	amounts := GetAmountsFromMaxOrder(32)
-	timestamp := uint64(now.Unix())
+	amounts := GetAmountsFromMaxOrder(64)
+	if unit == cashu.AUTH {
+		amounts = []uint64{1}
+	}
+
+	unixTime := uint64(now.Unix())
 	rotationReq := sig.RotationRequest{
 		Unit:        unitSig,
 		InputFeePpk: uint64(fee),
 		Amounts:     amounts,
-		FinalExpiry: &timestamp,
+		FinalExpiry: &unixTime,
 	}
 	rotationResponse, err := s.grpcClient.RotateKeyset(ctx, &rotationReq)
 	if err != nil {

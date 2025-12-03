@@ -113,7 +113,7 @@ func (l *LocalSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 	}
 	for _, seed := range seeds {
 		if seed.Unit != cashu.AUTH.String() {
-			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: uint64(seed.Version), FinalExpiry: seed.FinalExpiry})
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: seed.Version, FinalExpiry: seed.FinalExpiry})
 		}
 	}
 	return response, nil
@@ -134,7 +134,7 @@ func (l *LocalSigner) getSignerPrivateKey() (*secp256k1.PrivateKey, error) {
 	return mintKey, nil
 }
 
-func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, version int, fee uint, final_expiry *time.Time) (cashu.Seed, error) {
+func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, version uint32, fee uint, final_expiry *time.Time) (cashu.Seed, error) {
 	// rotate one level up
 	newSeed := cashu.Seed{
 		CreatedAt:   time.Now().Unix(),
@@ -384,7 +384,7 @@ func (l *LocalSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	}
 	for _, seed := range seeds {
 		if seed.Unit == cashu.AUTH.String() {
-			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: uint64(seed.Version), FinalExpiry: seed.FinalExpiry})
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: seed.Id, Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: seed.Version, FinalExpiry: seed.FinalExpiry})
 		}
 	}
 	return response, nil
