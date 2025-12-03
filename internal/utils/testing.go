@@ -298,7 +298,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		WaitingFor: wait.ForAll(
 			wait.ForLog("Application startup complete").AsRegexp(),
 			wait.ForHTTP("/api/v1/status").WithPort("5000/tcp"),
-		), 
+		),
 		Files: []testcontainers.ContainerFile{
 			{
 				Reader:            tlscertReader,

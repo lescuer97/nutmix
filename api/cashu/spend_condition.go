@@ -188,7 +188,7 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 
 			sigFlag, err := SigFlagFromString(tagInfo[0])
 			if err != nil {
-				return  errors.Join(ErrInvalidSigFlag, err)
+				return errors.Join(ErrInvalidSigFlag, err)
 			}
 
 			tags.Sigflag = sigFlag

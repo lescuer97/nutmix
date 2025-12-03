@@ -13,7 +13,7 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	switch {
 	case errors.Is(proofError, cashu.ErrBlindMessageAlreadySigned):
 		message := cashu.ErrBlindMessageAlreadySigned.Error()
-		return cashu.OUTPUT_BLINDED_MESSAGE_ALREADY_SIGNED, &message
+		return cashu.OUTPUTS_ALREADY_SIGNED, &message
 
 	case errors.Is(proofError, cashu.ErrEmptyWitness):
 
@@ -24,18 +24,18 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := "No route found for payment"
 		return cashu.LIGHTNING_PAYMENT_FAILED, &message
 	case errors.Is(proofError, cashu.ErrNoValidSignatures):
-		return cashu.TOKEN_NOT_VERIFIED, nil
+		return cashu.PROOF_VERIFICATION_FAILED, nil
 	case errors.Is(proofError, cashu.ErrNotEnoughSignatures):
-		return cashu.TOKEN_NOT_VERIFIED, nil
+		return cashu.PROOF_VERIFICATION_FAILED, nil
 	case errors.Is(proofError, cashu.ErrInvalidProof):
 		message := cashu.ErrInvalidProof.Error()
-		return cashu.TOKEN_NOT_VERIFIED, &message
+		return cashu.PROOF_VERIFICATION_FAILED, &message
 	case errors.Is(proofError, cashu.ErrInvalidBlindMessage):
 		message := cashu.ErrInvalidBlindMessage.Error()
-		return cashu.TOKEN_NOT_VERIFIED, &message
+		return cashu.PROOF_VERIFICATION_FAILED, &message
 	case errors.Is(proofError, cashu.ErrInvalidPreimage):
 		message := cashu.ErrInvalidPreimage.Error()
-		return cashu.TOKEN_NOT_VERIFIED, &message
+		return cashu.PROOF_VERIFICATION_FAILED, &message
 
 	case errors.Is(proofError, cashu.ErrLocktimePassed):
 		message := cashu.ErrLocktimePassed.Error()
@@ -48,7 +48,7 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 
 	case errors.Is(proofError, cashu.ErrProofSpent):
 		message := cashu.ErrProofSpent.Error()
-		return cashu.TOKEN_ALREADY_SPENT, &message
+		return cashu.PROOF_ALREADY_SPENT, &message
 
 	case errors.Is(proofError, cashu.ErrNotSameUnits):
 		message := cashu.ErrNotSameUnits.Error()
@@ -76,11 +76,11 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 
 	case errors.Is(proofError, cashu.ErrInvalidPreimage):
 		message := cashu.ErrInvalidPreimage.Error()
-		return cashu.TOKEN_NOT_VERIFIED, &message
+		return cashu.PROOF_VERIFICATION_FAILED, &message
 
 	case errors.Is(proofError, cashu.ErrBlindMessageAlreadySigned):
 		message := cashu.ErrBlindMessageAlreadySigned.Error()
-		return cashu.OUTPUT_BLINDED_MESSAGE_ALREADY_SIGNED, &message
+		return cashu.OUTPUTS_ALREADY_SIGNED, &message
 
 	case strings.Contains(proofError.Error(), "could not obtain lock"):
 		message := "Transaction is already pending"
@@ -98,7 +98,7 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 
 	case errors.Is(proofError, cashu.ErrCouldNotParsePublicKey):
 		message := cashu.ErrCouldNotParsePublicKey.Error()
-		return cashu.TOKEN_NOT_VERIFIED, &message
+		return cashu.PROOF_VERIFICATION_FAILED, &message
 	}
 
 	return cashu.UNKNOWN, nil
