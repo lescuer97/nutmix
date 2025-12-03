@@ -217,7 +217,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 10003 {
+	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -262,7 +262,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
+	if errorRes.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
@@ -578,7 +578,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
+	if errorRes.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
@@ -654,7 +654,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 10003 {
+	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -696,7 +696,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 10003 {
+	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -740,7 +740,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
+	if errorRes.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 

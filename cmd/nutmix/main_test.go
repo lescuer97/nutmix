@@ -308,7 +308,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
-	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
+	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf(`Expected code be Minting disables. Got:  %q`, errorResponse.Code)
 	}
 	if errorResponse.Error != "Proof could not be verified" {
@@ -351,7 +351,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 11002 {
+	if errorResponse.Code != cashu.TRANSACTION_NOT_BALANCED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -490,7 +490,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 11002 {
+	if errorResponse.Code != cashu.TRANSACTION_NOT_BALANCED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -594,7 +594,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
+	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Expected Invalid Proof, got %v", errorResponse.Code)
 	}
 
@@ -1097,7 +1097,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
-	if errorResponse.Code != cashu.TOKEN_NOT_VERIFIED {
+	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
 	}
 
@@ -1261,7 +1261,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 11002 {
+	if errorResponse.Code != cashu.TRANSACTION_NOT_BALANCED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -1400,7 +1400,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 11002 {
+	if errorResponse.Code != cashu.TRANSACTION_NOT_BALANCED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -1530,7 +1530,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Fatalf("json.Unmarshal(w.Body.Bytes(), &errorRes): %v", err)
 	}
 
-	if errorRes.Code != cashu.TOKEN_NOT_VERIFIED {
+	if errorRes.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
