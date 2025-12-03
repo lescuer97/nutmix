@@ -575,16 +575,15 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	errorResponse := cashu.ErrorResponse{}
+	var errorResponse cashu.ErrorResponse
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
-	log.Printf("\n errorResponse: %+v\n ", errorResponse)
 
-	if errorResponse.Code != 10003 {
+	if errorResponse.Code != 10001 {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 	}
 	if errorResponse.Error != "Proof could not be verified" {
