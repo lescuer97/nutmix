@@ -1,8 +1,8 @@
 package utils
 
 var (
-	// AppVersion set a build time
-	AppVersion = "0.0.0"
+	// AppVersion will be in 0.0.0 format
+	AppVersion = "development"
 
 	// BuildTime is the time it built, in RFC3339
 	BuildTime = "unknown"
