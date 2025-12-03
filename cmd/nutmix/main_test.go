@@ -256,7 +256,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
-	if errorResponse.Error != "Tokens have already been issued for quote" {
+	if errorResponse.Error != "Quote has already been issued" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
 
 	}
@@ -448,7 +448,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 10003 {
+	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -1220,7 +1220,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
-	if errorResponse.Error != "Tokens have already been issued for quote" {
+	if errorResponse.Error != "Quote has already been issued" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
 
 	}
@@ -1358,7 +1358,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 10003 {
+	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -1650,7 +1650,7 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 11005 {
+	if errorResponse.Code != cashu.UNIT_NOT_SUPPORTED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
@@ -1678,7 +1678,7 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != 11005 {
+	if errorResponse.Code != cashu.UNIT_NOT_SUPPORTED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 
 	}
