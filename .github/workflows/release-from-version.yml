@@ -20,14 +20,13 @@ jobs:
         with:
           go-version: "1.23.12"
 
-      - name: Install templ
-        run: go install github.com/a-h/templ/cmd/templ@latest
+      - name: Install Just
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just
 
-      - name: Run templ build
-        run: templ generate .
-
-      - name: Build Linux binary
-        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o nutmix ./cmd/nutmix/main.go
+      - name: Run release task
+        run: just release
 
       - name: Create or Update GitHub Release
         uses: ncipollo/release-action@v1
@@ -38,5 +37,5 @@ jobs:
           prerelease: ${{ endsWith(github.ref_name, '-prelease') }}
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: |
-            ./nutmix
+            release/*
           allowUpdates: true
