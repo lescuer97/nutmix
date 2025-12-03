@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
+	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -41,102 +43,75 @@ func (s *SpendCondition) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, &a)
 }
 
-// ["P2PK",{"nonce":"3229136a6627050449e85dcdf90315f87519f172b2af80b2e1d460695db511ab","data":"0275c5c0ddafea52d669f09de48da03896d09962d6d4e545e94f573d52840f04ae"}]
+// MarshalJSON serializes SpendCondition to cashu protocol format: ["P2PK",{"nonce":"...","data":"...","tags":[...]}]
 func (sc *SpendCondition) MarshalJSON() ([]byte, error) {
-	str := "["
-
-	typestr, err := sc.Type.String()
-
-	if err != nil {
-		return nil, err
+	// AnyOneCanSpend cannot be marshalled to JSON (it's a plain 64-byte secret)
+	if sc.Type == AnyOneCanSpend {
+		return nil, fmt.Errorf("cannot marshal AnyOneCanSpend to JSON: %w", ErrInvalidSpendCondition)
 	}
 
-	str += fmt.Sprintf("\"%s\",", typestr)
+	typeStr, err := sc.Type.String()
+	if err != nil {
+		return nil, fmt.Errorf("sc.Type.String(): %w", err)
+	}
 
-	str += "{"
-	str += fmt.Sprintf("\"%s\",", sc.Data.Nonce)
+	dataJSON, err := sc.Data.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("sc.Data.MarshalJSON(): %w", err)
+	}
 
-	return []byte(str), nil
+	// Format: ["TYPE", {...data...}]
+	result := fmt.Sprintf(`["%s",%s]`, typeStr, string(dataJSON))
+	return []byte(result), nil
 }
 
+// String returns the JSON string representation of the SpendCondition
 func (sc *SpendCondition) String() (string, error) {
-	str := "["
-
-	typestr, err := sc.Type.String()
-
+	b, err := sc.MarshalJSON()
 	if err != nil {
 		return "", err
 	}
-
-	str += fmt.Sprintf("\"%s\",", typestr)
-	str += fmt.Sprintf(`{"nonce":"%s",`, sc.Data.Nonce)
-	str += fmt.Sprintf(`"data":"%s",`, sc.Data.Data)
-	str += fmt.Sprintf(`"tags":[`)
-	str += fmt.Sprintf(`["sigflag","%s"],`, sc.Data.Tags.Sigflag.String())
-	str += fmt.Sprintf(`["n_sigs","%s"],`, strconv.Itoa(sc.Data.Tags.NSigs))
-	str += fmt.Sprintf(`["locktime","%s"],`, strconv.Itoa(sc.Data.Tags.Locktime))
-	if len(sc.Data.Tags.Refund) > 0 {
-
-		str += fmt.Sprintf(`["refund"`)
-
-		for _, pubkey := range sc.Data.Tags.Refund {
-
-			str += fmt.Sprintf(`,"%s"`, hex.EncodeToString(pubkey.SerializeCompressed()))
-		}
-
-		str += fmt.Sprintf(`],`)
-
-	}
-	if len(sc.Data.Tags.Pubkeys) > 0 {
-
-		str += fmt.Sprintf(`["pubkeys"`)
-
-		for _, pubkey := range sc.Data.Tags.Pubkeys {
-
-			str += fmt.Sprintf(`,"%s"`, hex.EncodeToString(pubkey.SerializeCompressed()))
-		}
-
-		str += fmt.Sprintf(`]`)
-
-	}
-
-	str += fmt.Sprintf(`]}]`)
-
-	return str, nil
+	return string(b), nil
 }
 
 func (sc *SpendCondition) CheckValid() error {
-	if len(sc.Data.Tags.Pubkeys)+len(sc.Data.Tags.Pubkeys) > 10 {
+	if len(sc.Data.Tags.Pubkeys)+len(sc.Data.Tags.Refund) > 10 {
 		return ErrInvalidSpendCondition
 	}
 
 	return nil
 }
 
+// HasSigAll returns true if this spend condition requires SIG_ALL flag
+func (sc *SpendCondition) HasSigAll() bool {
+	return sc.Data.Tags.Sigflag == SigAll
+}
+
 type SpendConditionType int
 
 const (
-	P2PK SpendConditionType = iota + 1
-	HTLC SpendConditionType = iota + 2
+	AnyOneCanSpend SpendConditionType = iota // 0 - non-JSON 64-byte hex secret
+	P2PK                                     // 1
+	HTLC                                     // 2
 )
 
 func (sc *SpendConditionType) UnmarshalJSON(b []byte) error {
 	switch string(b) {
 	case `"P2PK"`, "P2PK":
 		*sc = P2PK
-		break
 	case `"HTLC"`, "HTLC":
 		*sc = HTLC
-		break
-
 	default:
-		return ErrInvalidSpendCondition
+		// For non-JSON secrets or unknown types, treat as AnyOneCanSpend
+		*sc = AnyOneCanSpend
 	}
 	return nil
-
 }
+
 func (sc SpendConditionType) String() (string, error) {
 	switch sc {
+	case AnyOneCanSpend:
+		return "", nil // AnyOneCanSpend has no string representation (plain 64-byte secret)
 	case P2PK:
 		return "P2PK", nil
 	case HTLC:
@@ -146,14 +121,66 @@ func (sc SpendConditionType) String() (string, error) {
 	}
 }
 
+// IsSpendConditioned returns true if this type requires spend condition verification
+func (sc SpendConditionType) IsSpendConditioned() bool {
+	return sc == P2PK || sc == HTLC
+}
+
 type TagsInfo struct {
 	originalTag string
 	Sigflag     SigFlag
 	Pubkeys     []*btcec.PublicKey
-	NSigs       int
-	Locktime    int
+	NSigs       uint
+	Locktime    uint
 	Refund      []*btcec.PublicKey
-	NSigRefund  int
+	NSigRefund  uint
+}
+
+// MarshalJSON serializes TagsInfo to the cashu protocol format: [["sigflag","SIG_ALL"],["pubkeys","..."]]
+// Per NUT-11 spec: Tags are arrays with format ["key", "value1", "value2", ...]
+// Note: Integer tag values (n_sigs, locktime, n_sigs_refund) are serialized as strings per spec
+func (tags *TagsInfo) MarshalJSON() ([]byte, error) {
+	var result [][]string
+
+	// Add sigflag if set (if unset/0, defaults to SIG_INPUTS per NUT-11 spec and is omitted)
+	if tags.Sigflag != 0 {
+		result = append(result, []string{"sigflag", tags.Sigflag.String()})
+	}
+
+	// Add pubkeys if present
+	if len(tags.Pubkeys) > 0 {
+		pubkeysTag := []string{"pubkeys"}
+		for _, pubkey := range tags.Pubkeys {
+			pubkeysTag = append(pubkeysTag, hex.EncodeToString(pubkey.SerializeCompressed()))
+		}
+		result = append(result, pubkeysTag)
+	}
+
+	// Add n_sigs if set (greater than 0)
+	if tags.NSigs > 0 {
+		result = append(result, []string{"n_sigs", strconv.FormatUint(uint64(tags.NSigs), 10)})
+	}
+
+	// Add locktime if set
+	if tags.Locktime > 0 {
+		result = append(result, []string{"locktime", strconv.FormatUint(uint64(tags.Locktime), 10)})
+	}
+
+	// Add refund pubkeys if present
+	if len(tags.Refund) > 0 {
+		refundTag := []string{"refund"}
+		for _, pubkey := range tags.Refund {
+			refundTag = append(refundTag, hex.EncodeToString(pubkey.SerializeCompressed()))
+		}
+		result = append(result, refundTag)
+	}
+
+	// Add n_sigs_refund if set
+	if tags.NSigRefund > 0 {
+		result = append(result, []string{"n_sigs_refund", strconv.FormatUint(uint64(tags.NSigRefund), 10)})
+	}
+
+	return json.Marshal(result)
 }
 
 func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
@@ -224,24 +251,36 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
-			nSigs, err := strconv.Atoi(tagInfo[0])
+			nSigs, err := strconv.ParseUint(tagInfo[0], 10, 64)
 			if err != nil {
-				return fmt.Errorf("strconv.Atoi: %w", err)
+				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
 			}
 
-			tags.NSigs = nSigs
+			tags.NSigs = uint(nSigs)
+
+		case NSigRefund:
+			if len(tagInfo) != 1 {
+				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
+			}
+
+			nSigsRefund, err := strconv.ParseUint(tagInfo[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
+			}
+
+			tags.NSigRefund = uint(nSigsRefund)
 
 		case Locktime:
 			if len(tagInfo) != 1 {
 				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
-			locktime, err := strconv.Atoi(tagInfo[0])
+			locktime, err := strconv.ParseUint(tagInfo[0], 10, 64)
 			if err != nil {
-				return fmt.Errorf("strconv.Atoi: %w", err)
+				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
 			}
 
-			tags.Locktime = locktime
+			tags.Locktime = uint(locktime)
 		}
 
 	}
@@ -255,15 +294,24 @@ type SpendConditionData struct {
 	Tags  TagsInfo
 }
 
+// MarshalJSON serializes SpendConditionData to: {"nonce":"...","data":"...","tags":[...]}
+func (scd *SpendConditionData) MarshalJSON() ([]byte, error) {
+	// Create a map for controlled serialization order
+	tagsJSON, err := scd.Tags.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("scd.Tags.MarshalJSON(): %w", err)
+	}
+
+	// Build the JSON manually to ensure correct key order and format
+	result := fmt.Sprintf(`{"nonce":"%s","data":"%s","tags":%s}`, scd.Nonce, scd.Data, string(tagsJSON))
+	return []byte(result), nil
+}
+
 func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 	preImageBytes, err := hex.DecodeString(witness.Preimage)
 
 	if err != nil {
 		return errors.Join(ErrInvalidHexPreimage, err)
-	}
-
-	if len(preImageBytes) != 32 {
-		return ErrInvalidPreimage
 	}
 
 	parsedPreimage := sha256.Sum256(preImageBytes)
@@ -279,12 +327,12 @@ func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 type Tags int
 
 const (
-	Sigflag    Tags = iota + 1
-	Pubkeys    Tags = iota + 2
-	NSigs      Tags = iota + 3
-	Locktime   Tags = iota + 4
-	Refund     Tags = iota + 5
-	NSigRefund Tags = iota + 6
+	Sigflag    Tags = iota + 1 // 1
+	Pubkeys                    // 2
+	NSigs                      // 3
+	Locktime                   // 4
+	Refund                     // 5
+	NSigRefund                 // 6
 )
 
 func (t Tags) String() string {
@@ -300,7 +348,7 @@ func (t Tags) String() string {
 	case Refund:
 		return "refund"
 	case NSigRefund:
-		return "refund"
+		return "n_sigs_refund"
 	}
 	return ""
 }
@@ -327,8 +375,8 @@ func TagFromString(s string) (Tags, error) {
 type SigFlag int
 
 const (
-	SigAll    SigFlag = iota + 1
-	SigInputs SigFlag = iota + 2
+	SigAll    SigFlag = iota + 1 // 1
+	SigInputs                    // 2
 )
 
 func (sf SigFlag) String() string {
@@ -420,14 +468,16 @@ func (wit *Witness) UnmarshalJSON(b []byte) error {
 type SigflagValidation struct {
 	sigFlag            SigFlag
 	signaturesRequired uint
-	pubkeys            map[*btcec.PublicKey]bool
+	pubkeys            map[*btcec.PublicKey]struct{}
+	expired            bool
 }
 
 func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 	sigFlagValidation := SigflagValidation{
 		sigFlag:            SigInputs,
-		signaturesRequired: 0,
-		pubkeys:            make(map[*btcec.PublicKey]bool),
+		signaturesRequired: 1,
+		pubkeys:            make(map[*btcec.PublicKey]struct{}),
+		expired:            false,
 	}
 	for _, proof := range proofs {
 		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
@@ -443,16 +493,46 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 			}
 
 			for _, pubkey := range spendCondition.Data.Tags.Pubkeys {
-				sigFlagValidation.pubkeys[pubkey] = true
+				sigFlagValidation.pubkeys[pubkey] = struct{}{}
+			}
+
+			currentTime := time.Now().Unix()
+			// Incase of expiration we set the refund pubkeys and the n_sigs_refund
+			if spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
+				sigFlagValidation.expired = true
+				refundPubkeys := make(map[*btcec.PublicKey]struct{})
+				for i := range spendCondition.Data.Tags.Refund {
+					if spendCondition.Data.Tags.Refund[i] != nil {
+						refundPubkeys[spendCondition.Data.Tags.Refund[i]] = struct{}{}
+					}
+				}
+				sigFlagValidation.pubkeys = refundPubkeys
+				sigFlagValidation.signaturesRequired = max(1, spendCondition.Data.Tags.NSigRefund)
 			}
 		}
 	}
 	return sigFlagValidation, nil
 }
 
-func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]bool, signatures []*schnorr.Signature) (uint, error) {
+// ProofsHaveSigAll returns true if any proof in the slice has SIG_ALL flag set.
+// This is useful for determining if outputs need to be included in signature verification.
+func ProofsHaveSigAll(proofs Proofs) (bool, error) {
+	for _, proof := range proofs {
+		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
+		if err != nil {
+			return false, fmt.Errorf("proof.IsProofSpendConditioned(): %w", err)
+		}
+		if isLocked && spendCondition != nil && spendCondition.HasSigAll() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]struct{}, signatures []*schnorr.Signature) (uint, error) {
 	hashMessage := sha256.Sum256([]byte(msg))
 	amountValidSigs := uint(0)
+	log.Printf("msg hash: %x", hashMessage)
 
 	for _, sig := range signatures {
 		for pubkey, _ := range pubkeys {
@@ -465,12 +545,3 @@ func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]bool, signatur
 	}
 	return amountValidSigs, nil
 }
-
-// func GetSignaturesFromWitness(proof Proof) ([]*schnorr.Signature, error){
-//
-// }
-// func MakeSigAllMessage(proofs Proofs) (string, error){
-// 	for _, proof := range proofs{
-// 	}
-//
-// }
