@@ -17,24 +17,26 @@ var (
 type ErrorCode int
 
 const (
-	OUTPUT_BLINDED_MESSAGE_ALREADY_SIGNED = 10002
-	TOKEN_NOT_VERIFIED                    = 10003
+	PROOF_VERIFICATION_FAILED = 10001
 
-	TOKEN_ALREADY_SPENT      = 11001
-	TRANSACTION_NOT_BALANCED = 11002
-	UNIT_NOT_SUPPORTED       = 11005
+	PROOF_ALREADY_SPENT      = 11001
+	PROOFS_PENDING           = 11002
+	OUTPUTS_ALREADY_SIGNED   = 11003
+	OUTPUTS_PENDING          = 11004
+	TRANSACTION_NOT_BALANCED = 11005
 	INSUFICIENT_FEE          = 11006
 	// AMOUNT_OUTSIDE_OF_LIMIT = 11006
 	DUPLICATE_INPUTS            = 11007
 	DUPLICATE_OUTPUTS           = 11008
 	MULTIPLE_UNITS_OUTPUT_INPUT = 11009
 	INPUT_OUTPUT_NOT_SAME_UNIT  = 11010
+	UNIT_NOT_SUPPORTED          = 11013
 
 	KEYSET_NOT_KNOW = 12001
 	INACTIVE_KEYSET = 12002
 
 	REQUEST_NOT_PAID         = 20001
-	TOKEN_ALREADY_ISSUED     = 20002
+	QUOTE_ALREADY_ISSUED     = 20002
 	MINTING_DISABLED         = 20003
 	LIGHTNING_PAYMENT_FAILED = 20004
 	QUOTE_PENDING            = 20005
@@ -58,13 +60,17 @@ func (e ErrorCode) String() string {
 
 	error := ""
 	switch e {
-	case OUTPUT_BLINDED_MESSAGE_ALREADY_SIGNED:
+	case OUTPUTS_ALREADY_SIGNED:
 		error = "Blinded message of output already signed"
-	case TOKEN_NOT_VERIFIED:
+	case PROOF_VERIFICATION_FAILED:
 		error = "Proof could not be verified"
 
-	case TOKEN_ALREADY_SPENT:
-		error = "Token is already spent"
+	case PROOF_ALREADY_SPENT:
+		error = "Proof is already spent"
+	case PROOFS_PENDING:
+		error = "Proofs are pending"
+	case OUTPUTS_PENDING:
+		error = "Outputs are pending"
 	case TRANSACTION_NOT_BALANCED:
 		error = "Transaction is not balanced (inputs != outputs)"
 	case UNIT_NOT_SUPPORTED:
@@ -91,8 +97,8 @@ func (e ErrorCode) String() string {
 
 	case REQUEST_NOT_PAID:
 		error = "Quote request is not paid"
-	case TOKEN_ALREADY_ISSUED:
-		error = "Tokens have already been issued for quote"
+	case QUOTE_ALREADY_ISSUED:
+		error = "Quote has already been issued"
 	case MINTING_DISABLED:
 		error = "Minting is disabled"
 	case QUOTE_PENDING:
