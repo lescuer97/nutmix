@@ -169,13 +169,13 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 	for _, tag := range arrayToCheck {
 
 		if len(tag) < 2 {
-			return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+			return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 		}
 
 		tagName, err := TagFromString(tag[0])
 
 		if err != nil {
-			return errors.New(fmt.Sprintf("%s: %s", ErrInvalidTagName, tag[0]))
+			return fmt.Errorf("%w: %s", ErrInvalidTagName, tag[0])
 		}
 
 		tagInfo := tag[1:]
@@ -183,19 +183,19 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 
 		case Sigflag:
 			if len(tagInfo) != 1 {
-				return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
 			sigFlag, err := SigFlagFromString(tagInfo[0])
 			if err != nil {
-				return errors.New(fmt.Sprintf("%s: %s", ErrInvalidSigFlag, tagInfo[0]))
+				return  errors.Join(ErrInvalidSigFlag, err)
 			}
 
 			tags.Sigflag = sigFlag
 
 		case Pubkeys, Refund:
 			if len(tagInfo) < 1 {
-				return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
 			for _, pubkey := range tagInfo {
@@ -221,24 +221,24 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 
 		case NSigs:
 			if len(tagInfo) != 1 {
-				return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
 			nSigs, err := strconv.Atoi(tagInfo[0])
 			if err != nil {
-				return errors.New(fmt.Sprintf("strconv.Atoi: %s", tagInfo[0]))
+				return fmt.Errorf("strconv.Atoi: %w", err)
 			}
 
 			tags.NSigs = nSigs
 
 		case Locktime:
 			if len(tagInfo) != 1 {
-				return errors.New(fmt.Sprintf("%s: %s", ErrMalformedTag, tag))
+				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
 			locktime, err := strconv.Atoi(tagInfo[0])
 			if err != nil {
-				return errors.New(fmt.Sprintf("strconv.Atoi: %s", tagInfo[0]))
+				return fmt.Errorf("strconv.Atoi: %w", err)
 			}
 
 			tags.Locktime = locktime
@@ -348,7 +348,7 @@ func SigFlagFromString(s string) (SigFlag, error) {
 	case "SIG_INPUTS":
 		return SigInputs, nil
 	default:
-		return 0, errors.New(fmt.Sprintf("%s: %s", ErrInvalidTagValue, s))
+		return 0, fmt.Errorf("%w: %s", ErrInvalidTagValue, s)
 	}
 }
 

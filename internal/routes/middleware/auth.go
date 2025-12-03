@@ -79,8 +79,8 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 		if !mint.Config.MINT_REQUIRE_AUTH {
 			c.Next()
 		}
-		// Check if current path matches any of the patterns
 		if mint.Config.MINT_REQUIRE_AUTH {
+			// Check if current path matches any of the patterns
 			for _, pattern := range mint.Config.MINT_AUTH_BLIND_AUTH_URLS {
 				if !mint.Config.MINT_REQUIRE_AUTH {
 					log.Panicf("mint require auth should always be on when using the middleware")

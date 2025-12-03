@@ -65,7 +65,7 @@ func DeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, error) 
 		amounts = []uint64{amounts[0]}
 	}
 
-	keyset, err := cashu.GenerateKeysets(versionKey, amounts, seed.Id, unit, seed.InputFeePpk, seed.Active)
+	keyset, err := cashu.GenerateKeysets(versionKey, amounts, seed)
 	if err != nil {
 		return nil, fmt.Errorf(`GenerateKeysets(versionKey,GetAmountsForKeysets(), "", unit, 0) %w`, err)
 	}
