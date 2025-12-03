@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -581,10 +582,10 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
+	log.Printf("\n errorResponse: %+v\n ", errorResponse)
 
 	if errorResponse.Code != 10003 {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Proof could not be verified" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
