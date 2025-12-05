@@ -3,10 +3,10 @@ package database
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -34,6 +34,18 @@ const (
 	DOCKERDATABASE = "DOCKERDATABASE"
 	CUSTOMDATABASE = "CUSTOMDATABASE"
 )
+
+type EcashInventory struct {
+	AmountValue uint64
+	Quantity    uint64
+}
+
+// ProofTimeSeriesPoint represents a single data point for charting proofs over time
+type ProofTimeSeriesPoint struct {
+	Timestamp   int64  `json:"timestamp"`   // Unix timestamp (seconds) for the bucket start
+	TotalAmount uint64 `json:"totalAmount"` // Sum of proof amounts in this bucket
+	Count       uint64 `json:"count"`       // Number of proofs in this bucket
+}
 
 type MintDB interface {
 	GetTx(ctx context.Context) (pgx.Tx, error)
@@ -72,9 +84,21 @@ type MintDB interface {
 	GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
 
-	GetProofsMintReserve() (templates.MintReserve, error)
-	GetBlindSigsMintReserve() (templates.MintReserve, error)
+	GetProofsInventory(since time.Time, until *time.Time) (EcashInventory, error)
+	GetBlindSigsInventory(since time.Time, until *time.Time) (EcashInventory, error)
+	// GetProofsTimeSeries returns proofs aggregated by time buckets for charting
+	// since: lower bound unix timestamp (inclusive)
+	// until: upper bound unix timestamp (exclusive), nil means current time
+	// bucketMinutes: size of each time bucket in minutes
+	GetProofsTimeSeries(since int64, until *int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
+	// GetBlindSigsTimeSeries returns blind signatures aggregated by time buckets for charting
+	// since: lower bound unix timestamp (inclusive)
+	// until: upper bound unix timestamp (exclusive), nil means current time
+	// bucketMinutes: size of each time bucket in minutes
+	GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
 
+	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
+	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	GetConfig() (utils.Config, error)
 	SetConfig(config utils.Config) error
 	UpdateConfig(config utils.Config) error

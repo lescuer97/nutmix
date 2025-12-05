@@ -6,7 +6,6 @@ import (
 	"embed"
 	"encoding/hex"
 	"errors"
-	"html/template"
 	"io/fs"
 	"log"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -27,16 +27,12 @@ import (
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
 
-type ErrorNotif struct {
-	Error string
-}
-
 func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 
 		if len(c.Errors) > 0 {
-			message := "Unknown Problem"
+			message := "Something went wrong"
 			for _, e := range c.Errors {
 				switch {
 				case errors.Is(e, utils.ErrAlreadyLNPaying):
@@ -53,15 +49,15 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 					message = ErrInvalidStrikeCheck.Error()
 				case errors.Is(e, ErrIncorrectNpub):
 					message = ErrIncorrectNpub.Error()
-					c.Status(http.StatusBadRequest)
+				case errors.Is(e, ErrCouldNotParseLogin):
+					message = ErrCouldNotParseLogin.Error()
+				case errors.Is(e, ErrInvalidNostrSignature):
+					message = ErrInvalidNostrSignature.Error()
 				}
 			}
 			slog.Error("Error from calls", slog.String("errors", c.Errors.String()))
 
-			component := templates.ErrorNotif(message)
-			c.Header("HX-Reswap", "innerHtml")
-			c.Header("HX-Retarget", "#notifications")
-			err := component.Render(c.Request.Context(), c.Writer)
+			err := RenderError(c, message)
 			if err != nil {
 				slog.Error("Could not render error notification", slog.Any("error", err))
 				return
@@ -71,26 +67,38 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 	}
 }
 
-//go:embed static/*.css static/*.js
-var static embed.FS
+func renderHTMX(c *gin.Context, component templ.Component) error {
+	c.Header("HX-Reswap", "innerHtml")
+	c.Header("HX-Retarget", "#notifications")
+	return component.Render(c.Request.Context(), c.Writer)
+}
 
-//go:embed templates/*.html
-var templatesFs embed.FS
+func RenderError(c *gin.Context, message string) error {
+	return renderHTMX(c, templates.ErrorNotif(message))
+}
+
+func RenderSuccess(c *gin.Context, message string) error {
+	return renderHTMX(c, templates.SuccessNotif(message))
+}
+
+//go:embed static/dist/js/*.js static/dist/css/*.css
+var staticEmbed embed.FS
 
 func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
-	contentStatic, err := fs.Sub(static, "static")
+	// Create a file server for the embedded static files
+	// The embed contains files at: static/dist/js/*.js and static/dist/css/*.css
+	// We need to serve them at /js and /css routes
+	jsFS, err := fs.Sub(staticEmbed, "static/dist/js")
 	if err != nil {
-		slog.Error(
-			`fs.Sub(static, "static")`,
-			slog.String(utils.LogExtraInfo, err.Error()),
-		)
-		panic(err)
+		log.Panicf("could not create correct /dist/js directory")
 	}
-	httpFs := http.FS(contentStatic)
-	r.StaticFS("/static", httpFs)
+	cssFS, err := fs.Sub(staticEmbed, "static/dist/css")
+	if err != nil {
+		log.Panicf("could not create correct /dist/css directory")
+	}
 
-	templ := template.Must(template.ParseFS(templatesFs, "templates/*.html"))
-	r.SetHTMLTemplate(templ)
+	r.StaticFS("/js", http.FS(jsFS))
+	r.StaticFS("/css", http.FS(cssFS))
 
 	adminRoute := r.Group("/admin")
 
@@ -136,29 +144,45 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 			c.Abort()
 		}
 	})
+	// Create token blacklist
+	tokenBlacklist := NewTokenBlacklist()
 
 	adminRoute.Use(ErrorHtmlMessageMiddleware())
 	// I use the first active keyset as secret for jwt token signing
-	adminRoute.Use(AuthMiddleware(loginKey.Serialize()))
+	// adminRoute.Use(AuthMiddleware(loginKey.Serialize(), tokenBlacklist))
+
+	adminHandler := newAdminHandler(mint)
+
 	// PAGES SETUP
 	// This is /admin pages
 	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
+
 	if nostrPubkey != nil {
+		adminRoute.GET("/proofs-chart", ProofsChartCard(mint))
+		adminRoute.GET("/api/proofs-chart-data", ProofsChartDataAPI(mint))
+		adminRoute.GET("/blindsigs-chart", BlindSigsChartCard(mint))
+		adminRoute.GET("/api/blindsigs-chart-data", BlindSigsChartDataAPI(mint))
 		adminRoute.GET("", InitPage(mint))
+		adminRoute.GET("/ln", LnPage(mint))
 		adminRoute.GET("/keysets", KeysetsPage(mint))
 		adminRoute.GET("/settings", MintSettingsPage(mint))
 		adminRoute.GET("/bolt11", LightningNodePage(mint))
 
 		// change routes
 		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
+		adminRoute.POST("/mintsettings/general", MintSettingsGeneral(mint))
+		adminRoute.POST("/mintsettings/lightning", MintSettingsLightning(mint))
+		adminRoute.POST("/mintsettings/auth", MintSettingsAuth(mint))
+		// Legacy/Fallback
 		adminRoute.POST("/mintsettings", MintSettingsForm(mint))
 		adminRoute.POST("/bolt11", Bolt11Post(mint))
-		adminRoute.POST("/rotate/sats", RotateSatsSeed(mint))
+		adminRoute.POST("/rotate/sats", RotateSatsSeed(&adminHandler))
+		adminRoute.POST("/logout", LogoutHandler(tokenBlacklist))
 
 		// fractional html components
-		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(mint))
+		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(&adminHandler))
 		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
-		adminRoute.GET("/mint-balance", MintBalance(mint))
+		adminRoute.GET("/mint-balance", MintBalance(&adminHandler))
 		adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint))
 		adminRoute.GET("/mint-melt-list", MintMeltList(mint))
 		adminRoute.GET("/logs", LogsTab())
@@ -254,19 +278,18 @@ func LogsTab() gin.HandlerFunc {
 		}
 
 		file, err := os.Open(logsdir + "/" + m.LogFileName)
-		defer file.Close()
 		if err != nil {
 			slog.Warn(
 				"os.Open(logsdir ",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-				Error: "Could not get logs from mint",
+			err := RenderError(c, "Could not get logs from mint")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
+		defer file.Close()
 
 		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo}, timeRequestDuration.RollBackFromNow())
 

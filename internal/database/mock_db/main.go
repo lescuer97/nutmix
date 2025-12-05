@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
-	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -312,23 +313,126 @@ func (m *MockDB) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) e
 
 }
 
-func (m *MockDB) GetProofsMintReserve() (templates.MintReserve, error) {
-	var mintReserve templates.MintReserve
+func (m *MockDB) GetProofsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
+	var mintReserve database.EcashInventory
 
 	for _, p := range m.Proofs {
-		mintReserve.SatAmount += p.Amount
-		mintReserve.Amount += 1
+		if p.SeenAt < since.Unix() {
+			continue
+		}
+		if until != nil && p.SeenAt > until.Unix() {
+			continue
+		}
+		mintReserve.AmountValue += p.Amount
+		mintReserve.Quantity += 1
 	}
 
 	return mintReserve, nil
 }
-func (m *MockDB) GetBlindSigsMintReserve() (templates.MintReserve, error) {
+func (m *MockDB) GetBlindSigsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
+	var mintReserve database.EcashInventory
 
-	var mintReserve templates.MintReserve
-
-	for _, p := range m.RecoverSigDB {
-		mintReserve.SatAmount += p.Amount
-		mintReserve.Amount += 1
+	for _, p := range m.Proofs {
+		if p.SeenAt < since.Unix() {
+			continue
+		}
+		if until != nil && p.SeenAt > until.Unix() {
+			continue
+		}
+		mintReserve.AmountValue += p.Amount
+		mintReserve.Quantity += 1
 	}
 	return mintReserve, nil
+}
+
+func (m *MockDB) GetProofsTimeSeries(since int64, until *int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+	bucketSeconds := int64(bucketMinutes * 60)
+
+	// Determine upper bound
+	upperBound := time.Now().Unix()
+	if until != nil {
+		upperBound = *until
+	}
+
+	// Group proofs by time bucket
+	buckets := make(map[int64]*database.ProofTimeSeriesPoint)
+
+	for _, p := range m.Proofs {
+		if p.SeenAt < since || p.SeenAt >= upperBound {
+			continue
+		}
+
+		// Calculate bucket timestamp using floor division
+		bucketTimestamp := (p.SeenAt / bucketSeconds) * bucketSeconds
+
+		if _, exists := buckets[bucketTimestamp]; !exists {
+			buckets[bucketTimestamp] = &database.ProofTimeSeriesPoint{
+				Timestamp:   bucketTimestamp,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		buckets[bucketTimestamp].TotalAmount += p.Amount
+		buckets[bucketTimestamp].Count++
+	}
+
+	// Convert map to sorted slice
+	var points []database.ProofTimeSeriesPoint
+	for _, point := range buckets {
+		points = append(points, *point)
+	}
+
+	// Sort by timestamp
+	sort.Slice(points, func(i, j int) bool {
+		return points[i].Timestamp < points[j].Timestamp
+	})
+
+	return points, nil
+}
+
+func (m *MockDB) GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+	bucketSeconds := int64(bucketMinutes * 60)
+
+	// Determine upper bound
+	upperBound := time.Now().Unix()
+	if until != nil {
+		upperBound = *until
+	}
+
+	// Group blind sigs by time bucket
+	buckets := make(map[int64]*database.ProofTimeSeriesPoint)
+
+	for _, sig := range m.RecoverSigDB {
+		if sig.CreatedAt < since || sig.CreatedAt >= upperBound {
+			continue
+		}
+
+		// Calculate bucket timestamp using floor division
+		bucketTimestamp := (sig.CreatedAt / bucketSeconds) * bucketSeconds
+
+		if _, exists := buckets[bucketTimestamp]; !exists {
+			buckets[bucketTimestamp] = &database.ProofTimeSeriesPoint{
+				Timestamp:   bucketTimestamp,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		buckets[bucketTimestamp].TotalAmount += sig.Amount
+		buckets[bucketTimestamp].Count++
+	}
+
+	// Convert map to sorted slice
+	var points []database.ProofTimeSeriesPoint
+	for _, point := range buckets {
+		points = append(points, *point)
+	}
+
+	// Sort by timestamp
+	sort.Slice(points, func(i, j int) bool {
+		return points[i].Timestamp < points[j].Timestamp
+	})
+
+	return points, nil
 }

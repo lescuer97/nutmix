@@ -15,41 +15,42 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func MintBalance(mint *m.Mint) gin.HandlerFunc {
+func MintBalance(handler *adminHandler) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		isFakeWallet := false
 
-		if mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET {
-			isFakeWallet = true
-		}
-		proofsReserve, err := mint.MintDB.GetProofsMintReserve()
-
+		balance, err := handler.getProofsBalance(time.Unix(0, 0))
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.GetProofsMintReserve(). %w", err))
+			c.Error(fmt.Errorf("handler.getProofsBalance(time.Unix(0, 0)). %w", err))
 			return
 		}
-		sigsReserve, err := mint.MintDB.GetBlindSigsMintReserve()
+		// proofsReserve, err := mint.MintDB.GetProofsInventory(time.Unix(0, 0), nil)
+		//
+		// if err != nil {
+		// 	c.Error(fmt.Errorf("mint.MintDB.GetProofsMintReserve(). %w", err))
+		// 	return
+		// }
+		// sigsReserve, err := mint.MintDB.GetBlindSigsInventory(time.Unix(0, 0), nil)
+		//
+		// if err != nil {
+		// 	c.Error(fmt.Errorf("mint.MintDB.GetProofsMintReserve(). %w", err))
+		// 	return
+		// }
 
-		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.GetProofsMintReserve(). %w", err))
-			return
-		}
-
-		milillisatBalance, err := mint.LightningBackend.WalletBalance()
+		milillisatBalance, err := handler.lnSatsBalance()
 		if err != nil {
 			slog.Warn(
-				"mint.LightningComs.WalletBalance()",
+				"handler.lnSatsBalance()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-				Error: "There was a problem getting the balance",
+			err := RenderError(c, "There was a problem getting the balance")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
-		component := templates.MintBalance(milillisatBalance/1000, isFakeWallet, proofsReserve, sigsReserve)
+
+		component := templates.MintBalance(milillisatBalance, handler.isFakeWallet(), balance)
 
 		err = component.Render(c.Request.Context(), c.Writer)
 		if err != nil {
@@ -73,12 +74,10 @@ func MintMeltSummary(mint *m.Mint) gin.HandlerFunc {
 			slog.Error(
 				"database.GetMintMeltBalanceByTime(pool",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			errorMessage := ErrorNotif{
-
-				Error: "There was an error getting mint activity",
+			err := RenderError(c, "There was an error getting mint activity")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 
@@ -96,12 +95,10 @@ func MintMeltSummary(mint *m.Mint) gin.HandlerFunc {
 					"zpay32.Decode",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
-				errorMessage := ErrorNotif{
-
-					Error: "Could not decode invoice",
+				err := RenderError(c, "Could not decode invoice")
+				if err != nil {
+					slog.Error("RenderError", slog.Any("error", err))
 				}
-
-				c.HTML(200, "settings-error", errorMessage)
 				return
 			}
 
@@ -138,12 +135,10 @@ func MintMeltList(mint *m.Mint) gin.HandlerFunc {
 				"database.GetMintMeltBalanceByTime(pool",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-
-				Error: "There was an error getting mint activity",
+			err := RenderError(c, "There was an error getting mint activity")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 
@@ -199,12 +194,10 @@ func SwapsList(mint *m.Mint) gin.HandlerFunc {
 				"mint.MintDB.GetAllLiquiditySwaps()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-
-				Error: "There was an error getting mint activity",
+			err := RenderError(c, "There was an error getting mint activity")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 
