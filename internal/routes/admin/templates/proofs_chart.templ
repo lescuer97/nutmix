@@ -30,23 +30,33 @@ templ ProofsChartContent(data []database.ProofTimeSeriesPoint) {
 templ ProofsChartCard(data []database.ProofTimeSeriesPoint, summary ChartSummary) {
 	<div
 		id="proofs-chart-card"
-		class="card card-md"
+		class="card card-md mt-4 mb-4"
 		hx-get="/admin/proofs-chart"
 		hx-trigger="date-range-changed from:body"
 		hx-include="#chartStartDate, #chartEndDate"
 		hx-swap="outerHTML"
 		hx-indicator="#date-range-loading"
 	>
-		<div class="chart-summary-header">
-			<h2 class="chart-summary-title">Proofs</h2>
-			<div class="chart-summary-stats">
-				<div class="chart-stat">
-					<span class="chart-stat-value">{ formatNumber(summary.TotalSats) }</span>
-					<span class="chart-stat-label">Sats</span>
+		<div class="chart-header-content">
+			<h2 class="mb-6 text-xl font-semibold">Proofs</h2>
+			<div class="chart-summary-container">
+				<div class="summary-card">
+					<div class="summary-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Total Value</span>
+						<span class="summary-value">{ formatNumber(summary.TotalSats) } <span class="text-sm text-secondary font-normal">sats</span></span>
+					</div>
 				</div>
-				<div class="chart-stat">
-					<span class="chart-stat-value">{ formatNumber(summary.TotalCount) }</span>
-					<span class="chart-stat-label">Proofs</span>
+				<div class="summary-card">
+					<div class="summary-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Proofs Count</span>
+						<span class="summary-value">{ formatNumber(summary.TotalCount) }</span>
+					</div>
 				</div>
 			</div>
 		</div>
