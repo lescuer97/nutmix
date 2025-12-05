@@ -6,7 +6,6 @@ import (
 	"embed"
 	"encoding/hex"
 	"errors"
-	"html/template"
 	"io/fs"
 	"log"
 	"net/http"
@@ -85,9 +84,6 @@ func RenderSuccess(c *gin.Context, message string) error {
 //go:embed static/dist/js/*.js static/dist/css/*.css
 var staticEmbed embed.FS
 
-//go:embed templates/*.html
-var templatesFs embed.FS
-
 func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 	// Create a file server for the embedded static files
 	// The embed contains files at: static/dist/js/*.js and static/dist/css/*.css
@@ -103,9 +99,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 
 	r.StaticFS("/js", http.FS(jsFS))
 	r.StaticFS("/css", http.FS(cssFS))
-
-	templ := template.Must(template.ParseFS(templatesFs, "templates/*.html"))
-	r.SetHTMLTemplate(templ)
 
 	adminRoute := r.Group("/admin")
 
@@ -170,6 +163,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.GET("/blindsigs-chart", BlindSigsChartCard(mint))
 		adminRoute.GET("/api/blindsigs-chart-data", BlindSigsChartDataAPI(mint))
 		adminRoute.GET("", InitPage(mint))
+		adminRoute.GET("/ln", LnPage(mint))
 		adminRoute.GET("/keysets", KeysetsPage(mint))
 		adminRoute.GET("/settings", MintSettingsPage(mint))
 		adminRoute.GET("/bolt11", LightningNodePage(mint))

@@ -1,0 +1,15 @@
+package templates
+
+templ LightningActivityLayout(startDate string, endDate string) {
+	@Layout("lightning") {
+		<main class="main-content">
+			@DateRangePicker(startDate, endDate)
+			<div class="card card-md">
+				<div class="chart-loading-placeholder">
+					<span>Graph placeholder</span>
+				</div>
+			</div>
+		</main>
+	}
+}
+

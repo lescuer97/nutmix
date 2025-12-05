@@ -349,3 +349,23 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 		}
 	}
 }
+
+func LnPage(mint *mint.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+
+		// Calculate default date range (7 weeks ago to now)
+		now := time.Now()
+		startTime := now.Add(-2 * 7 * 24 * time.Hour) // 7 weeks ago
+
+		startDate := startTime.Format("2006-01-02")
+		endDate := now.Format("2006-01-02")
+
+		err := templates.LightningActivityLayout(startDate, endDate).Render(ctx, c.Writer)
+
+		if err != nil {
+			c.Error(err)
+			return
+		}
+	}
+}
