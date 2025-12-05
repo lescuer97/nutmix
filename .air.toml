@@ -4,12 +4,12 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "./tmp/main"
-  cmd = "go build -o ./tmp/main cmd/nutmix/*.go"
+  bin = "./nutmix"
+  cmd = "just dev"
   delay = 1000
   exclude_dir = ["assets","node_modules","internal/routes/admin/static/node_modules", "tmp", "vendor", "testdata", "keycloak", "keycloak_pq_data"]
   exclude_file = []
-  exclude_regex = ["_test.go"]
+  exclude_regex = ["_test.go", "_templ.go"]
   exclude_unchanged = false
   follow_symlink = false
   full_bin = ""

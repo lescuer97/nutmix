@@ -58,7 +58,18 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
-		err := templates.MintActivityLayout(utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND)).Render(ctx, c.Writer)
+		// Calculate default date range (7 weeks ago to now)
+		now := time.Now()
+		startTime := now.Add(-2 * 7 * 24 * time.Hour) // 7 weeks ago
+
+		startDate := startTime.Format("2006-01-02")
+		endDate := now.Format("2006-01-02")
+
+		err := templates.MintActivityLayout(
+			utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND),
+			startDate,
+			endDate,
+		).Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(err)
@@ -67,20 +78,66 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 	}
 }
 
-// ProofsChartCard returns the full chart card component (for initial HTMX load)
+// parseDateRange parses start and end date query params and returns parsed times and bucket minutes
+func parseDateRange(startDateStr, endDateStr string) (startTime, endTime time.Time, bucketMinutes int) {
+	var err error
+
+	// Parse start date in YYYY-MM-DD format (HTML date input format)
+	if startDateStr != "" {
+		startTime, err = time.Parse("2006-01-02", startDateStr)
+		if err != nil {
+			slog.Warn("Invalid start date format", slog.String("date", startDateStr))
+			// Default to 7 weeks ago
+			startTime = time.Now().Add(-7 * 7 * 24 * time.Hour)
+		}
+	} else {
+		// Default to 7 weeks ago
+		startTime = time.Now().Add(-7 * 7 * 24 * time.Hour)
+	}
+
+	// Parse end date
+	if endDateStr != "" {
+		endTime, err = time.Parse("2006-01-02", endDateStr)
+		if err != nil {
+			slog.Warn("Invalid end date format", slog.String("date", endDateStr))
+			endTime = time.Now()
+		} else {
+			// Set to end of day
+			endTime = endTime.Add(24*time.Hour - time.Second)
+		}
+	} else {
+		endTime = time.Now()
+	}
+
+	// Calculate appropriate bucket size based on date range
+	duration := endTime.Sub(startTime)
+	switch {
+	case duration <= 24*time.Hour:
+		bucketMinutes = 30 // 30 min buckets for 1 day
+	case duration <= 7*24*time.Hour:
+		bucketMinutes = 60 // 1 hour buckets for up to 1 week
+	case duration <= 30*24*time.Hour:
+		bucketMinutes = 180 // 3 hour buckets for up to 1 month
+	default:
+		bucketMinutes = 360 // 6 hour buckets for longer periods
+	}
+
+	return startTime, endTime, bucketMinutes
+}
+
+// ProofsChartCard returns the full chart card component (for HTMX load with optional date params)
 func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
-		// Default to last 7 weeks
-		now := time.Now()
-		startTime := now.Add(-7 * 7 * 24 * time.Hour) // 7 weeks ago
-
-		// Use 6 hour buckets for 7 weeks of data
-		bucketMinutes := 360
+		// Parse date range from query params
+		startDateStr := c.Query("start")
+		endDateStr := c.Query("end")
+		startTime, endTime, bucketMinutes := parseDateRange(startDateStr, endDateStr)
 
 		// Fetch proofs time-series data
-		data, err := mint.MintDB.GetProofsTimeSeries(startTime.Unix(), nil, bucketMinutes)
+		endUnix := endTime.Unix()
+		data, err := mint.MintDB.GetProofsTimeSeries(startTime.Unix(), &endUnix, bucketMinutes)
 		if err != nil {
 			slog.Error(
 				"mint.MintDB.GetProofsTimeSeries()",
@@ -88,13 +145,7 @@ func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 			data = []database.ProofTimeSeriesPoint{}
 		}
 
-		chartData := templates.ProofsChartData{
-			Data:      data,
-			StartDate: startTime.Format("2006-01-02"),
-			EndDate:   now.Format("2006-01-02"),
-		}
-
-		err = templates.ProofsChartCard(chartData).Render(ctx, c.Writer)
+		err = templates.ProofsChartCard(data).Render(ctx, c.Writer)
 		if err != nil {
 			c.Error(err)
 			return
@@ -106,52 +157,11 @@ func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 func ProofsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
+
+		// Parse date range from query params
 		startDateStr := c.Query("start")
 		endDateStr := c.Query("end")
-
-		// Parse dates
-		var startTime, endTime time.Time
-		var err error
-
-		// Parse dates in YYYY-MM-DD format (HTML date input format)
-		if startDateStr != "" {
-			startTime, err = time.Parse("2006-01-02", startDateStr)
-			if err != nil {
-				slog.Warn("Invalid start date format", slog.String("date", startDateStr))
-				// Default to 7 weeks ago
-				startTime = time.Now().Add(-7 * 7 * 24 * time.Hour)
-			}
-		} else {
-			// Default to 7 weeks ago
-			startTime = time.Now().Add(-7 * 7 * 24 * time.Hour)
-		}
-
-		if endDateStr != "" {
-			endTime, err = time.Parse("2006-01-02", endDateStr)
-			if err != nil {
-				slog.Warn("Invalid end date format", slog.String("date", endDateStr))
-				endTime = time.Now()
-			} else {
-				// Set to end of day
-				endTime = endTime.Add(24*time.Hour - time.Second)
-			}
-		} else {
-			endTime = time.Now()
-		}
-
-		// Calculate appropriate bucket size based on date range
-		duration := endTime.Sub(startTime)
-		var bucketMinutes int
-		switch {
-		case duration <= 24*time.Hour:
-			bucketMinutes = 30 // 30 min buckets for 1 day
-		case duration <= 7*24*time.Hour:
-			bucketMinutes = 60 // 1 hour buckets for up to 1 week
-		case duration <= 30*24*time.Hour:
-			bucketMinutes = 180 // 3 hour buckets for up to 1 month
-		default:
-			bucketMinutes = 360 // 6 hour buckets for longer periods
-		}
+		startTime, endTime, bucketMinutes := parseDateRange(startDateStr, endDateStr)
 
 		endUnix := endTime.Unix()
 		data, err := mint.MintDB.GetProofsTimeSeries(startTime.Unix(), &endUnix, bucketMinutes)
@@ -172,20 +182,19 @@ func ProofsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 	}
 }
 
-// BlindSigsChartCard returns the full blind sigs chart card component (for initial HTMX load)
+// BlindSigsChartCard returns the full blind sigs chart card component (for HTMX load with optional date params)
 func BlindSigsChartCard(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
-		// Default to last 7 weeks
-		now := time.Now()
-		startTime := now.Add(-7 * 7 * 24 * time.Hour) // 7 weeks ago
-
-		// Use 6 hour buckets for 7 weeks of data
-		bucketMinutes := 360
+		// Parse date range from query params
+		startDateStr := c.Query("start")
+		endDateStr := c.Query("end")
+		startTime, endTime, bucketMinutes := parseDateRange(startDateStr, endDateStr)
 
 		// Fetch blind sigs time-series data
-		data, err := mint.MintDB.GetBlindSigsTimeSeries(startTime.Unix(), nil, bucketMinutes)
+		endUnix := endTime.Unix()
+		data, err := mint.MintDB.GetBlindSigsTimeSeries(startTime.Unix(), &endUnix, bucketMinutes)
 		if err != nil {
 			slog.Error(
 				"mint.MintDB.GetBlindSigsTimeSeries()",
@@ -193,13 +202,7 @@ func BlindSigsChartCard(mint *mint.Mint) gin.HandlerFunc {
 			data = []database.ProofTimeSeriesPoint{}
 		}
 
-		chartData := templates.BlindSigsChartData{
-			Data:      data,
-			StartDate: startTime.Format("2006-01-02"),
-			EndDate:   now.Format("2006-01-02"),
-		}
-
-		err = templates.BlindSigsChartCard(chartData).Render(ctx, c.Writer)
+		err = templates.BlindSigsChartCard(data).Render(ctx, c.Writer)
 		if err != nil {
 			c.Error(err)
 			return
@@ -211,52 +214,11 @@ func BlindSigsChartCard(mint *mint.Mint) gin.HandlerFunc {
 func BlindSigsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
+
+		// Parse date range from query params
 		startDateStr := c.Query("start")
 		endDateStr := c.Query("end")
-
-		// Parse dates
-		var startTime, endTime time.Time
-		var err error
-
-		// Parse dates in YYYY-MM-DD format (HTML date input format)
-		if startDateStr != "" {
-			startTime, err = time.Parse("2006-01-02", startDateStr)
-			if err != nil {
-				slog.Warn("Invalid start date format", slog.String("date", startDateStr))
-				// Default to 7 weeks ago
-				startTime = time.Now().Add(-7 * 7 * 24 * time.Hour)
-			}
-		} else {
-			// Default to 7 weeks ago
-			startTime = time.Now().Add(-7 * 7 * 24 * time.Hour)
-		}
-
-		if endDateStr != "" {
-			endTime, err = time.Parse("2006-01-02", endDateStr)
-			if err != nil {
-				slog.Warn("Invalid end date format", slog.String("date", endDateStr))
-				endTime = time.Now()
-			} else {
-				// Set to end of day
-				endTime = endTime.Add(24*time.Hour - time.Second)
-			}
-		} else {
-			endTime = time.Now()
-		}
-
-		// Calculate appropriate bucket size based on date range
-		duration := endTime.Sub(startTime)
-		var bucketMinutes int
-		switch {
-		case duration <= 24*time.Hour:
-			bucketMinutes = 30 // 30 min buckets for 1 day
-		case duration <= 7*24*time.Hour:
-			bucketMinutes = 60 // 1 hour buckets for up to 1 week
-		case duration <= 30*24*time.Hour:
-			bucketMinutes = 180 // 3 hour buckets for up to 1 month
-		default:
-			bucketMinutes = 360 // 6 hour buckets for longer periods
-		}
+		startTime, endTime, bucketMinutes := parseDateRange(startDateStr, endDateStr)
 
 		endUnix := endTime.Unix()
 		data, err := mint.MintDB.GetBlindSigsTimeSeries(startTime.Unix(), &endUnix, bucketMinutes)
