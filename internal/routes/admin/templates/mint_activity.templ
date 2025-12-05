@@ -153,14 +153,49 @@ templ MintMeltEventList(eventList []MintMeltRequestVisual) {
 	</div>
 }
 
-templ MintActivityLayout(liquidityManagerAvailable bool) {
+// DateRangePicker is a unified date picker component for chart filtering
+templ DateRangePicker(startDate string, endDate string) {
+		<div class="date-picker-container">
+			<div class="date-picker-group">
+				<label for="chartStartDate" class="date-label">From</label>
+				<input
+					type="date"
+					id="chartStartDate"
+					name="start"
+					class="date-input"
+					value={ startDate }
+					hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
+				/>
+			</div>
+			<div class="date-picker-group">
+				<label for="chartEndDate" class="date-label">To</label>
+				<input
+					type="date"
+					id="chartEndDate"
+					name="end"
+					class="date-input"
+					value={ endDate }
+					hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
+				/>
+			</div>
+		</div>
+		<div id="date-range-loading" class="htmx-indicator chart-loading">
+			<span class="loading-spinner"></span>
+			<span>Updating charts...</span>
+		</div>
+}
+
+templ MintActivityLayout(liquidityManagerAvailable bool, startDate string, endDate string) {
 	@Layout("stats") {
 		<main class="main-content">
+			@DateRangePicker(startDate, endDate)
 			<div
 				id="proofs-chart-placeholder"
 				hx-get="/admin/proofs-chart"
-				hx-trigger="load"
+				hx-trigger="load, date-range-changed from:body"
+				hx-include="#chartStartDate, #chartEndDate"
 				hx-swap="outerHTML"
+				hx-indicator="#date-range-loading"
 			>
 				<div class="card card-md">
 					<div class="chart-loading-placeholder">
@@ -172,8 +207,10 @@ templ MintActivityLayout(liquidityManagerAvailable bool) {
 			<div
 				id="blindsigs-chart-placeholder"
 				hx-get="/admin/blindsigs-chart"
-				hx-trigger="load"
+				hx-trigger="load, date-range-changed from:body"
+				hx-include="#chartStartDate, #chartEndDate"
 				hx-swap="outerHTML"
+				hx-indicator="#date-range-loading"
 			>
 				<div class="card card-md">
 					<div class="chart-loading-placeholder">

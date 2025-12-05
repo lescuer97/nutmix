@@ -2,12 +2,6 @@ package templates
 
 import "github.com/lescuer97/nutmix/internal/database"
 
-type BlindSigsChartData struct {
-	Data      []database.ProofTimeSeriesPoint
-	StartDate string // Format: YYYY-MM-DD
-	EndDate   string // Format: YYYY-MM-DD
-}
-
 // BlindSigsChartContent renders just the chart canvas and data - used for HTMX date updates
 templ BlindSigsChartContent(data []database.ProofTimeSeriesPoint) {
 	<div id="blindsigs-chart-container" style="position: relative; height: 400px; width: 100%;">
@@ -16,59 +10,29 @@ templ BlindSigsChartContent(data []database.ProofTimeSeriesPoint) {
 	@templ.JSONScript("blindSigsChartData", data)
 }
 
-// BlindSigsChartCard renders the complete chart card with date picker - used for initial load via HTMX
-templ BlindSigsChartCard(chartData BlindSigsChartData) {
-	<div id="blindsigs-chart-card" class="card card-md">
+// BlindSigsChartCard renders the chart card without date picker - date picker is now in MintActivityLayout
+templ BlindSigsChartCard(data []database.ProofTimeSeriesPoint) {
+	<div
+		id="blindsigs-chart-card"
+		class="card card-md"
+		hx-get="/admin/blindsigs-chart"
+		hx-trigger="date-range-changed from:body"
+		hx-include="#chartStartDate, #chartEndDate"
+		hx-swap="outerHTML"
+		hx-indicator="#date-range-loading"
+	>
 		<div class="chart-header">
 			<div class="chart-title-section">
 				<h2 class="text-xl font-semibold">Blind Signatures Over Time</h2>
 				<p class="text-secondary text-sm">Time-series visualization of blind signature activity</p>
-			</div>
-			<div class="date-picker-container">
-				<div class="date-picker-group">
-					<label for="blindSigsStartDate" class="date-label">From</label>
-					<input
-						type="date"
-						id="blindSigsStartDate"
-						name="start"
-						class="date-input"
-						value={ chartData.StartDate }
-						hx-get="/admin/api/blindsigs-chart-data"
-						hx-include="#blindSigsStartDate, #blindSigsEndDate"
-						hx-target="#blindsigs-chart-wrapper"
-						hx-swap="innerHTML"
-						hx-trigger="change"
-						hx-indicator="#blindsigs-chart-loading"
-					/>
-				</div>
-				<div class="date-picker-group">
-					<label for="blindSigsEndDate" class="date-label">To</label>
-					<input
-						type="date"
-						id="blindSigsEndDate"
-						name="end"
-						class="date-input"
-						value={ chartData.EndDate }
-						hx-get="/admin/api/blindsigs-chart-data"
-						hx-include="#blindSigsStartDate, #blindSigsEndDate"
-						hx-target="#blindsigs-chart-wrapper"
-						hx-swap="innerHTML"
-						hx-trigger="change"
-						hx-indicator="#blindsigs-chart-loading"
-					/>
-				</div>
 			</div>
 		</div>
 		<div class="chart-legend-info">
 			<span class="legend-item legend-purple">Sats Value</span>
 			<span class="legend-item legend-cyan">Signature Count</span>
 		</div>
-		<div id="blindsigs-chart-loading" class="htmx-indicator chart-loading">
-			<span class="loading-spinner"></span>
-			<span>Loading chart data...</span>
-		</div>
 		<div id="blindsigs-chart-wrapper">
-			@BlindSigsChartContent(chartData.Data)
+			@BlindSigsChartContent(data)
 		</div>
 	</div>
 }
