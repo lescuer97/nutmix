@@ -365,7 +365,7 @@ func LnPage(mint *mint.Mint) gin.HandlerFunc {
 		startDate := startTime.Format("2006-01-02")
 		endDate := now.Format("2006-01-02")
 
-		err := templates.LightningActivityLayout(startDate, endDate).Render(ctx, c.Writer)
+		err := templates.LightningActivityLayout(mint.Config, startDate, endDate).Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(err)

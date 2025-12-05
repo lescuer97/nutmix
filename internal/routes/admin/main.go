@@ -168,7 +168,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.GET("/api/ln-chart-data", LnChartDataAPI(mint))
 		adminRoute.GET("/keysets", KeysetsPage(mint))
 		adminRoute.GET("/settings", MintSettingsPage(mint))
-		adminRoute.GET("/bolt11", LightningNodePage(mint))
 
 		// change routes
 		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
@@ -176,7 +175,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.POST("/mintsettings/lightning", MintSettingsLightning(mint))
 		adminRoute.POST("/mintsettings/auth", MintSettingsAuth(mint))
 		// Legacy/Fallback
-		adminRoute.POST("/mintsettings", MintSettingsForm(mint))
 		adminRoute.POST("/bolt11", Bolt11Post(mint))
 		adminRoute.POST("/rotate/sats", RotateSatsSeed(&adminHandler))
 		adminRoute.POST("/logout", LogoutHandler(tokenBlacklist))
@@ -184,9 +182,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		// fractional html components
 		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(&adminHandler))
 		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
-		adminRoute.GET("/mint-balance", MintBalance(&adminHandler))
-		adminRoute.GET("/mint-melt-summary", MintMeltSummary(mint))
-		adminRoute.GET("/mint-melt-list", MintMeltList(mint))
 		adminRoute.GET("/logs", LogsTab())
 
 		// only have swap routes if liquidity manager is possible

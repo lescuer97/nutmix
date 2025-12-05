@@ -74,3 +74,15 @@
     opacity: 0;
   }
 }
+
+.top-divider {
+  margin-top: var(--spacing-xl);
+  border-top: 1px solid var(--border-secondary);
+  padding-top: var(--spacing-xl);
+}
+
+.bottom-divider {
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 1px solid var(--border-secondary);
+  padding-bottom: var(--spacing-xl);
+}

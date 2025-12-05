@@ -1,6 +1,8 @@
 package templates
 
-templ LightningActivityLayout(startDate string, endDate string) {
+import "github.com/lescuer97/nutmix/internal/utils"
+
+templ LightningActivityLayout(config utils.Config, startDate string, endDate string) {
 	@Layout("lightning") {
 		<main class="main-content">
 			@DateRangePicker(startDate, endDate)
@@ -20,7 +22,12 @@ templ LightningActivityLayout(startDate string, endDate string) {
 					</div>
 				</div>
 			</div>
+
+			<div class="mt-6">
+				@ExpansionPanel("Connection Settings", "Configure Lightning node connection", nil) {
+					@LightningConnectionSettings(config)
+				}
+			</div>
 		</main>
 	}
 }
-
