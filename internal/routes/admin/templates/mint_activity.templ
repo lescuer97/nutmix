@@ -155,34 +155,34 @@ templ MintMeltEventList(eventList []MintMeltRequestVisual) {
 
 // DateRangePicker is a unified date picker component for chart filtering
 templ DateRangePicker(startDate string, endDate string) {
-		<div class="date-picker-container">
-			<div class="date-picker-group">
-				<label for="chartStartDate" class="date-label">From</label>
-				<input
-					type="date"
-					id="chartStartDate"
-					name="start"
-					class="date-input"
-					value={ startDate }
-					hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
-				/>
-			</div>
-			<div class="date-picker-group">
-				<label for="chartEndDate" class="date-label">To</label>
-				<input
-					type="date"
-					id="chartEndDate"
-					name="end"
-					class="date-input"
-					value={ endDate }
-					hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
-				/>
-			</div>
+	<div class="date-picker-container">
+		<div class="date-picker-group">
+			<label for="chartStartDate" class="date-label">From</label>
+			<input
+				type="date"
+				id="chartStartDate"
+				name="start"
+				class="date-input"
+				value={ startDate }
+				hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
+			/>
 		</div>
-		<div id="date-range-loading" class="htmx-indicator chart-loading">
-			<span class="loading-spinner"></span>
-			<span>Updating charts...</span>
+		<div class="date-picker-group">
+			<label for="chartEndDate" class="date-label">To</label>
+			<input
+				type="date"
+				id="chartEndDate"
+				name="end"
+				class="date-input"
+				value={ endDate }
+				hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
+			/>
 		</div>
+	</div>
+	<div id="date-range-loading" class="htmx-indicator chart-loading">
+		<span class="loading-spinner"></span>
+		<span>Updating charts...</span>
+	</div>
 }
 
 templ MintActivityLayout(liquidityManagerAvailable bool, startDate string, endDate string) {

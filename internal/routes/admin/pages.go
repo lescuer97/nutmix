@@ -125,6 +125,23 @@ func parseDateRange(startDateStr, endDateStr string) (startTime, endTime time.Ti
 	return startTime, endTime, bucketMinutes
 }
 
+// calculateChartSummary gets the latest data point values from time series data
+// The data is sorted by timestamp, so the last item is the most recent
+func calculateChartSummary(data []database.ProofTimeSeriesPoint) templates.ChartSummary {
+	if len(data) == 0 {
+		return templates.ChartSummary{
+			TotalSats:  0,
+			TotalCount: 0,
+		}
+	}
+	// Get the last (most recent) data point
+	latest := data[len(data)-1]
+	return templates.ChartSummary{
+		TotalSats:  latest.TotalAmount,
+		TotalCount: latest.Count,
+	}
+}
+
 // ProofsChartCard returns the full chart card component (for HTMX load with optional date params)
 func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -145,7 +162,9 @@ func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 			data = []database.ProofTimeSeriesPoint{}
 		}
 
-		err = templates.ProofsChartCard(data).Render(ctx, c.Writer)
+		summary := calculateChartSummary(data)
+
+		err = templates.ProofsChartCard(data, summary).Render(ctx, c.Writer)
 		if err != nil {
 			c.Error(err)
 			return
@@ -202,7 +221,9 @@ func BlindSigsChartCard(mint *mint.Mint) gin.HandlerFunc {
 			data = []database.ProofTimeSeriesPoint{}
 		}
 
-		err = templates.BlindSigsChartCard(data).Render(ctx, c.Writer)
+		summary := calculateChartSummary(data)
+
+		err = templates.BlindSigsChartCard(data, summary).Render(ctx, c.Writer)
 		if err != nil {
 			c.Error(err)
 			return
