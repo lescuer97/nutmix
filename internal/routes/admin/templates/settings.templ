@@ -7,24 +7,24 @@ import (
 
 templ MintSettings(config utils.Config) {
 	@Layout("settings") {
-		<main>
-			<form
-				class="settings form"
-				hx-post="/admin/mintsettings"
-				hx-target="#notifications"
-				hx-swap="innerHTML"
-			>
+		<main class="main-content">
+			<div class="content-header">
+				<h2>Mint Settings</h2>
+			</div>
+			@ExpansionPanel("General Settings", "Basic configuration for your mint", nil) {
 				@General(config)
+			}
+			@ExpansionPanel("Lightning Network", "Configure Lightning node connection and limits", nil) {
 				@Lightning(config)
+			}
+			@ExpansionPanel("Authentication", "Manage authentication providers and limits", nil) {
 				@Auth(config)
-				<button class="md-button" type="submit">Save Settings</button>
-			</form>
+			}
 		</main>
 	}
 }
 
 templ General(config utils.Config) {
-	<h2>Mint Settings</h2>
 	<div class="form-section">
 		<label for="MOTD" class="settings-input">
 			Mint Notifications (MOTD)
@@ -70,7 +70,6 @@ templ General(config utils.Config) {
 }
 
 templ Lightning(config utils.Config) {
-	<h2>Lightning Options</h2>
 	<div class="form-section">
 		<label for="PEG_OUT_ONLY" class="settings-input-checkbox">
 			ONLY PEG OUT SATS
@@ -120,7 +119,6 @@ templ Lightning(config utils.Config) {
 }
 
 templ Auth(config utils.Config) {
-	<h2>Authentification</h2>
 	<div class="form-section">
 		<label for="MINT_REQUIRE_AUTH" class="settings-input-checkbox">
 			Mint Authentification

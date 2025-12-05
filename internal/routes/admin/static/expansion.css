@@ -1,0 +1,122 @@
+/* Expansion Panel Styles */
+
+.expansion-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    transition: all var(--transition-base);
+    margin-bottom: var(--space-4);
+    overflow: hidden;
+}
+
+.expansion-panel:hover {
+    border-color: var(--border-secondary);
+}
+
+.expansion-panel[open] {
+    background: var(--bg-card);
+}
+
+/* Summary Styling */
+.expansion-summary {
+    list-style: none;
+    padding: var(--space-4) var(--space-5);
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition: background-color var(--transition-base);
+}
+
+.expansion-summary::-webkit-details-marker {
+    display: none;
+}
+
+.expansion-summary:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Header Layout */
+.expansion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+}
+
+.expansion-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    flex: 1;
+}
+
+.expansion-title {
+    font-size: var(--text-lg);
+    font-weight: var(--font-medium);
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.expansion-description {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.expansion-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.expansion-extra {
+    display: flex;
+    align-items: center;
+}
+
+/* Icon Animation */
+.expansion-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-base);
+}
+
+.expansion-icon {
+    width: 20px;
+    height: 20px;
+    transition: transform var(--transition-base);
+}
+
+details[open] .expansion-icon {
+    transform: rotate(180deg);
+}
+
+details[open] .expansion-icon-wrapper {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-secondary);
+    color: var(--text-primary);
+}
+
+/* Content Animation */
+.expansion-content {
+    border-top: 1px solid var(--border-primary);
+    animation: slideDown 0.3s ease-out forwards;
+    transform-origin: top;
+}
+
+.expansion-content-inner {
+    padding: var(--space-5);
+}
+
+@keyframes slideDown {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+

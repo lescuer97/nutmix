@@ -1,0 +1,45 @@
+package templates
+
+templ ExpansionPanel(title string, description string, summaryExtra templ.Component) {
+	<details class="expansion-panel card">
+		<summary class="expansion-summary">
+			<div class="expansion-header">
+				<div class="expansion-title-group">
+					<h3 class="expansion-title">{ title }</h3>
+					if description != "" {
+						<p class="expansion-description">{ description }</p>
+					}
+				</div>
+				<div class="expansion-controls">
+					if summaryExtra != nil {
+						<div class="expansion-extra">
+							@summaryExtra
+						</div>
+					}
+					<div class="expansion-icon-wrapper btn-icon">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="24"
+							height="24"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							class="expansion-icon"
+						>
+							<polyline points="6 9 12 15 18 9"></polyline>
+						</svg>
+					</div>
+				</div>
+			</div>
+		</summary>
+		<div class="expansion-content">
+			<div class="expansion-content-inner">
+				{ children... }
+			</div>
+		</div>
+	</details>
+}
+
