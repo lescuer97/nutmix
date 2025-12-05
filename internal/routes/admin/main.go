@@ -168,6 +168,10 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 
 		// change routes
 		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
+		adminRoute.POST("/mintsettings/general", MintSettingsGeneral(mint))
+		adminRoute.POST("/mintsettings/lightning", MintSettingsLightning(mint))
+		adminRoute.POST("/mintsettings/auth", MintSettingsAuth(mint))
+		// Legacy/Fallback
 		adminRoute.POST("/mintsettings", MintSettingsForm(mint))
 		adminRoute.POST("/bolt11", Bolt11Post(mint))
 		adminRoute.POST("/rotate/sats", RotateSatsSeed(&adminHandler))
