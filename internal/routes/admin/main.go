@@ -164,6 +164,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.GET("/api/blindsigs-chart-data", BlindSigsChartDataAPI(mint))
 		adminRoute.GET("", InitPage(mint))
 		adminRoute.GET("/ln", LnPage(mint))
+		adminRoute.GET("/ln-chart", LnChartCard(mint))
+		adminRoute.GET("/api/ln-chart-data", LnChartDataAPI(mint))
 		adminRoute.GET("/keysets", KeysetsPage(mint))
 		adminRoute.GET("/settings", MintSettingsPage(mint))
 		adminRoute.GET("/bolt11", LightningNodePage(mint))

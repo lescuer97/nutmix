@@ -32,6 +32,10 @@ const COLORS = {
   cyanLight: 'rgba(0, 217, 177, 0.1)',
   purple: '#8b5cf6',
   purpleLight: 'rgba(139, 92, 246, 0.1)',
+  green: '#22c55e',
+  greenLight: 'rgba(34, 197, 94, 0.15)',
+  red: '#ef4444',
+  redLight: 'rgba(239, 68, 68, 0.15)',
   gridColor: '#2d333b',
   textColor: '#8b939f',
   textPrimary: '#ffffff'
@@ -40,7 +44,8 @@ const COLORS = {
 // Store chart instances
 const chartInstances = {
   proofs: null,
-  blindSigs: null
+  blindSigs: null,
+  ln: null
 };
 
 /**
@@ -311,6 +316,199 @@ function initializeBlindSigsChartFromDOM() {
 }
 
 /**
+ * Create chart configuration for mint/melt (LN) chart
+ * @param {Array} data - Array of {timestamp, mintAmount, meltAmount, mintCount, meltCount} objects
+ */
+function createLnChartConfig(data) {
+  // Transform data for Chart.js
+  const chartData = data.map(point => ({
+    x: new Date(point.timestamp * 1000), // Convert Unix timestamp to Date
+    mint: point.mintAmount,
+    melt: point.meltAmount
+  }));
+
+  return {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Mint (Inflows)',
+          data: chartData.map(d => ({ x: d.x, y: d.mint })),
+          borderColor: COLORS.green,
+          backgroundColor: COLORS.greenLight,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: COLORS.green,
+          pointBorderColor: COLORS.green,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Melt (Outflows)',
+          data: chartData.map(d => ({ x: d.x, y: -d.melt })), // Display melt as negative for visual comparison
+          borderColor: COLORS.red,
+          backgroundColor: COLORS.redLight,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: COLORS.red,
+          pointBorderColor: COLORS.red,
+          yAxisID: 'y'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: COLORS.textPrimary,
+            usePointStyle: true,
+            padding: 20,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 12
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: '#161b22',
+          titleColor: COLORS.textPrimary,
+          bodyColor: COLORS.textColor,
+          borderColor: COLORS.gridColor,
+          borderWidth: 1,
+          padding: 12,
+          displayColors: true,
+          callbacks: {
+            title: function(tooltipItems) {
+              const date = tooltipItems[0].parsed.x;
+              return new Date(date).toLocaleString();
+            },
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              if (context.parsed.y !== null) {
+                // Show absolute value for melt (since we display as negative)
+                const value = Math.abs(context.parsed.y);
+                label += value.toLocaleString() + ' sats';
+              }
+              return label;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            displayFormats: {
+              hour: 'MMM d, HH:mm',
+              day: 'MMM d',
+              week: 'MMM d',
+              month: 'MMM yyyy'
+            },
+            tooltipFormat: 'PPpp'
+          },
+          title: {
+            display: true,
+            text: 'Time',
+            color: COLORS.textColor,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 12,
+              weight: '500'
+            }
+          },
+          grid: {
+            color: COLORS.gridColor,
+            drawBorder: false
+          },
+          ticks: {
+            color: COLORS.textColor,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 11
+            },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 8
+          }
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Sats',
+            color: COLORS.textColor,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 12,
+              weight: '500'
+            }
+          },
+          grid: {
+            color: COLORS.gridColor,
+            drawBorder: false
+          },
+          ticks: {
+            color: COLORS.textColor,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 11
+            },
+            callback: function(value) {
+              return value.toLocaleString();
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
+/**
+ * Initialize or reinitialize the LN (mint/melt) chart from the current DOM
+ */
+function initializeLnChartFromDOM() {
+  const canvas = document.getElementById('lnChart');
+  const dataElement = document.getElementById('lnChartData');
+
+  if (!canvas || !dataElement) {
+    return;
+  }
+
+  // Destroy existing chart if any
+  if (chartInstances.ln) {
+    chartInstances.ln.destroy();
+    chartInstances.ln = null;
+  }
+
+  try {
+    const data = JSON.parse(dataElement.textContent);
+    const config = createLnChartConfig(data);
+    chartInstances.ln = new Chart(canvas, config);
+    console.log('LN chart initialized with', data.length, 'data points');
+  } catch (error) {
+    console.error('Failed to initialize LN chart:', error);
+  }
+}
+
+/**
  * Set up HTMX event listener to reinitialize charts after content swap
  */
 function setupHtmxListener() {
@@ -333,6 +531,14 @@ function setupHtmxListener() {
       console.log('Blind sigs chart content swapped, reinitializing...');
       setTimeout(initializeBlindSigsChartFromDOM, 50);
     }
+    
+    // LN chart updates
+    if (targetId === 'ln-chart-wrapper' || 
+        targetId === 'ln-chart-placeholder' ||
+        targetId === 'ln-chart-card') {
+      console.log('LN chart content swapped, reinitializing...');
+      setTimeout(initializeLnChartFromDOM, 50);
+    }
   });
 
   // Also listen for htmx:afterSettle for initial HTMX loads
@@ -347,6 +553,11 @@ function setupHtmxListener() {
     if (targetId === 'blindsigs-chart-placeholder') {
       console.log('Blind sigs chart card settled, initializing...');
       setTimeout(initializeBlindSigsChartFromDOM, 50);
+    }
+    
+    if (targetId === 'ln-chart-placeholder') {
+      console.log('LN chart card settled, initializing...');
+      setTimeout(initializeLnChartFromDOM, 50);
     }
   });
 }
@@ -376,5 +587,15 @@ export function initCharts() {
     initializeBlindSigsChartFromDOM();
   } else {
     console.log('Blind sigs chart elements not found on initial load, waiting for HTMX...');
+  }
+
+  // Try to initialize LN chart if elements are present
+  const lnCanvas = document.getElementById('lnChart');
+  const lnDataElement = document.getElementById('lnChartData');
+
+  if (lnCanvas && lnDataElement) {
+    initializeLnChartFromDOM();
+  } else {
+    console.log('LN chart elements not found on initial load, waiting for HTMX...');
   }
 }
