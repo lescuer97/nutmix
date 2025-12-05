@@ -9,7 +9,7 @@ type KeysetData struct {
 	Unit        string
 	Fees        uint
 	CreatedAt   int64
-	Version     uint64
+	Version     uint32
 	ExpireLimit *time.Time
 }
 
@@ -74,7 +74,7 @@ templ KeysetsList(keysetMap map[string][]KeysetData) {
 templ keysetCard(keyset KeysetData) {
 	{{ activeStr := strconv.FormatBool(keyset.Active) }}
 	{{ inputFeeStr := strconv.FormatUint(uint64(keyset.Fees), 10) }}
-	{{ versionStr := strconv.FormatUint(keyset.Version, 10) }}
+	{{ versionStr := strconv.FormatUint(uint64(keyset.Version), 10) }}
 	<div class="card">
 		<span>Id: { keyset.Id }</span>
 		<span>Active: { activeStr }</span>

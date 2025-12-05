@@ -5,7 +5,7 @@ import (
 )
 
 type SeedType struct {
-	Version int
+	Version uint32
 	Active  bool
 	Unit    cashu.Unit
 }
