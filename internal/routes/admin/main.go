@@ -17,6 +17,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -26,10 +27,6 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
-
-type ErrorNotif struct {
-	Error string
-}
 
 func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -61,10 +58,7 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 			}
 			slog.Error("Error from calls", slog.String("errors", c.Errors.String()))
 
-			component := templates.ErrorNotif(message)
-			c.Header("HX-Reswap", "innerHtml")
-			c.Header("HX-Retarget", "#notifications")
-			err := component.Render(c.Request.Context(), c.Writer)
+			err := RenderError(c, message)
 			if err != nil {
 				slog.Error("Could not render error notification", slog.Any("error", err))
 				return
@@ -72,6 +66,20 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 		}
 
 	}
+}
+
+func renderHTMX(c *gin.Context, component templ.Component) error {
+	c.Header("HX-Reswap", "innerHtml")
+	c.Header("HX-Retarget", "#notifications")
+	return component.Render(c.Request.Context(), c.Writer)
+}
+
+func RenderError(c *gin.Context, message string) error {
+	return renderHTMX(c, templates.ErrorNotif(message))
+}
+
+func RenderSuccess(c *gin.Context, message string) error {
+	return renderHTMX(c, templates.SuccessNotif(message))
 }
 
 //go:embed static/dist/js/*.js static/dist/css/*.css
@@ -155,12 +163,12 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 	// PAGES SETUP
 	// This is /admin pages
 	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
-	adminRoute.GET("/proofs-chart", ProofsChartCard(mint))
-	adminRoute.GET("/api/proofs-chart-data", ProofsChartDataAPI(mint))
-	adminRoute.GET("/blindsigs-chart", BlindSigsChartCard(mint))
-	adminRoute.GET("/api/blindsigs-chart-data", BlindSigsChartDataAPI(mint))
 
 	if nostrPubkey != nil {
+		adminRoute.GET("/proofs-chart", ProofsChartCard(mint))
+		adminRoute.GET("/api/proofs-chart-data", ProofsChartDataAPI(mint))
+		adminRoute.GET("/blindsigs-chart", BlindSigsChartCard(mint))
+		adminRoute.GET("/api/blindsigs-chart-data", BlindSigsChartDataAPI(mint))
 		adminRoute.GET("", InitPage(mint))
 		adminRoute.GET("/keysets", KeysetsPage(mint))
 		adminRoute.GET("/settings", MintSettingsPage(mint))
@@ -281,11 +289,10 @@ func LogsTab() gin.HandlerFunc {
 				"os.Open(logsdir ",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-				Error: "Could not get logs from mint",
+			err := RenderError(c, "Could not get logs from mint")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 		defer file.Close()
