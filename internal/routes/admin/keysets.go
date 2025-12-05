@@ -89,11 +89,10 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 					"Err: There was a problem rotating the key",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
-				errorMessage := ErrorNotif{
-					Error: "Fee was not an integer",
+				err := RenderError(c, "Fee was not an integer")
+				if err != nil {
+					slog.Error("RenderError", slog.Any("error", err))
 				}
-
-				c.HTML(200, "settings-error", errorMessage)
 				return
 			}
 			rotateRequest.Fee = uint(newSeedFee)
@@ -104,11 +103,10 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 					"Err: There was a problem rotating the key",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
-				errorMessage := ErrorNotif{
-					Error: "Expire limit is not an integer",
+				err := RenderError(c, "Expire limit is not an integer")
+				if err != nil {
+					slog.Error("RenderError", slog.Any("error", err))
 				}
-
-				c.HTML(200, "settings-error", errorMessage)
 				return
 			}
 			rotateRequest.ExpireLimitHours = uint(expiryLimit)
@@ -120,11 +118,10 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 				"mint.Signer.RotateKeyset(cashu.Sat, rotateRequest.Fee)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-				Error: "There was an error getting the seeds",
+			err := RenderError(c, "There was an error getting the seeds")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 
@@ -132,13 +129,11 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 			c.JSON(200, nil)
 		} else {
 
-			successMessage := struct {
-				Success string
-			}{
-				Success: "Key succesfully rotated",
-			}
 			c.Header("HX-Trigger", "recharge-keyset")
-			c.HTML(200, "settings-success", successMessage)
+			err := RenderSuccess(c, "Key succesfully rotated")
+			if err != nil {
+				slog.Error("RenderSuccess", slog.Any("error", err))
+			}
 		}
 	}
 }

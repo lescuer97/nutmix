@@ -38,7 +38,6 @@ func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
 			c.Status(400)
 			return
 		}
-		return
 	}
 }
 
@@ -147,7 +146,6 @@ func MintSettingsForm(mint *m.Mint) gin.HandlerFunc {
 		// It's kept here in case there's a legacy full form submit somewhere,
 		// or it can be removed entirely if we're sure.
 		// For now, we'll just return.
-		return
 	}
 }
 
@@ -163,10 +161,7 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 		// Validate Icon URL if provided
 		if iconUrl != "" {
 			if err := validateURL(iconUrl); err != nil {
-				errorMessage := ErrorNotif{
-					Error: fmt.Sprintf("Invalid Icon URL: %s", err.Error()),
-				}
-				c.HTML(200, "settings-error", errorMessage)
+				RenderError(c, fmt.Sprintf("Invalid Icon URL: %s", err.Error()))
 				return
 			}
 		}
@@ -174,10 +169,7 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 		// Validate TOS URL if provided
 		if tosUrl != "" {
 			if err := validateURL(tosUrl); err != nil {
-				errorMessage := ErrorNotif{
-					Error: fmt.Sprintf("Invalid Terms of Service URL: %s", err.Error()),
-				}
-				c.HTML(200, "settings-error", errorMessage)
+				RenderError(c, fmt.Sprintf("Invalid Terms of Service URL: %s", err.Error()))
 				return
 			}
 		}
@@ -231,12 +223,7 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 		}
 
-		successMessage := struct {
-			Success string
-		}{
-			Success: "General settings successfully set (Mock)",
-		}
-		c.HTML(200, "settings-success", successMessage)
+		RenderSuccess(c, "General settings successfully set (Mock)")
 	}
 }
 
@@ -256,11 +243,7 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 			slog.Debug(
 				`checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))`,
 				slog.String(utils.LogExtraInfo, err.Error()))
-			errorMessage := ErrorNotif{
-				Error: "peg out limit has a problem",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
+			RenderError(c, "peg out limit has a problem")
 			return
 		}
 		mint.Config.PEG_IN_LIMIT_SATS = pegInLitmit
@@ -271,11 +254,7 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 			slog.Debug(
 				`checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))`,
 				slog.String(utils.LogExtraInfo, err.Error()))
-			errorMessage := ErrorNotif{
-				Error: "peg out limit has a problem",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
+			RenderError(c, "peg out limit has a problem")
 			return
 		}
 		mint.Config.PEG_OUT_LIMIT_SATS = pegOutLitmit
@@ -287,12 +266,7 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 		}
 
-		successMessage := struct {
-			Success string
-		}{
-			Success: "Lightning settings successfully set (Mock)",
-		}
-		c.HTML(200, "settings-success", successMessage)
+		RenderSuccess(c, "Lightning settings successfully set (Mock)")
 	}
 }
 
@@ -317,13 +291,7 @@ func MintSettingsAuth(mint *m.Mint) gin.HandlerFunc {
 			// return // Mocking success
 		}
 
-		successMessage := struct {
-			Success string
-		}{
-			Success: "Auth settings successfully set (Mock)",
-		}
-
-		c.HTML(200, "settings-success", successMessage)
+		RenderSuccess(c, "Auth settings successfully set (Mock)")
 	}
 }
 
@@ -343,12 +311,6 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
-		successMessage := struct {
-			Success string
-		}{
-			Success: "Lighning node settings changed successfully set",
-		}
-
 		formNetwork := c.Request.PostFormValue("NETWORK")
 
 		chainparam, err := m.CheckChainParams(formNetwork)
@@ -357,11 +319,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				"m.CheckChainParams(formNetwork)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-				Error: "Could not setup network for lightning",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
+			RenderError(c, "Could not setup network for lightning")
 			return
 		}
 
@@ -393,11 +351,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 					"lndWallet.SetupGrpc",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
-				errorMessage := ErrorNotif{
-					Error: "Something went wrong setting up LND communications",
-				}
-
-				c.HTML(200, "settings-error", errorMessage)
+				RenderError(c, "Something went wrong setting up LND communications")
 				return
 			}
 
@@ -407,11 +361,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				slog.Warn(
 					"Could not get lightning balance",
 					slog.String(utils.LogExtraInfo, err.Error()))
-				errorMessage := ErrorNotif{
-					Error: "Could not check stablished connection with Node",
-				}
-
-				c.HTML(200, "settings-error", errorMessage)
+				RenderError(c, "Could not check stablished connection with Node")
 				return
 
 			}
@@ -475,11 +425,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 					"lndWallet.SetupGrpc",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
-				errorMessage := ErrorNotif{
-					Error: "Something went wrong setting up CLN communications",
-				}
-
-				c.HTML(200, "settings-error", errorMessage)
+				RenderError(c, "Something went wrong setting up CLN communications")
 				return
 			}
 
@@ -489,11 +435,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				slog.Warn(
 					"Could not get lightning balance",
 					slog.String(utils.LogExtraInfo, err.Error()))
-				errorMessage := ErrorNotif{
-					Error: "Could not check stablished connection with Node",
-				}
-
-				c.HTML(200, "settings-error", errorMessage)
+				RenderError(c, "Could not check stablished connection with Node")
 				return
 
 			}
@@ -512,17 +454,12 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			slog.Error(
 				"mint.MintDB.UpdateConfig(mint.Config)",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			errorMessage := ErrorNotif{
-				Error: "there was a problem in the server",
-			}
-
-			c.HTML(200, "settings-error", errorMessage)
+			RenderError(c, "there was a problem in the server")
 
 			return
 
 		}
 
-		c.HTML(200, "settings-success", successMessage)
-		return
+		RenderSuccess(c, "Lighning node settings changed successfully set")
 	}
 }

@@ -43,11 +43,10 @@ func MintBalance(handler *adminHandler) gin.HandlerFunc {
 				"handler.lnSatsBalance()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-				Error: "There was a problem getting the balance",
+			err := RenderError(c, "There was a problem getting the balance")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 
@@ -75,12 +74,10 @@ func MintMeltSummary(mint *m.Mint) gin.HandlerFunc {
 			slog.Error(
 				"database.GetMintMeltBalanceByTime(pool",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			errorMessage := ErrorNotif{
-
-				Error: "There was an error getting mint activity",
+			err := RenderError(c, "There was an error getting mint activity")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 
@@ -98,12 +95,10 @@ func MintMeltSummary(mint *m.Mint) gin.HandlerFunc {
 					"zpay32.Decode",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
-				errorMessage := ErrorNotif{
-
-					Error: "Could not decode invoice",
+				err := RenderError(c, "Could not decode invoice")
+				if err != nil {
+					slog.Error("RenderError", slog.Any("error", err))
 				}
-
-				c.HTML(200, "settings-error", errorMessage)
 				return
 			}
 
@@ -140,12 +135,10 @@ func MintMeltList(mint *m.Mint) gin.HandlerFunc {
 				"database.GetMintMeltBalanceByTime(pool",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-
-				Error: "There was an error getting mint activity",
+			err := RenderError(c, "There was an error getting mint activity")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 
@@ -201,12 +194,10 @@ func SwapsList(mint *m.Mint) gin.HandlerFunc {
 				"mint.MintDB.GetAllLiquiditySwaps()",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-
-				Error: "There was an error getting mint activity",
+			err := RenderError(c, "There was an error getting mint activity")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 
