@@ -108,6 +108,38 @@
   background-color: var(--accent-cyan);
 }
 
+/* Chart Summary Card */
+.chart-summary-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  gap: var(--space-6);
+  width: fit-content;
+  margin-bottom: var(--space-4);
+}
+
+.chart-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.chart-stat-value {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.chart-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Chart Loading Indicator */
 .chart-loading {
   display: none;

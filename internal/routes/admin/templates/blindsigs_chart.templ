@@ -21,16 +21,26 @@ templ BlindSigsChartCard(data []database.ProofTimeSeriesPoint, summary ChartSumm
 		hx-swap="outerHTML"
 		hx-indicator="#date-range-loading"
 	>
-		<div class="chart-summary-header">
-			<h2 class="chart-summary-title">Blind Signatures</h2>
-			<div class="chart-summary-stats">
-				<div class="chart-stat">
-					<span class="chart-stat-value">{ formatNumber(summary.TotalSats) }</span>
-					<span class="chart-stat-label">Sats</span>
+		<div class="chart-header-content">
+			<h2 class="mb-6 text-xl font-semibold">Blind Signatures</h2>
+			<div class="chart-summary-container">
+				<div class="summary-card">
+					<div class="summary-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Total Value</span>
+						<span class="summary-value">{ formatNumber(summary.TotalSats) } <span class="text-sm text-secondary font-normal">sats</span></span>
+					</div>
 				</div>
-				<div class="chart-stat">
-					<span class="chart-stat-value">{ formatNumber(summary.TotalCount) }</span>
-					<span class="chart-stat-label">Signatures</span>
+				<div class="summary-card">
+					<div class="summary-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Signatures</span>
+						<span class="summary-value">{ formatNumber(summary.TotalCount) }</span>
+					</div>
 				</div>
 			</div>
 		</div>

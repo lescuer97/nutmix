@@ -191,6 +191,7 @@ templ MintActivityLayout(liquidityManagerAvailable bool, startDate string, endDa
 			@DateRangePicker(startDate, endDate)
 			<div
 				id="proofs-chart-placeholder"
+				class="mt-4 mb-4"
 				hx-get="/admin/proofs-chart"
 				hx-trigger="load, date-range-changed from:body"
 				hx-include="#chartStartDate, #chartEndDate"
