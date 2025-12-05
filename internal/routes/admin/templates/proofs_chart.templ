@@ -1,6 +1,22 @@
 package templates
 
-import "github.com/lescuer97/nutmix/internal/database"
+import (
+	"github.com/lescuer97/nutmix/internal/database"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+)
+
+// ChartSummary holds the summary statistics for a chart
+type ChartSummary struct {
+	TotalSats  uint64
+	TotalCount uint64
+}
+
+// formatNumber formats a number with thousand separators (periods)
+func formatNumber(n uint64) string {
+	p := message.NewPrinter(language.German)
+	return p.Sprintf("%.0f", float64(n))
+}
 
 // ProofsChartContent renders just the chart canvas and data - used for HTMX date updates
 templ ProofsChartContent(data []database.ProofTimeSeriesPoint) {
@@ -11,7 +27,7 @@ templ ProofsChartContent(data []database.ProofTimeSeriesPoint) {
 }
 
 // ProofsChartCard renders the chart card without date picker - date picker is now in MintActivityLayout
-templ ProofsChartCard(data []database.ProofTimeSeriesPoint) {
+templ ProofsChartCard(data []database.ProofTimeSeriesPoint, summary ChartSummary) {
 	<div
 		id="proofs-chart-card"
 		class="card card-md"
@@ -21,10 +37,17 @@ templ ProofsChartCard(data []database.ProofTimeSeriesPoint) {
 		hx-swap="outerHTML"
 		hx-indicator="#date-range-loading"
 	>
-		<div class="chart-header">
-			<div class="chart-title-section">
-				<h2 class="text-xl font-semibold">Proofs Over Time</h2>
-				<p class="text-secondary text-sm">Time-series visualization of proof activity</p>
+		<div class="chart-summary-header">
+			<h2 class="chart-summary-title">Proofs</h2>
+			<div class="chart-summary-stats">
+				<div class="chart-stat">
+					<span class="chart-stat-value">{ formatNumber(summary.TotalSats) }</span>
+					<span class="chart-stat-label">Sats</span>
+				</div>
+				<div class="chart-stat">
+					<span class="chart-stat-value">{ formatNumber(summary.TotalCount) }</span>
+					<span class="chart-stat-label">Proofs</span>
+				</div>
 			</div>
 		</div>
 		<div class="chart-legend-info">
@@ -36,4 +59,3 @@ templ ProofsChartCard(data []database.ProofTimeSeriesPoint) {
 		</div>
 	</div>
 }
-
