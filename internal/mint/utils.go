@@ -87,7 +87,7 @@ func (m *Mint) VerifyOutputs(tx pgx.Tx, outputs []cashu.BlindedMessage, keys []c
 	}
 
 	outputsMap := make(map[string]bool)
-	blindingFactors := []string{}
+	blindingFactors := []cashu.WrappedPublicKey{}
 
 	// Check if there is a repeated output, if not add it to the blindingFactors
 	for _, output := range outputs {
@@ -97,7 +97,8 @@ func (m *Mint) VerifyOutputs(tx pgx.Tx, outputs []cashu.BlindedMessage, keys []c
 			return unit, cashu.ErrRepeatedOutput
 		}
 		outputsMap[outputKey] = true
-		blindingFactors = append(blindingFactors, outputKey)
+
+		blindingFactors = append(blindingFactors, output.B_)
 	}
 
 	blindRecoverySigs, err := m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)

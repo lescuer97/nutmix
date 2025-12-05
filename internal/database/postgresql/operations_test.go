@@ -482,6 +482,7 @@ func TestSaveProofAndGetBySecret_ValidPubkey(t *testing.T) {
 	wrappedY := cashu.WrappedPublicKey{PublicKey: yPubkey}
 
 	now := time.Now().Unix()
+
 	secret := "test_secret_1"
 
 	proof := cashu.Proof{
@@ -724,7 +725,7 @@ func TestSaveRestoreSigsAndGet_ValidPubkeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []string{b_PubkeyStr})
+	sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []cashu.WrappedPublicKey{wrappedB})
 	if err != nil {
 		t.Fatalf("db.GetRestoreSigsFromBlindedMessages failed: %v", err)
 	}
@@ -839,7 +840,7 @@ func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []string{b1_PubkeyStr, b2_PubkeyStr})
+	sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []cashu.WrappedPublicKey{wrappedB1, wrappedB2})
 	if err != nil {
 		t.Fatalf("db.GetRestoreSigsFromBlindedMessages failed: %v", err)
 	}
