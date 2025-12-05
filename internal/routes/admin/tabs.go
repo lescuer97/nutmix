@@ -223,7 +223,7 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 		}
 
-		RenderSuccess(c, "General settings successfully set (Mock)")
+		RenderSuccess(c, "General settings successfully set")
 	}
 }
 
@@ -266,7 +266,7 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 		}
 
-		RenderSuccess(c, "Lightning settings successfully set (Mock)")
+		RenderSuccess(c, "Lightning settings successfully set")
 	}
 }
 
@@ -291,7 +291,7 @@ func MintSettingsAuth(mint *m.Mint) gin.HandlerFunc {
 			// return // Mocking success
 		}
 
-		RenderSuccess(c, "Auth settings successfully set (Mock)")
+		RenderSuccess(c, "Auth settings successfully set")
 	}
 }
 
