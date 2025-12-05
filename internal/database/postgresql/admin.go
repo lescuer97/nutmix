@@ -32,10 +32,10 @@ func (pql Postgresql) UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activat
 
 func (pql Postgresql) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLoginAuth, error) {
 	rows, err := tx.Query(context.Background(), "SELECT nonce, activated, expiry FROM nostr_login WHERE nonce = $1 FOR UPDATE", nonce)
-	defer rows.Close()
 	if err != nil {
 		return database.NostrLoginAuth{}, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
+	defer rows.Close()
 
 	nostrLogin, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[database.NostrLoginAuth])
 
@@ -123,10 +123,10 @@ func (pql Postgresql) GetLiquiditySwaps(swap utils.LiquiditySwap) ([]utils.Liqui
 
 	var swaps []utils.LiquiditySwap
 	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration, checking_id FROM liquidity_swaps ")
-	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
+	defer rows.Close()
 
 	swaps, err = pgx.CollectRows(rows, pgx.RowToStructByName[utils.LiquiditySwap])
 
@@ -141,10 +141,10 @@ func (pql Postgresql) GetLiquiditySwapById(tx pgx.Tx, id string) (utils.Liquidit
 
 	var swaps utils.LiquiditySwap
 	rows, err := tx.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration, checking_id FROM liquidity_swaps WHERE id = $1 FOR SHARE", id)
-	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
+	defer rows.Close()
 
 	swaps, err = pgx.CollectOneRow(rows, pgx.RowToStructByName[utils.LiquiditySwap])
 
@@ -179,7 +179,7 @@ func (pql Postgresql) GetLiquiditySwapsByStates(states []utils.SwapState) ([]uti
 	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type,expiration, checking_id FROM liquidity_swaps WHERE state = ANY($1) ORDER BY expiration DESC FOR UPDATE NOWAIT", states)
 	defer rows.Close()
 	if err != nil {
-		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
+		return swaps, fmt.Errorf("Error checking for liquidity swaps: %w", err)
 	}
 
 	swaps, err = pgx.CollectRows(rows, pgx.RowToStructByName[utils.LiquiditySwap])
