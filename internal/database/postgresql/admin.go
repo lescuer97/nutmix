@@ -159,10 +159,10 @@ func (pql Postgresql) GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error) {
 
 	var swaps []utils.LiquiditySwap
 	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type,expiration, checking_id FROM liquidity_swaps ORDER BY expiration DESC")
-	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
 	}
+	defer rows.Close()
 
 	swaps, err = pgx.CollectRows(rows, pgx.RowToStructByName[utils.LiquiditySwap])
 
@@ -177,10 +177,10 @@ func (pql Postgresql) GetLiquiditySwapsByStates(states []utils.SwapState) ([]uti
 
 	var swaps []utils.LiquiditySwap
 	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type,expiration, checking_id FROM liquidity_swaps WHERE state = ANY($1) ORDER BY expiration DESC FOR UPDATE NOWAIT", states)
-	defer rows.Close()
 	if err != nil {
 		return swaps, fmt.Errorf("Error checking for liquidity swaps: %w", err)
 	}
+	defer rows.Close()
 
 	swaps, err = pgx.CollectRows(rows, pgx.RowToStructByName[utils.LiquiditySwap])
 

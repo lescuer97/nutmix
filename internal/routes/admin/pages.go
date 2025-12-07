@@ -267,20 +267,8 @@ func BlindSigsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
-		milillisatBalance, err := mint.LightningBackend.WalletBalance()
-		if err != nil {
 
-			slog.Warn(
-				"mint.LightningComs.WalletBalance()",
-				slog.String(utils.LogExtraInfo, err.Error()))
-
-			c.Error(err)
-			// c.HTML(400,"", nil)
-			return
-		}
-		amount := strconv.FormatUint(milillisatBalance/1000, 10)
-
-		err = templates.LiquidityDashboard(c.Query("swapForm"), amount).Render(ctx, c.Writer)
+		err := templates.LiquidityDashboard().Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(err)

@@ -86,3 +86,87 @@
   border-bottom: 1px solid var(--border-secondary);
   padding-bottom: var(--spacing-xl);
 }
+
+/* ============================================
+   TABLE STYLES
+   ============================================ */
+
+.table {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-primary);
+  overflow: hidden;
+}
+
+.table-header {
+  display: flex;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row-item {
+  display: flex;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color var(--transition-fast);
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+}
+
+.row-item:last-child {
+  border-bottom: none;
+}
+
+.row-item:hover {
+  background-color: var(--bg-card-hover);
+}
+
+.cell {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+}
+
+.cell:last-child {
+  padding-right: 0;
+}
+
+/* Specific cell widths helpers */
+.w-5 { width: 5%; flex: none; }
+.w-10 { width: 10%; flex: none; }
+.w-15 { width: 15%; flex: none; }
+.w-20 { width: 20%; flex: none; }
+.w-25 { width: 25%; flex: none; }
+.w-30 { width: 30%; flex: none; }
+.w-40 { width: 40%; flex: none; }
+.w-50 { width: 50%; flex: none; }
+.w-60 { width: 60%; flex: none; }
+.w-70 { width: 70%; flex: none; }
+
+/* Action buttons container for pages */
+.page-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}

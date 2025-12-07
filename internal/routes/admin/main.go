@@ -2,10 +2,10 @@ package admin
 
 import (
 	"context"
-	"crypto/rand"
 	"embed"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -157,6 +157,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 	// This is /admin pages
 	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
 
+	fmt.Println("can use liquidity manager", utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND))
 	if nostrPubkey != nil {
 		adminRoute.GET("/proofs-chart", ProofsChartCard(mint))
 		adminRoute.GET("/api/proofs-chart-data", ProofsChartDataAPI(mint))
@@ -300,15 +301,4 @@ func LogsTab() gin.HandlerFunc {
 			return
 		}
 	}
-}
-
-func generateHMACSecret() ([]byte, error) {
-	// generate random Nonce
-	secret := make([]byte, 32)  // create a slice with length 16 for the nonce
-	_, err := rand.Read(secret) // read random bytes into the nonce slice
-	if err != nil {
-		return secret, err
-	}
-
-	return secret, nil
 }
