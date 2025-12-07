@@ -192,6 +192,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 			adminRoute.GET("/liquidity/:swapId", SwapStatusPage(mint))
 			adminRoute.GET("/swaps-list", SwapsList(mint))
 			adminRoute.GET("/liquidity-button", LiquidityButton())
+			adminRoute.GET("/ln-send", LnSendPage(mint))
+			adminRoute.GET("/ln-receive", LnReceivePage(mint))
 			adminRoute.GET("/liquid-swap-form", SwapOutForm(mint))
 			adminRoute.GET("/lightning-swap-form", LightningSwapForm())
 			adminRoute.POST("/out-swap-req", SwapOutRequest(mint))

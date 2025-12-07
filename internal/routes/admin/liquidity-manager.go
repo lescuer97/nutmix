@@ -36,6 +36,47 @@ func LiquidityButton() gin.HandlerFunc {
 	}
 }
 
+// LnSendPage handles the send funds page
+func LnSendPage(mint *m.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+
+		milillisatBalance, err := mint.LightningBackend.WalletBalance()
+		var balance string
+		if err != nil {
+			slog.Warn(
+				"mint.LightningComs.WalletBalance()",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			balance = "Unavailable"
+		} else {
+			balance = strconv.FormatUint(milillisatBalance/1000, 10)
+		}
+
+		component := templates.LnSendPage(balance)
+
+		err = component.Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
+			return
+		}
+	}
+}
+
+// LnReceivePage handles the receive funds page
+func LnReceivePage(mint *m.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+		
+		component := templates.LnReceivePage()
+
+		err := component.Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
+			return
+		}
+	}
+}
+
 // swaps out of the mint
 func SwapOutForm(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -90,8 +131,27 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		decodedInvoice, err := zpay32.Decode(invoice, mint.LightningBackend.GetNetwork())
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
-			log.Printf("\n zpay32.Decode(res.Destination) %+v \n", err)
-			c.Error(fmt.Errorf("\n zpay32.Decode(res.Destination) %+v \n", err))
+			slog.Warn("zpay32.Decode(invoice)", slog.Any("error", err))
+			RenderError(c, "Invalid Lightning Invoice")
+			return
+		}
+
+		if decodedInvoice.MilliSat == nil {
+			RenderError(c, "Invoice must have an amount")
+			return
+		}
+
+		// Check for sufficient funds
+		currentBalance, err := mint.LightningBackend.WalletBalance()
+		if err != nil {
+			slog.Error("Could not fetch wallet balance", slog.Any("error", err))
+			RenderError(c, "Could not check wallet balance")
+			return
+		}
+
+		invoiceAmountMsats := uint64(*decodedInvoice.MilliSat)
+		if currentBalance < invoiceAmountMsats {
+			RenderError(c, fmt.Sprintf("Insufficient funds: Have %d sats, need %d sats", currentBalance/1000, invoiceAmountMsats/1000))
 			return
 		}
 
@@ -99,7 +159,7 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		feesResponse, err := mint.LightningBackend.QueryFees(invoice, decodedInvoice, false, cashu.Amount{Unit: cashu.Sat, Amount: uint64(amount)})
 		if err != nil {
 			slog.Info("mint.LightningComs.PayInvoice", slog.Any("error", err))
-			c.JSON(500, "Opps!, something went wrong")
+			RenderError(c, "Could not calculate fees or route not found")
 			return
 		}
 
@@ -172,14 +232,21 @@ func SwapInRequest(mint *m.Mint) gin.HandlerFunc {
 
 		amount, err := strconv.ParseUint(amountStr, 10, 64)
 		if err != nil {
-			c.Error(fmt.Errorf("strconv.ParseUint(amountStr, 10, 64 ). %w", err))
+			RenderError(c, "Invalid amount")
 			return
 		}
+		
+		if amount <= 0 {
+			RenderError(c, "Amount must be greater than 0")
+			return
+		}
+
 		uuid := uuid.New().String()
 
 		resp, err := mint.LightningBackend.RequestInvoice(cashu.MintRequestDB{Quote: uuid}, cashu.Amount{Amount: amount, Unit: cashu.Sat})
 		if err != nil {
-			c.Error(fmt.Errorf("mint.LightningBackend.RequestInvoice(int64(amount)). %w", err))
+			slog.Error("mint.LightningBackend.RequestInvoice", slog.Any("error", err))
+			RenderError(c, "Could not generate invoice")
 			return
 		}
 		swap := utils.LiquiditySwap{

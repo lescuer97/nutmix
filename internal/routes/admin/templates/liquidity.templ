@@ -102,6 +102,89 @@ templ SwapOutPostForm(nodeBalance string) {
 	</form>
 }
 
+templ LnSendPage(nodeBalance string) {
+	@Layout("lightning") {
+		<main class="main-content">
+			<div class="content-header">
+				<h2>Send Funds</h2>
+			</div>
+			<div class="card p-6" style="max-width: 600px; margin: 0 auto;">
+				<div class="mb-6 text-center">
+					<h3 class="text-secondary text-sm uppercase mb-2">Available Balance</h3>
+					<div class="text-3xl font-bold font-mono text-accent">{ nodeBalance } <span class="text-lg text-secondary">sats</span></div>
+				</div>
+
+				<form
+					class="form-group"
+					hx-post="/admin/out-swap-req"
+					hx-target="#send-result"
+					hx-swap="innerHTML"
+				>
+					<div class="form-section">
+						<label class="settings-input" for="invoice">
+							Lightning Invoice
+							<textarea 
+								name="invoice" 
+								required 
+								placeholder="lnbc..."
+								class="font-mono text-sm"
+								rows="5"
+							></textarea>
+						</label>
+					</div>
+					
+					<div class="form-actions flex justify-end mt-4">
+						<button hx-disabled-elt="this" type="submit" class="btn btn-primary">
+							Send Payment
+						</button>
+					</div>
+				</form>
+				
+				<div id="send-result" class="mt-6"></div>
+			</div>
+		</main>
+	}
+}
+
+templ LnReceivePage() {
+	@Layout("lightning") {
+		<main class="main-content">
+			<div class="content-header">
+				<h2>Receive Funds</h2>
+			</div>
+			<div class="card p-6" style="max-width: 600px; margin: 0 auto;">
+				<form
+					class="form-group"
+					hx-post="/admin/in-swap-req"
+					hx-target="#receive-result"
+					hx-swap="innerHTML"
+				>
+					<div class="form-section">
+						<label class="settings-input" for="amount">
+							Amount (Sats)
+							<input 
+								name="amount" 
+								required 
+								min="1" 
+								type="number"
+								placeholder="0"
+							/>
+						</label>
+					</div>
+					
+					<div class="form-actions flex justify-end mt-4">
+						<button hx-disabled-elt="this" type="submit" class="btn btn-primary">
+							Generate Invoice
+						</button>
+					</div>
+				</form>
+				
+				<div id="receive-result" class="mt-6"></div>
+			</div>
+		</main>
+	}
+}
+
 templ SwapInPostForm() {
 	<form
 		class="swap-form"
@@ -142,21 +225,22 @@ templ LightningReceiveSummary(recieveSats string, address string, qrCode string,
 }
 
 templ LightningSendSummary(recieveSats string, address string, swapId string) {
-	<div>
-		<h3 style="margin-left: 15px;">Liquidity Out</h3>
-		<div class="summary">
+	<div class="card p-4 mt-4 border border-secondary">
+		<h3 class="text-lg font-bold mb-4">Payment Request Created</h3>
+		<div class="summary flex flex-col gap-2">
 			<p>
-				Please confirm you want to send:  { recieveSats }. To this invoice:
+				Please confirm you want to send <span class="font-mono font-bold">{ recieveSats }</span> to:
 			</p>
-			<p>
+			<div class="p-3 bg-secondary rounded font-mono text-xs break-all text-secondary">
 				{ address }
-			</p>
+			</div>
+			
 			<div
 				hx-get={ "/admin/swap/" + swapId }
 				hx-trigger="load"
 				hx-swap="innerHTML"
 				hx-target="this"
-				class="swap-state"
+				class="swap-state mt-4"
 			></div>
 		</div>
 	</div>
@@ -165,20 +249,21 @@ templ LightningSendSummary(recieveSats string, address string, swapId string) {
 templ SwapState(state utils.SwapState, swapId string) {
 	{{ waitingConfirm := state == utils.WaitingUserConfirmation }}
 	{{ stringState := state.ToString() }}
-	<div class="state">
-		<h3>Swap State</h3>
-		<div>
-			Current state: <b>{ stringState } </b>
+	<div class="state bg-card p-4 rounded border border-subtle">
+		<div class="flex items-center justify-between mb-4">
+			<h3 class="text-sm uppercase text-secondary">Status</h3>
+			<div class="font-bold">{ stringState }</div>
 		</div>
+		
 		if waitingConfirm {
 			<form
-				class="swap-form"
+				class="swap-form flex justify-end"
 				hx-post={ "/admin/swap/" + swapId + "/confirm" }
 				hx-swap="outerHTML"
 				hx-target=".state"
 				hx-disabled-elt="find button"
 			>
-				<button style="margin-top: 10px;" hx-disabled-elt="this" type="submit">Confirm Swap</button>
+				<button class="btn btn-primary w-full" type="submit">Confirm Payment</button>
 			</form>
 		}
 	</div>
