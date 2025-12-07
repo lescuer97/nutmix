@@ -202,25 +202,42 @@ templ SwapInPostForm() {
 }
 
 templ LightningReceiveSummary(recieveSats string, address string, qrCode string, swapId string) {
-	<h3 style="margin-left: 15px;">Liquidity In</h3>
-	<div class="summary">
-		<p>
-			Please pay this invoice: 
-		</p>
-		<p>
-			{ address }
-		</p>
-		<p>
-			For receiving:  { recieveSats }
-		</p>
-		@QRCode(qrCode)
-		<div
-			hx-get={ "/admin/swap/" + swapId }
-			hx-trigger="load"
-			hx-swap="innerHTML"
-			hx-target="this"
-			class="swap-state"
-		></div>
+	<div class="card p-4 mt-4 border border-secondary">
+		<h3 class="text-lg font-bold mb-4">Liquidity In</h3>
+		<div class="summary flex flex-col gap-4">
+			<div class="text-center">
+				<p class="text-secondary text-sm mb-2">Scan to Pay</p>
+				<div class="inline-block p-2 bg-white rounded">
+					@QRCode(qrCode)
+				</div>
+			</div>
+			
+			<div>
+				<p class="text-sm text-secondary mb-1">
+					Amount to Receive
+				</p>
+				<div class="font-mono font-bold text-xl">
+					{ recieveSats } <span class="text-sm text-secondary">sats</span>
+				</div>
+			</div>
+
+			<div>
+				<p class="text-sm text-secondary mb-1">
+					Lightning Invoice
+				</p>
+				<div class="p-3 bg-secondary rounded font-mono text-xs break-all text-secondary">
+					{ address }
+				</div>
+			</div>
+			
+			<div
+				hx-get={ "/admin/swap/" + swapId }
+				hx-trigger="load"
+				hx-swap="innerHTML"
+				hx-target="this"
+				class="swap-state mt-2"
+			></div>
+		</div>
 	</div>
 }
 
@@ -271,8 +288,8 @@ templ SwapState(state utils.SwapState, swapId string) {
 
 templ SwapStatusPage(summary templ.Component) {
 	@Layout("lightning") {
-		<main class="liquidity-dashboard">
-			<div class="actions-container">
+		<main class="liquidity-dashboard main-content">
+			<div class="actions-container" style="max-width: 600px; margin: 0 auto;">
 				@summary
 			</div>
 		</main>
