@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"github.com/lightningnetwork/lnd/zpay32"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
@@ -309,9 +311,7 @@ func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 }
 
 func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
-
 	return func(c *gin.Context) {
-
 		formNetwork := c.Request.PostFormValue("NETWORK")
 
 		chainparam, err := m.CheckChainParams(formNetwork)
@@ -324,29 +324,49 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		mint.Config.NETWORK = chainparam.Name
+		var newBackend lightning.LightningBackend
+		var newBackendType utils.LightningBackend
+
+		// Temporary config variables to hold the new settings
+		// Initialize with existing config values
+		var (
+			lndHost     = mint.Config.LND_GRPC_HOST
+			lndTls      = mint.Config.LND_TLS_CERT
+			lndMacaroon = mint.Config.LND_MACAROON
+
+			lnbitsKey      = mint.Config.MINT_LNBITS_KEY
+			lnbitsEndpoint = mint.Config.MINT_LNBITS_ENDPOINT
+
+			strikeKey      = mint.Config.STRIKE_KEY
+			strikeEndpoint = mint.Config.STRIKE_ENDPOINT
+
+			clnHost     = mint.Config.CLN_GRPC_HOST
+			clnCa       = mint.Config.CLN_CA_CERT
+			clnClient   = mint.Config.CLN_CLIENT_CERT
+			clnKey      = mint.Config.CLN_CLIENT_KEY
+			clnMacaroon = mint.Config.CLN_MACAROON
+		)
 
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
 
 		case string(utils.FAKE_WALLET):
-
-			mint.Config.MINT_LIGHTNING_BACKEND = utils.FAKE_WALLET
-
+			newBackendType = utils.FAKE_WALLET
 			fakeWalletBackend := lightning.FakeWallet{
 				Network: chainparam,
 			}
+			newBackend = fakeWalletBackend
 
-			mint.LightningBackend = fakeWalletBackend
 		case string(utils.LNDGRPC):
-			lndHost := c.Request.PostFormValue("LND_GRPC_HOST")
-			tlsCert := c.Request.PostFormValue("LND_TLS_CERT")
-			macaroon := c.Request.PostFormValue("LND_MACAROON")
+			newBackendType = utils.LNDGRPC
+			lndHost = c.Request.PostFormValue("LND_GRPC_HOST")
+			lndTls = c.Request.PostFormValue("LND_TLS_CERT")
+			lndMacaroon = c.Request.PostFormValue("LND_MACAROON")
 
 			lndWallet := lightning.LndGrpcWallet{
 				Network: chainparam,
 			}
 
-			err := lndWallet.SetupGrpc(lndHost, macaroon, tlsCert)
+			err := lndWallet.SetupGrpc(lndHost, lndMacaroon, lndTls)
 			if err != nil {
 				slog.Error(
 					"lndWallet.SetupGrpc",
@@ -355,39 +375,24 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				RenderError(c, "Something went wrong setting up LND communications")
 				return
 			}
-
-			// check connection
-			_, err = lndWallet.WalletBalance()
-			if err != nil {
-				slog.Warn(
-					"Could not get lightning balance",
-					slog.String(utils.LogExtraInfo, err.Error()))
-				RenderError(c, "Could not check stablished connection with Node")
-				return
-
-			}
-			mint.LightningBackend = lndWallet
-			mint.Config.MINT_LIGHTNING_BACKEND = utils.LNDGRPC
-			mint.Config.LND_GRPC_HOST = lndHost
-			mint.Config.LND_MACAROON = macaroon
-			mint.Config.LND_TLS_CERT = tlsCert
+			newBackend = lndWallet
 
 		case string(utils.LNBITS):
-			lnbitsKey := c.Request.PostFormValue("MINT_LNBITS_KEY")
-			lnbitsEndpoint := c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
+			newBackendType = utils.LNBITS
+			lnbitsKey = c.Request.PostFormValue("MINT_LNBITS_KEY")
+			lnbitsEndpoint = c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
 
 			lnbitsWallet := lightning.LnbitsWallet{
 				Network:  chainparam,
 				Key:      lnbitsKey,
 				Endpoint: lnbitsEndpoint,
 			}
-			mint.LightningBackend = lnbitsWallet
-			mint.Config.MINT_LIGHTNING_BACKEND = utils.LNBITS
-			mint.Config.MINT_LNBITS_KEY = lnbitsKey
-			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
+			newBackend = lnbitsWallet
+
 		case string(utils.Strike):
-			strikeKey := c.Request.PostFormValue("STRIKE_KEY")
-			strikeEndpoint := c.Request.PostFormValue("STRIKE_ENDPOINT")
+			newBackendType = utils.Strike
+			strikeKey = c.Request.PostFormValue("STRIKE_KEY")
+			strikeEndpoint = c.Request.PostFormValue("STRIKE_ENDPOINT")
 
 			strikeWallet := lightning.Strike{
 				Network: chainparam,
@@ -396,71 +401,115 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			err := strikeWallet.Setup(strikeKey, strikeEndpoint)
 			if err != nil {
 				c.Error(fmt.Errorf("strikeWallet.Setup(strikeKey, strikeEndpoint) %w %w", err, ErrInvalidStrikeConfig))
+				RenderError(c, "Invalid Strike configuration")
 				return
 			}
-			// check connection
-			_, err = strikeWallet.WalletBalance()
-			if err != nil {
-				c.Error(fmt.Errorf("strikeWallet.WalletBalance() %w %w", err, ErrInvalidStrikeCheck))
-				return
-			}
+			newBackend = strikeWallet
 
-			mint.Config.MINT_LIGHTNING_BACKEND = utils.Strike
-			mint.Config.STRIKE_KEY = strikeKey
-			mint.Config.STRIKE_ENDPOINT = strikeEndpoint
-			mint.LightningBackend = strikeWallet
 		case string(utils.CLNGRPC):
-			clnHost := c.Request.PostFormValue("CLN_GRPC_HOST")
-			clnCaCert := c.Request.PostFormValue("CLN_CA_CERT")
-			clnClientCert := c.Request.PostFormValue("CLN_CLIENT_CERT")
-			clnClientKey := c.Request.PostFormValue("CLN_CLIENT_KEY")
-			macaroon := c.Request.PostFormValue("CLN_MACAROON")
+			newBackendType = utils.CLNGRPC
+			clnHost = c.Request.PostFormValue("CLN_GRPC_HOST")
+			clnCa = c.Request.PostFormValue("CLN_CA_CERT")
+			clnClient = c.Request.PostFormValue("CLN_CLIENT_CERT")
+			clnKey = c.Request.PostFormValue("CLN_CLIENT_KEY")
+			clnMacaroon = c.Request.PostFormValue("CLN_MACAROON")
 
 			clnWallet := lightning.CLNGRPCWallet{
 				Network: chainparam,
 			}
 
-			err := clnWallet.SetupGrpc(clnHost, clnCaCert, clnClientCert, clnClientKey, macaroon)
+			err := clnWallet.SetupGrpc(clnHost, clnCa, clnClient, clnKey, clnMacaroon)
 			if err != nil {
 				slog.Error(
-					"lndWallet.SetupGrpc",
+					"clnWallet.SetupGrpc",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
 				RenderError(c, "Something went wrong setting up CLN communications")
 				return
 			}
+			newBackend = clnWallet
 
-			// check connection
-			_, err = clnWallet.WalletBalance()
-			if err != nil {
-				slog.Warn(
-					"Could not get lightning balance",
-					slog.String(utils.LogExtraInfo, err.Error()))
-				RenderError(c, "Could not check stablished connection with Node")
-				return
-
-			}
-			mint.LightningBackend = clnWallet
-			mint.Config.MINT_LIGHTNING_BACKEND = utils.CLNGRPC
-			mint.Config.CLN_GRPC_HOST = clnHost
-			mint.Config.CLN_MACAROON = macaroon
-			mint.Config.CLN_CA_CERT = clnCaCert
-			mint.Config.CLN_CLIENT_KEY = clnClientKey
-			mint.Config.CLN_CLIENT_CERT = clnClientCert
+		default:
+			RenderError(c, "Invalid backend selection")
+			return
 		}
 
-		err = mint.MintDB.UpdateConfig(mint.Config)
+		// --- VERIFICATION STEP ---
 
+		// 1. Check connection/balance
+		_, err = newBackend.WalletBalance()
+		if err != nil {
+			slog.Warn(
+				"Could not get lightning balance",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			RenderError(c, "Could not check established connection with Node (WalletBalance failed)")
+			return
+		}
+
+		// 2. Check invoice generation (100 sats)
+		// We use a dummy quote ID to avoid messing with real DB if possible.
+		testQuote := "verification-test-" + strconv.FormatInt(time.Now().Unix(), 10)
+		invoiceResp, err := newBackend.RequestInvoice(
+			cashu.MintRequestDB{Quote: testQuote},
+			cashu.Amount{Unit: cashu.Sat, Amount: 100},
+		)
+		if err != nil {
+			slog.Error("newBackend.RequestInvoice failed during verification", slog.String("err", err.Error()))
+			RenderError(c, "Could not generate a test invoice with the new backend")
+			return
+		}
+
+		// 3. Decode invoice and verify network
+		decodedInvoice, err := zpay32.Decode(invoiceResp.PaymentRequest, &chainparam)
+		if err != nil {
+			slog.Error("zpay32.Decode failed during verification", slog.String("err", err.Error()))
+			RenderError(c, "Lightning backend network does not match selected network configuration")
+			return
+		}
+
+		// Verify amount matches (sanity check)
+		if decodedInvoice.MilliSat == nil || int64(decodedInvoice.MilliSat.ToSatoshis()) != 100 {
+			slog.Warn("Decoded invoice amount mismatch")
+		}
+
+		// --- APPLY SETTINGS ---
+
+		// Update Config object
+		mint.Config.NETWORK = chainparam.Name
+		mint.Config.MINT_LIGHTNING_BACKEND = newBackendType
+
+		switch newBackendType {
+		case utils.LNDGRPC:
+			mint.Config.LND_GRPC_HOST = lndHost
+			mint.Config.LND_MACAROON = lndMacaroon
+			mint.Config.LND_TLS_CERT = lndTls
+		case utils.LNBITS:
+			mint.Config.MINT_LNBITS_KEY = lnbitsKey
+			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
+		case utils.Strike:
+			mint.Config.STRIKE_KEY = strikeKey
+			mint.Config.STRIKE_ENDPOINT = strikeEndpoint
+		case utils.CLNGRPC:
+			mint.Config.CLN_GRPC_HOST = clnHost
+			mint.Config.CLN_MACAROON = clnMacaroon
+			mint.Config.CLN_CA_CERT = clnCa
+			mint.Config.CLN_CLIENT_KEY = clnKey
+			mint.Config.CLN_CLIENT_CERT = clnClient
+		}
+
+		// Switch the live backend
+		mint.LightningBackend = newBackend
+
+		// Save to DB
+		err = mint.MintDB.UpdateConfig(mint.Config)
 		if err != nil {
 			slog.Error(
 				"mint.MintDB.UpdateConfig(mint.Config)",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			RenderError(c, "there was a problem in the server")
-
+			RenderError(c, "Settings applied but failed to save to database")
 			return
-
 		}
 
-		RenderSuccess(c, "Lighning node settings changed successfully set")
+		RenderSuccess(c, "Lightning node settings changed and verified successfully")
 	}
 }
