@@ -2,11 +2,11 @@ package templates
 
 // MintMeltTimeSeriesPoint represents a single data point for mint/melt charting
 type MintMeltTimeSeriesPoint struct {
-	Timestamp  int64  `json:"timestamp"`   // Unix timestamp for bucket start
-	MintAmount int64  `json:"mintAmount"`  // Sum of mint amounts (positive/inflows)
-	MeltAmount int64  `json:"meltAmount"`  // Sum of melt amounts (outflows)
-	MintCount  uint64 `json:"mintCount"`   // Number of mint requests
-	MeltCount  uint64 `json:"meltCount"`   // Number of melt requests
+	Timestamp  int64  `json:"timestamp"`  // Unix timestamp for bucket start
+	MintAmount int64  `json:"mintAmount"` // Sum of mint amounts (positive/inflows)
+	MeltAmount int64  `json:"meltAmount"` // Sum of melt amounts (outflows)
+	MintCount  uint64 `json:"mintCount"`  // Number of mint requests
+	MeltCount  uint64 `json:"meltCount"`  // Number of melt requests
 }
 
 // LnChartSummary holds the summary statistics for the LN chart
@@ -48,7 +48,7 @@ templ LnChartCard(data []MintMeltTimeSeriesPoint, summary LnChartSummary) {
 			<div class="chart-summary-container">
 				<div class="summary-card">
 					<div class="summary-icon summary-icon-green">
-						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
 					</div>
 					<div class="summary-content">
 						<span class="summary-label">Inflows (Mint)</span>
@@ -57,7 +57,7 @@ templ LnChartCard(data []MintMeltTimeSeriesPoint, summary LnChartSummary) {
 				</div>
 				<div class="summary-card">
 					<div class="summary-icon summary-icon-red">
-						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
 					</div>
 					<div class="summary-content">
 						<span class="summary-label">Outflows (Melt)</span>
@@ -66,7 +66,7 @@ templ LnChartCard(data []MintMeltTimeSeriesPoint, summary LnChartSummary) {
 				</div>
 				<div class="summary-card">
 					<div class="summary-icon">
-						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 18V6"></path></svg>
 					</div>
 					<div class="summary-content">
 						<span class="summary-label">Net Flow</span>
@@ -84,4 +84,3 @@ templ LnChartCard(data []MintMeltTimeSeriesPoint, summary LnChartSummary) {
 		</div>
 	</div>
 }
-

@@ -36,7 +36,6 @@ templ LiquidityDashboard() {
 					</a>
 				</div>
 			</div>
-			
 			<div class="actions-container">
 				<h3 class="mb-4">Recent Swaps</h3>
 				<div class="active-swaps">
@@ -114,7 +113,6 @@ templ LnSendPage(nodeBalance string) {
 					<h3 class="text-secondary text-sm uppercase mb-2">Available Balance</h3>
 					<div class="text-3xl font-bold font-mono text-accent">{ nodeBalance } <span class="text-lg text-secondary">sats</span></div>
 				</div>
-
 				<form
 					class="form-group"
 					hx-post="/admin/out-swap-req"
@@ -124,23 +122,21 @@ templ LnSendPage(nodeBalance string) {
 					<div class="form-section">
 						<label class="settings-input" for="invoice">
 							Lightning Invoice
-							<textarea 
-								name="invoice" 
-								required 
+							<textarea
+								name="invoice"
+								required
 								placeholder="lnbc..."
 								class="font-mono text-sm"
 								rows="5"
 							></textarea>
 						</label>
 					</div>
-					
 					<div class="form-actions flex justify-end mt-4">
 						<button hx-disabled-elt="this" type="submit" class="btn btn-primary">
 							Send Payment
 						</button>
 					</div>
 				</form>
-				
 				<div id="send-result" class="mt-6"></div>
 			</div>
 		</main>
@@ -163,23 +159,21 @@ templ LnReceivePage() {
 					<div class="form-section">
 						<label class="settings-input" for="amount">
 							Amount (Sats)
-							<input 
-								name="amount" 
-								required 
-								min="1" 
+							<input
+								name="amount"
+								required
+								min="1"
 								type="number"
 								placeholder="0"
 							/>
 						</label>
 					</div>
-					
 					<div class="form-actions flex justify-end mt-4">
 						<button hx-disabled-elt="this" type="submit" class="btn btn-primary">
 							Generate Invoice
 						</button>
 					</div>
 				</form>
-				
 				<div id="receive-result" class="mt-6"></div>
 			</div>
 		</main>
@@ -212,7 +206,6 @@ templ LightningReceiveSummary(recieveSats string, address string, qrCode string,
 					@QRCode(qrCode)
 				</div>
 			</div>
-			
 			<div>
 				<p class="text-sm text-secondary mb-1">
 					Amount to Receive
@@ -221,7 +214,6 @@ templ LightningReceiveSummary(recieveSats string, address string, qrCode string,
 					{ recieveSats } <span class="text-sm text-secondary">sats</span>
 				</div>
 			</div>
-
 			<div>
 				<p class="text-sm text-secondary mb-1">
 					Lightning Invoice
@@ -230,7 +222,6 @@ templ LightningReceiveSummary(recieveSats string, address string, qrCode string,
 					{ address }
 				</div>
 			</div>
-			
 			<div
 				hx-get={ "/admin/swap/" + swapId }
 				hx-trigger="load"
@@ -252,7 +243,6 @@ templ LightningSendSummary(recieveSats string, address string, swapId string) {
 			<div class="p-3 bg-secondary rounded font-mono text-xs break-all text-secondary">
 				{ address }
 			</div>
-			
 			<div
 				hx-get={ "/admin/swap/" + swapId }
 				hx-trigger="load"
@@ -272,7 +262,6 @@ templ SwapState(state utils.SwapState, swapId string) {
 			<h3 class="text-sm uppercase text-secondary">Status</h3>
 			<div class="font-bold">{ stringState }</div>
 		</div>
-		
 		if waitingConfirm {
 			<form
 				class="swap-form flex justify-end"

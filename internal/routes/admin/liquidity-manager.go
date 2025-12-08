@@ -214,7 +214,7 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		c.Header("HX-Replace-URL", "/admin/liquidity/"+uuid)
+		c.Header("HX-Location", "/admin/liquidity/"+uuid)
 		component := templates.LightningSendSummary(decodedInvoice.MilliSat.ToSatoshis().Format(btcutil.AmountSatoshi), swap.LightningInvoice, uuid)
 
 		err = component.Render(ctx, c.Writer)
@@ -317,7 +317,8 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 		}
 		newLiquidity <- uuid
 
-		c.Header("HX-Replace-URL", "/admin/liquidity/"+uuid)
+		// redirect to the swap status page
+		c.Header("HX-Location", "/admin/liquidity/"+uuid)
 		component := templates.LightningReceiveSummary(amountConverted, swap.LightningInvoice, qrcode, swap.Id)
 
 		err = component.Render(ctx, c.Writer)

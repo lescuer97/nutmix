@@ -22,7 +22,6 @@ templ LightningActivityLayout(config utils.Config, startDate string, endDate str
 					</div>
 				</div>
 			</div>
-
 			<div class="mt-6">
 				@ExpansionPanel("Connection Settings", "Configure Lightning node connection", nil) {
 					@LightningConnectionSettings(config)
