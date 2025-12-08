@@ -774,6 +774,92 @@ func (pql Postgresql) GetBlindSigsTimeSeries(since int64, until *int64, bucketMi
 	return points, nil
 }
 
+func (pql Postgresql) GetProofsCountByKeyset(since time.Time, until *time.Time) (map[string]database.ProofsCountByKeyset, error) {
+	results := make(map[string]database.ProofsCountByKeyset)
+
+	var query string
+	var args []any
+
+	if until != nil {
+		// Both since and until are provided
+		query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
+				 FROM proofs 
+				 WHERE seen_at >= $1 AND seen_at < $2
+				 GROUP BY id`
+		args = []any{since.Unix(), until.Unix()}
+	} else {
+		// Only since is provided
+		query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
+				 FROM proofs 
+				 WHERE seen_at >= $1
+				 GROUP BY id`
+		args = []any{since.Unix()}
+	}
+
+	rows, err := pql.pool.Query(context.Background(), query, args...)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return results, nil
+		}
+		return results, databaseError(fmt.Errorf("GetProofsCountByKeyset query error: %w", err))
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item database.ProofsCountByKeyset
+		err := rows.Scan(&item.KeysetId, &item.TotalAmount, &item.Count)
+		if err != nil {
+			return results, databaseError(fmt.Errorf("GetProofsCountByKeyset scan error: %w", err))
+		}
+		results[item.KeysetId] = item
+	}
+
+	return results, nil
+}
+
+func (pql Postgresql) GetBlindSigsCountByKeyset(since time.Time, until *time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
+	results := make(map[string]database.BlindSigsCountByKeyset)
+
+	var query string
+	var args []any
+
+	if until != nil {
+		// Both since and until are provided
+		query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
+				 FROM recovery_signature 
+				 WHERE created_at >= $1 AND created_at < $2
+				 GROUP BY id`
+		args = []any{since.Unix(), until.Unix()}
+	} else {
+		// Only since is provided
+		query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
+				 FROM recovery_signature 
+				 WHERE created_at >= $1
+				 GROUP BY id`
+		args = []any{since.Unix()}
+	}
+
+	rows, err := pql.pool.Query(context.Background(), query, args...)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return results, nil
+		}
+		return results, databaseError(fmt.Errorf("GetBlindSigsCountByKeyset query error: %w", err))
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item database.BlindSigsCountByKeyset
+		err := rows.Scan(&item.KeysetId, &item.TotalAmount, &item.Count)
+		if err != nil {
+			return results, databaseError(fmt.Errorf("GetBlindSigsCountByKeyset scan error: %w", err))
+		}
+		results[item.KeysetId] = item
+	}
+
+	return results, nil
+}
+
 func (pql Postgresql) Close() {
 	pql.pool.Close()
 }

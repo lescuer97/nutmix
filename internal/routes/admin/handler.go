@@ -152,3 +152,11 @@ func (a *adminHandler) getMeltRequestByTime(since time.Time) (uint64, error) {
 func (a *adminHandler) getLogs(until time.Time) (uint64, error) {
 	panic("still not implemented")
 }
+
+func (a *adminHandler) getProofsCountByKeyset(since time.Time, until *time.Time) (map[string]database.ProofsCountByKeyset, error) {
+	return a.mint.MintDB.GetProofsCountByKeyset(since, until)
+}
+
+func (a *adminHandler) getBlindSigsCountByKeyset(since time.Time, until *time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
+	return a.mint.MintDB.GetBlindSigsCountByKeyset(since, until)
+}

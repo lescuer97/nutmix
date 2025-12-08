@@ -159,6 +159,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 
 	fmt.Println("can use liquidity manager", utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND))
 	if nostrPubkey != nil {
+		adminRoute.GET("/summary", SummaryComponent(mint, &adminHandler))
 		adminRoute.GET("/proofs-chart", ProofsChartCard(mint))
 		adminRoute.GET("/api/proofs-chart-data", ProofsChartDataAPI(mint))
 		adminRoute.GET("/blindsigs-chart", BlindSigsChartCard(mint))

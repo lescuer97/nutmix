@@ -190,6 +190,15 @@ templ MintActivityLayout(liquidityManagerAvailable bool, startDate string, endDa
 		<main class="main-content">
 			@DateRangePicker(startDate, endDate)
 			<div
+				id="summary-placeholder"
+				class="mt-4 mb-4"
+				hx-get="/admin/summary"
+				hx-trigger="load, date-range-changed from:body"
+				hx-include="#chartStartDate, #chartEndDate"
+				hx-swap="outerHTML"
+				hx-indicator="#date-range-loading"
+			></div>
+			<div
 				id="proofs-chart-placeholder"
 				class="mt-4 mb-4"
 				hx-get="/admin/proofs-chart"
@@ -222,4 +231,21 @@ templ MintActivityLayout(liquidityManagerAvailable bool, startDate string, endDa
 			</div>
 		</main>
 	}
+}
+
+type Summary struct {
+	LnBalance  uint64
+	FakeWallet bool
+	Fees       uint64
+}
+
+templ SummaryComponent(summary Summary) {
+	if summary.FakeWallet {
+		<div>Fake Wallet doesn't have a balance</div>
+	} else {
+		<div>Node Balance:</div>
+		<div><b>{ summary.LnBalance }</b> Sats</div>
+	}
+	<div>Fees:</div>
+	<div><b>{ summary.Fees }</b> Sats</div>
 }

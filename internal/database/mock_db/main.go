@@ -436,3 +436,59 @@ func (m *MockDB) GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes
 
 	return points, nil
 }
+
+func (m *MockDB) GetProofsCountByKeyset(since time.Time, until *time.Time) (map[string]database.ProofsCountByKeyset, error) {
+	results := make(map[string]database.ProofsCountByKeyset)
+
+	for _, p := range m.Proofs {
+		if p.SeenAt < since.Unix() {
+			continue
+		}
+		if until != nil && p.SeenAt >= until.Unix() {
+			continue
+		}
+
+		item, exists := results[p.Id]
+		if !exists {
+			item = database.ProofsCountByKeyset{
+				KeysetId:    p.Id,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		item.TotalAmount += p.Amount
+		item.Count++
+		results[p.Id] = item
+	}
+
+	return results, nil
+}
+
+func (m *MockDB) GetBlindSigsCountByKeyset(since time.Time, until *time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
+	results := make(map[string]database.BlindSigsCountByKeyset)
+
+	for _, sig := range m.RecoverSigDB {
+		if sig.CreatedAt < since.Unix() {
+			continue
+		}
+		if until != nil && sig.CreatedAt >= until.Unix() {
+			continue
+		}
+
+		item, exists := results[sig.Id]
+		if !exists {
+			item = database.BlindSigsCountByKeyset{
+				KeysetId:    sig.Id,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		item.TotalAmount += sig.Amount
+		item.Count++
+		results[sig.Id] = item
+	}
+
+	return results, nil
+}

@@ -9,6 +9,8 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/gin-gonic/gin"
+	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -210,4 +212,69 @@ func SwapsList(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 	}
+}
+
+func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Parse date range from query params
+		startDateStr := c.Query("start")
+		endDateStr := c.Query("end")
+		startTime, endTime, _ := parseDateRange(startDateStr, endDateStr)
+
+		proofsCount, err := adminHandler.getProofsCountByKeyset(startTime, &endTime)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+
+		keysets, err := mint.Signer.GetKeysets()
+		if err != nil {
+			c.Error(err)
+			return
+		}
+
+		fees, err := fees(proofsCount, keysets.Keysets)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+
+		lnBalance, err := mint.LightningBackend.WalletBalance()
+		if err != nil {
+			c.Error(err)
+			return
+		}
+
+		summary := templates.Summary{
+			LnBalance:  lnBalance,
+			FakeWallet: mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET,
+			Fees:       fees,
+		}
+
+		err = templates.SummaryComponent(summary).Render(c.Request.Context(), c.Writer)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+	}
+}
+
+func fees(proofs map[string]database.ProofsCountByKeyset, keysets []cashu.BasicKeysetResponse) (uint64, error) {
+	totalFees := uint64(0)
+
+	for _, keyset := range keysets {
+		if keyset.Unit != cashu.AUTH.String() {
+			for keysetId, proof := range proofs {
+				if keyset.Id == keysetId {
+					totalFees += uint64(proof.Count) * uint64(keyset.InputFeePpk)
+				}
+			}
+		}
+
+	}
+
+	totalFees = (totalFees + 999) / 1000
+
+	return totalFees, nil
+
 }

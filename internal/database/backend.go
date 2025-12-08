@@ -47,6 +47,20 @@ type ProofTimeSeriesPoint struct {
 	Count       uint64 `json:"count"`       // Number of proofs in this bucket
 }
 
+// ProofsCountByKeyset represents the total amount and count of proofs grouped by keyset ID
+type ProofsCountByKeyset struct {
+	KeysetId    string `json:"keyset_id"`
+	TotalAmount uint64 `json:"total_amount"`
+	Count       uint64 `json:"count"`
+}
+
+// BlindSigsCountByKeyset represents the total amount and count of blind signatures grouped by keyset ID
+type BlindSigsCountByKeyset struct {
+	KeysetId    string `json:"keyset_id"`
+	TotalAmount uint64 `json:"total_amount"`
+	Count       uint64 `json:"count"`
+}
+
 type MintDB interface {
 	GetTx(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context, tx pgx.Tx) error
@@ -110,6 +124,14 @@ type MintDB interface {
 	/// Calls for the admin dashboard
 
 	GetMintMeltBalanceByTime(time int64) (MintMeltBalance, error)
+	// GetProofsCountByKeyset returns the total amount and count of proofs grouped by keyset ID
+	// since: lower bound time (inclusive)
+	// until: upper bound time (exclusive), nil means current time
+	GetProofsCountByKeyset(since time.Time, until *time.Time) (map[string]ProofsCountByKeyset, error)
+	// GetBlindSigsCountByKeyset returns the total amount and count of blind signatures grouped by keyset ID
+	// since: lower bound time (inclusive)
+	// until: upper bound time (exclusive), nil means current time
+	GetBlindSigsCountByKeyset(since time.Time, until *time.Time) (map[string]BlindSigsCountByKeyset, error)
 
 	SaveNostrAuth(auth NostrLoginAuth) error
 	UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error

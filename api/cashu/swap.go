@@ -2,7 +2,6 @@ package cashu
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 )
 
@@ -16,7 +15,6 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 	if err != nil {
 		return fmt.Errorf("checkForSigAll(p.Inputs). %w", err)
 	}
-	log.Println("sigflagValidation: ", sigFlagValidation.sigFlag)
 	if sigFlagValidation.sigFlag == SigAll {
 
 		firstSpendCondition, err := p.Inputs[0].parseSpendCondition()
@@ -44,8 +42,6 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		// makes message
 		msg := p.makeSigAllMsg()
 
-		log.Println("\n msg: ", msg)
-
 		pubkeys, err := p.Inputs[0].PubkeysForVerification()
 		if err != nil {
 			return fmt.Errorf("p.Inputs[0].Pubkeys(). %w", err)
@@ -55,9 +51,6 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		if err != nil {
 			return err
 		}
-
-		log.Println("amountOfSigs: ", amountOfSigs)
-		log.Println("sigFlagValidation.signaturesRequired: ", sigFlagValidation.signaturesRequired)
 
 		if amountOfSigs >= sigFlagValidation.signaturesRequired {
 			return nil
