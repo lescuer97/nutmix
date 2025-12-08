@@ -27,14 +27,14 @@ func newAdminHandler(mint *mint.Mint) adminHandler {
 	}
 }
 
-func (a *adminHandler) getKeysets(filterUnits []string) (map[string][]templates.KeysetData, error) {
+func (a *adminHandler) getKeysets(filterUnits []string) (map[string][]templates.KeysetData, []string, error) {
 	keysets, err := a.mint.Signer.GetKeysets()
 	if err != nil {
-		return nil, fmt.Errorf("a.mint.Signer.GetKeysets(). %w", err)
+		return nil, nil, fmt.Errorf("a.mint.Signer.GetKeysets(). %w", err)
 	}
 	authKeysets, err := a.mint.Signer.GetAuthKeys()
 	if err != nil {
-		return nil, fmt.Errorf("a.mint.Signer.GetAuthKeys(). %w", err)
+		return nil, nil, fmt.Errorf("a.mint.Signer.GetAuthKeys(). %w", err)
 	}
 
 	keysetMap := make(map[string][]templates.KeysetData)
@@ -74,7 +74,22 @@ func (a *adminHandler) getKeysets(filterUnits []string) (map[string][]templates.
 		keysetMap[unit] = ranges
 	}
 
-	return keysetMap, nil
+	// create ordered list of units
+	var orderedUnits []string
+	for unit := range keysetMap {
+		orderedUnits = append(orderedUnits, unit)
+	}
+	sort.Slice(orderedUnits, func(i, j int) bool {
+		if orderedUnits[i] == "sat" {
+			return true
+		}
+		if orderedUnits[j] == "sat" {
+			return false
+		}
+		return orderedUnits[i] < orderedUnits[j]
+	})
+
+	return keysetMap, orderedUnits, nil
 }
 
 func (a *adminHandler) rotateKeyset(unit cashu.Unit, fee uint, expiry_hours uint) error {

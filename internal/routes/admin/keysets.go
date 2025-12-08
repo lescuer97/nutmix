@@ -33,9 +33,9 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 }
 func KeysetsLayoutPage(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		keysetMap, err := adminHandler.getKeysets(nil)
+		keysetMap, orderedUnits, err := adminHandler.getKeysets(nil)
 		ctx := context.Background()
-		err = templates.KeysetsList(keysetMap).Render(ctx, c.Writer)
+		err = templates.KeysetsList(keysetMap, orderedUnits).Render(ctx, c.Writer)
 
 		if err != nil {
 			c.Error(fmt.Errorf("templates.KeysetsList(keysetArr.Keysets).Render(ctx, c.Writer). %w", err))
