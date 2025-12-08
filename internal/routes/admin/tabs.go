@@ -20,12 +20,13 @@ import (
 )
 
 var (
-	ErrInvalidOICDURL        = errors.New("Invalid OICD Discovery URL")
-	ErrInvalidNostrKey       = errors.New("NOSTR npub is not valid")
-	ErrInvalidStrikeConfig   = errors.New("Invalid strike Config")
-	ErrInvalidStrikeCheck    = errors.New("Could not verify strike configuration")
-	ErrCouldNotParseLogin    = errors.New("Could not parse login")
-	ErrInvalidNostrSignature = errors.New("Invalid Nostr signature")
+	ErrInvalidOICDURL         = errors.New("Invalid OICD Discovery URL")
+	ErrInvalidNostrKey        = errors.New("NOSTR npub is not valid")
+	ErrInvalidStrikeConfig    = errors.New("Invalid strike Config")
+	ErrInvalidStrikeCheck     = errors.New("Could not verify strike configuration")
+	ErrCouldNotParseLogin     = errors.New("Could not parse login")
+	ErrInvalidNostrSignature  = errors.New("Invalid Nostr signature")
+	ErrFailedLightningPayment = errors.New("Failed Lightning payment")
 )
 
 func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {

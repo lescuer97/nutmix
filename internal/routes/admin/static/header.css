@@ -63,7 +63,8 @@
 /* Active tab styles using CSS-only approach - color only */
 body[data-route="stats"] .nav-tab[data-tab="stats"],
 body[data-route="lightning"] .nav-tab[data-tab="lightning"],
-body[data-route="settings"] .nav-tab[data-tab="settings"] {
+body[data-route="settings"] .nav-tab[data-tab="settings"], 
+body[data-route="liquidity"] .nav-tab[data-tab="liquidity"] {
   color: var(--accent-cyan);
 }
 

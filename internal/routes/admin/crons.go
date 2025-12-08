@@ -3,7 +3,9 @@ package admin
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -13,143 +15,188 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func CheckStatusOfLiquiditySwaps(mint *m.Mint) {
+// newLiquidity is a channel that will be used to send new liquidity swap ids to the checked
+func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
+	ctx := context.Background()
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		slog.Warn(
+			"Could not get db transactions",
+			slog.String(utils.LogExtraInfo, err.Error()),
+		)
+		return
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			fmt.Println("Rolling back because of failure", p)
+			slog.Error("Rolling back because of failure", slog.Any("error", err))
+			mint.MintDB.Rollback(ctx, tx)
+
+		} else if err != nil {
+			slog.Error("Rolling back because of failure", slog.Any("error", err))
+			mint.MintDB.Rollback(ctx, tx)
+		}
+	}()
+	swaps, err := mint.MintDB.GetLiquiditySwapsByStates(tx, []utils.SwapState{
+		utils.MintWaitingPaymentRecv,
+		utils.LightningPaymentPending,
+	})
+
+	if err != nil {
+		slog.Warn(
+			"mint.MintDB.GetLiquiditySwapsByStates()",
+			slog.Any("error", err.Error()))
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		slog.Error("Could not commit transaction", slog.Any("error", err))
+	}
 
 	for {
 		func() {
-			ctx := context.Background()
-			tx, err := mint.MintDB.GetTx(ctx)
-			if err != nil {
-				slog.Debug(
-					"Could not get db transactions",
-					slog.String(utils.LogExtraInfo, err.Error()),
-				)
-				return
+
+			// check if there are new liquidity swaps to check
+			select {
+			case swapId := <-newLiquidity:
+				swaps = append(swaps, swapId)
+			default:
+				break
 			}
 
-			defer func() {
-				if p := recover(); p != nil {
-					slog.Error("Rolling back because of failure", slog.Any("error", err))
-					mint.MintDB.Rollback(ctx, tx)
+			for _, swapId := range swaps {
+				func() {
+					slog.Debug("Checking out swap", slog.String("swap_id", swapId))
 
-				} else if err != nil {
-					slog.Error("Rolling back because of failure", slog.Any("error", err))
-					mint.MintDB.Rollback(ctx, tx)
-				} else {
-					err = mint.MintDB.Commit(context.Background(), tx)
+					swapTx, err := mint.MintDB.GetTx(ctx)
 					if err != nil {
-						slog.Error("Failed to commit transaction", slog.Any("error", err))
+						slog.Warn(
+							"Could not get db transactions",
+							slog.String(utils.LogExtraInfo, err.Error()),
+						)
+						return
 					}
-				}
-			}()
+					defer func() {
+						if p := recover(); p != nil {
+							slog.Error("Rolling back because of failure", slog.Any("error", err))
+							mint.MintDB.Rollback(ctx, swapTx)
 
-			swaps, err := mint.MintDB.GetLiquiditySwapsByStates([]utils.SwapState{
-				utils.MintWaitingPaymentRecv,
-				utils.LightningPaymentPending,
-				utils.WaitingUserConfirmation,
-			})
+						} else if err != nil {
+							slog.Error("Rolling back because of failure", slog.Any("error", err))
+							mint.MintDB.Rollback(ctx, swapTx)
+						}
+					}()
 
-			if err != nil {
-				slog.Warn(
-					"mint.MintDB.GetLiquiditySwapsByStates()",
-					slog.String(utils.LogExtraInfo, err.Error()))
-			}
+					swap, err := mint.MintDB.GetLiquiditySwapById(swapTx, swapId)
+					if err != nil {
+						slog.Warn(
+							"Could not get swap",
+							slog.String(utils.LogExtraInfo, err.Error()),
+						)
+						return
+					}
+					err = swapTx.Commit(ctx)
+					if err != nil {
+						slog.Error("Could not commit sub transaction", slog.Any("error", err))
+						return
+					}
 
-			for _, swap := range swaps {
-				slog.Debug("Checking out swap", slog.String("swap_id", swap.Id))
+					decodedInvoice, err := zpay32.Decode(swap.LightningInvoice, mint.LightningBackend.GetNetwork())
+					if err != nil {
+						slog.Warn(
+							"zpay32.Decode(swap.Destination, mint.LightningBackend.GetNetwork())",
+							slog.String(utils.LogExtraInfo, err.Error()))
+						return
+					}
 
-				swapTx, err := mint.MintDB.SubTx(ctx, tx)
-				if err != nil {
-					slog.Debug(
-						"Could not get swapTx for swap",
-						slog.String(utils.LogExtraInfo, err.Error()),
-					)
-					return
-				}
+					payHash := hex.EncodeToString(decodedInvoice.PaymentHash[:])
 
-				now := time.Now().Unix()
+					switch swap.Type {
+					case utils.LiquidityIn:
+						slog.Debug("Checking in swap", slog.String("swap_id", swap.Id))
+						status, _, err := mint.LightningBackend.CheckReceived(cashu.MintRequestDB{Quote: payHash}, decodedInvoice)
+						if err != nil {
+							slog.Warn(
+								"mint.LightningBackend.CheckReceived(payHash)",
+								slog.String(utils.LogExtraInfo, err.Error()))
 
-				if now > int64(swap.Expiration) {
-					err := mint.MintDB.ChangeLiquiditySwapState(swapTx, swap.Id, utils.Expired)
+							return
+						}
+
+						switch status {
+						case lightning.SETTLED:
+							swap.State = utils.Finished
+						case lightning.PENDING:
+							swap.State = utils.LightningPaymentPending
+						case lightning.FAILED:
+							swap.State = utils.LightningPaymentFail
+						}
+
+					case utils.LiquidityOut:
+						slog.Debug("Checking out swap", slog.String("swap_id", swap.Id))
+						status, _, _, err := mint.LightningBackend.CheckPayed(payHash, decodedInvoice, swap.CheckingId)
+						if err != nil {
+							slog.Warn(
+								"mint.LightningBackend.CheckPayed(payHash)",
+								slog.Any("error", err),
+								slog.String("swap_id", swap.Id),
+								slog.String("invoice", swap.LightningInvoice),
+							)
+
+							return
+						}
+
+						switch status {
+						case lightning.SETTLED:
+							swap.State = utils.Finished
+						case lightning.PENDING:
+							swap.State = utils.LightningPaymentPending
+						case lightning.FAILED:
+							swap.State = utils.LightningPaymentFail
+						}
+
+					}
+
+					afterCheckTx, err := mint.MintDB.GetTx(ctx)
+					if err != nil {
+						slog.Warn(
+							"Could not get db transactions",
+							slog.String(utils.LogExtraInfo, err.Error()),
+						)
+						return
+					}
+					defer func() {
+						if p := recover(); p != nil {
+							slog.Error("Rolling back because of failure", slog.Any("error", err))
+							mint.MintDB.Rollback(ctx, afterCheckTx)
+						}
+					}()
+					err = mint.MintDB.ChangeLiquiditySwapState(afterCheckTx, swap.Id, swap.State)
 					if err != nil {
 						slog.Warn(
 							"mint.MintDB.ChangeLiquiditySwapState(swap.Id,utils.Expired)",
 							slog.String(utils.LogExtraInfo, err.Error()))
-						continue
+
+						return
 					}
-				}
-				decodedInvoice, err := zpay32.Decode(swap.LightningInvoice, mint.LightningBackend.GetNetwork())
-				if err != nil {
-					slog.Warn(
-						"zpay32.Decode(swap.Destination, mint.LightningBackend.GetNetwork())",
-						slog.String(utils.LogExtraInfo, err.Error()))
-					mint.MintDB.Rollback(ctx, swapTx)
-					continue
-				}
 
-				payHash := hex.EncodeToString(decodedInvoice.PaymentHash[:])
-
-				switch swap.Type {
-				case utils.LiquidityIn:
-					status, _, err := mint.LightningBackend.CheckReceived(cashu.MintRequestDB{Quote: payHash}, decodedInvoice)
+					slog.Debug("Commiting swap", slog.String("swap_id", swap.Id))
+					err = afterCheckTx.Commit(ctx)
 					if err != nil {
-						slog.Warn(
-							"mint.LightningBackend.CheckReceived(payHash)",
-							slog.String(utils.LogExtraInfo, err.Error()))
-						mint.MintDB.Rollback(ctx, swapTx)
-
-						continue
+						slog.Error("Could not commit sub transaction", slog.Any("error", err))
+						return
 					}
 
-					switch status {
-					case lightning.SETTLED:
-						swap.State = utils.Finished
-					case lightning.PENDING:
-						swap.State = utils.LightningPaymentPending
-					case lightning.FAILED:
-						swap.State = utils.LightningPaymentFail
+					if swap.State == utils.Finished || swap.State == utils.Expired || swap.State == utils.LightningPaymentFail {
+						swaps = slices.DeleteFunc(swaps, func(id string) bool {
+							return id == swap.Id
+						})
 					}
-
-				case utils.LiquidityOut:
-					status, _, _, err := mint.LightningBackend.CheckPayed(payHash, decodedInvoice, swap.CheckingId)
-					if err != nil {
-						slog.Warn(
-							"mint.LightningBackend.CheckPayed(payHash)",
-							slog.String(utils.LogExtraInfo, err.Error()))
-						mint.MintDB.Rollback(ctx, swapTx)
-
-						continue
-					}
-
-					switch status {
-					case lightning.SETTLED:
-						swap.State = utils.Finished
-					case lightning.PENDING:
-						swap.State = utils.LightningPaymentPending
-					case lightning.FAILED:
-						swap.State = utils.LightningPaymentFail
-					}
-
-				}
-
-				err = mint.MintDB.ChangeLiquiditySwapState(swapTx, swap.Id, swap.State)
-				if err != nil {
-					slog.Warn(
-						"mint.MintDB.ChangeLiquiditySwapState(swap.Id,utils.Expired)",
-						slog.String(utils.LogExtraInfo, err.Error()))
-					mint.MintDB.Rollback(ctx, swapTx)
-
-				}
-
-				slog.Debug("Commiting swap", slog.String("swap_id", swap.Id))
-				err = mint.MintDB.Commit(context.Background(), swapTx)
-				if err != nil {
-					slog.Error("Could not commit sub transaction", slog.Any("error", err))
-				}
+				}()
 			}
 
 		}()
-		time.Sleep(40 * time.Second)
+		slog.Debug("Sleeping for 2 seconds", slog.String("swaps", fmt.Sprintf("%v", swaps)))
+		time.Sleep(2 * time.Second)
 
 	}
 

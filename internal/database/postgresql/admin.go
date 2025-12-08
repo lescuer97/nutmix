@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -173,20 +174,26 @@ func (pql Postgresql) GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error) {
 	return swaps, nil
 }
 
-func (pql Postgresql) GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error) {
+func (pql Postgresql) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapState) ([]string, error) {
 
-	var swaps []utils.LiquiditySwap
-	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type,expiration, checking_id FROM liquidity_swaps WHERE state = ANY($1) ORDER BY expiration DESC FOR UPDATE NOWAIT", states)
+	swapIds := make([]string, 0)
+	rows, err := tx.Query(context.Background(), "SELECT id FROM liquidity_swaps WHERE state = ANY($1) ORDER BY expiration DESC FOR UPDATE", states)
 	if err != nil {
-		return swaps, fmt.Errorf("Error checking for liquidity swaps: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return swapIds, nil
+		}
+		return nil, fmt.Errorf("Error checking for liquidity swaps: %w", err)
 	}
 	defer rows.Close()
 
-	swaps, err = pgx.CollectRows(rows, pgx.RowToStructByName[utils.LiquiditySwap])
-
+	swapIds, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
+		var id string
+		err := row.Scan(&id)
+		return id, err
+	})
 	if err != nil {
-		return swaps, fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.NostrLoginAuth]): %w", err)
+		return swapIds, fmt.Errorf("pgx.CollectRows(rows, func(row pgx.CollectableRow) : %w", err)
 	}
 
-	return swaps, nil
+	return swapIds, nil
 }

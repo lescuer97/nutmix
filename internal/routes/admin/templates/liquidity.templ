@@ -9,14 +9,15 @@ import (
 templ LiquidityButton() {
 	<a
 		href="/admin/liquidity"
-		class="action-button"
+		class="nav-tab"
+		data-tab="liquidity"
 	>
-		Manage node's liquidity
+		Liquidity
 	</a>
 }
 
 templ LiquidityDashboard() {
-	@Layout("lightning") {
+	@Layout("liquidity") {
 		<main class="liquidity-dashboard main-content">
 			<div class="content-header">
 				<h2>Liquidity Management</h2>
@@ -103,7 +104,7 @@ templ SwapOutPostForm(nodeBalance string) {
 }
 
 templ LnSendPage(nodeBalance string) {
-	@Layout("lightning") {
+	@Layout("liquidity") {
 		<main class="main-content">
 			<div class="content-header">
 				<h2>Send Funds</h2>
@@ -147,7 +148,7 @@ templ LnSendPage(nodeBalance string) {
 }
 
 templ LnReceivePage() {
-	@Layout("lightning") {
+	@Layout("liquidity") {
 		<main class="main-content">
 			<div class="content-header">
 				<h2>Receive Funds</h2>
@@ -277,7 +278,7 @@ templ SwapState(state utils.SwapState, swapId string) {
 				class="swap-form flex justify-end"
 				hx-post={ "/admin/swap/" + swapId + "/confirm" }
 				hx-swap="outerHTML"
-				hx-target=".state"
+				hx-target="closest .state"
 				hx-disabled-elt="find button"
 			>
 				<button class="btn btn-primary w-full" type="submit">Confirm Payment</button>
@@ -287,7 +288,7 @@ templ SwapState(state utils.SwapState, swapId string) {
 }
 
 templ SwapStatusPage(summary templ.Component) {
-	@Layout("lightning") {
+	@Layout("liquidity") {
 		<main class="liquidity-dashboard main-content">
 			<div class="actions-container" style="max-width: 600px; margin: 0 auto;">
 				@summary

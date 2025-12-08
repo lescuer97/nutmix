@@ -90,6 +90,15 @@
   min-height: 32px;
 }
 
+/* Disabled State */
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(100%);
+}
+
 /* Shake Animation */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }

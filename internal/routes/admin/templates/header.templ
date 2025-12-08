@@ -9,6 +9,8 @@ templ Header() {
 			<a href="/admin" class="nav-tab" data-tab="stats">stats</a>
 			<a href="/admin/ln" class="nav-tab" data-tab="lightning">lightning</a>
 			<a href="/admin/settings" class="nav-tab" data-tab="settings">settings</a>
+			// should only show if liquidity manager is possible
+			<a hx-get="/admin/liquidity-button" hx-target="this" hx-trigger="load" hx-swap="outerHTML"></a>
 		</nav>
 	</header>
 }

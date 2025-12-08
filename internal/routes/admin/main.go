@@ -187,20 +187,21 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 
 		// only have swap routes if liquidity manager is possible
 		if utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
+			newLiquidity := make(chan string)
 
 			adminRoute.GET("/liquidity", LigthningLiquidityPage(mint))
+			adminRoute.GET("/liquidity-button", LiquidityButton(mint))
 			adminRoute.GET("/liquidity/:swapId", SwapStatusPage(mint))
 			adminRoute.GET("/swaps-list", SwapsList(mint))
-			adminRoute.GET("/liquidity-button", LiquidityButton())
 			adminRoute.GET("/ln-send", LnSendPage(mint))
 			adminRoute.GET("/ln-receive", LnReceivePage(mint))
 			adminRoute.GET("/liquid-swap-form", SwapOutForm(mint))
 			adminRoute.GET("/lightning-swap-form", LightningSwapForm())
 			adminRoute.POST("/out-swap-req", SwapOutRequest(mint))
-			adminRoute.POST("/in-swap-req", SwapInRequest(mint))
+			adminRoute.POST("/in-swap-req", SwapInRequest(mint, newLiquidity))
 			adminRoute.GET("/swap/:swapId", SwapStateCheck(mint))
-			adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(mint))
-			go CheckStatusOfLiquiditySwaps(mint)
+			adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(mint, newLiquidity))
+			go CheckStatusOfLiquiditySwaps(mint, newLiquidity)
 		}
 	}
 

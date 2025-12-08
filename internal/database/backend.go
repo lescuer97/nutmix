@@ -120,7 +120,7 @@ type MintDB interface {
 	GetLiquiditySwapById(tx pgx.Tx, id string) (utils.LiquiditySwap, error)
 	ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.SwapState) error
 	GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error)
-	GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error)
+	GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapState) ([]string, error)
 
 	// Mint Auth
 	GetAuthUser(tx pgx.Tx, sub string) (AuthUser, error)

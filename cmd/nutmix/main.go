@@ -68,6 +68,7 @@ func main() {
 
 	if os.Getenv("DEBUG") == "true" {
 		opts.Level = slog.LevelDebug
+		opts.AddSource = true
 	}
 
 	logger := slog.New(slog.NewJSONHandler(w, opts))
