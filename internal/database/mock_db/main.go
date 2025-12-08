@@ -313,14 +313,11 @@ func (m *MockDB) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) e
 
 }
 
-func (m *MockDB) GetProofsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
+func (m *MockDB) GetProofsInventory(since time.Time) (database.EcashInventory, error) {
 	var mintReserve database.EcashInventory
 
 	for _, p := range m.Proofs {
 		if p.SeenAt < since.Unix() {
-			continue
-		}
-		if until != nil && p.SeenAt > until.Unix() {
 			continue
 		}
 		mintReserve.AmountValue += p.Amount
@@ -329,14 +326,11 @@ func (m *MockDB) GetProofsInventory(since time.Time, until *time.Time) (database
 
 	return mintReserve, nil
 }
-func (m *MockDB) GetBlindSigsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
+func (m *MockDB) GetBlindSigsInventory(since time.Time) (database.EcashInventory, error) {
 	var mintReserve database.EcashInventory
 
 	for _, p := range m.Proofs {
 		if p.SeenAt < since.Unix() {
-			continue
-		}
-		if until != nil && p.SeenAt > until.Unix() {
 			continue
 		}
 		mintReserve.AmountValue += p.Amount
@@ -345,14 +339,11 @@ func (m *MockDB) GetBlindSigsInventory(since time.Time, until *time.Time) (datab
 	return mintReserve, nil
 }
 
-func (m *MockDB) GetProofsTimeSeries(since int64, until *int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+func (m *MockDB) GetProofsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
 	bucketSeconds := int64(bucketMinutes * 60)
 
 	// Determine upper bound
 	upperBound := time.Now().Unix()
-	if until != nil {
-		upperBound = *until
-	}
 
 	// Group proofs by time bucket
 	buckets := make(map[int64]*database.ProofTimeSeriesPoint)
@@ -391,14 +382,11 @@ func (m *MockDB) GetProofsTimeSeries(since int64, until *int64, bucketMinutes in
 	return points, nil
 }
 
-func (m *MockDB) GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+func (m *MockDB) GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
 	bucketSeconds := int64(bucketMinutes * 60)
 
 	// Determine upper bound
 	upperBound := time.Now().Unix()
-	if until != nil {
-		upperBound = *until
-	}
 
 	// Group blind sigs by time bucket
 	buckets := make(map[int64]*database.ProofTimeSeriesPoint)
@@ -437,14 +425,11 @@ func (m *MockDB) GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes
 	return points, nil
 }
 
-func (m *MockDB) GetProofsCountByKeyset(since time.Time, until *time.Time) (map[string]database.ProofsCountByKeyset, error) {
+func (m *MockDB) GetProofsCountByKeyset(since time.Time) (map[string]database.ProofsCountByKeyset, error) {
 	results := make(map[string]database.ProofsCountByKeyset)
 
 	for _, p := range m.Proofs {
 		if p.SeenAt < since.Unix() {
-			continue
-		}
-		if until != nil && p.SeenAt >= until.Unix() {
 			continue
 		}
 
@@ -465,14 +450,11 @@ func (m *MockDB) GetProofsCountByKeyset(since time.Time, until *time.Time) (map[
 	return results, nil
 }
 
-func (m *MockDB) GetBlindSigsCountByKeyset(since time.Time, until *time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
+func (m *MockDB) GetBlindSigsCountByKeyset(since time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
 	results := make(map[string]database.BlindSigsCountByKeyset)
 
 	for _, sig := range m.RecoverSigDB {
 		if sig.CreatedAt < since.Unix() {
-			continue
-		}
-		if until != nil && sig.CreatedAt >= until.Unix() {
 			continue
 		}
 

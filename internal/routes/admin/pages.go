@@ -134,7 +134,7 @@ func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
 		// Fetch proofs time-series data (use nil for until to get all data up to now)
-		data, err := mint.MintDB.GetProofsTimeSeries(startTime.Unix(), nil, bucketMinutes)
+		data, err := mint.MintDB.GetProofsTimeSeries(startTime.Unix(), bucketMinutes)
 		if err != nil {
 			slog.Error(
 				"mint.MintDB.GetProofsTimeSeries()",
@@ -161,7 +161,7 @@ func ProofsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
-		data, err := mint.MintDB.GetProofsTimeSeries(startTime.Unix(), nil, bucketMinutes)
+		data, err := mint.MintDB.GetProofsTimeSeries(startTime.Unix(), bucketMinutes)
 		if err != nil {
 			slog.Error(
 				"mint.MintDB.GetProofsTimeSeries()",
@@ -189,7 +189,7 @@ func BlindSigsChartCard(mint *mint.Mint) gin.HandlerFunc {
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
 		// Fetch blind sigs time-series data (use nil for until to get all data up to now)
-		data, err := mint.MintDB.GetBlindSigsTimeSeries(startTime.Unix(), nil, bucketMinutes)
+		data, err := mint.MintDB.GetBlindSigsTimeSeries(startTime.Unix(), bucketMinutes)
 		if err != nil {
 			slog.Error(
 				"mint.MintDB.GetBlindSigsTimeSeries()",
@@ -216,7 +216,7 @@ func BlindSigsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
-		data, err := mint.MintDB.GetBlindSigsTimeSeries(startTime.Unix(), nil, bucketMinutes)
+		data, err := mint.MintDB.GetBlindSigsTimeSeries(startTime.Unix(), bucketMinutes)
 		if err != nil {
 			slog.Error(
 				"mint.MintDB.GetBlindSigsTimeSeries()",

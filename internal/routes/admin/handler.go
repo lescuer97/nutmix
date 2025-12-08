@@ -109,14 +109,14 @@ func (a *adminHandler) lnSatsBalance() (uint64, error) {
 }
 
 func (a *adminHandler) getProofsBalance(since time.Time) (templates.Balance, error) {
-	proofsReserve, err := a.mint.MintDB.GetProofsInventory(time.Unix(0, 0), nil)
+	proofsReserve, err := a.mint.MintDB.GetProofsInventory(time.Unix(0, 0))
 	if err != nil {
-		return templates.Balance{}, fmt.Errorf("a.mint.MintDB.GetProofsInventory(time.Unix(0, 0), nil). %w", err)
+		return templates.Balance{}, fmt.Errorf("a.mint.MintDB.GetProofsInventory(time.Unix(0, 0)). %w", err)
 	}
 
-	blindSigsReserve, err := a.mint.MintDB.GetBlindSigsInventory(time.Unix(0, 0), nil)
+	blindSigsReserve, err := a.mint.MintDB.GetBlindSigsInventory(time.Unix(0, 0))
 	if err != nil {
-		return templates.Balance{}, fmt.Errorf("a.mint.MintDB.GetBlindSigsInventory(time.Unix(0, 0), nil). %w", err)
+		return templates.Balance{}, fmt.Errorf("a.mint.MintDB.GetBlindSigsInventory(time.Unix(0, 0)). %w", err)
 	}
 	neededBalance := blindSigsReserve.AmountValue - proofsReserve.AmountValue
 
@@ -133,10 +133,10 @@ func (a *adminHandler) getProofsBalance(since time.Time) (templates.Balance, err
 
 }
 func (a *adminHandler) inventoryProofsByTime(since time.Time) (database.EcashInventory, error) {
-	proofsReserve, err := a.mint.MintDB.GetProofsInventory(time.Unix(0, 0), nil)
+	proofsReserve, err := a.mint.MintDB.GetProofsInventory(time.Unix(0, 0))
 
 	if err != nil {
-		return database.EcashInventory{}, fmt.Errorf("a.mint.MintDB.GetProofsInventory(time.Unix(0, 0), nil). %w", err)
+		return database.EcashInventory{}, fmt.Errorf("a.mint.MintDB.GetProofsInventory(time.Unix(0, 0)). %w", err)
 	}
 	return proofsReserve, nil
 }
@@ -153,10 +153,10 @@ func (a *adminHandler) getLogs(until time.Time) (uint64, error) {
 	panic("still not implemented")
 }
 
-func (a *adminHandler) getProofsCountByKeyset(since time.Time, until *time.Time) (map[string]database.ProofsCountByKeyset, error) {
-	return a.mint.MintDB.GetProofsCountByKeyset(since, until)
+func (a *adminHandler) getProofsCountByKeyset(since time.Time) (map[string]database.ProofsCountByKeyset, error) {
+	return a.mint.MintDB.GetProofsCountByKeyset(since)
 }
 
-func (a *adminHandler) getBlindSigsCountByKeyset(since time.Time, until *time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
-	return a.mint.MintDB.GetBlindSigsCountByKeyset(since, until)
+func (a *adminHandler) getBlindSigsCountByKeyset(since time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
+	return a.mint.MintDB.GetBlindSigsCountByKeyset(since)
 }

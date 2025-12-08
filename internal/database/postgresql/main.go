@@ -584,25 +584,17 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSig
 	}
 }
 
-func (pql Postgresql) GetProofsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
+func (pql Postgresql) GetProofsInventory(since time.Time) (database.EcashInventory, error) {
 	var mintReserve database.EcashInventory
 
 	var query string
 	var args []any
 
-	if until != nil {
-		// Both since and until are provided
-		query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
-				 FROM proofs 
-				 WHERE seen_at >= $1 AND seen_at < $2`
-		args = []any{since.Unix(), until.Unix()}
-	} else {
-		// Only since is provided
-		query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
-				 FROM proofs 
-				 WHERE seen_at >= $1`
-		args = []any{since.Unix()}
-	}
+	// Only since is provided
+	query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
+			 FROM proofs 
+			 WHERE seen_at >= $1`
+	args = []any{since.Unix()}
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 
@@ -624,25 +616,17 @@ func (pql Postgresql) GetProofsInventory(since time.Time, until *time.Time) (dat
 	return mintReserve, nil
 }
 
-func (pql Postgresql) GetBlindSigsInventory(since time.Time, until *time.Time) (database.EcashInventory, error) {
+func (pql Postgresql) GetBlindSigsInventory(since time.Time) (database.EcashInventory, error) {
 	var mintReserve database.EcashInventory
 
 	var query string
 	var args []any
 
-	if until != nil {
-		// Both since and until are provided
-		query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
-				 FROM recovery_signature 
-				 WHERE created_at >= $1 AND created_at < $2`
-		args = []any{since.Unix(), until.Unix()}
-	} else {
-		// Only since is provided
-		query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
-				 FROM recovery_signature 
-				 WHERE created_at >= $1`
-		args = []any{since.Unix()}
-	}
+	// Only since is provided
+	query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
+			 FROM recovery_signature 
+			 WHERE created_at >= $1`
+	args = []any{since.Unix()}
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 
@@ -664,7 +648,7 @@ func (pql Postgresql) GetBlindSigsInventory(since time.Time, until *time.Time) (
 	return mintReserve, nil
 }
 
-func (pql Postgresql) GetProofsTimeSeries(since int64, until *int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+func (pql Postgresql) GetProofsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
 	var points []database.ProofTimeSeriesPoint
 
 	bucketSeconds := int64(bucketMinutes * 60)
@@ -674,29 +658,19 @@ func (pql Postgresql) GetProofsTimeSeries(since int64, until *int64, bucketMinut
 
 	// Use floor division to group proofs into time buckets
 	// (seen_at / bucket_seconds) * bucket_seconds gives us the bucket start timestamp
-	if until != nil {
-		query = `SELECT 
-					(seen_at / $3) * $3 as bucket_timestamp,
-					COALESCE(SUM(amount), 0) as total_amount,
-					COUNT(*) as count
-				 FROM proofs 
-				 WHERE seen_at >= $1 AND seen_at < $2
-				 GROUP BY bucket_timestamp
-				 ORDER BY bucket_timestamp ASC`
-		args = []any{since, *until, bucketSeconds}
-	} else {
-		// Use current time as upper bound
-		now := time.Now().Unix()
-		query = `SELECT 
-					(seen_at / $3) * $3 as bucket_timestamp,
-					COALESCE(SUM(amount), 0) as total_amount,
-					COUNT(*) as count
-				 FROM proofs 
-				 WHERE seen_at >= $1 AND seen_at < $2
-				 GROUP BY bucket_timestamp
-				 ORDER BY bucket_timestamp ASC`
-		args = []any{since, now, bucketSeconds}
-	}
+	
+	// Use current time as upper bound
+	now := time.Now().Unix()
+	query = `SELECT 
+				(seen_at / $3) * $3 as bucket_timestamp,
+				COALESCE(SUM(amount), 0) as total_amount,
+				COUNT(*) as count
+			 FROM proofs 
+			 WHERE seen_at >= $1 AND seen_at < $2
+			 GROUP BY bucket_timestamp
+			 ORDER BY bucket_timestamp ASC`
+	args = []any{since, now, bucketSeconds}
+	
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {
@@ -719,7 +693,7 @@ func (pql Postgresql) GetProofsTimeSeries(since int64, until *int64, bucketMinut
 	return points, nil
 }
 
-func (pql Postgresql) GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+func (pql Postgresql) GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
 	var points []database.ProofTimeSeriesPoint
 
 	bucketSeconds := int64(bucketMinutes * 60)
@@ -729,29 +703,19 @@ func (pql Postgresql) GetBlindSigsTimeSeries(since int64, until *int64, bucketMi
 
 	// Use floor division to group blind sigs into time buckets
 	// (created_at / bucket_seconds) * bucket_seconds gives us the bucket start timestamp
-	if until != nil {
-		query = `SELECT 
-					(created_at / $3) * $3 as bucket_timestamp,
-					COALESCE(SUM(amount), 0) as total_amount,
-					COUNT(*) as count
-				 FROM recovery_signature 
-				 WHERE created_at >= $1 AND created_at < $2
-				 GROUP BY bucket_timestamp
-				 ORDER BY bucket_timestamp ASC`
-		args = []any{since, *until, bucketSeconds}
-	} else {
-		// Use current time as upper bound
-		now := time.Now().Unix()
-		query = `SELECT 
-					(created_at / $3) * $3 as bucket_timestamp,
-					COALESCE(SUM(amount), 0) as total_amount,
-					COUNT(*) as count
-				 FROM recovery_signature 
-				 WHERE created_at >= $1 AND created_at < $2
-				 GROUP BY bucket_timestamp
-				 ORDER BY bucket_timestamp ASC`
-		args = []any{since, now, bucketSeconds}
-	}
+	
+	// Use current time as upper bound
+	now := time.Now().Unix()
+	query = `SELECT 
+				(created_at / $3) * $3 as bucket_timestamp,
+				COALESCE(SUM(amount), 0) as total_amount,
+				COUNT(*) as count
+			 FROM recovery_signature 
+			 WHERE created_at >= $1 AND created_at < $2
+			 GROUP BY bucket_timestamp
+			 ORDER BY bucket_timestamp ASC`
+	args = []any{since, now, bucketSeconds}
+	
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {
@@ -774,27 +738,18 @@ func (pql Postgresql) GetBlindSigsTimeSeries(since int64, until *int64, bucketMi
 	return points, nil
 }
 
-func (pql Postgresql) GetProofsCountByKeyset(since time.Time, until *time.Time) (map[string]database.ProofsCountByKeyset, error) {
+func (pql Postgresql) GetProofsCountByKeyset(since time.Time) (map[string]database.ProofsCountByKeyset, error) {
 	results := make(map[string]database.ProofsCountByKeyset)
 
 	var query string
 	var args []any
 
-	if until != nil {
-		// Both since and until are provided
-		query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
-				 FROM proofs 
-				 WHERE seen_at >= $1 AND seen_at < $2
-				 GROUP BY id`
-		args = []any{since.Unix(), until.Unix()}
-	} else {
-		// Only since is provided
-		query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
-				 FROM proofs 
-				 WHERE seen_at >= $1
-				 GROUP BY id`
-		args = []any{since.Unix()}
-	}
+	// Only since is provided
+	query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
+			 FROM proofs 
+			 WHERE seen_at >= $1
+			 GROUP BY id`
+	args = []any{since.Unix()}
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {
@@ -817,27 +772,18 @@ func (pql Postgresql) GetProofsCountByKeyset(since time.Time, until *time.Time) 
 	return results, nil
 }
 
-func (pql Postgresql) GetBlindSigsCountByKeyset(since time.Time, until *time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
+func (pql Postgresql) GetBlindSigsCountByKeyset(since time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
 	results := make(map[string]database.BlindSigsCountByKeyset)
 
 	var query string
 	var args []any
 
-	if until != nil {
-		// Both since and until are provided
-		query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
-				 FROM recovery_signature 
-				 WHERE created_at >= $1 AND created_at < $2
-				 GROUP BY id`
-		args = []any{since.Unix(), until.Unix()}
-	} else {
-		// Only since is provided
-		query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
-				 FROM recovery_signature 
-				 WHERE created_at >= $1
-				 GROUP BY id`
-		args = []any{since.Unix()}
-	}
+	// Only since is provided
+	query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
+			 FROM recovery_signature 
+			 WHERE created_at >= $1
+			 GROUP BY id`
+	args = []any{since.Unix()}
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {

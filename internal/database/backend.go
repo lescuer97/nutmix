@@ -98,18 +98,16 @@ type MintDB interface {
 	GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
 
-	GetProofsInventory(since time.Time, until *time.Time) (EcashInventory, error)
-	GetBlindSigsInventory(since time.Time, until *time.Time) (EcashInventory, error)
+	GetProofsInventory(since time.Time) (EcashInventory, error)
+	GetBlindSigsInventory(since time.Time) (EcashInventory, error)
 	// GetProofsTimeSeries returns proofs aggregated by time buckets for charting
 	// since: lower bound unix timestamp (inclusive)
-	// until: upper bound unix timestamp (exclusive), nil means current time
 	// bucketMinutes: size of each time bucket in minutes
-	GetProofsTimeSeries(since int64, until *int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
+	GetProofsTimeSeries(since int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
 	// GetBlindSigsTimeSeries returns blind signatures aggregated by time buckets for charting
 	// since: lower bound unix timestamp (inclusive)
-	// until: upper bound unix timestamp (exclusive), nil means current time
 	// bucketMinutes: size of each time bucket in minutes
-	GetBlindSigsTimeSeries(since int64, until *int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
+	GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
 
 	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
@@ -126,12 +124,10 @@ type MintDB interface {
 	GetMintMeltBalanceByTime(time int64) (MintMeltBalance, error)
 	// GetProofsCountByKeyset returns the total amount and count of proofs grouped by keyset ID
 	// since: lower bound time (inclusive)
-	// until: upper bound time (exclusive), nil means current time
-	GetProofsCountByKeyset(since time.Time, until *time.Time) (map[string]ProofsCountByKeyset, error)
+	GetProofsCountByKeyset(since time.Time) (map[string]ProofsCountByKeyset, error)
 	// GetBlindSigsCountByKeyset returns the total amount and count of blind signatures grouped by keyset ID
 	// since: lower bound time (inclusive)
-	// until: upper bound time (exclusive), nil means current time
-	GetBlindSigsCountByKeyset(since time.Time, until *time.Time) (map[string]BlindSigsCountByKeyset, error)
+	GetBlindSigsCountByKeyset(since time.Time) (map[string]BlindSigsCountByKeyset, error)
 
 	SaveNostrAuth(auth NostrLoginAuth) error
 	UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error

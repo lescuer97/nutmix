@@ -220,7 +220,7 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 		timeRange := c.Query("since")
 		startTime, _ := parseTimeRange(timeRange)
 
-		proofsCount, err := adminHandler.getProofsCountByKeyset(startTime, nil)
+		proofsCount, err := adminHandler.getProofsCountByKeyset(startTime)
 		if err != nil {
 			c.Error(err)
 			return
