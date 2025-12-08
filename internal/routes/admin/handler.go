@@ -109,37 +109,47 @@ func (a *adminHandler) lnSatsBalance() (uint64, error) {
 }
 
 func (a *adminHandler) getProofsBalance(since time.Time) (templates.Balance, error) {
-	proofsReserve, err := a.mint.MintDB.GetProofsInventory(time.Unix(0, 0))
+	proofsTotalAmountValue := uint64(0)
+	proofsTotalQuantityValue := uint64(0)
+
+	proofsReserve, err := a.mint.MintDB.GetProofsCountByKeyset(time.Unix(0, 0))
 	if err != nil {
 		return templates.Balance{}, fmt.Errorf("a.mint.MintDB.GetProofsInventory(time.Unix(0, 0)). %w", err)
 	}
 
-	blindSigsReserve, err := a.mint.MintDB.GetBlindSigsInventory(time.Unix(0, 0))
+	for _, val := range proofsReserve {
+		proofsTotalAmountValue += val.TotalAmount
+		proofsTotalQuantityValue += val.Count
+	}
+
+	blindSigsTotalAmountValue := uint64(0)
+	blindSigsTotalQuantityValue := uint64(0)
+
+	blindSigsReserve, err := a.mint.MintDB.GetBlindSigsCountByKeyset(time.Unix(0, 0))
 	if err != nil {
 		return templates.Balance{}, fmt.Errorf("a.mint.MintDB.GetBlindSigsInventory(time.Unix(0, 0)). %w", err)
 	}
-	neededBalance := blindSigsReserve.AmountValue - proofsReserve.AmountValue
 
-	ratioProofSigAmountSats := (float64(proofsReserve.AmountValue) / float64(blindSigsReserve.AmountValue)) * 100
+	for _, val := range blindSigsReserve {
+		blindSigsTotalAmountValue += val.TotalAmount
+		blindSigsTotalQuantityValue += val.Count
+	}
+
+	neededBalance := proofsTotalAmountValue - blindSigsTotalAmountValue
+
+	ratioProofSigAmountSats := (float64(proofsTotalAmountValue) / float64(blindSigsTotalAmountValue)) * 100
 
 	return templates.Balance{
-		ProofsAmount:      proofsReserve.AmountValue,
-		ProofsQuantity:    proofsReserve.Quantity,
-		BlindSigsAmount:   blindSigsReserve.AmountValue,
-		BlindSigsQuantity: blindSigsReserve.Quantity,
+		ProofsAmount:      proofsTotalAmountValue,
+		ProofsQuantity:    proofsTotalQuantityValue,
+		BlindSigsAmount:   blindSigsTotalAmountValue,
+		BlindSigsQuantity: blindSigsTotalQuantityValue,
 		NeededBalance:     neededBalance,
 		Ratio:             ratioProofSigAmountSats,
 	}, nil
 
 }
-func (a *adminHandler) inventoryProofsByTime(since time.Time) (database.EcashInventory, error) {
-	proofsReserve, err := a.mint.MintDB.GetProofsInventory(time.Unix(0, 0))
 
-	if err != nil {
-		return database.EcashInventory{}, fmt.Errorf("a.mint.MintDB.GetProofsInventory(time.Unix(0, 0)). %w", err)
-	}
-	return proofsReserve, nil
-}
 func (a *adminHandler) getTotalBalanceBlindSignaturesByTime(until time.Time) (uint64, error) {
 	panic("still not implemented")
 }

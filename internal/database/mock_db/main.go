@@ -313,31 +313,6 @@ func (m *MockDB) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) e
 
 }
 
-func (m *MockDB) GetProofsInventory(since time.Time) (database.EcashInventory, error) {
-	var mintReserve database.EcashInventory
-
-	for _, p := range m.Proofs {
-		if p.SeenAt < since.Unix() {
-			continue
-		}
-		mintReserve.AmountValue += p.Amount
-		mintReserve.Quantity += 1
-	}
-
-	return mintReserve, nil
-}
-func (m *MockDB) GetBlindSigsInventory(since time.Time) (database.EcashInventory, error) {
-	var mintReserve database.EcashInventory
-
-	for _, p := range m.Proofs {
-		if p.SeenAt < since.Unix() {
-			continue
-		}
-		mintReserve.AmountValue += p.Amount
-		mintReserve.Quantity += 1
-	}
-	return mintReserve, nil
-}
 
 func (m *MockDB) GetProofsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
 	bucketSeconds := int64(bucketMinutes * 60)

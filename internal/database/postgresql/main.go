@@ -584,69 +584,6 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSig
 	}
 }
 
-func (pql Postgresql) GetProofsInventory(since time.Time) (database.EcashInventory, error) {
-	var mintReserve database.EcashInventory
-
-	var query string
-	var args []any
-
-	// Only since is provided
-	query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
-			 FROM proofs 
-			 WHERE seen_at >= $1`
-	args = []any{since.Unix()}
-
-	rows, err := pql.pool.Query(context.Background(), query, args...)
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return mintReserve, nil
-		}
-		return mintReserve, databaseError(fmt.Errorf("Error checking for recovery_signature and proofs: %w", err))
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		err := rows.Scan(&mintReserve.AmountValue, &mintReserve.Quantity)
-		if err != nil {
-			return mintReserve, databaseError(fmt.Errorf("rows.Scan(&mintReserve.AmountValue, &mintReserve.Quantity): %w", err))
-		}
-	}
-
-	return mintReserve, nil
-}
-
-func (pql Postgresql) GetBlindSigsInventory(since time.Time) (database.EcashInventory, error) {
-	var mintReserve database.EcashInventory
-
-	var query string
-	var args []any
-
-	// Only since is provided
-	query = `SELECT COALESCE(SUM(amount), 0), COALESCE(COUNT(*), 0) 
-			 FROM recovery_signature 
-			 WHERE created_at >= $1`
-	args = []any{since.Unix()}
-
-	rows, err := pql.pool.Query(context.Background(), query, args...)
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return mintReserve, nil
-		}
-		return mintReserve, databaseError(fmt.Errorf("Error checking for recovery_signature and proofs: %w", err))
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		err := rows.Scan(&mintReserve.AmountValue, &mintReserve.Quantity)
-		if err != nil {
-			return mintReserve, databaseError(fmt.Errorf("rows.Scan(&mintReserve.AmountValue, &mintReserve.Quantity): %w", err))
-		}
-	}
-
-	return mintReserve, nil
-}
 
 func (pql Postgresql) GetProofsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
 	var points []database.ProofTimeSeriesPoint

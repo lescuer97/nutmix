@@ -35,10 +35,6 @@ const (
 	CUSTOMDATABASE = "CUSTOMDATABASE"
 )
 
-type EcashInventory struct {
-	AmountValue uint64
-	Quantity    uint64
-}
 
 // ProofTimeSeriesPoint represents a single data point for charting proofs over time
 type ProofTimeSeriesPoint struct {
@@ -98,8 +94,6 @@ type MintDB interface {
 	GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
 
-	GetProofsInventory(since time.Time) (EcashInventory, error)
-	GetBlindSigsInventory(since time.Time) (EcashInventory, error)
 	// GetProofsTimeSeries returns proofs aggregated by time buckets for charting
 	// since: lower bound unix timestamp (inclusive)
 	// bucketMinutes: size of each time bucket in minutes
