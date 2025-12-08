@@ -14,43 +14,47 @@ type KeysetData struct {
 }
 
 templ KeysetsPage() {
-	@Layout("stats") {
-		<main class="keysets">
-			<div hx-ext="remove-me" id="notifications"></div>
-			<form
-				hx-indicator="#loader"
-				hx-target="#notifications"
-				hx-swap="innerHTML"
-				hx-post="/admin/rotate/sats"
-				class="fees-form form"
-			>
-				<label for="UNIT" class="">
-					UNIT
-					<select name="UNIT">
-						<option value="sat">SAT</option>
-						<option value="eur">EUR</option>
-						<option value="auth">AUTH</option>
-					</select>
-				</label>
-				<label for="FEE" class="settings-input">
-					Fees (PPK). Ex: 100 PPK = 1 sat / 10 Inputs
-					<input type="number" name="FEE" value="0"/>
-				</label>
-				<label for="EXPIRE_LIMIT" class="settings-input">
-					Hours for expiration of keyset
-					<input type="number" name="EXPIRE_LIMIT" value="270"/>
-				</label>
-				<button style="min-width: 150px;" hx-disabled-elt="this" class="square" type="submit">
-					Rotate Sats keys up
-				</button>
-				<div id="loader" class="htmx-indicator lds-dual-ring"></div>
-			</form>
+	@Layout("keysets") {
+		<main class="main-content">
+			<div class="card p-6 mb-8">
+				<h3 class="text-lg font-semibold mb-4 text-primary">Rotate Keysets</h3>
+				<form
+					hx-indicator="#loader"
+					hx-target="#notifications"
+					hx-swap="innerHTML"
+					hx-post="/admin/rotate/sats"
+					class="flex flex-wrap items-end gap-4"
+				>
+					<label class="settings-input min-w-[120px]">
+						<span class="text-secondary text-sm font-medium mb-2">Unit</span>
+						<select name="UNIT">
+							<option value="sat">SAT</option>
+							<option value="eur">EUR</option>
+							<option value="auth">AUTH</option>
+						</select>
+					</label>
+					<label class="settings-input min-w-[200px] flex-1">
+						<span class="text-secondary text-sm font-medium mb-2">Fees (PPK). Ex: 100 = 1 sat / 10 Inputs</span>
+						<input type="number" name="FEE" value="0"/>
+					</label>
+					<label class="settings-input min-w-[200px]">
+						<span class="text-secondary text-sm font-medium mb-2">Expiration (Hours)</span>
+						<input type="number" name="EXPIRE_LIMIT" value="270"/>
+					</label>
+					<div class="flex items-center gap-2">
+						<button hx-disabled-elt="this" class="btn btn-primary" type="submit">
+							Rotate
+						</button>
+						<div id="loader" class="htmx-indicator lds-dual-ring"></div>
+					</div>
+				</form>
+			</div>
+			
 			<div
 				hx-get="/admin/keysets-layout"
 				hx-trigger="load, recharge-keyset from:body"
 				hx-swap="innerHTML"
 				hx-target="this"
-				class="keysets-list"
 			></div>
 		</main>
 	}
@@ -58,11 +62,11 @@ templ KeysetsPage() {
 
 templ KeysetsList(keysetMap map[string][]KeysetData) {
 	for unit, keysets := range keysetMap {
-		<div class="unit-list">
-			<h2>
+		<div class="mb-8">
+			<h2 class="text-xl font-semibold mb-4 capitalize text-primary">
 				{ unit }
 			</h2>
-			<div>
+			<div class="flex flex-wrap gap-6">
 				for _, keyset := range keysets {
 					@keysetCard(keyset)
 				}
@@ -72,14 +76,34 @@ templ KeysetsList(keysetMap map[string][]KeysetData) {
 }
 
 templ keysetCard(keyset KeysetData) {
-	{{ activeStr := strconv.FormatBool(keyset.Active) }}
 	{{ inputFeeStr := strconv.FormatUint(uint64(keyset.Fees), 10) }}
 	{{ versionStr := strconv.FormatUint(keyset.Version, 10) }}
-	<div class="card">
-		<span>Id: { keyset.Id }</span>
-		<span>Active: { activeStr }</span>
-		<span>Unit: <span class="unit">{ keyset.Unit }</span></span>
-		<span>Fees (PPK): { inputFeeStr }</span>
-		<span>Version: { versionStr }</span>
+	<div class="card card-hover transition-all w-full max-w-sm">
+		<div class="card-header">
+			<span class="font-mono text-sm text-secondary truncate" title={ keyset.Id }>Id: { keyset.Id }</span>
+			if keyset.Active {
+				<span class="text-xs font-bold text-success bg-opacity-10 bg-green-500 px-2 py-1 rounded-full uppercase">Active</span>
+			} else {
+				<span class="text-xs font-bold text-secondary bg-opacity-10 bg-gray-500 px-2 py-1 rounded-full uppercase">Inactive</span>
+			}
+		</div>
+		<div class="card-body">
+			<div class="grid grid-cols-2 gap-4 text-sm">
+				<div class="flex flex-col">
+					<span class="text-secondary text-xs uppercase mb-1">Unit</span>
+					<span class="font-medium capitalize">{ keyset.Unit }</span>
+				</div>
+				if keyset.Unit != "auth" {
+					<div class="flex flex-col">
+						<span class="text-secondary text-xs uppercase mb-1">Fees (PPK)</span>
+						<span class="font-mono">{ inputFeeStr }</span>
+					</div>
+				}
+				<div class="flex flex-col">
+					<span class="text-secondary text-xs uppercase mb-1">Version</span>
+					<span class="font-mono">{ versionStr }</span>
+				</div>
+			</div>
+		</div>
 	</div>
 }
