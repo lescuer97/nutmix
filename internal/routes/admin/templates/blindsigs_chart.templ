@@ -17,7 +17,7 @@ templ BlindSigsChartCard(data []database.ProofTimeSeriesPoint, summary ChartSumm
 		class="card card-md"
 		hx-get="/admin/blindsigs-chart"
 		hx-trigger="date-range-changed from:body"
-		hx-include="#chartStartDate, #chartEndDate"
+		hx-include="#timeRangeSelect"
 		hx-swap="outerHTML"
 		hx-indicator="#date-range-loading"
 	>

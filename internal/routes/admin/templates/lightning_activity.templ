@@ -2,16 +2,16 @@ package templates
 
 import "github.com/lescuer97/nutmix/internal/utils"
 
-templ LightningActivityLayout(config utils.Config, startDate string, endDate string) {
+templ LightningActivityLayout(config utils.Config, selectedRange string) {
 	@Layout("lightning") {
 		<main class="main-content">
-			@DateRangePicker(startDate, endDate)
+			@TimeRangeSelector(selectedRange)
 			<div
 				id="ln-chart-placeholder"
 				class="mt-4 mb-4"
 				hx-get="/admin/ln-chart"
 				hx-trigger="load, date-range-changed from:body"
-				hx-include="#chartStartDate, #chartEndDate"
+				hx-include="#timeRangeSelect"
 				hx-swap="outerHTML"
 				hx-indicator="#date-range-loading"
 			>

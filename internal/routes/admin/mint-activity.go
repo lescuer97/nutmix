@@ -216,12 +216,11 @@ func SwapsList(mint *m.Mint) gin.HandlerFunc {
 
 func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Parse date range from query params
-		startDateStr := c.Query("start")
-		endDateStr := c.Query("end")
-		startTime, endTime, _ := parseDateRange(startDateStr, endDateStr)
+		// Parse time range from query params
+		timeRange := c.Query("since")
+		startTime, _ := parseTimeRange(timeRange)
 
-		proofsCount, err := adminHandler.getProofsCountByKeyset(startTime, &endTime)
+		proofsCount, err := adminHandler.getProofsCountByKeyset(startTime, nil)
 		if err != nil {
 			c.Error(err)
 			return
@@ -245,10 +244,17 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 			return
 		}
 
+		// Format the since date for display
+		sinceDate := startTime.Format("Jan 2, 2006")
+		if timeRange == "all" {
+			sinceDate = "the beginning"
+		}
+
 		summary := templates.Summary{
-			LnBalance:  lnBalance,
+			LnBalance:  lnBalance / 1000,
 			FakeWallet: mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET,
 			Fees:       fees,
+			SinceDate:  sinceDate,
 		}
 
 		err = templates.SummaryComponent(summary).Render(c.Request.Context(), c.Writer)

@@ -39,7 +39,7 @@ templ LnChartCard(data []MintMeltTimeSeriesPoint, summary LnChartSummary) {
 		class="card card-md mt-4 mb-4"
 		hx-get="/admin/ln-chart"
 		hx-trigger="date-range-changed from:body"
-		hx-include="#chartStartDate, #chartEndDate"
+		hx-include="#timeRangeSelect"
 		hx-swap="outerHTML"
 		hx-indicator="#date-range-loading"
 	>

@@ -1,10 +1,6 @@
 package templates
 
-import (
-	"github.com/lescuer97/nutmix/internal/database"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
-)
+import "github.com/lescuer97/nutmix/internal/database"
 
 // ChartSummary holds the summary statistics for a chart
 type ChartSummary struct {
@@ -14,8 +10,7 @@ type ChartSummary struct {
 
 // formatNumber formats a number with thousand separators (periods)
 func formatNumber(n uint64) string {
-	p := message.NewPrinter(language.German)
-	return p.Sprintf("%.0f", float64(n))
+	return FormatNumber(n)
 }
 
 // ProofsChartContent renders just the chart canvas and data - used for HTMX date updates
@@ -33,7 +28,7 @@ templ ProofsChartCard(data []database.ProofTimeSeriesPoint, summary ChartSummary
 		class="card card-md mt-4 mb-4"
 		hx-get="/admin/proofs-chart"
 		hx-trigger="date-range-changed from:body"
-		hx-include="#chartStartDate, #chartEndDate"
+		hx-include="#timeRangeSelect"
 		hx-swap="outerHTML"
 		hx-indicator="#date-range-loading"
 	>

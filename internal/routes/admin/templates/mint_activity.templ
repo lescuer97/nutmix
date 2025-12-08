@@ -153,31 +153,29 @@ templ MintMeltEventList(eventList []MintMeltRequestVisual) {
 	</div>
 }
 
-// DateRangePicker is a unified date picker component for chart filtering
-templ DateRangePicker(startDate string, endDate string) {
-	<div class="date-picker-container">
-		<div class="date-picker-group">
-			<label for="chartStartDate" class="date-label">From</label>
-			<input
-				type="date"
-				id="chartStartDate"
-				name="start"
-				class="date-input"
-				value={ startDate }
-				hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
-			/>
-		</div>
-		<div class="date-picker-group">
-			<label for="chartEndDate" class="date-label">To</label>
-			<input
-				type="date"
-				id="chartEndDate"
-				name="end"
-				class="date-input"
-				value={ endDate }
-				hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
-			/>
-		</div>
+// TimeRangeSelector is a dropdown component for selecting preset time ranges
+templ TimeRangeSelector(selectedRange string) {
+	<div class="time-range-container">
+		<span class="time-range-icon">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+				<line x1="16" y1="2" x2="16" y2="6"></line>
+				<line x1="8" y1="2" x2="8" y2="6"></line>
+				<line x1="3" y1="10" x2="21" y2="10"></line>
+			</svg>
+		</span>
+		<select
+			id="timeRangeSelect"
+			name="since"
+			class="time-range-select"
+			hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
+		>
+			<option value="1w" selected?={ selectedRange == "1w" || selectedRange == "" }>Last 7 days</option>
+			<option value="1m" selected?={ selectedRange == "1m" }>Last 30 days</option>
+			<option value="3m" selected?={ selectedRange == "3m" }>Last 3 months</option>
+			<option value="1y" selected?={ selectedRange == "1y" }>Last year</option>
+			<option value="all" selected?={ selectedRange == "all" }>All time</option>
+		</select>
 	</div>
 	<div id="date-range-loading" class="htmx-indicator chart-loading">
 		<span class="loading-spinner"></span>
@@ -185,16 +183,16 @@ templ DateRangePicker(startDate string, endDate string) {
 	</div>
 }
 
-templ MintActivityLayout(liquidityManagerAvailable bool, startDate string, endDate string) {
+templ MintActivityLayout(liquidityManagerAvailable bool, selectedRange string) {
 	@Layout("stats") {
 		<main class="main-content">
-			@DateRangePicker(startDate, endDate)
+			@TimeRangeSelector(selectedRange)
 			<div
 				id="summary-placeholder"
 				class="mt-4 mb-4"
 				hx-get="/admin/summary"
 				hx-trigger="load, date-range-changed from:body"
-				hx-include="#chartStartDate, #chartEndDate"
+				hx-include="#timeRangeSelect"
 				hx-swap="outerHTML"
 				hx-indicator="#date-range-loading"
 			></div>
@@ -203,7 +201,7 @@ templ MintActivityLayout(liquidityManagerAvailable bool, startDate string, endDa
 				class="mt-4 mb-4"
 				hx-get="/admin/proofs-chart"
 				hx-trigger="load, date-range-changed from:body"
-				hx-include="#chartStartDate, #chartEndDate"
+				hx-include="#timeRangeSelect"
 				hx-swap="outerHTML"
 				hx-indicator="#date-range-loading"
 			>
@@ -218,7 +216,7 @@ templ MintActivityLayout(liquidityManagerAvailable bool, startDate string, endDa
 				id="blindsigs-chart-placeholder"
 				hx-get="/admin/blindsigs-chart"
 				hx-trigger="load, date-range-changed from:body"
-				hx-include="#chartStartDate, #chartEndDate"
+				hx-include="#timeRangeSelect"
 				hx-swap="outerHTML"
 				hx-indicator="#date-range-loading"
 			>
@@ -237,15 +235,37 @@ type Summary struct {
 	LnBalance  uint64
 	FakeWallet bool
 	Fees       uint64
+	SinceDate  string // Formatted date string showing the start date
 }
 
 templ SummaryComponent(summary Summary) {
-	if summary.FakeWallet {
-		<div>Fake Wallet doesn't have a balance</div>
-	} else {
-		<div>Node Balance:</div>
-		<div><b>{ summary.LnBalance }</b> Sats</div>
-	}
-	<div>Fees:</div>
-	<div><b>{ summary.Fees }</b> Sats</div>
+	<div
+		id="summary-placeholder"
+		class="flex gap-4 mb-4 mt-4 flex-wrap"
+		hx-get="/admin/summary"
+		hx-trigger="date-range-changed from:body"
+		hx-include="#timeRangeSelect"
+		hx-swap="outerHTML"
+		hx-indicator="#date-range-loading"
+	>
+		<div class="card card-md flex-1">
+			if summary.FakeWallet {
+				<div class="text-secondary font-semibold">Fake Wallet doesn't have a balance</div>
+			} else {
+				<div class="text-secondary font-semibold uppercase text-xs mb-2">Node Balance</div>
+				<div class="text-2xl font-bold text-primary">
+					{ FormatNumber(summary.LnBalance) } <span class="text-sm font-normal text-secondary">Sats</span>
+				</div>
+			}
+		</div>
+		<div class="card card-md flex-1">
+			<div class="text-secondary font-semibold uppercase text-xs mb-2">Fees</div>
+			<div class="text-2xl font-bold text-primary">
+				{ FormatNumber(summary.Fees) } <span class="text-sm font-normal text-secondary">Sats</span>
+			</div>
+			<div class="text-xs text-secondary mt-2">
+				Fees generated since: { summary.SinceDate }
+			</div>
+		</div>
+	</div>
 }

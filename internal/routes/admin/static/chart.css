@@ -21,58 +21,106 @@
   margin-bottom: var(--space-1);
 }
 
-/* Date Picker Container */
-.date-picker-container {
-  display: flex;
-  align-items: flex-end;
+/* Time Range Selector */
+.time-range-container {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-3);
-  flex-wrap: wrap;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-3);
+  width: fit-content;
+  max-width: 220px;
 }
 
-.date-picker-group {
+.time-range-icon {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
-.date-label {
+.time-range-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.time-range-label {
   font-size: var(--text-xs);
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-weight: var(--font-medium);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
+  display: none;
 }
 
-.date-input {
-  background: var(--bg-input);
-  border: 1px solid var(--border-secondary);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
+.time-range-select {
+  background: transparent;
+  border: none;
   color: var(--text-primary);
   font-size: var(--text-sm);
   font-family: var(--font-sans);
-  min-width: 140px;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.date-input:hover {
-  border-color: var(--border-active);
-}
-
-.date-input:focus {
-  outline: none;
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 2px rgba(0, 217, 177, 0.15);
-}
-
-/* Fix date input calendar icon color for dark theme */
-.date-input::-webkit-calendar-picker-indicator {
-  filter: invert(0.7);
+  font-weight: var(--font-medium);
   cursor: pointer;
+  appearance: none;
+  padding: 0;
+  padding-right: var(--space-5);
+  min-width: 110px;
+  max-width: 140px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2300d9b1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0 center;
 }
 
-.date-input::-webkit-calendar-picker-indicator:hover {
-  filter: invert(0.9);
+.time-range-select:hover {
+  color: var(--accent-cyan);
+}
+
+.time-range-select:focus {
+  outline: none;
+  color: var(--accent-cyan);
+}
+
+/* Firefox has better option styling support */
+@-moz-document url-prefix() {
+  .time-range-select option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 10px 16px;
+    font-weight: var(--font-normal);
+    font-size: var(--text-sm);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .time-range-select option:checked {
+    background: var(--accent-cyan) !important;
+    color: var(--bg-primary) !important;
+    font-weight: var(--font-medium);
+  }
+
+  .time-range-select option:hover {
+    background: var(--bg-card-hover);
+  }
+}
+
+/* Chromium-based browsers - limited option styling */
+.time-range-select option {
+  background: #161b22;
+  color: #ffffff;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.time-range-container:hover {
+  border-color: var(--border-secondary);
+}
+
+.time-range-container:focus-within {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 217, 177, 0.1);
 }
 
 /* Chart Legend Info */
