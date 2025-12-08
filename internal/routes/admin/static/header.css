@@ -59,6 +59,9 @@
 .nav-tab:hover {
   color: var(--text-primary);
 }
+.logout-button {
+  color: var(--accent-red);
+}
 
 /* Active tab styles using CSS-only approach - color only */
 body[data-route="stats"] .nav-tab[data-tab="stats"],
