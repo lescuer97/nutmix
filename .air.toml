@@ -4,8 +4,8 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "./nutmix"
-  cmd = "just dev"
+  bin = "./build/nutmix"
+  cmd = "just build-dev"
   delay = 1000
   exclude_dir = ["internal/routes/admin/static/node_modules", "tmp", "vendor", "testdata", "keycloak", "keycloak_pq_data", "internal/routes/admin/static/dist"]
   exclude_file = []
