@@ -20,3 +20,4 @@ keycloak/postgres_data
 /nutmix
 
 dist
+release/

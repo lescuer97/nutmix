@@ -130,7 +130,8 @@ gen-templ:
 web-install:
     set -euo pipefail
     echo "Intalling npm dependencies"
-    cd internal/routes/admin/static && bun install
+    cd internal/routes/admin/static 
+    bun install
 
 # builds web packages for deployment
 web-build-prod:
@@ -228,7 +229,7 @@ build-platform target:
     echo "Built $OUTPUT"
 
 # Build for all platforms
-release:
+release: build
     #!/usr/bin/env bash
     set -euo pipefail
 
