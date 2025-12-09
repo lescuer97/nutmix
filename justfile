@@ -127,8 +127,7 @@ gen-templ:
 # installs all necesary web packages
 web-install:
     echo "Intalling npm dependencies"
-    cd internal/routes/admin/static 
-    bun install
+    cd internal/routes/admin/static  && bun install
 
 # builds web packages for deployment
 web-build-prod:
