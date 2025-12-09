@@ -111,7 +111,6 @@ install-deps:
 # Generate protobuf code
 gen-proto:
     #!/usr/bin/env bash
-    set -euo pipefail
     echo "Generating protobuf code..."
     protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
 
@@ -122,13 +121,11 @@ gen-proto:
 # Generate Go code from templ files
 gen-templ:
     #!/usr/bin/env bash
-    set -euo pipefail
     echo "Generating Go code from templ files..."
     templ generate .
 
 # installs all necesary web packages
 web-install:
-    set -euo pipefail
     echo "Intalling npm dependencies"
     cd internal/routes/admin/static 
     bun install
