@@ -4,19 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/database"
-	"github.com/lescuer97/nutmix/internal/mint"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 func TestMintInfo(t *testing.T) {
+	const testVersion = "test-version"
+	// Mock the version
+	utils.AppVersion = testVersion
 
 	const posgrespassword = "password"
 	const postgresuser = "user"
@@ -37,7 +42,6 @@ func TestMintInfo(t *testing.T) {
 	}
 
 	connUri, err := postgresContainer.ConnectionString(ctx)
-
 	if err != nil {
 		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
@@ -66,17 +70,15 @@ func TestMintInfo(t *testing.T) {
 
 	var mintInfo cashu.GetInfoResponse
 	err = json.Unmarshal(w.Body.Bytes(), &mintInfo)
-
 	if err != nil {
 		t.Errorf("Error unmarshalling response: %v", err)
 	}
 
-	if mintInfo.Version != "nutmix/0.3.9" {
+	if mintInfo.Version != "nutmix/"+testVersion {
 		t.Errorf("Incorrect version  %v", mintInfo.Version)
 	}
 
 	if mintInfo.Pubkey != "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798" {
 		t.Errorf("Incorrect Pubkey  %v", mintInfo.Pubkey)
 	}
-
 }
