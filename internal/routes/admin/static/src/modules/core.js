@@ -8,6 +8,9 @@ import 'htmx-ext-remove-me';
  */
 export function initCore() {
   // Make HTMX available globally for use in templates and other scripts
+document.body.addEventListener('htmx:load', function (evt) {
+  htmx.logAll();
+});
   window.htmx = htmx;
   console.log('HTMX initialized');
 }

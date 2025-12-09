@@ -33,9 +33,9 @@ function initializeApp() {
 }
 
 // Wait for DOM to be ready before initializing
-// if (document.readyState === 'loading') {
+if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeApp);
-// } else {
-//   // DOM is already ready
-//   initializeApp();
-// }
+} else {
+  // DOM is already ready
+  initializeApp();
+}

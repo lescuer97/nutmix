@@ -10,11 +10,6 @@ templ BlindSigsChartContent(data []database.ProofTimeSeriesPoint) {
 			data-chart={ templ.JSONString(data) }
 		></canvas>
 	</div>
-	<script>
-		if (typeof window !== 'undefined' && window.initializeBlindSigsChart) {
-			window.initializeBlindSigsChart();
-		}
-	</script>
 }
 
 // BlindSigsChartCard renders the chart card without date picker - date picker is now in MintActivityLayout

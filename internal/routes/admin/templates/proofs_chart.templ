@@ -21,8 +21,6 @@ templ ProofsChartContent(data []database.ProofTimeSeriesPoint) {
 			data-chart={ templ.JSONString(data) }
 		></canvas>
 	</div>
-	<script src="/js/modules/chart.js" defer></script>
-	<script src="/js/modules/proofs_chart.js" defer></script>
 }
 
 // ProofsChartCard renders the chart card without date picker - date picker is now in MintActivityLayout

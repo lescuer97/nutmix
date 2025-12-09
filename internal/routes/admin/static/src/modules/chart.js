@@ -43,7 +43,7 @@ const COLORS = {
 };
 
 // Store chart instances
-export const chartInstances = {
+ const chartInstances = {
   proofs: null,
   blindSigs: null,
   ln: null
@@ -51,7 +51,7 @@ export const chartInstances = {
 
 // Helper to read chart data from a canvas data attribute first, then fallback
 // to a paired script tag (legacy). Returns { canvas, data }.
-export function getChartContext({ canvasId, dataElementId }) {
+ function getChartContext({ canvasId, dataElementId }) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) {
     return { canvas: null, data: null };
@@ -78,8 +78,6 @@ export function getChartContext({ canvasId, dataElementId }) {
       }
     }
   }
-  console.log('canva', canvas);
-  console.log('data', data);
 
   return { canvas, data };
 }
@@ -89,7 +87,7 @@ export function getChartContext({ canvasId, dataElementId }) {
  * @param {Array} data - Array of {timestamp, totalAmount, count} objects
  * @param {string} countLabel - Label for the count axis (e.g., 'Proof Count' or 'Signature Count')
  */
-export function createChartConfig(data, countLabel) {
+ function createChartConfig(data, countLabel) {
   // Transform data for Chart.js
   const chartData = data.map(point => ({
     x: new Date(point.timestamp * 1000), // Convert Unix timestamp to Date
@@ -289,7 +287,7 @@ export function createChartConfig(data, countLabel) {
  * @param {Array} data - Array of {timestamp, totalAmount, count} objects
  * @param {string} countLabel - Label for the count axis
  */
-export function initChart(canvas, data, countLabel) {
+ function initChart(canvas, data, countLabel) {
   if (!canvas || !Array.isArray(data)) {
     console.warn('Chart initialization skipped: missing canvas or data');
     return null;
@@ -516,10 +514,221 @@ export function initChart(canvas, data, countLabel) {
 // }
 
 /**
+ * Initialize or reinitialize the blind sigs chart from the current DOM
+ */
+ function initializeBlindSigsChartFromDOM() {
+  const { canvas, data } = getChartContext({
+    canvasId: 'blindSigsChart',
+    dataElementId: 'blindSigsChartData'
+  });
+
+  if (!canvas || !data) {
+    return;
+  }
+
+  if (chartInstances.blindSigs) {
+    chartInstances.blindSigs.destroy();
+    chartInstances.blindSigs = null;
+  }
+
+  chartInstances.blindSigs = initChart(canvas, data, 'Signature Count');
+  if (chartInstances.blindSigs) {
+    console.log('Blind sigs chart initialized with', data.length, 'data points');
+  }
+}
+
+/**
+ * Create chart configuration for mint/melt (LN) chart
+ * @param {Array} data - Array of {timestamp, mintAmount, meltAmount, mintCount, meltCount} objects
+ */
+function createLnChartConfig(data) {
+  // Transform data for Chart.js
+  const chartData = data.map(point => ({
+    x: new Date(point.timestamp * 1000), // Convert Unix timestamp to Date
+    mint: point.mintAmount,
+    melt: point.meltAmount
+  }));
+
+  return {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Mint (Inflows)',
+          data: chartData.map(d => ({ x: d.x, y: d.mint })),
+          borderColor: COLORS.green,
+          backgroundColor: COLORS.greenLight,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: COLORS.green,
+          pointBorderColor: COLORS.green,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Melt (Outflows)',
+          data: chartData.map(d => ({ x: d.x, y: -d.melt })), // Display melt as negative for visual comparison
+          borderColor: COLORS.red,
+          backgroundColor: COLORS.redLight,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: COLORS.red,
+          pointBorderColor: COLORS.red,
+          yAxisID: 'y'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: COLORS.textPrimary,
+            usePointStyle: true,
+            padding: 20,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 12
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: '#161b22',
+          titleColor: COLORS.textPrimary,
+          bodyColor: COLORS.textColor,
+          borderColor: COLORS.gridColor,
+          borderWidth: 1,
+          padding: 12,
+          displayColors: true,
+          callbacks: {
+            title: function(tooltipItems) {
+              const date = tooltipItems[0].parsed.x;
+              return new Date(date).toLocaleString();
+            },
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              if (context.parsed.y !== null) {
+                // Show absolute value for melt (since we display as negative)
+                const value = Math.abs(context.parsed.y);
+                label += value.toLocaleString() + ' sats';
+              }
+              return label;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            displayFormats: {
+              hour: 'MMM d, HH:mm',
+              day: 'MMM d',
+              week: 'MMM d',
+              month: 'MMM yyyy'
+            },
+            tooltipFormat: 'PPpp'
+          },
+          title: {
+            display: true,
+            text: 'Time',
+            color: COLORS.textColor,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 12,
+              weight: '500'
+            }
+          },
+          grid: {
+            color: COLORS.gridColor,
+            drawBorder: false
+          },
+          ticks: {
+            color: COLORS.textColor,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 11
+            },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 8
+          }
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Sats',
+            color: COLORS.textColor,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 12,
+              weight: '500'
+            }
+          },
+          grid: {
+            color: COLORS.gridColor,
+            drawBorder: false
+          },
+          ticks: {
+            color: COLORS.textColor,
+            font: {
+              family: "'Inter', sans-serif",
+              size: 11
+            },
+            callback: function(value) {
+              return value.toLocaleString();
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
+/**
+ * Initialize or reinitialize the LN (mint/melt) chart from the current DOM
+ */
+ function initializeLnChartFromDOM() {
+  const { canvas, data } = getChartContext({
+    canvasId: 'lnChart',
+    dataElementId: 'lnChartData'
+  });
+
+  if (!canvas || !data) {
+    return;
+  }
+
+  if (chartInstances.ln) {
+    chartInstances.ln.destroy();
+    chartInstances.ln = null;
+  }
+
+  const config = createLnChartConfig(data);
+  chartInstances.ln = new Chart(canvas, config);
+}
+
+/**
  * Initialize or reinitialize the proofs chart from the current DOM
  */
-export function initializeProofsChartFromDOM() {
-    console.log('initializeProofsChartFromDOM');
+ function initializeProofsChartFromDOM() {
   const { canvas, data } = getChartContext({
     canvasId: 'proofsChart',
     dataElementId: 'proofsChartData'
@@ -536,7 +745,6 @@ export function initializeProofsChartFromDOM() {
 
   chartInstances.proofs = initChart(canvas, data, 'Proof Count');
   if (chartInstances.proofs) {
-    console.log('Proofs chart initialized with', data.length, 'data points');
   }
 }
 
@@ -552,7 +760,6 @@ function setupHtmxListener() {
     if (targetId === 'chart-wrapper' || 
         targetId === 'proofs-chart-placeholder' ||
         targetId === 'proofs-chart-card') {
-      console.log('Proofs chart content swapped, reinitializing...');
       setTimeout(initializeProofsChartFromDOM, 50);
     }
     
@@ -560,7 +767,6 @@ function setupHtmxListener() {
     if (targetId === 'blindsigs-chart-wrapper' || 
         targetId === 'blindsigs-chart-placeholder' ||
         targetId === 'blindsigs-chart-card') {
-      console.log('Blind sigs chart content swapped, reinitializing...');
       setTimeout(initializeBlindSigsChartFromDOM, 50);
     }
     
@@ -568,30 +774,26 @@ function setupHtmxListener() {
     if (targetId === 'ln-chart-wrapper' || 
         targetId === 'ln-chart-placeholder' ||
         targetId === 'ln-chart-card') {
-      console.log('LN chart content swapped, reinitializing...');
       setTimeout(initializeLnChartFromDOM, 50);
     }
   });
 
   // // Also listen for htmx:afterSettle for initial HTMX loads
-  // document.body.addEventListener('htmx:afterSettle', (event) => {
-  //   const targetId = event.detail.target?.id;
+  document.body.addEventListener('htmx:afterSettle', (event) => {
+    const targetId = event.detail.target?.id;
     
-  //   if (targetId === 'proofs-chart-placeholder') {
-  //     console.log('Proofs chart card settled, initializing...');
-  //     setTimeout(initializeProofsChartFromDOM, 50);
-  //   }
+    if (targetId === 'proofs-chart-placeholder') {
+      setTimeout(initializeProofsChartFromDOM, 50);
+    }
     
-  //   if (targetId === 'blindsigs-chart-placeholder') {
-  //     console.log('Blind sigs chart card settled, initializing...');
-  //     setTimeout(initializeBlindSigsChartFromDOM, 50);
-  //   }
+    if (targetId === 'blindsigs-chart-placeholder') {
+      setTimeout(initializeBlindSigsChartFromDOM, 50);
+    }
     
-  //   if (targetId === 'ln-chart-placeholder') {
-  //     console.log('LN chart card settled, initializing...');
-  //     setTimeout(initializeLnChartFromDOM, 50);
-  //   }
-  // });
+    if (targetId === 'ln-chart-placeholder') {
+      setTimeout(initializeLnChartFromDOM, 50);
+    }
+  });
 }
 
 /**
@@ -644,5 +846,46 @@ function setupHtmxListener() {
 //   initializeBlindSigsChartFromDOM();
 //   initializeLnChartFromDOM();
 // }
+// 
+// New: Set up MutationObserver to re-run init when new elements are added
+// function setupChartObserver() {
+//     const observer = new MutationObserver(mutations => {
+//       let shouldInitProofs = false;
+//       let shouldInitBlindSigs = false;
+//       let shouldInitLn = false;
+//         mutations.forEach(mutation => {
+//             mutation.addedNodes.forEach(node => {
+
+//                 if (node.nodeType === 1 && (node.matches('.proofs-chart') || node.querySelector('.proofs-chart'))) {
+//                   console.log('Proofs chart added, reinitializing...');
+//                   shouldInitProofs = true;
+//                 }
+//                 if (node.nodeType === 1 && (node.matches('.blindsigs-chart') || node.querySelector('.blindsigs-chart'))) {
+//                     shouldInitBlindSigs= true;
+                  
+//                 }
+//                 if (node.nodeType === 1 && (node.matches('.ln-chart') || node.querySelector('.ln-chart'))) {
+//                     shouldInitLn= true;
+                  
+//                 }
+//             });
+//         });
+
+//       if (shouldInitProofs) {
+//         initializeProofsChartFromDOM();
+//       }
+//       if (shouldInitBlindSigs) {
+//         initializeBlindSigsChartFromDOM();
+//       }
+//       if (shouldInitLn) {
+//         initializeLnChartFromDOM();
+//       }
+//     });
+
+//     // Observe the body or a specific container (change document.body if needed)
+//     observer.observe(document.body, { childList: true, subtree: true });
+// }
+
 
 setupHtmxListener();
+// setupChartObserver();
