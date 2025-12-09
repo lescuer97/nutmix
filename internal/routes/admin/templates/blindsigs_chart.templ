@@ -5,9 +5,16 @@ import "github.com/lescuer97/nutmix/internal/database"
 // BlindSigsChartContent renders just the chart canvas and data - used for HTMX date updates
 templ BlindSigsChartContent(data []database.ProofTimeSeriesPoint) {
 	<div id="blindsigs-chart-container" style="position: relative; height: 400px; width: 100%;">
-		<canvas id="blindSigsChart"></canvas>
+		<canvas
+			id="blindSigsChart"
+			data-chart={ templ.JSONString(data) }
+		></canvas>
 	</div>
-	@templ.JSONScript("blindSigsChartData", data)
+	<script>
+		if (typeof window !== 'undefined' && window.initializeBlindSigsChart) {
+			window.initializeBlindSigsChart();
+		}
+	</script>
 }
 
 // BlindSigsChartCard renders the chart card without date picker - date picker is now in MintActivityLayout

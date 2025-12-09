@@ -16,9 +16,13 @@ func formatNumber(n uint64) string {
 // ProofsChartContent renders just the chart canvas and data - used for HTMX date updates
 templ ProofsChartContent(data []database.ProofTimeSeriesPoint) {
 	<div id="chart-container" style="position: relative; height: 400px; width: 100%;">
-		<canvas id="proofsChart"></canvas>
+		<canvas
+			id="proofsChart"
+			data-chart={ templ.JSONString(data) }
+		></canvas>
 	</div>
-	@templ.JSONScript("proofsChartData", data)
+	<script src="/js/modules/chart.js" defer></script>
+	<script src="/js/modules/proofs_chart.js" defer></script>
 }
 
 // ProofsChartCard renders the chart card without date picker - date picker is now in MintActivityLayout

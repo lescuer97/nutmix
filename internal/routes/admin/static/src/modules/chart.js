@@ -1,30 +1,31 @@
 // Chart.js module for time-series visualization
-import {
-  Chart,
-  LineController,
-  LineElement,
-  PointElement,
-  LinearScale,
-  TimeScale,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-} from 'chart.js';
+// import {
+//   Chart,
+//   LineController,
+//   LineElement,
+//   PointElement,
+//   LinearScale,
+//   TimeScale,
+//   Title,
+//   Tooltip,
+//   Legend,
+//   Filler
+// } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import Chart from 'chart.js/auto'
 
 // Register Chart.js components
-Chart.register(
-  LineController,
-  LineElement,
-  PointElement,
-  LinearScale,
-  TimeScale,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+// Chart.register(
+//   LineController,
+//   LineElement,
+//   PointElement,
+//   LinearScale,
+//   TimeScale,
+//   Title,
+//   Tooltip,
+//   Legend,
+//   Filler
+// );
 
 // Color scheme matching the design system
 const COLORS = {
@@ -42,18 +43,53 @@ const COLORS = {
 };
 
 // Store chart instances
-const chartInstances = {
+export const chartInstances = {
   proofs: null,
   blindSigs: null,
   ln: null
 };
+
+// Helper to read chart data from a canvas data attribute first, then fallback
+// to a paired script tag (legacy). Returns { canvas, data }.
+export function getChartContext({ canvasId, dataElementId }) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) {
+    return { canvas: null, data: null };
+  }
+
+  let data = null;
+
+  const attrData = canvas.getAttribute('data-chart');
+  if (attrData) {
+    try {
+      data = JSON.parse(attrData);
+    } catch (error) {
+      console.error(`Failed to parse data-chart for ${canvasId}:`, error);
+    }
+  }
+
+  if (!data && dataElementId) {
+    const dataElement = document.getElementById(dataElementId);
+    if (dataElement) {
+      try {
+        data = JSON.parse(dataElement.textContent);
+      } catch (error) {
+        console.error(`Failed to parse legacy data element for ${canvasId}:`, error);
+      }
+    }
+  }
+  console.log('canva', canvas);
+  console.log('data', data);
+
+  return { canvas, data };
+}
 
 /**
  * Create chart configuration
  * @param {Array} data - Array of {timestamp, totalAmount, count} objects
  * @param {string} countLabel - Label for the count axis (e.g., 'Proof Count' or 'Signature Count')
  */
-function createChartConfig(data, countLabel) {
+export function createChartConfig(data, countLabel) {
   // Transform data for Chart.js
   const chartData = data.map(point => ({
     x: new Date(point.timestamp * 1000), // Convert Unix timestamp to Date
@@ -253,258 +289,254 @@ function createChartConfig(data, countLabel) {
  * @param {Array} data - Array of {timestamp, totalAmount, count} objects
  * @param {string} countLabel - Label for the count axis
  */
-function initChart(canvas, data, countLabel) {
-  if (!canvas || !data) {
+export function initChart(canvas, data, countLabel) {
+  if (!canvas || !Array.isArray(data)) {
     console.warn('Chart initialization skipped: missing canvas or data');
     return null;
   }
 
   const config = createChartConfig(data, countLabel);
-  return new Chart(canvas, config);
+  const chart = new Chart(canvas, config);
+  return chart;
 }
+
+
+
+// /**
+//  * Initialize or reinitialize the blind sigs chart from the current DOM
+//  */
+// function initializeBlindSigsChartFromDOM() {
+//   const { canvas, data } = getChartContext({
+//     canvasId: 'blindSigsChart',
+//     dataElementId: 'blindSigsChartData'
+//   });
+
+//   if (!canvas || !data) {
+//     return;
+//   }
+
+//   if (chartInstances.blindSigs) {
+//     chartInstances.blindSigs.destroy();
+//     chartInstances.blindSigs = null;
+//   }
+
+//   chartInstances.blindSigs = initChart(canvas, data, 'Signature Count');
+//   if (chartInstances.blindSigs) {
+//     console.log('Blind sigs chart initialized with', data.length, 'data points');
+//   }
+// }
+
+// /**
+//  * Create chart configuration for mint/melt (LN) chart
+//  * @param {Array} data - Array of {timestamp, mintAmount, meltAmount, mintCount, meltCount} objects
+//  */
+// function createLnChartConfig(data) {
+//   // Transform data for Chart.js
+//   const chartData = data.map(point => ({
+//     x: new Date(point.timestamp * 1000), // Convert Unix timestamp to Date
+//     mint: point.mintAmount,
+//     melt: point.meltAmount
+//   }));
+
+//   return {
+//     type: 'line',
+//     data: {
+//       datasets: [
+//         {
+//           label: 'Mint (Inflows)',
+//           data: chartData.map(d => ({ x: d.x, y: d.mint })),
+//           borderColor: COLORS.green,
+//           backgroundColor: COLORS.greenLight,
+//           borderWidth: 2,
+//           fill: true,
+//           tension: 0.3,
+//           pointRadius: 3,
+//           pointHoverRadius: 6,
+//           pointBackgroundColor: COLORS.green,
+//           pointBorderColor: COLORS.green,
+//           yAxisID: 'y'
+//         },
+//         {
+//           label: 'Melt (Outflows)',
+//           data: chartData.map(d => ({ x: d.x, y: -d.melt })), // Display melt as negative for visual comparison
+//           borderColor: COLORS.red,
+//           backgroundColor: COLORS.redLight,
+//           borderWidth: 2,
+//           fill: true,
+//           tension: 0.3,
+//           pointRadius: 3,
+//           pointHoverRadius: 6,
+//           pointBackgroundColor: COLORS.red,
+//           pointBorderColor: COLORS.red,
+//           yAxisID: 'y'
+//         }
+//       ]
+//     },
+//     options: {
+//       responsive: true,
+//       maintainAspectRatio: false,
+//       interaction: {
+//         mode: 'index',
+//         intersect: false
+//       },
+//       plugins: {
+//         legend: {
+//           display: true,
+//           position: 'top',
+//           labels: {
+//             color: COLORS.textPrimary,
+//             usePointStyle: true,
+//             padding: 20,
+//             font: {
+//               family: "'Inter', sans-serif",
+//               size: 12
+//             }
+//           }
+//         },
+//         tooltip: {
+//           backgroundColor: '#161b22',
+//           titleColor: COLORS.textPrimary,
+//           bodyColor: COLORS.textColor,
+//           borderColor: COLORS.gridColor,
+//           borderWidth: 1,
+//           padding: 12,
+//           displayColors: true,
+//           callbacks: {
+//             title: function(tooltipItems) {
+//               const date = tooltipItems[0].parsed.x;
+//               return new Date(date).toLocaleString();
+//             },
+//             label: function(context) {
+//               let label = context.dataset.label || '';
+//               if (label) {
+//                 label += ': ';
+//               }
+//               if (context.parsed.y !== null) {
+//                 // Show absolute value for melt (since we display as negative)
+//                 const value = Math.abs(context.parsed.y);
+//                 label += value.toLocaleString() + ' sats';
+//               }
+//               return label;
+//             }
+//           }
+//         }
+//       },
+//       scales: {
+//         x: {
+//           type: 'time',
+//           time: {
+//             displayFormats: {
+//               hour: 'MMM d, HH:mm',
+//               day: 'MMM d',
+//               week: 'MMM d',
+//               month: 'MMM yyyy'
+//             },
+//             tooltipFormat: 'PPpp'
+//           },
+//           title: {
+//             display: true,
+//             text: 'Time',
+//             color: COLORS.textColor,
+//             font: {
+//               family: "'Inter', sans-serif",
+//               size: 12,
+//               weight: '500'
+//             }
+//           },
+//           grid: {
+//             color: COLORS.gridColor,
+//             drawBorder: false
+//           },
+//           ticks: {
+//             color: COLORS.textColor,
+//             font: {
+//               family: "'Inter', sans-serif",
+//               size: 11
+//             },
+//             maxRotation: 0,
+//             autoSkip: true,
+//             maxTicksLimit: 8
+//           }
+//         },
+//         y: {
+//           type: 'linear',
+//           display: true,
+//           position: 'left',
+//           title: {
+//             display: true,
+//             text: 'Sats',
+//             color: COLORS.textColor,
+//             font: {
+//               family: "'Inter', sans-serif",
+//               size: 12,
+//               weight: '500'
+//             }
+//           },
+//           grid: {
+//             color: COLORS.gridColor,
+//             drawBorder: false
+//           },
+//           ticks: {
+//             color: COLORS.textColor,
+//             font: {
+//               family: "'Inter', sans-serif",
+//               size: 11
+//             },
+//             callback: function(value) {
+//               return value.toLocaleString();
+//             }
+//           }
+//         }
+//       }
+//     }
+//   };
+// }
+
+// /**
+//  * Initialize or reinitialize the LN (mint/melt) chart from the current DOM
+//  */
+// function initializeLnChartFromDOM() {
+//   const { canvas, data } = getChartContext({
+//     canvasId: 'lnChart',
+//     dataElementId: 'lnChartData'
+//   });
+
+//   if (!canvas || !data) {
+//     return;
+//   }
+
+//   if (chartInstances.ln) {
+//     chartInstances.ln.destroy();
+//     chartInstances.ln = null;
+//   }
+
+//   const config = createLnChartConfig(data);
+//   chartInstances.ln = new Chart(canvas, config);
+//   console.log('LN chart initialized with', data.length, 'data points');
+// }
 
 /**
  * Initialize or reinitialize the proofs chart from the current DOM
  */
-function initializeProofsChartFromDOM() {
-  const canvas = document.getElementById('proofsChart');
-  const dataElement = document.getElementById('proofsChartData');
+export function initializeProofsChartFromDOM() {
+    console.log('initializeProofsChartFromDOM');
+  const { canvas, data } = getChartContext({
+    canvasId: 'proofsChart',
+    dataElementId: 'proofsChartData'
+  });
 
-  if (!canvas || !dataElement) {
+  if (!canvas || !data) {
     return;
   }
 
-  // Destroy existing chart if any
   if (chartInstances.proofs) {
     chartInstances.proofs.destroy();
     chartInstances.proofs = null;
   }
 
-  try {
-    const data = JSON.parse(dataElement.textContent);
-    chartInstances.proofs = initChart(canvas, data, 'Proof Count');
+  chartInstances.proofs = initChart(canvas, data, 'Proof Count');
+  if (chartInstances.proofs) {
     console.log('Proofs chart initialized with', data.length, 'data points');
-  } catch (error) {
-    console.error('Failed to initialize proofs chart:', error);
-  }
-}
-
-/**
- * Initialize or reinitialize the blind sigs chart from the current DOM
- */
-function initializeBlindSigsChartFromDOM() {
-  const canvas = document.getElementById('blindSigsChart');
-  const dataElement = document.getElementById('blindSigsChartData');
-
-  if (!canvas || !dataElement) {
-    return;
-  }
-
-  // Destroy existing chart if any
-  if (chartInstances.blindSigs) {
-    chartInstances.blindSigs.destroy();
-    chartInstances.blindSigs = null;
-  }
-
-  try {
-    const data = JSON.parse(dataElement.textContent);
-    chartInstances.blindSigs = initChart(canvas, data, 'Signature Count');
-    console.log('Blind sigs chart initialized with', data.length, 'data points');
-  } catch (error) {
-    console.error('Failed to initialize blind sigs chart:', error);
-  }
-}
-
-/**
- * Create chart configuration for mint/melt (LN) chart
- * @param {Array} data - Array of {timestamp, mintAmount, meltAmount, mintCount, meltCount} objects
- */
-function createLnChartConfig(data) {
-  // Transform data for Chart.js
-  const chartData = data.map(point => ({
-    x: new Date(point.timestamp * 1000), // Convert Unix timestamp to Date
-    mint: point.mintAmount,
-    melt: point.meltAmount
-  }));
-
-  return {
-    type: 'line',
-    data: {
-      datasets: [
-        {
-          label: 'Mint (Inflows)',
-          data: chartData.map(d => ({ x: d.x, y: d.mint })),
-          borderColor: COLORS.green,
-          backgroundColor: COLORS.greenLight,
-          borderWidth: 2,
-          fill: true,
-          tension: 0.3,
-          pointRadius: 3,
-          pointHoverRadius: 6,
-          pointBackgroundColor: COLORS.green,
-          pointBorderColor: COLORS.green,
-          yAxisID: 'y'
-        },
-        {
-          label: 'Melt (Outflows)',
-          data: chartData.map(d => ({ x: d.x, y: -d.melt })), // Display melt as negative for visual comparison
-          borderColor: COLORS.red,
-          backgroundColor: COLORS.redLight,
-          borderWidth: 2,
-          fill: true,
-          tension: 0.3,
-          pointRadius: 3,
-          pointHoverRadius: 6,
-          pointBackgroundColor: COLORS.red,
-          pointBorderColor: COLORS.red,
-          yAxisID: 'y'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index',
-        intersect: false
-      },
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          labels: {
-            color: COLORS.textPrimary,
-            usePointStyle: true,
-            padding: 20,
-            font: {
-              family: "'Inter', sans-serif",
-              size: 12
-            }
-          }
-        },
-        tooltip: {
-          backgroundColor: '#161b22',
-          titleColor: COLORS.textPrimary,
-          bodyColor: COLORS.textColor,
-          borderColor: COLORS.gridColor,
-          borderWidth: 1,
-          padding: 12,
-          displayColors: true,
-          callbacks: {
-            title: function(tooltipItems) {
-              const date = tooltipItems[0].parsed.x;
-              return new Date(date).toLocaleString();
-            },
-            label: function(context) {
-              let label = context.dataset.label || '';
-              if (label) {
-                label += ': ';
-              }
-              if (context.parsed.y !== null) {
-                // Show absolute value for melt (since we display as negative)
-                const value = Math.abs(context.parsed.y);
-                label += value.toLocaleString() + ' sats';
-              }
-              return label;
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          type: 'time',
-          time: {
-            displayFormats: {
-              hour: 'MMM d, HH:mm',
-              day: 'MMM d',
-              week: 'MMM d',
-              month: 'MMM yyyy'
-            },
-            tooltipFormat: 'PPpp'
-          },
-          title: {
-            display: true,
-            text: 'Time',
-            color: COLORS.textColor,
-            font: {
-              family: "'Inter', sans-serif",
-              size: 12,
-              weight: '500'
-            }
-          },
-          grid: {
-            color: COLORS.gridColor,
-            drawBorder: false
-          },
-          ticks: {
-            color: COLORS.textColor,
-            font: {
-              family: "'Inter', sans-serif",
-              size: 11
-            },
-            maxRotation: 0,
-            autoSkip: true,
-            maxTicksLimit: 8
-          }
-        },
-        y: {
-          type: 'linear',
-          display: true,
-          position: 'left',
-          title: {
-            display: true,
-            text: 'Sats',
-            color: COLORS.textColor,
-            font: {
-              family: "'Inter', sans-serif",
-              size: 12,
-              weight: '500'
-            }
-          },
-          grid: {
-            color: COLORS.gridColor,
-            drawBorder: false
-          },
-          ticks: {
-            color: COLORS.textColor,
-            font: {
-              family: "'Inter', sans-serif",
-              size: 11
-            },
-            callback: function(value) {
-              return value.toLocaleString();
-            }
-          }
-        }
-      }
-    }
-  };
-}
-
-/**
- * Initialize or reinitialize the LN (mint/melt) chart from the current DOM
- */
-function initializeLnChartFromDOM() {
-  const canvas = document.getElementById('lnChart');
-  const dataElement = document.getElementById('lnChartData');
-
-  if (!canvas || !dataElement) {
-    return;
-  }
-
-  // Destroy existing chart if any
-  if (chartInstances.ln) {
-    chartInstances.ln.destroy();
-    chartInstances.ln = null;
-  }
-
-  try {
-    const data = JSON.parse(dataElement.textContent);
-    const config = createLnChartConfig(data);
-    chartInstances.ln = new Chart(canvas, config);
-    console.log('LN chart initialized with', data.length, 'data points');
-  } catch (error) {
-    console.error('Failed to initialize LN chart:', error);
   }
 }
 
@@ -541,61 +573,76 @@ function setupHtmxListener() {
     }
   });
 
-  // Also listen for htmx:afterSettle for initial HTMX loads
-  document.body.addEventListener('htmx:afterSettle', (event) => {
-    const targetId = event.detail.target?.id;
+  // // Also listen for htmx:afterSettle for initial HTMX loads
+  // document.body.addEventListener('htmx:afterSettle', (event) => {
+  //   const targetId = event.detail.target?.id;
     
-    if (targetId === 'proofs-chart-placeholder') {
-      console.log('Proofs chart card settled, initializing...');
-      setTimeout(initializeProofsChartFromDOM, 50);
-    }
+  //   if (targetId === 'proofs-chart-placeholder') {
+  //     console.log('Proofs chart card settled, initializing...');
+  //     setTimeout(initializeProofsChartFromDOM, 50);
+  //   }
     
-    if (targetId === 'blindsigs-chart-placeholder') {
-      console.log('Blind sigs chart card settled, initializing...');
-      setTimeout(initializeBlindSigsChartFromDOM, 50);
-    }
+  //   if (targetId === 'blindsigs-chart-placeholder') {
+  //     console.log('Blind sigs chart card settled, initializing...');
+  //     setTimeout(initializeBlindSigsChartFromDOM, 50);
+  //   }
     
-    if (targetId === 'ln-chart-placeholder') {
-      console.log('LN chart card settled, initializing...');
-      setTimeout(initializeLnChartFromDOM, 50);
-    }
-  });
+  //   if (targetId === 'ln-chart-placeholder') {
+  //     console.log('LN chart card settled, initializing...');
+  //     setTimeout(initializeLnChartFromDOM, 50);
+  //   }
+  // });
 }
 
 /**
  * Initialize charts on page load
  */
-export function initCharts() {
-  // Set up HTMX listener for dynamic updates (do this first)
-  setupHtmxListener();
+// export function initCharts() {
+//   // Set up HTMX listener for dynamic updates (do this first)
+//   setupHtmxListener();
 
-  // Try to initialize proofs chart if elements are present
-  const proofsCanvas = document.getElementById('proofsChart');
-  const proofsDataElement = document.getElementById('proofsChartData');
+//   // Try to initialize proofs chart if elements are present
+//   const proofsCanvas = document.getElementById('proofsChart');
+//   const proofsDataElement = document.getElementById('proofsChartData');
 
-  if (proofsCanvas && proofsDataElement) {
-    initializeProofsChartFromDOM();
-  } else {
-    console.log('Proofs chart elements not found on initial load, waiting for HTMX...');
-  }
+//   if (proofsCanvas && proofsDataElement) {
+//     initializeProofsChartFromDOM();
+//   } else {
+//     console.log('Proofs chart elements not found on initial load, waiting for HTMX...');
+//   }
 
-  // Try to initialize blind sigs chart if elements are present
-  const blindSigsCanvas = document.getElementById('blindSigsChart');
-  const blindSigsDataElement = document.getElementById('blindSigsChartData');
+//   // Try to initialize blind sigs chart if elements are present
+//   const blindSigsCanvas = document.getElementById('blindSigsChart');
+//   const blindSigsDataElement = document.getElementById('blindSigsChartData');
 
-  if (blindSigsCanvas && blindSigsDataElement) {
-    initializeBlindSigsChartFromDOM();
-  } else {
-    console.log('Blind sigs chart elements not found on initial load, waiting for HTMX...');
-  }
+//   if (blindSigsCanvas && blindSigsDataElement) {
+//     initializeBlindSigsChartFromDOM();
+//   } else {
+//     console.log('Blind sigs chart elements not found on initial load, waiting for HTMX...');
+//   }
 
-  // Try to initialize LN chart if elements are present
-  const lnCanvas = document.getElementById('lnChart');
-  const lnDataElement = document.getElementById('lnChartData');
+//   // Try to initialize LN chart if elements are present
+//   const lnCanvas = document.getElementById('lnChart');
+//   const lnDataElement = document.getElementById('lnChartData');
 
-  if (lnCanvas && lnDataElement) {
-    initializeLnChartFromDOM();
-  } else {
-    console.log('LN chart elements not found on initial load, waiting for HTMX...');
-  }
-}
+//   if (lnCanvas && lnDataElement) {
+//     initializeLnChartFromDOM();
+//   } else {
+//     console.log('LN chart elements not found on initial load, waiting for HTMX...');
+//   }
+// }
+
+/**
+ * Initialize charts on page load
+ */
+// export function initCharts() {
+//   // Set up HTMX listener for dynamic updates (do this first)
+//   setupHtmxListener();
+
+//   // Initialize any charts already in the DOM (others will be handled by HTMX events)
+//   // initializeProofsChartFromDOM();
+//   initializeBlindSigsChartFromDOM();
+//   initializeLnChartFromDOM();
+// }
+
+setupHtmxListener();

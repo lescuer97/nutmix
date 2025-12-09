@@ -7,10 +7,10 @@ import { initCore } from './modules/core.js';
 import { initAuth } from './modules/auth.js';
 
 // 3. Time controls module
-import { initTimeControls } from './modules/time-controls.js';
+// import { initTimeControls } from './modules/time-controls.js';
 
 // 4. Chart module
-import { initCharts } from './modules/chart.js';
+// import { initCharts } from './modules/chart.js';
 
 /**
  * Initialize the application
@@ -24,18 +24,18 @@ function initializeApp() {
   initAuth();
   
   // Initialize time controls
-  initTimeControls();
+  // initTimeControls();
   
   // Initialize charts (will only render if chart elements exist on the page)
-  initCharts();
+  // initCharts();
   
   console.log('App fully initialized');
 }
 
 // Wait for DOM to be ready before initializing
-if (document.readyState === 'loading') {
+// if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeApp);
-} else {
-  // DOM is already ready
-  initializeApp();
-}
+// } else {
+//   // DOM is already ready
+//   initializeApp();
+// }

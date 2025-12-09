@@ -81,7 +81,7 @@ func RenderSuccess(c *gin.Context, message string) error {
 	return renderHTMX(c, templates.SuccessNotif(message))
 }
 
-//go:embed static/dist/js/*.js static/dist/css/*.css
+//go:embed static/dist/js/*.js static/dist/js/modules/*.js static/dist/css/*.css
 var staticEmbed embed.FS
 
 func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
