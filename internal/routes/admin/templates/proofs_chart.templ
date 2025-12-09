@@ -29,7 +29,7 @@ templ ProofsChartCard(data []database.ProofTimeSeriesPoint, summary ChartSummary
 		id="proofs-chart-card"
 		class="card card-md mt-4 mb-4"
 		hx-get="/admin/proofs-chart"
-		hx-trigger="date-range-changed from:body"
+		hx-trigger="change from:#timeRangeSelect"
 		hx-include="#timeRangeSelect"
 		hx-swap="outerHTML"
 		hx-indicator="#date-range-loading"

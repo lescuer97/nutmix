@@ -168,7 +168,6 @@ templ TimeRangeSelector(selectedRange string) {
 			id="timeRangeSelect"
 			name="since"
 			class="time-range-select"
-			hx-on:change="htmx.trigger(document.body, 'date-range-changed')"
 		>
 			<option value="1w" selected?={ selectedRange == "1w" || selectedRange == "" }>Last 7 days</option>
 			<option value="1m" selected?={ selectedRange == "1m" }>Last 30 days</option>
@@ -191,7 +190,7 @@ templ MintActivityLayout(liquidityManagerAvailable bool, selectedRange string) {
 				id="summary-placeholder"
 				class="mt-4 mb-4"
 				hx-get="/admin/summary"
-				hx-trigger="load, date-range-changed from:body"
+				hx-trigger="load, change from:#timeRangeSelect"
 				hx-include="#timeRangeSelect"
 				hx-swap="outerHTML"
 				hx-indicator="#date-range-loading"
@@ -200,7 +199,7 @@ templ MintActivityLayout(liquidityManagerAvailable bool, selectedRange string) {
 				id="proofs-chart-placeholder"
 				class="mt-4 mb-4"
 				hx-get="/admin/proofs-chart"
-				hx-trigger="load, date-range-changed from:body"
+				hx-trigger="load, change from:#timeRangeSelect"
 				hx-include="#timeRangeSelect"
 				hx-swap="outerHTML"
 				hx-indicator="#date-range-loading"
@@ -215,7 +214,7 @@ templ MintActivityLayout(liquidityManagerAvailable bool, selectedRange string) {
 			<div
 				id="blindsigs-chart-placeholder"
 				hx-get="/admin/blindsigs-chart"
-				hx-trigger="load, date-range-changed from:body"
+				hx-trigger="load, change from:#timeRangeSelect"
 				hx-include="#timeRangeSelect"
 				hx-swap="outerHTML"
 				hx-indicator="#date-range-loading"
@@ -245,7 +244,7 @@ templ SummaryComponent(summary Summary) {
 		id="summary-placeholder"
 		class="flex gap-4 mb-4 mt-4 flex-wrap"
 		hx-get="/admin/summary"
-		hx-trigger="date-range-changed from:body"
+		hx-trigger="change from:#timeRangeSelect"
 		hx-include="#timeRangeSelect"
 		hx-swap="outerHTML"
 		hx-indicator="#date-range-loading"
