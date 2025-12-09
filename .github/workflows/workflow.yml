@@ -26,6 +26,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y just
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
       - name: Install dependencies
         run: just install-deps
 
