@@ -35,7 +35,6 @@ const (
 	CUSTOMDATABASE = "CUSTOMDATABASE"
 )
 
-
 // ProofTimeSeriesPoint represents a single data point for charting proofs over time
 type ProofTimeSeriesPoint struct {
 	Timestamp   int64  `json:"timestamp"`   // Unix timestamp (seconds) for the bucket start

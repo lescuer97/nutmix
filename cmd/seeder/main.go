@@ -61,7 +61,7 @@ func main() {
 
 		// --- Keyset Rotation ---
 		fee := uint((i + 1) * 100)
-		
+
 		// Start Transaction for Keyset Rotation
 		tx, err := db.GetTx(ctx)
 		if err != nil {
@@ -73,7 +73,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to get seeds: %v", err)
 		}
-		
+
 		highestVersion := 0
 		for idx, s := range seeds {
 			if s.Version > highestVersion {
@@ -81,7 +81,7 @@ func main() {
 			}
 			seeds[idx].Active = false
 		}
-		
+
 		if len(seeds) > 0 {
 			if err := db.UpdateSeedsActiveStatus(tx, seeds); err != nil {
 				log.Fatalf("Failed to update seeds status: %v", err)
@@ -133,7 +133,7 @@ func main() {
 
 		// --- Request Generation ---
 		numRequests := 50 // Max 50
-		
+
 		for j := 0; j < numRequests; j++ {
 			// Randomly choose Mint or Melt
 			isMint := coinFlip()
@@ -228,16 +228,16 @@ func processMint(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 				log.Printf("Mint: Key not found for amount %d", msg.Amount)
 				return
 			}
-			
+
 			// Sign
 			C_ := crypto.SignBlindedMessage(msg.B_.PublicKey, key.PrivKey)
-			
+
 			blindSig := cashu.BlindSignature{
 				Amount: msg.Amount,
 				Id:     keysetId,
 				C_:     cashu.WrappedPublicKey{PublicKey: C_},
 			}
-			
+
 			// Generate DLEQ
 			if err := blindSig.GenerateDLEQ(msg.B_.PublicKey, key.PrivKey); err != nil {
 				log.Printf("Mint: Failed to generate DLEQ: %v", err)
@@ -255,7 +255,7 @@ func processMint(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 				Dleq:      blindSig.Dleq,
 				MeltQuote: "", // Not relevant for mint
 			})
-			
+
 			// Unblind to get proof
 			C := crypto.UnblindSignature(C_, rs[i], key.PrivKey.PubKey())
 			*availableProofs = append(*availableProofs, cashu.Proof{
@@ -263,16 +263,16 @@ func processMint(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 				Id:     keysetId,
 				Secret: secrets[i],
 				C:      cashu.WrappedPublicKey{PublicKey: C},
-				// Y is needed for validation/DB constraint? 
+				// Y is needed for validation/DB constraint?
 				// Usually Y = HashToCurve(Secret), let's calculate it if needed by DB schema
 			})
-			
+
 			// Calculate Y for the proof (needed for DB SaveProof)
 			// In cashu/nutmix, Y seems to be stored in DB proofs table.
 			// Let's check how Y is derived. Usually it's HashToCurve(Secret).
 			// Looking at api/cashu/types.go or pkg/crypto.
 			// pkg/crypto/bdhke.go usually has HashToCurve.
-			// I'll use a placeholder/helper if I can't find it immediately, 
+			// I'll use a placeholder/helper if I can't find it immediately,
 			// but I should check.
 			// Wait, the proofs table has a Y column. I should calculate it.
 			Y, err := crypto.HashToCurve([]byte(secrets[i]))
@@ -289,14 +289,14 @@ func processMint(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 			log.Printf("Mint: Failed to save restore sigs: %v", err)
 			return
 		}
-		
-		// We DO NOT save the proofs here for minting? 
+
+		// We DO NOT save the proofs here for minting?
 		// Usually the mint doesn't store the proofs until they are spent?
 		// Wait, the mint stores used proofs (nullifiers/Y).
 		// So for MINT operation, we don't insert into `proofs` table.
 		// `proofs` table tracks SPENT proofs (nullifiers).
 	}
-	
+
 	if err := db.Commit(ctx, tx); err != nil {
 		log.Printf("Mint: Failed to commit: %v", err)
 	}
@@ -348,7 +348,7 @@ func processMelt(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 		paid = false
 		selectedProofs = nil
 	}
-	
+
 	actualAmount := targetAmount
 	if !paid {
 		actualAmount = targetAmount // Just the request amount
@@ -388,7 +388,7 @@ func processMelt(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 		// Let's verify this assumption.
 		// backend.go: GetProofsFromSecret -> SELECT ... FROM proofs
 		// If it's for double spending check, then inserting means "spending".
-		
+
 		for i := range selectedProofs {
 			selectedProofs[i].SeenAt = timestamp.Unix()
 			selectedProofs[i].Quote = &quoteId
@@ -407,7 +407,7 @@ func processMelt(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 			*availableProofs = append((*availableProofs)[:idx], (*availableProofs)[idx+1:]...)
 		}
 	}
-	
+
 	if err := db.Commit(ctx, tx); err != nil {
 		log.Printf("Melt: Failed to commit: %v", err)
 	}
@@ -466,4 +466,3 @@ func createBlindedMessages(amount uint64, keysetId string) ([]cashu.BlindedMessa
 
 	return blindedMessages, secrets, rs, nil
 }
-

@@ -584,7 +584,6 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSig
 	}
 }
 
-
 func (pql Postgresql) GetProofsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
 	var points []database.ProofTimeSeriesPoint
 
@@ -595,7 +594,7 @@ func (pql Postgresql) GetProofsTimeSeries(since int64, bucketMinutes int) ([]dat
 
 	// Use floor division to group proofs into time buckets
 	// (seen_at / bucket_seconds) * bucket_seconds gives us the bucket start timestamp
-	
+
 	// Use current time as upper bound
 	now := time.Now().Unix()
 	query = `SELECT 
@@ -607,7 +606,6 @@ func (pql Postgresql) GetProofsTimeSeries(since int64, bucketMinutes int) ([]dat
 			 GROUP BY bucket_timestamp
 			 ORDER BY bucket_timestamp ASC`
 	args = []any{since, now, bucketSeconds}
-	
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {
@@ -640,7 +638,7 @@ func (pql Postgresql) GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]
 
 	// Use floor division to group blind sigs into time buckets
 	// (created_at / bucket_seconds) * bucket_seconds gives us the bucket start timestamp
-	
+
 	// Use current time as upper bound
 	now := time.Now().Unix()
 	query = `SELECT 
@@ -652,7 +650,6 @@ func (pql Postgresql) GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]
 			 GROUP BY bucket_timestamp
 			 ORDER BY bucket_timestamp ASC`
 	args = []any{since, now, bucketSeconds}
-	
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {

@@ -38,13 +38,12 @@ templ LiquidityDashboard() {
 			</div>
 			// liquidity summary should show the total amount of sats owned and the total amount of sats in the ln node
 			<div class="mt-4 mb-4">
-					<div
-						hx-get="/admin/liquidity-summary"
-						hx-trigger="load"
-						hx-swap="innerHTML"
-					></div>
+				<div
+					hx-get="/admin/liquidity-summary"
+					hx-trigger="load"
+					hx-swap="innerHTML"
+				></div>
 			</div>
-
 			<div class="actions-container">
 				<h3 class="mb-4">Recent Swaps</h3>
 				<div class="active-swaps">
@@ -300,11 +299,11 @@ templ LiquiditySummaryComponent(lnSatsBalance uint64, balance Balance) {
 	{{ iliquid := lnSatsBalance < balance.NeededBalance }}
 	<div class="flex gap-4 mb-4 mt-4 flex-wrap">
 		<div class="card card-md flex-1">
-			<div class={"text-secondary font-semibold uppercase text-xs mb-2"}>Sats needed</div>
-			<div class={"text-2xl font-bold text-primary", templ.KV("iliquid", iliquid)}>
+			<div class={ "text-secondary font-semibold uppercase text-xs mb-2" }>Sats needed</div>
+			<div class={ "text-2xl font-bold text-primary", templ.KV("iliquid", iliquid) }>
 				{ FormatNumber(balance.NeededBalance) } <span class="text-sm font-normal text-secondary">Sats</span>
 				if iliquid {
-					<span class="text-sm font-normal text-secondary"> (Insufficient balance)</span>
+					<span class="text-sm font-normal text-secondary">(Insufficient balance)</span>
 				}
 			</div>
 		</div>

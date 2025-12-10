@@ -66,7 +66,7 @@ templ KeysetsList(keysetMap map[string][]KeysetData, orderedUnits []string) {
 			<h2 class="text-xl font-semibold mb-4 capitalize text-primary">
 				{ unit }
 			</h2>
-			<div class="flex flex-wrap gap-6">
+			<div class="flex flex-wrap gap-6 keysets-list">
 				for _, keyset := range keysets {
 					@keysetCard(keyset)
 				}
