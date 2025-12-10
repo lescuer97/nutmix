@@ -12,6 +12,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"golang.org/x/sync/errgroup"
 )
 
 type adminHandler struct {
@@ -108,34 +109,46 @@ func (a *adminHandler) lnSatsBalance() (uint64, error) {
 	return milillisatBalance, nil
 }
 
-func (a *adminHandler) getProofsBalance(since time.Time) (templates.Balance, error) {
+func (a *adminHandler) EcashBalance(since time.Time) (templates.Balance, error) {
 	proofsTotalAmountValue := uint64(0)
 	proofsTotalQuantityValue := uint64(0)
 
-	proofsReserve, err := a.mint.MintDB.GetProofsCountByKeyset(time.Unix(0, 0))
-	if err != nil {
-		return templates.Balance{}, fmt.Errorf("a.mint.MintDB.GetProofsInventory(time.Unix(0, 0)). %w", err)
-	}
+	errgroup := errgroup.Group{}
 
-	for _, val := range proofsReserve {
-		proofsTotalAmountValue += val.TotalAmount
-		proofsTotalQuantityValue += val.Count
-	}
+	errgroup.Go(func() error {
+		proofsReserve, err := a.mint.MintDB.GetProofsCountByKeyset(time.Unix(0, 0))
+		if err != nil {
+			return fmt.Errorf("a.mint.MintDB.GetProofsInventory(time.Unix(0, 0)). %w", err)
+		}
+
+		for _, val := range proofsReserve {
+			proofsTotalAmountValue += val.TotalAmount
+			proofsTotalQuantityValue += val.Count
+		}
+		return nil
+	})
 
 	blindSigsTotalAmountValue := uint64(0)
 	blindSigsTotalQuantityValue := uint64(0)
 
-	blindSigsReserve, err := a.mint.MintDB.GetBlindSigsCountByKeyset(time.Unix(0, 0))
+	errgroup.Go(func() error {
+		blindSigsReserve, err := a.mint.MintDB.GetBlindSigsCountByKeyset(time.Unix(0, 0))
+		if err != nil {
+			return fmt.Errorf("a.mint.MintDB.GetBlindSigsInventory(time.Unix(0, 0)). %w", err)
+		}
+
+		for _, val := range blindSigsReserve {
+			blindSigsTotalAmountValue += val.TotalAmount
+			blindSigsTotalQuantityValue += val.Count
+		}
+		return nil
+	})
+	err := errgroup.Wait()
 	if err != nil {
-		return templates.Balance{}, fmt.Errorf("a.mint.MintDB.GetBlindSigsInventory(time.Unix(0, 0)). %w", err)
+		return templates.Balance{}, fmt.Errorf("errgroup.Wait(). %w", err)
 	}
 
-	for _, val := range blindSigsReserve {
-		blindSigsTotalAmountValue += val.TotalAmount
-		blindSigsTotalQuantityValue += val.Count
-	}
-
-	neededBalance := proofsTotalAmountValue - blindSigsTotalAmountValue
+	neededBalance := blindSigsTotalAmountValue - proofsTotalAmountValue
 
 	ratioProofSigAmountSats := (float64(proofsTotalAmountValue) / float64(blindSigsTotalAmountValue)) * 100
 

@@ -186,3 +186,7 @@
   gap: var(--space-3);
   align-items: center;
 }
+
+.iliquid {
+  color: var(--accent-red);
+}

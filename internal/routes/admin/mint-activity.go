@@ -12,7 +12,6 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-
 func SwapsList(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 

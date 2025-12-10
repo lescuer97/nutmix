@@ -197,6 +197,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 			adminRoute.GET("/lightning-swap-form", LightningSwapForm())
 			adminRoute.POST("/out-swap-req", SwapOutRequest(mint))
 			adminRoute.POST("/in-swap-req", SwapInRequest(mint, newLiquidity))
+			adminRoute.GET("/liquidity-summary", LiquiditySummaryComponent(&adminHandler))
 			adminRoute.GET("/swap/:swapId", SwapStateCheck(mint))
 			adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(mint, newLiquidity))
 			go CheckStatusOfLiquiditySwaps(mint, newLiquidity)
@@ -204,4 +205,3 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 	}
 
 }
-

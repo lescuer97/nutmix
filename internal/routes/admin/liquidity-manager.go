@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/gin-gonic/gin"
@@ -538,4 +539,29 @@ func generateQR(data string) (string, error) {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(png), nil
+}
+
+func LiquiditySummaryComponent(handler *adminHandler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+		balance, err := handler.EcashBalance(time.Unix(0, 0))
+		if err != nil {
+			c.Error(fmt.Errorf("mint.MintDB.GetNeededSats(). %w", err))
+			return
+		}
+
+		lnSatsBalance, err := handler.lnSatsBalance()
+		if err != nil {
+			c.Error(fmt.Errorf("handler.lnSatsBalance(). %w", err))
+			return
+		}
+
+		component := templates.LiquiditySummaryComponent(lnSatsBalance, balance)
+		err = component.Render(ctx, c.Writer)
+		if err != nil {
+			c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
+			return
+
+		}
+	}
 }
