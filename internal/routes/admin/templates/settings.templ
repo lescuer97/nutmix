@@ -242,32 +242,3 @@ templ Auth(config utils.Config) {
 		});
 	</script>
 }
-
-templ MultiSelect(id string, name string, options []string, selectedValues []string) {
-	<select id={ id } name={ name } multiple>
-		for _, option := range options {
-			<option
-				value={ option }
-				selected?={ isSelected(option, selectedValues) }
-			>
-				{ option }
-			</option>
-		}
-	</select>
-}
-
-func stringOrEmpty(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-func isSelected(value string, selectedValues []string) bool {
-	for _, selectedValue := range selectedValues {
-		if selectedValue == value {
-			return true
-		}
-	}
-	return false
-}

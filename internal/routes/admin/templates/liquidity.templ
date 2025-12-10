@@ -295,12 +295,6 @@ templ SwapStatusPage(summary templ.Component) {
 	}
 }
 
-// QR component
-templ QRCode(qrData string) {
-	<img src={ "data:image/png;base64," + qrData } alt="QR Code"/>
-}
-
-
 // two cards ln sats balance and sats needed
 templ LiquiditySummaryComponent(lnSatsBalance uint64, balance Balance) {
 	{{ iliquid := lnSatsBalance < balance.NeededBalance }}
