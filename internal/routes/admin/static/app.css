@@ -118,6 +118,22 @@
   flex-direction: column;
 }
 
+
+/*  make reactive scrollable div with max height of the size of the screen remaining */
+.table .rows {
+  max-height: calc(100vh - 200px);
+  min-height: 100px;
+  overflow-y: auto; 
+}
+
+@media (max-height: 768px) {
+  .table .rows {
+    max-height: calc(100vh - 200px);
+    min-height: 100px;
+    overflow-y: auto; 
+  }
+}
+
 .row-item {
   display: flex;
   padding: var(--space-3) var(--space-4);
@@ -168,5 +184,5 @@
 .page-actions {
   display: flex;
   gap: var(--space-3);
-  margin-bottom: var(--space-6);
+  align-items: center;
 }
