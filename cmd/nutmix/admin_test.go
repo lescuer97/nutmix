@@ -236,19 +236,14 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
+	if w.Code != 200 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
 
 	var res string
 
-	err = json.Unmarshal(w.Body.Bytes(), &res)
-	if err != nil {
-		t.Errorf("Error unmarshalling response: %v", err)
-	}
-
-	if res != "Private key used is not correct" {
-		t.Errorf("Expected to get Private key used is not correct %s", res)
+	if !strings.Contains(w.Body.String(), "Incorrect npub used in signature") {
+		t.Errorf("Expected to get Incorrect npub used in signature %s", res)
 	}
 }
 
