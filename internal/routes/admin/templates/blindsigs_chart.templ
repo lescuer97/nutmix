@@ -1,6 +1,7 @@
 package templates
 
 import "github.com/lescuer97/nutmix/internal/database"
+import "time"
 
 // BlindSigsChartContent renders just the chart canvas and data - used for HTMX date updates
 templ BlindSigsChartContent(data []database.ProofTimeSeriesPoint) {
@@ -24,7 +25,13 @@ templ BlindSigsChartCard(data []database.ProofTimeSeriesPoint, summary ChartSumm
 		hx-indicator="#date-range-loading"
 	>
 		<div class="chart-header-content">
-			<h2 class="mb-6 text-xl font-semibold">Blind Signatures</h2>
+			<h2 class="mb-5 text-xl font-semibold">Blind Signatures</h2>
+			if len(data) > 0 {
+				{{ sinceDate := time.Unix(data[0].Timestamp, 0).Format("Jan 2, 2006") }}
+				<div class="text-xs text-secondary mt-2 mb-2">
+					Blind signatures generated since: { sinceDate }
+				</div>
+			}
 			<div class="chart-summary-container">
 				<div class="summary-card">
 					<div class="summary-icon">
