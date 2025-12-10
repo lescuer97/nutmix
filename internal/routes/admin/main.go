@@ -147,7 +147,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 
 	adminRoute.Use(ErrorHtmlMessageMiddleware())
 	// I use the first active keyset as secret for jwt token signing
-	// adminRoute.Use(AuthMiddleware(loginKey.Serialize(), tokenBlacklist))
+	adminRoute.Use(AuthMiddleware(loginKey.Serialize(), tokenBlacklist))
 
 	adminHandler := newAdminHandler(mint)
 
