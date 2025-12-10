@@ -13,8 +13,6 @@ import (
 
 	"log/slog"
 	"os"
-	"slices"
-	"time"
 
 	"github.com/a-h/templ"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -184,7 +182,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		// fractional html components
 		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(&adminHandler))
 		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
-		adminRoute.GET("/logs", LogsTab())
 
 		// only have swap routes if liquidity manager is possible
 		if utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
@@ -208,101 +205,3 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 
 }
 
-type TIME_REQUEST string
-
-var (
-	h24 TIME_REQUEST = "24h"
-	h48 TIME_REQUEST = "48h"
-	h72 TIME_REQUEST = "72h"
-	d7  TIME_REQUEST = "7D"
-	ALL TIME_REQUEST = "all"
-)
-
-func ParseToTimeRequest(str string) TIME_REQUEST {
-
-	switch str {
-	case "24h":
-		return h24
-	case "48h":
-		return h48
-	case "72h":
-		return h72
-	case "7d":
-		return d7
-	case "all":
-		return ALL
-	default:
-		return h24
-	}
-
-}
-
-// return 24 hours by default
-func (t TIME_REQUEST) RollBackFromNow() time.Time {
-	rollBackHour := time.Now()
-
-	switch t {
-	case h24:
-		duration := time.Duration(24) * time.Hour
-		return rollBackHour.Add(-duration)
-	case h48:
-		duration := time.Duration(48) * time.Hour
-		return rollBackHour.Add(-duration)
-	case h72:
-		duration := time.Duration(72) * time.Hour
-		return rollBackHour.Add(-duration)
-	case d7:
-		duration := time.Duration((7 * 24)) * time.Hour
-		return rollBackHour.Add(-duration)
-	case ALL:
-		return time.Unix(1, 0)
-	}
-	duration := time.Duration(24) * time.Hour
-	return rollBackHour.Add(-duration)
-}
-
-func LogsTab() gin.HandlerFunc {
-
-	return func(c *gin.Context) {
-
-		timeHeader := c.GetHeader("time")
-
-		timeRequestDuration := ParseToTimeRequest(timeHeader)
-
-		// read logs
-		logsdir, err := utils.GetLogsDirectory()
-
-		if err != nil {
-			slog.Warn(
-				"utils.GetLogsDirectory()",
-				slog.String(utils.LogExtraInfo, err.Error()))
-
-		}
-
-		file, err := os.Open(logsdir + "/" + m.LogFileName)
-		if err != nil {
-			slog.Warn(
-				"os.Open(logsdir ",
-				slog.String(utils.LogExtraInfo, err.Error()))
-
-			err := RenderError(c, "Could not get logs from mint")
-			if err != nil {
-				slog.Error("RenderError", slog.Any("error", err))
-			}
-			return
-		}
-		defer file.Close()
-
-		logs := utils.ParseLogFileByLevelAndTime(file, []slog.Level{slog.LevelWarn, slog.LevelError, slog.LevelInfo}, timeRequestDuration.RollBackFromNow())
-
-		slices.Reverse(logs)
-		ctx := context.Background()
-
-		err = templates.Logs(logs).Render(ctx, c.Writer)
-		if err != nil {
-			c.Error(err)
-			// c.HTML(400,"", nil)
-			return
-		}
-	}
-}
