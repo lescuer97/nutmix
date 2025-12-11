@@ -26,7 +26,7 @@ func LiquidityButton(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 		if !utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
-			c.Status(404)
+			// c.Status(200)
 			return
 		}
 		component := templates.LiquidityButton()

@@ -66,8 +66,9 @@ func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 				if c.Request.URL.Path == "/admin/login" {
 					return
 				}
+				slog.Debug("token is not valid", slog.Any("token", token))
 				c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
-				c.Header("HX-Redirect", "/admin/login")
+				c.Header("HX-Location", "/admin/login")
 				return
 
 			}

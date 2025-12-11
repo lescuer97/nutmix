@@ -344,7 +344,7 @@ func calculateLnChartSummary(data []templates.MintMeltTimeSeriesPoint) templates
 
 // buildMintMeltTimeSeries processes raw mint/melt data and aggregates into time buckets
 // using zpay32 to decode invoice amounts
-func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *chaincfg.Params, startTime, endTime time.Time, bucketMinutes int) []templates.MintMeltTimeSeriesPoint {
+func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *chaincfg.Params, startTime time.Time, bucketMinutes int) []templates.MintMeltTimeSeriesPoint {
 	bucketSeconds := int64(bucketMinutes * 60)
 
 	// Maps to aggregate data by bucket
@@ -353,10 +353,6 @@ func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *
 
 	// Process mint requests - decode invoice to get amount
 	for _, mintRequest := range mintMeltBalance.Mint {
-		// Filter by end time
-		if mintRequest.SeenAt >= endTime.Unix() {
-			continue
-		}
 
 		invoice, err := zpay32.Decode(mintRequest.Request, network)
 		if err != nil {
@@ -379,10 +375,6 @@ func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *
 
 	// Process melt requests - use Amount field if > 0, otherwise decode invoice
 	for _, meltRequest := range mintMeltBalance.Melt {
-		// Filter by end time
-		if meltRequest.SeenAt >= endTime.Unix() {
-			continue
-		}
 
 		var amount int64
 		if meltRequest.Amount > 0 {
@@ -451,7 +443,6 @@ func LnChartCard(mint *mint.Mint) gin.HandlerFunc {
 		// Parse time range from query params
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
-		endTime := time.Now()
 
 		// Fetch raw mint/melt data
 		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(startTime.Unix())
@@ -462,8 +453,10 @@ func LnChartCard(mint *mint.Mint) gin.HandlerFunc {
 			mintMeltBalance = database.MintMeltBalance{}
 		}
 
+		fmt.Printf("\n mintMeltBalance: %+v\n", mintMeltBalance)
+
 		// Process and aggregate into time series using zpay32 for invoice decoding
-		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime, endTime, bucketMinutes)
+		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime,  bucketMinutes)
 
 		summary := calculateLnChartSummary(data)
 
@@ -483,7 +476,6 @@ func LnChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		// Parse time range from query params
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
-		endTime := time.Now()
 
 		// Fetch raw mint/melt data
 		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(startTime.Unix())
@@ -495,7 +487,7 @@ func LnChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		}
 
 		// Process and aggregate into time series using zpay32 for invoice decoding
-		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime, endTime, bucketMinutes)
+		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime,  bucketMinutes)
 
 		// Return HTML fragment for HTMX
 		err = templates.LnChartContent(data).Render(ctx, c.Writer)

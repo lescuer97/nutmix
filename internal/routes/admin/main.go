@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"strings"
 
 	"log/slog"
 	"os"
@@ -133,15 +132,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		nostrPubkey = pubkey
 	}
 
-	// INFO: if the admin page has a 404 we redirect to the login
-	r.Use(func(c *gin.Context) {
-		c.Next()
-		if c.Writer.Status() == http.StatusNotFound &&
-			strings.Contains(c.Request.URL.Path, "/admin") {
-			c.Redirect(http.StatusFound, "/admin/login")
-			c.Abort()
-		}
-	})
 	// Create token blacklist
 	tokenBlacklist := NewTokenBlacklist()
 
