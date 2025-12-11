@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database/postgresql"
 	"github.com/lescuer97/nutmix/internal/signer"
@@ -24,6 +25,11 @@ const (
 func main() {
 	log.Println("Starting database seeder...")
 
+	// get variables from env file
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatalf("Failed to load env file: %v", err)
+	}
 	// 1. Setup
 	mintPrivateKeyHex := os.Getenv("MINT_PRIVATE_KEY")
 	if mintPrivateKeyHex == "" {
@@ -48,101 +54,117 @@ func main() {
 
 	ctx := context.Background()
 
-	// 2. Main Loop - 24 Months
+	// 2. Main Loop - 24 Months, Weekly Requests
+	// Track: Blind Signature and Proof Invariants
+	// - Blind signatures are created in mint operations (one per blinded message)
+	// - Proofs are created from blind signatures in mint operations (one per blind signature)
+	// - Proofs are consumed (spent) in melt operations for paid requests
+	// - Invariant: len(availableProofs) <= total_blind_signatures_created
+	// - Invariant: proofs_saved_for_melt <= len(availableProofs) <= total_blind_signatures_created
 	now := time.Now()
 	startTime := now.AddDate(0, -24, 0)
 
 	availableProofs := make([]cashu.Proof, 0)
 	var currentKeyset map[uint64]cashu.MintKey
+	var currentKeysetId string
+	var currentMonth int = -1
 
-	for i := 0; i < 24; i++ {
-		currentMonthTime := startTime.AddDate(0, i, 0)
-		log.Printf("Processing month: %s", currentMonthTime.Format("2006-01"))
+	// Calculate total days: 24 months ≈ 730 days
+	// Generate requests once per day (multiple times per week)
+	totalDays := 24 * 30 // Approximate 30 days per month
 
-		// --- Keyset Rotation ---
-		fee := uint((i + 1) * 100)
+	for day := 0; day < totalDays; day++ {
+		currentDayTime := startTime.AddDate(0, 0, day)
+		currentDayMonth := int(currentDayTime.Month()) - 1 + (currentDayTime.Year()-startTime.Year())*12
 
-		// Start Transaction for Keyset Rotation
-		tx, err := db.GetTx(ctx)
-		if err != nil {
-			log.Fatalf("Failed to begin transaction: %v", err)
-		}
+		// Rotate keyset monthly
+		if currentDayMonth != currentMonth {
+			currentMonth = currentDayMonth
+			log.Printf("Processing month: %s", currentDayTime.Format("2006-01"))
 
-		// Deactivate existing Sat seeds
-		seeds, err := db.GetSeedsByUnit(tx, cashu.Sat)
-		if err != nil {
-			log.Fatalf("Failed to get seeds: %v", err)
-		}
+			// --- Keyset Rotation ---
+			fee := uint((currentMonth + 1) * 100)
 
-		highestVersion := 0
-		for idx, s := range seeds {
-			if s.Version > highestVersion {
-				highestVersion = s.Version
+			// Start Transaction for Keyset Rotation
+			tx, err := db.GetTx(ctx)
+			if err != nil {
+				log.Fatalf("Failed to begin transaction: %v", err)
 			}
-			seeds[idx].Active = false
-		}
 
-		if len(seeds) > 0 {
-			if err := db.UpdateSeedsActiveStatus(tx, seeds); err != nil {
-				log.Fatalf("Failed to update seeds status: %v", err)
+			// Deactivate existing Sat seeds
+			seeds, err := db.GetSeedsByUnit(tx, cashu.Sat)
+			if err != nil {
+				log.Fatalf("Failed to get seeds: %v", err)
 			}
-		}
 
-		// Create New Seed
-		newSeed := cashu.Seed{
-			CreatedAt:   currentMonthTime.Unix(),
-			Active:      true,
-			Version:     highestVersion + 1,
-			Unit:        cashu.Sat.String(),
-			InputFeePpk: fee,
-		}
-
-		// Derive keys for the new seed
-		keysets, err := signer.DeriveKeyset(masterKey, newSeed)
-		if err != nil {
-			log.Fatalf("Failed to derive keyset: %v", err)
-		}
-
-		// Calculate ID
-		pubkeys := make([]*secp256k1.PublicKey, 0)
-		for _, k := range keysets {
-			pubkeys = append(pubkeys, k.GetPubKey())
-		}
-		keysetId, err := cashu.DeriveKeysetId(pubkeys)
-		if err != nil {
-			log.Fatalf("Failed to derive keyset ID: %v", err)
-		}
-		newSeed.Id = keysetId
-
-		// Save new seed
-		if err := db.SaveNewSeed(tx, newSeed); err != nil {
-			log.Fatalf("Failed to save new seed: %v", err)
-		}
-
-		if err := db.Commit(ctx, tx); err != nil {
-			log.Fatalf("Failed to commit keyset rotation: %v", err)
-		}
-
-		// Update current keyset map for signing
-		currentKeyset = make(map[uint64]cashu.MintKey)
-		for _, k := range keysets {
-			// Ensure private key is set correctly from derivation
-			k.Id = keysetId // Ensure ID is set
-			currentKeyset[k.Amount] = k
-		}
-
-		// --- Request Generation ---
-		numRequests := 50 // Max 50
-
-		for j := 0; j < numRequests; j++ {
-			// Randomly choose Mint or Melt
-			isMint := coinFlip()
-
-			if isMint {
-				processMint(ctx, db, currentMonthTime, currentKeyset, keysetId, &availableProofs)
-			} else {
-				processMelt(ctx, db, currentMonthTime, &availableProofs)
+			highestVersion := 0
+			for idx, s := range seeds {
+				if s.Version > highestVersion {
+					highestVersion = s.Version
+				}
+				seeds[idx].Active = false
 			}
+
+			if len(seeds) > 0 {
+				if err := db.UpdateSeedsActiveStatus(tx, seeds); err != nil {
+					log.Fatalf("Failed to update seeds status: %v", err)
+				}
+			}
+
+			// Create New Seed
+			newSeed := cashu.Seed{
+				CreatedAt:   currentDayTime.Unix(),
+				Active:      true,
+				Version:     highestVersion + 1,
+				Unit:        cashu.Sat.String(),
+				InputFeePpk: fee,
+			}
+
+			// Derive keys for the new seed
+			keysets, err := signer.DeriveKeyset(masterKey, newSeed)
+			if err != nil {
+				log.Fatalf("Failed to derive keyset: %v", err)
+			}
+
+			// Calculate ID
+			pubkeys := make([]*secp256k1.PublicKey, 0)
+			for _, k := range keysets {
+				pubkeys = append(pubkeys, k.GetPubKey())
+			}
+			keysetId, err := cashu.DeriveKeysetId(pubkeys)
+			if err != nil {
+				log.Fatalf("Failed to derive keyset ID: %v", err)
+			}
+			newSeed.Id = keysetId
+
+			// Save new seed
+			if err := db.SaveNewSeed(tx, newSeed); err != nil {
+				log.Fatalf("Failed to save new seed: %v", err)
+			}
+
+			if err := db.Commit(ctx, tx); err != nil {
+				log.Fatalf("Failed to commit keyset rotation: %v", err)
+			}
+
+			// Update current keyset map for signing
+			currentKeyset = make(map[uint64]cashu.MintKey)
+			for _, k := range keysets {
+				// Ensure private key is set correctly from derivation
+				k.Id = keysetId // Ensure ID is set
+				currentKeyset[k.Amount] = k
+			}
+			currentKeysetId = keysetId
+		}
+
+		// --- Request Generation - Weekly (multiple times per week) ---
+		// Generate requests once per day (7 times per week)
+		// Randomly choose Mint or Melt
+		isMint := coinFlip()
+
+		if isMint {
+			processMint(ctx, db, currentDayTime, currentKeyset, currentKeysetId, &availableProofs)
+		} else {
+			processMelt(ctx, db, currentDayTime, &availableProofs)
 		}
 	}
 
@@ -218,9 +240,22 @@ func processMint(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 			return
 		}
 
+		// Validate that blinded messages sum equals invoice amount
+		var blindedMessagesSum uint64
+		for _, msg := range blindedMessages {
+			blindedMessagesSum += msg.Amount
+		}
+		if blindedMessagesSum != amount {
+			log.Printf("Mint: Blinded messages sum (%d) does not match invoice amount (%d)", blindedMessagesSum, amount)
+			return
+		}
+
 		// Sign Messages
+		// Track: We create one blind signature per blinded message
+		// This ensures blind signatures count matches blinded messages count
 		var signatures []cashu.BlindSignature
 		var recoverSigs []cashu.RecoverSigDB
+		proofsBeforeMint := len(*availableProofs)
 
 		for i, msg := range blindedMessages {
 			key, ok := keyset[msg.Amount]
@@ -229,7 +264,7 @@ func processMint(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 				return
 			}
 
-			// Sign
+			// Sign - creates one blind signature per blinded message
 			C_ := crypto.SignBlindedMessage(msg.B_.PublicKey, key.PrivKey)
 
 			blindSig := cashu.BlindSignature{
@@ -257,24 +292,17 @@ func processMint(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 			})
 
 			// Unblind to get proof
+			// Track: We create one proof per blind signature
+			// This ensures proofs count matches blind signatures count
 			C := crypto.UnblindSignature(C_, rs[i], key.PrivKey.PubKey())
 			*availableProofs = append(*availableProofs, cashu.Proof{
 				Amount: msg.Amount,
 				Id:     keysetId,
 				Secret: secrets[i],
 				C:      cashu.WrappedPublicKey{PublicKey: C},
-				// Y is needed for validation/DB constraint?
-				// Usually Y = HashToCurve(Secret), let's calculate it if needed by DB schema
 			})
 
 			// Calculate Y for the proof (needed for DB SaveProof)
-			// In cashu/nutmix, Y seems to be stored in DB proofs table.
-			// Let's check how Y is derived. Usually it's HashToCurve(Secret).
-			// Looking at api/cashu/types.go or pkg/crypto.
-			// pkg/crypto/bdhke.go usually has HashToCurve.
-			// I'll use a placeholder/helper if I can't find it immediately,
-			// but I should check.
-			// Wait, the proofs table has a Y column. I should calculate it.
 			Y, err := crypto.HashToCurve([]byte(secrets[i]))
 			if err == nil {
 				(*availableProofs)[len(*availableProofs)-1].Y = cashu.WrappedPublicKey{PublicKey: Y}
@@ -284,7 +312,22 @@ func processMint(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 			(*availableProofs)[len(*availableProofs)-1].Quote = &quoteId
 		}
 
+		// Validate: Number of blind signatures should equal number of blinded messages
+		if len(signatures) != len(blindedMessages) {
+			log.Printf("Mint: Number of blind signatures (%d) does not match blinded messages (%d)", len(signatures), len(blindedMessages))
+			return
+		}
+
+		// Validate: Number of proofs created should equal number of blind signatures
+		proofsCreated := len(*availableProofs) - proofsBeforeMint
+		if proofsCreated != len(signatures) {
+			log.Printf("Mint: Number of proofs created (%d) does not match blind signatures (%d)", proofsCreated, len(signatures))
+			return
+		}
+
 		// Save Blind Signatures (Recovery)
+		// Track: These blind signatures are saved to the database
+		// The proofs created above come from these blind signatures
 		if err := db.SaveRestoreSigs(tx, recoverSigs); err != nil {
 			log.Printf("Mint: Failed to save restore sigs: %v", err)
 			return
@@ -327,26 +370,48 @@ func processMelt(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 		preimage = "preimage_" + quoteId
 	}
 
-	// Select proofs
+	// Select proofs to exactly match invoice amount + fees
+	// Track: Only select proofs for paid melt requests
+	// Ensure proofs don't exceed available blind signatures (they come from availableProofs)
 	var selectedProofs []cashu.Proof
 	var selectedAmount uint64
 	var indicesToRemove []int
+	requiredAmount := targetAmount + feePaid
 
-	// Simple selection strategy
+	// Selection strategy: Select proofs that sum to exactly invoice amount + fees
+	// Since proofs come in binary denominations, we select until we have enough
+	// but try to minimize excess
 	for i, p := range *availableProofs {
-		if selectedAmount >= targetAmount+feePaid {
+		// Stop if we have enough
+		if selectedAmount >= requiredAmount {
 			break
 		}
-		selectedProofs = append(selectedProofs, p)
-		selectedAmount += p.Amount
-		indicesToRemove = append(indicesToRemove, i)
+		// Add proof if adding it doesn't exceed by too much
+		// (with binary denominations, some excess is expected)
+		newAmount := selectedAmount + p.Amount
+		if newAmount <= requiredAmount || (selectedAmount < requiredAmount && newAmount-requiredAmount <= requiredAmount/10) {
+			selectedProofs = append(selectedProofs, p)
+			selectedAmount += p.Amount
+			indicesToRemove = append(indicesToRemove, i)
+		}
 	}
 
-	if paid && selectedAmount < targetAmount+feePaid {
-		// Not enough funds, degrade to unpaid or skip
+	// Validate: For paid melt requests, we must have enough proofs
+	if paid && selectedAmount < requiredAmount {
+		// Not enough funds, degrade to unpaid
 		state = cashu.UNPAID
 		paid = false
 		selectedProofs = nil
+		indicesToRemove = nil
+		selectedAmount = 0
+	}
+
+	// Track: Validate that proofs don't exceed available blind signatures
+	// Since proofs come from availableProofs (which are created from blind signatures),
+	// this invariant is maintained as long as we only use proofs from availableProofs
+	if len(selectedProofs) > len(*availableProofs) {
+		log.Printf("Melt: Selected proofs (%d) exceed available proofs (%d)", len(selectedProofs), len(*availableProofs))
+		return
 	}
 
 	actualAmount := targetAmount
@@ -382,12 +447,15 @@ func processMelt(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 	}
 
 	if paid {
+		// Track: Only save proofs for paid melt requests
+		// The proofs selected above sum to invoice amount + fees (or as close as possible with binary denominations)
+		// Validate: Ensure proofs don't exceed available blind signatures
+		// Since proofs come from availableProofs (created from blind signatures in mint operations),
+		// this invariant is maintained
+
 		// Mark proofs as spent in DB
-		// The `SaveProof` function in backend seems to insert proofs.
-		// In Nutmix, `proofs` table is likely for spent proofs (nullifiers).
-		// Let's verify this assumption.
-		// backend.go: GetProofsFromSecret -> SELECT ... FROM proofs
-		// If it's for double spending check, then inserting means "spending".
+		// The `SaveProof` function inserts proofs into the `proofs` table.
+		// In Nutmix, `proofs` table tracks spent proofs (nullifiers) for double-spend prevention.
 
 		for i := range selectedProofs {
 			selectedProofs[i].SeenAt = timestamp.Unix()
@@ -395,12 +463,20 @@ func processMelt(ctx context.Context, db postgresql.Postgresql, timestamp time.T
 			selectedProofs[i].State = cashu.PROOF_SPENT
 		}
 
+		// Validate: Selected proofs amount should match invoice amount + fees (within binary denomination tolerance)
+		if selectedAmount < requiredAmount {
+			log.Printf("Melt: Selected proofs amount (%d) is less than required (%d)", selectedAmount, requiredAmount)
+			return
+		}
+
 		if err := db.SaveProof(tx, selectedProofs); err != nil {
 			log.Printf("Melt: Failed to save proofs (spend): %v", err)
 			return
 		}
 
-		// Remove from available
+		// Remove from available proofs
+		// Track: This maintains the invariant that availableProofs only contains proofs
+		// that haven't been spent yet (and thus correspond to available blind signatures)
 		// Need to remove indices carefully (reverse order)
 		for i := len(indicesToRemove) - 1; i >= 0; i-- {
 			idx := indicesToRemove[i]
