@@ -73,9 +73,6 @@ install-deps:
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.0
     go install github.com/a-h/templ/cmd/templ@v0.3.960
 
-    # lint tools
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.6.0
-
     # Check protobuf-compiler
     if ! command -v protoc >/dev/null 2>&1; then
       echo "Installing protobuf-compiler..."
@@ -170,8 +167,17 @@ test:
     echo "Running tests..."
     go test -v ./...
 
+# Lint prerequisites
+ensure-golangci-lint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v golangci-lint >/dev/null 2>&1; then
+      echo "golangci-lint not found. Please install it (https://golangci-lint.run/usage/install/)." >&2
+      exit 1
+    fi
+
 # Lint recipe
-lint:
+lint: ensure-golangci-lint
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running linter..."
