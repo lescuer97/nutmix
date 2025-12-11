@@ -139,7 +139,7 @@ func CheckIfSignerErrorExists(err *sig.Error) error {
 		if detail == "" {
 			detail = "Unknown error occurred with the signer"
 		}
-		errResult = fmt.Errorf("%w, Unknown error occurred with the signer", cashu.ErrUnknown)
+		errResult = fmt.Errorf("%w, %s", cashu.ErrUnknown, detail)
 	default:
 		detail := err.Detail
 		if detail == "" {

@@ -64,7 +64,6 @@ func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
 	localsigner.keysets = keysets
 	localsigner.activeKeysets = activeKeysets
 
-	masterKey = nil
 	return localsigner, nil
 
 }
@@ -251,7 +250,6 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 	l.keysets = keysets
 	l.activeKeysets = activeKeysets
 
-	signerMasterKey = nil
 	return nil
 }
 

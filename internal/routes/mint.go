@@ -419,6 +419,10 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 
 		states, err := m.CheckProofState(mint, checkStateRequest.Ys)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
 		checkStateResponse.States = states
 
 		c.JSON(200, checkStateResponse)

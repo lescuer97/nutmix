@@ -274,6 +274,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	excesMintingBlindMessage, _, _, err := CreateBlindedMessages(10000000, activeKeys)
+	if err != nil {
+		t.Fatalf("Error creating blinded messages: %v", err)
+	}
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
 
@@ -304,6 +307,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	errorResponse = cashu.ErrorResponse{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+	if err != nil {
+		t.Errorf("Error unmarshalling response: %v", err)
+	}
 
 	if w.Code != 400 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
@@ -601,6 +607,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w.Flush()
 
 	meltProofs, err = GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
+	if err != nil {
+		t.Fatalf("Error generating melt proofs: %v", err)
+	}
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -1073,6 +1082,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	router.ServeHTTP(w, req)
 
 	excesMintingBlindMessage, _, _, err := CreateBlindedMessages(1000, activeKeys)
+	if err != nil {
+		t.Fatalf("Error creating blinded messages: %v", err)
+	}
 
 	excessMintRequest := cashu.PostMintBolt11Request{
 		Quote:   postMintQuoteResponse.Quote,
@@ -1096,6 +1108,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	errorResponse = cashu.ErrorResponse{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+	if err != nil {
+		t.Errorf("Error unmarshalling response: %v", err)
+	}
 
 	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
@@ -1342,7 +1357,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	badSig = "badSig"
 	replacedRequestBody = strings.Replace(string(jsonRequestBody), origProof, badSig, 1)
 	origProof = invalidSignatureProofs[len(invalidSignatureProofs)-1].C.String()
-	replacedRequestBody = strings.Replace(string(jsonRequestBody), origProof, badSig, 1)
+	replacedRequestBody = strings.Replace(replacedRequestBody, origProof, badSig, 1)
 
 	req = httptest.NewRequest("POST", "/v1/swap", strings.NewReader(replacedRequestBody))
 
@@ -1537,6 +1552,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w.Flush()
 
 	meltProofs, err = GenerateProofs(postSwapResponse.Signatures, activeKeys, swapSecrets, swapPrivateKeySecrets)
+	if err != nil {
+		t.Fatalf("Error generating melt proofs: %v", err)
+	}
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -1765,6 +1783,9 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	errorResponse := cashu.ErrorResponse{}
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+	if err != nil {
+		t.Errorf("Error unmarshalling response: %v", err)
+	}
 
 	if errorResponse.Code != cashu.MINTING_DISABLED {
 		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
@@ -1895,6 +1916,9 @@ func TestFeeReturnAmount(t *testing.T) {
 
 	// test melt tokens
 	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
+	if err != nil {
+		t.Fatalf("Error generating melt proofs: %v", err)
+	}
 
 	// mint cashu tokens
 	changeBlindedMessages, _, _, err := CreateBlindedMessages(10000, activeKeys)

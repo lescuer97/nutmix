@@ -110,8 +110,6 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
 
-	var aliceBlindSigs []cashu.BlindSignature
-
 	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
 
 	w = httptest.NewRecorder()
@@ -129,8 +127,6 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
-
-	aliceBlindSigs = append(aliceBlindSigs, postMintResponse.Signatures...)
 
 	// SWAP P2PK TOKEN with other P2PK TOKENS
 	swapProofs, err := GenerateProofsP2PK(postMintResponse.Signatures, activeKeys, p2pkMintingSecrets, P2PKMintingSecretKeys, []*secp256k1.PrivateKey{lockingPrivKey})
@@ -409,8 +405,6 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
 
-	var aliceBlindSigs []cashu.BlindSignature
-
 	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
 
 	w = httptest.NewRecorder()
@@ -428,8 +422,6 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
-
-	aliceBlindSigs = append(aliceBlindSigs, postMintResponse.Signatures...)
 
 	// SWAP P2PK TOKEN with other P2PK TOKENS
 	// sign multisig with correct privkeys
@@ -514,6 +506,9 @@ func TestP2PKMultisigSigning(t *testing.T) {
 
 	// TRY SWAPPING with refund key
 	swapProofsRefund, err := GenerateProofsP2PK(postSwapResponse.Signatures, activeKeys, swapSecretsP2PK, swapSecretKeyP2PK, []*secp256k1.PrivateKey{lockingPrivKeyTwo, refundPrivKey})
+	if err != nil {
+		t.Fatalf("Error generating refund proofs: %v", err)
+	}
 
 	currentPlus15 := time.Now().Add(15 * time.Minute).Unix()
 

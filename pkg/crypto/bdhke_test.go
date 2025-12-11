@@ -179,8 +179,8 @@ func TestHashE(t *testing.T) {
 	}
 
 	R2Bytes, err := hex.DecodeString("020000000000000000000000000000000000000000000000000000000000000001")
-	if error != nil {
-		t.Errorf("error parsing R1: %v", error)
+	if err != nil {
+		t.Errorf("error decoding R2: %v", err)
 	}
 	R2, error := secp256k1.ParsePubKey(R2Bytes)
 	if error != nil {
@@ -188,8 +188,8 @@ func TestHashE(t *testing.T) {
 	}
 
 	KBytes, err := hex.DecodeString("020000000000000000000000000000000000000000000000000000000000000001")
-	if error != nil {
-		t.Errorf("error parsing K: %v", error)
+	if err != nil {
+		t.Errorf("error decoding K: %v", err)
 	}
 	K, error := secp256k1.ParsePubKey(KBytes)
 
@@ -198,8 +198,8 @@ func TestHashE(t *testing.T) {
 	}
 
 	C_Bytes, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2")
-	if error != nil {
-		t.Errorf("error parsing C_: %v", error)
+	if err != nil {
+		t.Errorf("error decoding C_: %v", err)
 	}
 
 	C_, error := secp256k1.ParsePubKey(C_Bytes)

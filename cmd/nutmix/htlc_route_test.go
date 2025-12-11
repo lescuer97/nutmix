@@ -117,8 +117,6 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
 
-	var aliceBlindSigs []cashu.BlindSignature
-
 	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
 
 	w = httptest.NewRecorder()
@@ -136,8 +134,6 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
-
-	aliceBlindSigs = append(aliceBlindSigs, postMintResponse.Signatures...)
 
 	// activeKeys
 
@@ -479,8 +475,6 @@ func TestHTLCMultisigSigning(t *testing.T) {
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
 
-	var aliceBlindSigs []cashu.BlindSignature
-
 	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
 
 	w = httptest.NewRecorder()
@@ -498,8 +492,6 @@ func TestHTLCMultisigSigning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
-
-	aliceBlindSigs = append(aliceBlindSigs, postMintResponse.Signatures...)
 
 	// SWAP HTLC TOKEN with other HTLC TOKENS
 	// sign multisig with correct privkeys
@@ -588,6 +580,9 @@ func TestHTLCMultisigSigning(t *testing.T) {
 
 	// TRY SWAPPING with refund key
 	swapProofsRefund, err := GenerateProofsHTLC(postSwapResponse.Signatures, correctPreimage, activeKeys, swapSecretsHTLC, swapSecretKeyHTLC, []*secp256k1.PrivateKey{lockingPrivKeyTwo, refundPrivKey})
+	if err != nil {
+		t.Fatalf("Error generating refund proofs: %v", err)
+	}
 
 	currentPlus15 := time.Now().Add(15 * time.Minute).Unix()
 

@@ -105,6 +105,9 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	}
 
 	_, addressReader, err := lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "newaddress", "p2tr"})
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not execute newaddress command: %w", err)
+	}
 
 	reader := io.Reader(addressReader)
 	buf := make([]byte, 1024)
@@ -165,6 +168,9 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Started:          true,
 		Reuse:            true,
 	})
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not create Bob lnd container: %w", err)
+	}
 
 	lndBobIp, err := LndBobC.ContainerIP(ctx)
 
@@ -276,11 +282,16 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	tlsCertPath := "/.lnd/tls.cert"
 
 	err = os.Setenv(LND_HOST, lndAliceIp+":"+alicePort)
-	err = os.Setenv(LND_TLS_CERT, tlsCert)
-	err = os.Setenv(LND_MACAROON, macaroonHex)
-
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not set env %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("could not set env LND_HOST: %w", err)
+	}
+	err = os.Setenv(LND_TLS_CERT, tlsCert)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not set env LND_TLS_CERT: %w", err)
+	}
+	err = os.Setenv(LND_MACAROON, macaroonHex)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not set env LND_MACAROON: %w", err)
 	}
 
 	aliceLnbitsEnvVariables := make(map[string]string)
@@ -397,12 +408,10 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Password: "password",
 	}
 
-	jsonBytes, err = json.Marshal(authBody)
+	_, err = json.Marshal(authBody)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("json.Marshal: %w", err)
 	}
-
-	b = bytes.NewBuffer(jsonBytes)
 
 	walletsRequest, err := http.NewRequest("GET", "http://"+aliceLnbitsIp+":5000/api/v1/wallets", nil)
 	if err != nil {
@@ -437,9 +446,12 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	}
 
 	err = os.Setenv(MINT_LNBITS_KEY, responseWallet[0].AdminKey)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not set env MINT_LNBITS_KEY: %w", err)
+	}
 	err = os.Setenv(MINT_LNBITS_ENDPOINT, "http://"+aliceLnbitsIp+":5000")
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not set env %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("could not set env MINT_LNBITS_ENDPOINT: %w", err)
 	}
 
 	// generate wallet

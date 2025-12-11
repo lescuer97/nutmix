@@ -119,6 +119,9 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	mint.LightningBackend = &fakeWallet
 
 	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
+	if err != nil {
+		t.Fatalf("Error generating melt proofs: %v", err)
+	}
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -319,6 +322,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	mint.LightningBackend = &fakeWallet
 
 	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
+	if err != nil {
+		t.Fatalf("Error generating melt proofs: %v", err)
+	}
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -507,6 +513,9 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	mint.LightningBackend = &fakeWallet
 
 	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
+	if err != nil {
+		t.Fatalf("Error generating melt proofs: %v", err)
+	}
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
