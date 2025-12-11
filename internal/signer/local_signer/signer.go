@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"sort"
 	"time"
@@ -174,7 +175,11 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 	if err != nil {
 		return fmt.Errorf("l.db.GetTx(ctx). %w", err)
 	}
-	defer l.db.Rollback(ctx, tx)
+	defer func() {
+		if err := l.db.Rollback(ctx, tx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 
 	// get current highest seed version
 	var highestSeed cashu.Seed = cashu.Seed{Version: 0}
@@ -248,25 +253,6 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 
 	signerMasterKey = nil
 	return nil
-}
-
-func (l *LocalSigner) signBlindMessage(k *secp256k1.PrivateKey, message cashu.BlindedMessage) (cashu.BlindSignature, error) {
-
-	C_ := crypto.SignBlindedMessage(message.B_.PublicKey, k)
-
-	blindSig := cashu.BlindSignature{
-		Amount: message.Amount,
-		Id:     message.Id,
-		C_:     cashu.WrappedPublicKey{PublicKey: C_},
-	}
-
-	err := blindSig.GenerateDLEQ(message.B_.PublicKey, k)
-
-	if err != nil {
-		return blindSig, fmt.Errorf("blindSig.GenerateDLEQ: %w", err)
-	}
-
-	return blindSig, nil
 }
 
 func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {

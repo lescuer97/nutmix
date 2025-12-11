@@ -114,10 +114,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, tx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		err = mint.MintDB.SaveMintRequest(tx, mintRequestDB)
 		if err != nil {
@@ -128,7 +132,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
@@ -142,10 +146,14 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, tx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		quote, err := mint.MintDB.GetMintRequestById(tx, quoteId)
 		if err != nil {
@@ -180,7 +188,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
@@ -210,7 +218,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		ctx := context.Background()
 		preparationTx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
 		defer mint.MintDB.Rollback(ctx, preparationTx)
@@ -265,7 +273,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		}
 		err = mint.MintDB.Commit(ctx, preparationTx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, preparationTx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, preparationTx). %w", err))
 			return
 		}
 
@@ -312,7 +320,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			}
 			afterCheckTx, err := mint.MintDB.GetTx(ctx)
 			if err != nil {
-				c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+				_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 				return
 			}
 			defer mint.MintDB.Rollback(ctx, afterCheckTx)
@@ -325,7 +333,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			}
 			err = mint.MintDB.Commit(ctx, afterCheckTx)
 			if err != nil {
-				c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+				_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 				return
 			}
 
@@ -348,7 +356,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		mintRequestDB.State = cashu.ISSUED
 		afterBlindSignTx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
 		defer mint.MintDB.Rollback(ctx, afterBlindSignTx)
@@ -371,7 +379,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		slog.Debug(fmt.Sprintf("Commiting transaction for: id %v", mintRequestDB.Quote))
 		err = mint.MintDB.Commit(ctx, afterBlindSignTx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, afterBlindSignTx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, afterBlindSignTx). %w", err))
 			return
 		}
 
@@ -516,7 +524,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			slog.Warn("m.MintDB.GetTx(ctx)", slog.Any("error", err))
 			return
 		}
@@ -533,7 +541,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			slog.Warn("mint.MintDB.Commit(ctx tx)", slog.Any("error", err))
 			return
 		}

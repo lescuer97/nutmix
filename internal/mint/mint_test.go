@@ -148,7 +148,9 @@ func SetupDataOnDB(mint *Mint) error {
 	if err != nil {
 		return fmt.Errorf("mint.MintDB.GetTx(ctx): %+v ", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	err = mint.MintDB.SaveMeltRequest(tx, melt_quote)
 	if err != nil {
@@ -193,7 +195,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
 	if err != nil {
@@ -270,7 +274,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
 	if err != nil {
@@ -339,7 +345,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNPending(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(ctx): %+v ", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
 	if err != nil {

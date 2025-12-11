@@ -137,12 +137,16 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			slog.Warn("zpay32.Decode(invoice)", slog.Any("error", err))
-			RenderError(c, "Invalid Lightning Invoice")
+			if err := RenderError(c, "Invalid Lightning Invoice"); err != nil {
+				slog.Error("failed to render error", slog.Any("error", err))
+			}
 			return
 		}
 
 		if decodedInvoice.MilliSat == nil {
-			RenderError(c, "Invoice must have an amount")
+			if err := RenderError(c, "Invoice must have an amount"); err != nil {
+				slog.Error("failed to render error", slog.Any("error", err))
+			}
 			return
 		}
 
@@ -150,13 +154,17 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		currentBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
 			slog.Error("Could not fetch wallet balance", slog.Any("error", err))
-			RenderError(c, "Could not check wallet balance")
+			if err := RenderError(c, "Could not check wallet balance"); err != nil {
+				slog.Error("failed to render error", slog.Any("error", err))
+			}
 			return
 		}
 
 		invoiceAmountMsats := uint64(*decodedInvoice.MilliSat)
 		if currentBalance < invoiceAmountMsats {
-			RenderError(c, fmt.Sprintf("Insufficient funds: Have %d sats, need %d sats", currentBalance/1000, invoiceAmountMsats/1000))
+			if err := RenderError(c, fmt.Sprintf("Insufficient funds: Have %d sats, need %d sats", currentBalance/1000, invoiceAmountMsats/1000)); err != nil {
+				slog.Error("failed to render error", slog.Any("error", err))
+			}
 			return
 		}
 
@@ -164,7 +172,9 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		feesResponse, err := mint.LightningBackend.QueryFees(invoice, decodedInvoice, false, cashu.Amount{Unit: cashu.Sat, Amount: uint64(amount)})
 		if err != nil {
 			slog.Info("mint.LightningComs.PayInvoice", slog.Any("error", err))
-			RenderError(c, "Could not calculate fees or route not found")
+			if err := RenderError(c, "Could not calculate fees or route not found"); err != nil {
+				slog.Error("failed to render error", slog.Any("error", err))
+			}
 			return
 		}
 
@@ -237,12 +247,16 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 
 		amount, err := strconv.ParseUint(amountStr, 10, 64)
 		if err != nil {
-			RenderError(c, "Invalid amount")
+			if err := RenderError(c, "Invalid amount"); err != nil {
+				slog.Error("failed to render error", slog.Any("error", err))
+			}
 			return
 		}
 
 		if amount <= 0 {
-			RenderError(c, "Amount must be greater than 0")
+			if err := RenderError(c, "Amount must be greater than 0"); err != nil {
+				slog.Error("failed to render error", slog.Any("error", err))
+			}
 			return
 		}
 
@@ -251,7 +265,9 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 		resp, err := mint.LightningBackend.RequestInvoice(cashu.MintRequestDB{Quote: uuid}, cashu.Amount{Amount: amount, Unit: cashu.Sat})
 		if err != nil {
 			slog.Error("mint.LightningBackend.RequestInvoice", slog.Any("error", err))
-			RenderError(c, "Could not generate invoice")
+			if err := RenderError(c, "Could not generate invoice"); err != nil {
+				slog.Error("failed to render error", slog.Any("error", err))
+			}
 			return
 		}
 		swap := utils.LiquiditySwap{
@@ -361,10 +377,13 @@ func SwapStateCheck(mint *m.Mint) gin.HandlerFunc {
 
 		swapRequest, err := mint.MintDB.GetLiquiditySwapById(tx, swapId)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.GetLiquiditySwapById(swapId). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.GetLiquiditySwapById(swapId). %w", err))
 			return
 		}
-		tx.Commit(context.Background())
+		if err := tx.Commit(context.Background()); err != nil {
+			_ = c.Error(fmt.Errorf("tx.Commit failed: %w", err))
+			return
+		}
 
 		component := templates.SwapState(swapRequest.State, swapId)
 
@@ -466,7 +485,11 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 			if err != nil {
 				return
 			}
-			defer lnStatusTx.Rollback(ctx)
+			defer func() {
+				if err := lnStatusTx.Rollback(ctx); err != nil {
+					slog.Warn("rollback error", slog.Any("error", err))
+				}
+			}()
 
 			switch status {
 			// halt transaction and return a pending state

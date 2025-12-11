@@ -3,6 +3,7 @@ package mint
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"slices"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -15,7 +16,11 @@ func CheckProofState(mint *Mint, Ys []cashu.WrappedPublicKey) ([]cashu.CheckStat
 	if err != nil {
 		return states, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 
 	// set as unspent
 	proofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, Ys)

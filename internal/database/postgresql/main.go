@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -168,7 +169,11 @@ func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) err
 
 	}
 	results := tx.SendBatch(context.Background(), &batch)
-	defer results.Close()
+	defer func() {
+		if err := results.Close(); err != nil {
+			slog.Error("failed to close results", slog.Any("error", err))
+		}
+	}()
 
 	rows, err := results.Query()
 	if err != nil {
@@ -452,16 +457,20 @@ func (pql Postgresql) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu
 	}
 
 	results := tx.SendBatch(context.Background(), &batch)
-	defer results.Close()
+	defer func() {
+		if err := results.Close(); err != nil {
+			slog.Error("failed to close results", slog.Any("error", err))
+		}
+	}()
 
 	rows, err := results.Query()
-	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return err
 		}
 		return databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
+	defer rows.Close()
 
 	return nil
 }
@@ -474,16 +483,20 @@ func (pql Postgresql) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
 	}
 
 	results := tx.SendBatch(context.Background(), &batch)
-	defer results.Close()
+	defer func() {
+		if err := results.Close(); err != nil {
+			slog.Error("failed to close results", slog.Any("error", err))
+		}
+	}()
 
 	rows, err := results.Query()
-	defer rows.Close()
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return err
 		}
 		return databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
+	defer rows.Close()
 
 	return nil
 

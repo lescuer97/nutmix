@@ -16,7 +16,9 @@ func TestIsInternalTransactionSuccess(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	ctx := context.Background()
 	tx, err := mint.MintDB.GetTx(ctx)
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v ", err)
@@ -50,7 +52,9 @@ func TestIsInternalTransactionFail(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	ctx := context.Background()
 	tx, err := mint.MintDB.GetTx(ctx)
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v ", err)

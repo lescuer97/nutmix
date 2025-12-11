@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"net/http"
 
@@ -75,7 +76,11 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 	}
 
 	body, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("failed to close response body", slog.Any("error", err))
+		}
+	}()
 
 	if err != nil {
 		return fmt.Errorf("ioutil.ReadAll: %w", err)

@@ -317,10 +317,12 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Started:          true,
 		Reuse:            true,
 	})
-
-	aliceLnbitsC.CopyToContainer(ctx, []byte(tlsCert), tlsCertPath, 0o700)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get aliceLnbitsC %w", err)
+	}
+
+	if err := aliceLnbitsC.CopyToContainer(ctx, []byte(tlsCert), tlsCertPath, 0o700); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not copy to container %w", err)
 	}
 
 	aliceLnbitsIp, err := aliceLnbitsC.ContainerIP(ctx)

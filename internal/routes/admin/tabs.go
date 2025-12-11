@@ -164,7 +164,9 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 		// Validate Icon URL if provided
 		if iconUrl != "" {
 			if err := validateURL(iconUrl); err != nil {
-				RenderError(c, fmt.Sprintf("Invalid Icon URL: %s", err.Error()))
+				if renderErr := RenderError(c, fmt.Sprintf("Invalid Icon URL: %s", err.Error())); renderErr != nil {
+					slog.Error("failed to render error", slog.Any("error", renderErr))
+				}
 				return
 			}
 		}
@@ -172,7 +174,9 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 		// Validate TOS URL if provided
 		if tosUrl != "" {
 			if err := validateURL(tosUrl); err != nil {
-				RenderError(c, fmt.Sprintf("Invalid Terms of Service URL: %s", err.Error()))
+				if renderErr := RenderError(c, fmt.Sprintf("Invalid Terms of Service URL: %s", err.Error())); renderErr != nil {
+					slog.Error("failed to render error", slog.Any("error", renderErr))
+				}
 				return
 			}
 		}
@@ -226,7 +230,9 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 		}
 
-		RenderSuccess(c, "General settings successfully set")
+		if err := RenderSuccess(c, "General settings successfully set"); err != nil {
+			slog.Error("failed to render success", slog.Any("error", err))
+		}
 	}
 }
 

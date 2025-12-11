@@ -54,7 +54,11 @@ func main() {
 	if err != nil {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
-	defer logFile.Close()
+	defer func() {
+		if err := logFile.Close(); err != nil {
+			slog.Warn("failed to close log file", slog.Any("error", err))
+		}
+	}()
 
 	w := io.MultiWriter(os.Stdout, logFile)
 
@@ -147,7 +151,10 @@ func main() {
 
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
-	r.Run(PORT)
+	if err := r.Run(PORT); err != nil {
+		slog.Error("server failed", slog.Any("error", err))
+		os.Exit(1)
+	}
 }
 
 const MemorySigner = "memory"

@@ -57,21 +57,6 @@ type strikeAmount struct {
 
 // C0B9B39D8A69F62647352D1E048B07E0A788E0FDE77623BFBD31BC97AB743703
 
-func strikeInvoiceStateToCashuState(state strikeInvoiceState) (PaymentStatus, error) {
-	switch state {
-	case UNPAID:
-		return UNKNOWN, nil
-	case PAID:
-		return SETTLED, nil
-	case PENDING_STRIKE:
-		return PENDING, nil
-	case CANCELLED:
-		return FAILED, nil
-	default:
-		return PENDING, fmt.Errorf("Could not get payement status from strike state")
-	}
-}
-
 func strikePaymentStateToCashuState(state strikePaymentState) (PaymentStatus, error) {
 	switch state {
 	case PENDING_STRIKE_PAYMENT:

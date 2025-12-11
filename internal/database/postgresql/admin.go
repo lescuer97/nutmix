@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -57,7 +58,11 @@ func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBal
 
 	results := pql.pool.SendBatch(context.Background(), &batch)
 
-	defer results.Close()
+	defer func() {
+		if err := results.Close(); err != nil {
+			slog.Error("failed to close results", slog.Any("error", err))
+		}
+	}()
 
 	mintRows, err := results.Query()
 	if err != nil {

@@ -112,29 +112,29 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
 			return
 		}
 
 		defer func() {
 			if p := recover(); p != nil {
-				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				mint.MintDB.Rollback(ctx, tx)
+				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = mint.MintDB.Rollback(ctx, tx)
 
 			} else if err != nil {
-				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				mint.MintDB.Rollback(ctx, tx)
+				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = mint.MintDB.Rollback(ctx, tx)
 			} else {
 				err = mint.MintDB.Commit(context.Background(), tx)
 				if err != nil {
-					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
+					_ = c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
 				}
 			}
 		}()
 
 		nostrLogin, err := mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)
 		if err != nil {
-			c.Error(errors.Join(ErrCouldNotParseLogin, err))
+			_ = c.Error(errors.Join(ErrCouldNotParseLogin, err))
 			return
 		}
 
@@ -146,12 +146,12 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 		// check valid signature
 		validSig, err := nostrEvent.CheckSignature()
 		if err != nil {
-			c.Error(errors.Join(ErrInvalidNostrSignature, err))
+			_ = c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		if !validSig {
-			c.Error(errors.Join(ErrInvalidNostrSignature, err))
+			_ = c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 

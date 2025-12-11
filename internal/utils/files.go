@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-const logFileName string = "nutmix.log"
 const LogExtraInfo string = "extra-info"
 
 var (

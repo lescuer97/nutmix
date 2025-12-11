@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -39,7 +40,11 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 
-	defer mint.MintDB.Rollback(context.Background(), tx)
+	defer func() {
+		if err := mint.MintDB.Rollback(context.Background(), tx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 
 	quote, err := mint.MintDB.GetMeltRequestById(tx, quoteId)
 	if err != nil {

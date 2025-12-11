@@ -77,10 +77,14 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, tx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		keysets, err := mint.Signer.GetAuthKeys()
 		if err != nil {
@@ -133,7 +137,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 

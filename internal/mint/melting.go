@@ -63,7 +63,11 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 
-	defer m.MintDB.Rollback(ctx, initialTx)
+	defer func() {
+		if err := m.MintDB.Rollback(ctx, initialTx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 	quote, err := m.MintDB.GetMeltRequestById(initialTx, quoteId)
 
 	if err != nil {
@@ -115,7 +119,11 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			if err != nil {
 				return cashu.MeltRequestDB{}, fmt.Errorf("settleTx, err := m.MintDB.GetTx(ctx). %w", err)
 			}
-			defer m.MintDB.Rollback(ctx, settleTx)
+			defer func() {
+				if err := m.MintDB.Rollback(ctx, settleTx); err != nil {
+					slog.Warn("rollback error", slog.Any("error", err))
+				}
+			}()
 
 			changeMessages, err := m.MintDB.GetMeltChangeByQuote(settleTx, quote.Quote)
 			if err != nil {
@@ -180,7 +188,11 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			if err != nil {
 				return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 			}
-			defer m.MintDB.Rollback(ctx, failedLnTx)
+			defer func() {
+				if err := m.MintDB.Rollback(ctx, failedLnTx); err != nil {
+					slog.Warn("rollback error", slog.Any("error", err))
+				}
+			}()
 
 			err = m.MintDB.ChangeMeltRequestState(failedLnTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
 			if err != nil {
@@ -305,7 +317,11 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 	if err != nil {
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
 	}
-	defer m.MintDB.Rollback(ctx, preparationTx)
+	defer func() {
+		if err := m.MintDB.Rollback(ctx, preparationTx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 
 	quote, err = m.MintDB.GetMeltRequestById(preparationTx, meltRequest.Quote)
 	if err != nil {
@@ -396,7 +412,11 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 			if err != nil {
 				return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
 			}
-			defer m.MintDB.Rollback(ctx, lnTx)
+			defer func() {
+				if err := m.MintDB.Rollback(ctx, lnTx); err != nil {
+					slog.Warn("rollback error", slog.Any("error", err))
+				}
+			}()
 
 			slog.Warn("Possible payment failure", slog.String(utils.LogExtraInfo, fmt.Sprintf("error:  %+v. payment: %+v", err, payment)))
 
@@ -427,7 +447,11 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 			if err != nil {
 				return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
 			}
-			defer m.MintDB.Rollback(ctx, lnStatusTx)
+			defer func() {
+				if err := m.MintDB.Rollback(ctx, lnStatusTx); err != nil {
+					slog.Warn("rollback error", slog.Any("error", err))
+				}
+			}()
 
 			switch status {
 			// halt transaction and return a pending state
@@ -480,7 +504,11 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 	if err != nil {
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
 	}
-	defer m.MintDB.Rollback(ctx, paidLnxTx)
+	defer func() {
+		if err := m.MintDB.Rollback(ctx, paidLnxTx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 	totalExpent := quote.Amount + paidLightningFeeSat + uint64(fee)
 	if AmountProofs > totalExpent && len(meltRequest.Outputs) > 0 {
 		overpaidFees := AmountProofs - totalExpent

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -217,7 +218,11 @@ func (m *Mint) IsInternalTransaction(request string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("m.MintDB.GetTx(context.Background()). %w", err)
 	}
-	defer m.MintDB.Rollback(ctx, tx)
+	defer func() {
+		if err := m.MintDB.Rollback(ctx, tx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 
 	mintRequest, err := m.MintDB.GetMintRequestByRequest(tx, request)
 	if err != nil {

@@ -37,7 +37,11 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 			slog.Warn("upgrader.Upgrade(c.Writer, c.Request, nil)", slog.Any("error", err))
 			return
 		}
-		defer conn.Close()
+		defer func() {
+			if err := conn.Close(); err != nil {
+				slog.Warn("failed to close websocket connection", slog.Any("error", err))
+			}
+		}()
 
 		var request cashu.WsRequest
 

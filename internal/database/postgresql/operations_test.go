@@ -267,7 +267,9 @@ func TestGetMintMeltBalanceByTime_OnlyPubkey(t *testing.T) {
 	if err := db.SaveMintRequest(tx, mint2); err != nil {
 		t.Fatal(err)
 	}
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// Melt Requests
 	// Melt Request 1: Old, Issued (Excluded by time)
@@ -304,7 +306,9 @@ func TestGetMintMeltBalanceByTime_OnlyPubkey(t *testing.T) {
 	if err := db.SaveMeltRequest(tx, melt2); err != nil {
 		t.Fatal(err)
 	}
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// Query
 	res, err := db.GetMintMeltBalanceByTime(queryTime)
@@ -388,7 +392,9 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 	if err := db.SaveMintRequest(tx, mint2); err != nil {
 		t.Fatal(err)
 	}
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// Melt Requests
 	melt1 := cashu.MeltRequestDB{
@@ -409,7 +415,9 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 	if err := db.SaveMeltRequest(tx, melt1); err != nil {
 		t.Fatal(err)
 	}
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// Query
 	res, err := db.GetMintMeltBalanceByTime(queryTime)

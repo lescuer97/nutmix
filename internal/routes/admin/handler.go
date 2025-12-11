@@ -11,7 +11,6 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
-	"github.com/lescuer97/nutmix/internal/utils"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -97,10 +96,6 @@ func (a *adminHandler) rotateKeyset(unit cashu.Unit, fee uint, expiry_hours uint
 	return a.mint.Signer.RotateKeyset(unit, fee, expiry_hours)
 }
 
-func (a *adminHandler) isFakeWallet() bool {
-	return a.mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET
-}
-
 func (a *adminHandler) lnSatsBalance() (uint64, error) {
 	milillisatBalance, err := a.mint.LightningBackend.WalletBalance()
 	if err != nil {
@@ -163,23 +158,26 @@ func (a *adminHandler) EcashBalance(since time.Time) (templates.Balance, error) 
 
 }
 
+//nolint:unused // Placeholder for future implementation
 func (a *adminHandler) getTotalBalanceBlindSignaturesByTime(until time.Time) (uint64, error) {
 	panic("still not implemented")
 }
+
+//nolint:unused // Placeholder for future implementation
 func (a *adminHandler) getMintRequestByTime(since time.Time) (uint64, error) {
 	panic("still not implemented")
 }
+
+//nolint:unused // Placeholder for future implementation
 func (a *adminHandler) getMeltRequestByTime(since time.Time) (uint64, error) {
 	panic("still not implemented")
 }
+
+//nolint:unused // Placeholder for future implementation
 func (a *adminHandler) getLogs(until time.Time) (uint64, error) {
 	panic("still not implemented")
 }
 
 func (a *adminHandler) getProofsCountByKeyset(since time.Time) (map[string]database.ProofsCountByKeyset, error) {
 	return a.mint.MintDB.GetProofsCountByKeyset(since)
-}
-
-func (a *adminHandler) getBlindSigsCountByKeyset(since time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
-	return a.mint.MintDB.GetBlindSigsCountByKeyset(since)
 }
