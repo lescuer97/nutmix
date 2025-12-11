@@ -24,7 +24,7 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 		err := templates.KeysetsPage().Render(ctx, c.Writer)
 
 		if err != nil {
-			c.Error(fmt.Errorf("templates.KeysetsPage().Render(ctx, c.Writer). %w", err))
+			_ = c.Error(fmt.Errorf("templates.KeysetsPage().Render(ctx, c.Writer). %w", err))
 			// c.HTML(400,"", nil)
 			return
 		}
@@ -38,7 +38,7 @@ func KeysetsLayoutPage(adminHandler *adminHandler) gin.HandlerFunc {
 		err = templates.KeysetsList(keysetMap, orderedUnits).Render(ctx, c.Writer)
 
 		if err != nil {
-			c.Error(fmt.Errorf("templates.KeysetsList(keysetArr.Keysets).Render(ctx, c.Writer). %w", err))
+			_ = c.Error(fmt.Errorf("templates.KeysetsList(keysetArr.Keysets).Render(ctx, c.Writer). %w", err))
 			return
 		}
 	}
@@ -66,19 +66,19 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 			unitStr := c.Request.PostFormValue("UNIT")
 
 			if unitStr == "" {
-				c.Error(ErrUnitNotCorrect)
+				_ = c.Error(ErrUnitNotCorrect)
 				return
 			}
 
 			expireLimitStr := c.Request.PostFormValue("EXPIRE_LIMIT")
 			if expireLimitStr == "" {
-				c.Error(ErrNoExpiryTime)
+				_ = c.Error(ErrNoExpiryTime)
 				return
 			}
 
 			unit, err := cashu.UnitFromString(unitStr)
 			if err != nil {
-				c.Error(fmt.Errorf("cashu.UnitFromString(unitStr). %w. %w", err, ErrUnitNotCorrect))
+				_ = c.Error(fmt.Errorf("cashu.UnitFromString(unitStr). %w. %w", err, ErrUnitNotCorrect))
 				return
 			}
 			rotateRequest.Unit = unit

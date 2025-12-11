@@ -221,7 +221,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, preparationTx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, preparationTx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		mintRequestDB, err := mint.MintDB.GetMintRequestById(preparationTx, mintRequest.Quote)
 		if err != nil {
@@ -323,7 +327,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 				_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 				return
 			}
-			defer mint.MintDB.Rollback(ctx, afterCheckTx)
+			defer func() {
+				if err := mint.MintDB.Rollback(ctx, afterCheckTx); err != nil {
+					slog.Warn("rollback error", slog.Any("error", err))
+				}
+			}()
 
 			slog.Debug(fmt.Sprintf("Changing state of mint request id %v. To: %v", mintRequestDB.Quote, mintRequestDB.State))
 			err = mint.MintDB.ChangeMintRequestState(afterCheckTx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
@@ -359,7 +367,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, afterBlindSignTx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, afterBlindSignTx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		err = mint.MintDB.ChangeMintRequestState(afterBlindSignTx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
 		if err != nil {
@@ -528,7 +540,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			slog.Warn("m.MintDB.GetTx(ctx)", slog.Any("error", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, tx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		err = mint.MintDB.SaveMeltRequest(tx, dbRequest)
 

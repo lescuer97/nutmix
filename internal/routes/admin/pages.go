@@ -28,7 +28,7 @@ func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 			slog.Error(
 				"database.SaveNostrLoginAuth(pool, nostrLogin)",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 
@@ -43,7 +43,7 @@ func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 			slog.Error(
 				"database.SaveNostrLoginAuth(pool, nostrLogin)",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			c.Error(err)
+			_ = c.Error(err)
 			return
 
 		}
@@ -51,7 +51,7 @@ func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 		ctx := context.Background()
 		err = templates.LoginPage(nonce, adminNostrKeyAvailable).Render(ctx, c.Writer)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 
@@ -71,7 +71,7 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 		).Render(ctx, c.Writer)
 
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 	}
@@ -146,7 +146,7 @@ func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 
 		err = templates.ProofsChartCard(data, summary).Render(ctx, c.Writer)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 	}
@@ -173,7 +173,7 @@ func ProofsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		// Return HTML fragment for HTMX
 		err = templates.ProofsChartContent(data).Render(ctx, c.Writer)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 	}
@@ -201,7 +201,7 @@ func BlindSigsChartCard(mint *mint.Mint) gin.HandlerFunc {
 
 		err = templates.BlindSigsChartCard(data, summary).Render(ctx, c.Writer)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 	}
@@ -228,7 +228,7 @@ func BlindSigsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		// Return HTML fragment for HTMX
 		err = templates.BlindSigsChartContent(data).Render(ctx, c.Writer)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 	}
@@ -241,7 +241,7 @@ func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
 		err := templates.LiquidityDashboard().Render(ctx, c.Writer)
 
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			// c.HTML(400,"", nil)
 			return
 		}
@@ -260,36 +260,39 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 				"Incorrect body",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)
-			c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
 			return
 		}
 
 		defer func() {
 			if p := recover(); p != nil {
-				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				mint.MintDB.Rollback(ctx, tx)
+				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", err))
+				}
 
 			} else if err != nil {
-				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				mint.MintDB.Rollback(ctx, tx)
-			} else {
-				err = mint.MintDB.Commit(context.Background(), tx)
-				if err != nil {
-					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
+				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", err))
 				}
 			}
 		}()
 
 		swap, err := mint.MintDB.GetLiquiditySwapById(tx, swapId)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
+			return
+		}
+		if err := tx.Commit(context.Background()); err != nil {
+			_ = c.Error(fmt.Errorf("tx.Commit failed: %w", err))
 			return
 		}
 		amount := strconv.FormatUint(swap.Amount, 10)
 		// generate qrCode
 		qrcode, err := generateQR(swap.LightningInvoice)
 		if err != nil {
-			c.Error(fmt.Errorf("generateQR(swap.LightningInvoice). %w", err))
+			_ = c.Error(fmt.Errorf("generateQR(swap.LightningInvoice). %w", err))
 			return
 		}
 
@@ -305,7 +308,7 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 		err = templates.SwapStatusPage(component).Render(ctx, c.Writer)
 
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			// c.HTML(400,"", nil)
 			return
 		}
@@ -322,7 +325,7 @@ func LnPage(mint *mint.Mint) gin.HandlerFunc {
 		err := templates.LightningActivityLayout(mint.Config, selectedRange).Render(ctx, c.Writer)
 
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 	}
@@ -456,13 +459,13 @@ func LnChartCard(mint *mint.Mint) gin.HandlerFunc {
 		fmt.Printf("\n mintMeltBalance: %+v\n", mintMeltBalance)
 
 		// Process and aggregate into time series using zpay32 for invoice decoding
-		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime,  bucketMinutes)
+		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime, bucketMinutes)
 
 		summary := calculateLnChartSummary(data)
 
 		err = templates.LnChartCard(data, summary).Render(ctx, c.Writer)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 	}
@@ -487,12 +490,12 @@ func LnChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		}
 
 		// Process and aggregate into time series using zpay32 for invoice decoding
-		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime,  bucketMinutes)
+		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime, bucketMinutes)
 
 		// Return HTML fragment for HTMX
 		err = templates.LnChartContent(data).Render(ctx, c.Writer)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 	}

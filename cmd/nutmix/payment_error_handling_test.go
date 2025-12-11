@@ -145,7 +145,9 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	proofs, err := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
 	if err != nil {
@@ -345,7 +347,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	proofs, _ := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
 
@@ -381,7 +385,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {
@@ -534,7 +540,9 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {

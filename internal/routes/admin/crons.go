@@ -30,11 +30,15 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 		if p := recover(); p != nil {
 			fmt.Println("Rolling back because of failure", p)
 			slog.Error("Rolling back because of failure", slog.Any("error", err))
-			mint.MintDB.Rollback(ctx, tx)
+			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+				slog.Error("Failed to rollback transaction", slog.Any("error", err))
+			}
 
 		} else if err != nil {
 			slog.Error("Rolling back because of failure", slog.Any("error", err))
-			mint.MintDB.Rollback(ctx, tx)
+			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+				slog.Error("Failed to rollback transaction", slog.Any("error", err))
+			}
 		}
 	}()
 	swaps, err := mint.MintDB.GetLiquiditySwapsByStates(tx, []utils.SwapState{
@@ -78,11 +82,15 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 					defer func() {
 						if p := recover(); p != nil {
 							slog.Error("Rolling back because of failure", slog.Any("error", err))
-							mint.MintDB.Rollback(ctx, swapTx)
+							if err := mint.MintDB.Rollback(ctx, swapTx); err != nil {
+								slog.Error("Failed to rollback transaction", slog.Any("error", err))
+							}
 
 						} else if err != nil {
 							slog.Error("Rolling back because of failure", slog.Any("error", err))
-							mint.MintDB.Rollback(ctx, swapTx)
+							if err := mint.MintDB.Rollback(ctx, swapTx); err != nil {
+								slog.Error("Failed to rollback transaction", slog.Any("error", err))
+							}
 						}
 					}()
 
@@ -167,7 +175,9 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 					defer func() {
 						if p := recover(); p != nil {
 							slog.Error("Rolling back because of failure", slog.Any("error", err))
-							mint.MintDB.Rollback(ctx, afterCheckTx)
+							if err := mint.MintDB.Rollback(ctx, afterCheckTx); err != nil {
+								slog.Error("Failed to rollback transaction", slog.Any("error", err))
+							}
 						}
 					}()
 					err = mint.MintDB.ChangeLiquiditySwapState(afterCheckTx, swap.Id, swap.State)

@@ -245,7 +245,11 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 		if err != nil {
 			return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 		}
-		defer mint.MintDB.Rollback(ctx, tx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		switch request.Params.Kind {
 		case cashu.Bolt11MintQuote:

@@ -33,7 +33,7 @@ func SwapsList(mint *m.Mint) gin.HandlerFunc {
 
 		err = templates.ListOfSwaps(swaps).Render(ctx, c.Writer)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			c.Status(400)
 			return
 		}
@@ -48,25 +48,25 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 
 		proofsCount, err := adminHandler.getProofsCountByKeyset(startTime)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 
 		keysets, err := mint.Signer.GetKeysets()
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 
 		fees, err := fees(proofsCount, keysets.Keysets)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 
 		lnBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 
@@ -85,7 +85,7 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 
 		err = templates.SummaryComponent(summary).Render(c.Request.Context(), c.Writer)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 	}

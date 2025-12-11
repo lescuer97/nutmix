@@ -158,33 +158,33 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 		// check signature happened with the correct private key.
 		sigBytes, err := hex.DecodeString(nostrEvent.Sig)
 		if err != nil {
-			c.Error(errors.Join(ErrInvalidNostrSignature, err))
+			_ = c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		sig, err := schnorr.ParseSignature(sigBytes)
 		if err != nil {
-			c.Error(errors.Join(ErrInvalidNostrSignature, err))
+			_ = c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		eventHash := sha256.Sum256(nostrEvent.Serialize())
 		verified := sig.Verify(eventHash[:], adminNostrPubkey)
 		if !verified {
-			c.Error(ErrIncorrectNpub)
+			_ = c.Error(ErrIncorrectNpub)
 			return
 		}
 
 		nostrLogin.Activated = verified
 		err = mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated)
 		if err != nil {
-			c.Error(errors.Join(ErrCouldNotParseLogin, fmt.Errorf("mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated). %w", err)))
+			_ = c.Error(errors.Join(ErrCouldNotParseLogin, fmt.Errorf("mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated). %w", err)))
 			return
 		}
 
 		token, err := makeJWTToken(loginKey.Serialize())
 		if err != nil {
-			c.Error(fmt.Errorf("makeJWTToken(loginKey.Serialize()). %w", err))
+			_ = c.Error(fmt.Errorf("makeJWTToken(loginKey.Serialize()). %w", err))
 			return
 		}
 
