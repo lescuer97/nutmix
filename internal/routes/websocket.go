@@ -59,7 +59,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 					JsonRpc: "2.0",
 					Id:      request.Id,
 					Error: cashu.ErrorMsg{
-						Code:    cashu.UNKNOWN,
+						Code:    uint64(cashu.UNKNOWN),
 						Message: "Already subscribed to filter",
 					},
 				}

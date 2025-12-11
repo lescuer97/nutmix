@@ -225,7 +225,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		if mintRequestDB.Minted {
 			slog.Warn("Quote already minted", slog.String(utils.LogExtraInfo, mintRequestDB.Quote))
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.TOKEN_ALREADY_ISSUED, nil))
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.QUOTE_ALREADY_ISSUED, nil))
 			return
 		}
 

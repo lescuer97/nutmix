@@ -16,4 +16,4 @@ build/
 keycloak/keycloak_export
 keycloak/postgres_data
 
-nutmix
+/nutmix

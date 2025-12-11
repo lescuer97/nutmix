@@ -395,7 +395,6 @@ func (pql Postgresql) GetProofsFromSecretCurve(tx pgx.Tx, Ys []cashu.WrappedPubl
 	var proofList cashu.Proofs
 
 	rows, err := tx.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE y = ANY($1) FOR UPDATE NOWAIT`, Ys)
-	defer rows.Close()
 
 	if err != nil {
 
@@ -403,6 +402,7 @@ func (pql Postgresql) GetProofsFromSecretCurve(tx pgx.Tx, Ys []cashu.WrappedPubl
 			return proofList, nil
 		}
 	}
+	defer rows.Close()
 
 	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
 
