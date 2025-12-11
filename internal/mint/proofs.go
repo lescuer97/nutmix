@@ -23,6 +23,11 @@ func CheckProofState(mint *Mint, Ys []cashu.WrappedPublicKey) ([]cashu.CheckStat
 		return states, fmt.Errorf("database.CheckListOfProofsBySecretCurve(pool, Ys). %w", err)
 	}
 
+	err = mint.MintDB.Commit(ctx, tx)
+	if err != nil {
+		return states, fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
+	}
+
 	proofsForRemoval := make([]cashu.Proof, 0)
 
 	for _, state := range Ys {
@@ -38,7 +43,7 @@ func CheckProofState(mint *Mint, Ys []cashu.WrappedPublicKey) ([]cashu.CheckStat
 		switch {
 		// Check if is in list of spents and if its also pending add it for removal of pending list
 		case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
-			compare := p.Y == state
+			compare := p.Y.ToHex() == state.ToHex()
 			if p.Witness != "" {
 				checkState.Witness = &p.Witness
 			}
@@ -54,9 +59,5 @@ func CheckProofState(mint *Mint, Ys []cashu.WrappedPublicKey) ([]cashu.CheckStat
 		states = append(states, checkState)
 	}
 
-	err = mint.MintDB.Commit(ctx, tx)
-	if err != nil {
-		return states, fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
-	}
 	return states, nil
 }
