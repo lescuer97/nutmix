@@ -240,7 +240,7 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 
 	var res string
 
-	if !strings.Contains(w.Body.String(), "Incorrect npub used in signature") {
+	if !strings.Contains(w.Body.String(), "incorrect npub used in signature") {
 		t.Errorf("Expected to get Incorrect npub used in signature %s", res)
 	}
 }

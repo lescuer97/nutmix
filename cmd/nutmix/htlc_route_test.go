@@ -261,7 +261,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
-	if *errorRes.Detail != `Invalid preimage` {
+	if *errorRes.Detail != `invalid preimage` {
 		t.Fatalf("Expected response Invalid preimage, got %s", w.Body.String())
 	}
 
@@ -737,7 +737,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Errorf("Expected Invalid Proof, got %s", w.Body.String())
 	}
 
-	if *errorRes.Detail != `Invalid preimage` {
+	if *errorRes.Detail != `invalid preimage` {
 		t.Fatalf("Expected response Invalid preimage, got %s", w.Body.String())
 	}
 
