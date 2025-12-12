@@ -85,18 +85,18 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 	}
 
 	if keys.GetKeysets() == nil {
-		return fmt.Errorf("No keysets on the signer. %w", err)
+		return fmt.Errorf("no keysets on the signer: %w", err)
 	}
 
 	s.pubkey = keys.GetKeysets().Pubkey
 
 	for i, key := range keys.GetKeysets().Keysets {
 		if key == nil {
-			return fmt.Errorf("There was a nil key. index: %v", i)
+			return fmt.Errorf("there was a nil key, index: %v", i)
 		}
 
 		if key.Keys == nil {
-			return fmt.Errorf("No keys on keyset. Id: %v", key.Id)
+			return fmt.Errorf("no keys on keyset, id: %v", key.Id)
 		}
 
 		unit, err := ConvertSigUnitToCashuUnit(key.Unit)
@@ -229,7 +229,7 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 	}
 	// verify we have the same amount of blindedmessages than BlindSignatures
 	if len(blindSigs) != len(messages) {
-		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("Not the correct amount of blind signatures")
+		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("not the correct amount of blind signatures")
 	}
 
 	recoverySigs := []cashu.RecoverSigDB{}
@@ -284,7 +284,7 @@ func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {
 	}
 
 	if !boolResponse.GetSuccess() {
-		return fmt.Errorf("Invalid proofs. %w", cashu.ErrInvalidProof)
+		return fmt.Errorf("invalid proofs: %w", cashu.ErrInvalidProof)
 	}
 	return nil
 }

@@ -122,7 +122,7 @@ func (l *LocalSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 func (l *LocalSigner) getSignerPrivateKey() (*secp256k1.PrivateKey, error) {
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 	if mint_privkey == "" {
-		return nil, fmt.Errorf(`os.Getenv("MINT_PRIVATE_KEY").`)
+		return nil, fmt.Errorf(`os.Getenv("MINT_PRIVATE_KEY")`)
 	}
 
 	decodedPrivKey, err := hex.DecodeString(mint_privkey)
@@ -181,7 +181,7 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 	}()
 
 	// get current highest seed version
-	var highestSeed cashu.Seed = cashu.Seed{Version: 0}
+	var highestSeed = cashu.Seed{Version: 0}
 	seeds, err := l.db.GetSeedsByUnit(tx, unit)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -261,7 +261,7 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 		correctKeyset := l.activeKeysets[output.Id][output.Amount]
 
 		if correctKeyset.PrivKey == nil || !correctKeyset.Active {
-			return nil, nil, cashu.UsingInactiveKeyset
+			return nil, nil, cashu.ErrUsingInactiveKeyset
 		}
 
 		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)

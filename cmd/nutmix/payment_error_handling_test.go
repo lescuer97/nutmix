@@ -203,8 +203,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),

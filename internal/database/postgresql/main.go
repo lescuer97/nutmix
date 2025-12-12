@@ -18,7 +18,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/database/goose"
 )
 
-var DBError = errors.New("ERROR DATABASE")
+var ErrDB = errors.New("ERROR DATABASE")
 
 var DATABASE_URL_ENV = "DATABASE_URL"
 
@@ -27,7 +27,7 @@ type Postgresql struct {
 }
 
 func databaseError(err error) error {
-	return errors.Join(DBError, err)
+	return errors.Join(ErrDB, err)
 }
 
 func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error) {
@@ -53,7 +53,7 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error)
 	}
 
 	if err != nil {
-		return postgresql, databaseError(fmt.Errorf("Error connecting to database: %w", err))
+		return postgresql, databaseError(fmt.Errorf("error connecting to database: %w", err))
 	}
 	postgresql.pool = pool
 
@@ -77,20 +77,19 @@ func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 
 	rows, err := pql.pool.Query(context.Background(), `SELECT  created_at, active, version, unit, id,  "input_fee_ppk", final_expiry FROM seeds ORDER BY version DESC`)
-	defer rows.Close()
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return seeds, fmt.Errorf("No rows found: %w", err)
+			return seeds, fmt.Errorf("no rows found: %w", err)
 		}
 
-		return seeds, fmt.Errorf("Error checking for  seeds: %w", err)
+		return seeds, fmt.Errorf("error checking for seeds: %w", err)
 	}
+	defer rows.Close()
 
 	seeds_collect, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
 
 	if err != nil {
-		return seeds_collect, fmt.Errorf("Collecting rows: %w", err)
+		return seeds_collect, fmt.Errorf("collecting rows: %w", err)
 	}
 
 	return seeds_collect, nil
@@ -98,10 +97,10 @@ func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 
 func (pql Postgresql) GetSeedsByUnit(tx pgx.Tx, unit cashu.Unit) ([]cashu.Seed, error) {
 	rows, err := tx.Query(context.Background(), "SELECT  created_at, active, version, unit, id, input_fee_ppk, final_expiry FROM seeds WHERE unit = $1", unit.String())
-	defer rows.Close()
 	if err != nil {
-		return []cashu.Seed{}, fmt.Errorf("Error checking for Active seeds: %w", err)
+		return []cashu.Seed{}, fmt.Errorf("error checking for active seeds: %w", err)
 	}
+	defer rows.Close()
 
 	seeds, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
 
@@ -127,7 +126,7 @@ func (pql Postgresql) SaveNewSeed(tx pgx.Tx, seed cashu.Seed) error {
 		case err != nil && tries < 3:
 			continue
 		case err != nil && tries >= 3:
-			return databaseError(fmt.Errorf("Inserting to seeds: %w", err))
+			return databaseError(fmt.Errorf("inserting to seeds: %w", err))
 		case err == nil:
 			return nil
 		}
@@ -203,7 +202,7 @@ func (pql Postgresql) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) er
 
 	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId, pubkeyBytes, request.Description)
 	if err != nil {
-		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
+		return databaseError(fmt.Errorf("inserting to mint_request: %w", err))
 
 	}
 	return nil
@@ -213,7 +212,7 @@ func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool,
 	// change the paid status of the quote
 	_, err := tx.Exec(context.Background(), "UPDATE mint_request SET request_paid = $1, state = $3, minted = $4 WHERE quote = $2", paid, quote, state, minted)
 	if err != nil {
-		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
+		return databaseError(fmt.Errorf("inserting to mint_request: %w", err))
 
 	}
 	return nil
@@ -317,7 +316,7 @@ func (pql Postgresql) SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) er
 		"INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp, fee_paid, checking_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
 		request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp, request.FeePaid, request.CheckingId)
 	if err != nil {
-		return databaseError(fmt.Errorf("Inserting to mint_request: %w", err))
+		return databaseError(fmt.Errorf("inserting to mint_request: %w", err))
 	}
 	return nil
 }
@@ -357,16 +356,15 @@ func (pql Postgresql) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu
 	ctx := context.Background()
 	rows, err := tx.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE secret = ANY($1) FOR UPDATE NOWAIT", SecretList)
 
-	defer rows.Close()
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return proofList, nil
 		}
+		return proofList, databaseError(fmt.Errorf("query error: %w", err))
 	}
+	defer rows.Close()
 
 	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
-	rows.Close()
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -432,13 +430,13 @@ func (pql Postgresql) GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs,
 	var proofList cashu.Proofs
 
 	rows, err := tx.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = $1 FOR UPDATE NOWAIT`, quote)
-	defer rows.Close()
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return proofList, nil
 		}
+		return proofList, fmt.Errorf("query error: %w", err)
 	}
+	defer rows.Close()
 
 	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
 	if err != nil {
@@ -543,7 +541,7 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) 
 		if err == pgx.ErrNoRows {
 			return signaturesList, nil
 		}
-		return signaturesList, databaseError(fmt.Errorf("Error checking for  recovery_signature: %w", err))
+		return signaturesList, databaseError(fmt.Errorf("error checking for recovery_signature: %w", err))
 	}
 	defer rows.Close()
 

@@ -72,7 +72,7 @@ func ConvertCashuUnitToSignature(unit cashu.Unit) (*sig.CurrencyUnit, error) {
 		return &sig.CurrencyUnit{CurrencyUnit: &sig.CurrencyUnit_Unit{Unit: sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_AUTH}}, nil
 
 	default:
-		return nil, fmt.Errorf("No available unit.")
+		return nil, fmt.Errorf("no available unit")
 	}
 }
 
@@ -117,17 +117,17 @@ func CheckIfSignerErrorExists(err *sig.Error) error {
 	case sig.ErrorCode_ERROR_CODE_KEYSET_NOT_KNOWN:
 		errResult = fmt.Errorf("%w: %s", cashu.ErrKeysetNotFound, err.Detail)
 	case sig.ErrorCode_ERROR_CODE_KEYSET_INACTIVE:
-		errResult = fmt.Errorf("%w: %s", cashu.UsingInactiveKeyset, err.Detail)
+		errResult = fmt.Errorf("%w: %s", cashu.ErrUsingInactiveKeyset, err.Detail)
 	case sig.ErrorCode_ERROR_CODE_MINTING_DISABLED:
 		detail := err.Detail
 		if detail == "" {
 			detail = "Minting is disabled for this keyset"
 		}
 		// Using a custom error since there's no established error for this in the cashu package
-		mintingDisabledErr := errors.New("Minting disabled")
+		mintingDisabledErr := errors.New("minting disabled")
 		errResult = fmt.Errorf("%w: %s", mintingDisabledErr, detail)
 	case sig.ErrorCode_ERROR_CODE_COULD_NOT_ROTATE_KEYSET:
-		errResult = fmt.Errorf("Could not rotate keyset: %s", err.Detail)
+		errResult = fmt.Errorf("could not rotate keyset: %s", err.Detail)
 	case sig.ErrorCode_ERROR_CODE_INVALID_PROOF:
 		errResult = fmt.Errorf("%w: %s", cashu.ErrInvalidProof, err.Detail)
 	case sig.ErrorCode_ERROR_CODE_INVALID_BLIND_MESSAGE:

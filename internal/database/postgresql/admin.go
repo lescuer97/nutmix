@@ -16,7 +16,7 @@ func (pql Postgresql) SaveNostrAuth(auth database.NostrLoginAuth) error {
 	_, err := pql.pool.Exec(context.Background(), "INSERT INTO nostr_login (nonce, expiry , activated) VALUES ($1, $2, $3)", auth.Nonce, auth.Expiry, auth.Activated)
 
 	if err != nil {
-		return databaseError(fmt.Errorf("Inserting to nostr_login: %w", err))
+		return databaseError(fmt.Errorf("inserting to nostr_login: %w", err))
 
 	}
 	return nil
@@ -26,7 +26,7 @@ func (pql Postgresql) UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activat
 	// change the paid status of the quote
 	_, err := tx.Exec(context.Background(), "UPDATE nostr_login SET activated = $1 WHERE nonce = $2", activated, nonce)
 	if err != nil {
-		return databaseError(fmt.Errorf("Update to seeds: %w", err))
+		return databaseError(fmt.Errorf("update to seeds: %w", err))
 
 	}
 	return nil
@@ -35,7 +35,7 @@ func (pql Postgresql) UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activat
 func (pql Postgresql) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLoginAuth, error) {
 	rows, err := tx.Query(context.Background(), "SELECT nonce, activated, expiry FROM nostr_login WHERE nonce = $1 FOR UPDATE", nonce)
 	if err != nil {
-		return database.NostrLoginAuth{}, fmt.Errorf("Error checking for Active seeds: %w", err)
+		return database.NostrLoginAuth{}, fmt.Errorf("error checking for active seeds: %w", err)
 	}
 	defer rows.Close()
 
@@ -119,7 +119,7 @@ func (pql Postgresql) ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils
 	_, err := tx.Exec(context.Background(), "UPDATE liquidity_swaps SET state = $1 WHERE id = $2", state, id)
 
 	if err != nil {
-		return databaseError(fmt.Errorf("Update liquidity_swaps: %w", err))
+		return databaseError(fmt.Errorf("update liquidity_swaps: %w", err))
 
 	}
 	return nil
@@ -130,7 +130,7 @@ func (pql Postgresql) GetLiquiditySwaps(swap utils.LiquiditySwap) ([]utils.Liqui
 	var swaps []utils.LiquiditySwap
 	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration, checking_id FROM liquidity_swaps ")
 	if err != nil {
-		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
+		return swaps, fmt.Errorf("error checking for active seeds: %w", err)
 	}
 	defer rows.Close()
 
@@ -148,7 +148,7 @@ func (pql Postgresql) GetLiquiditySwapById(tx pgx.Tx, id string) (utils.Liquidit
 	var swaps utils.LiquiditySwap
 	rows, err := tx.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type, expiration, checking_id FROM liquidity_swaps WHERE id = $1 FOR SHARE", id)
 	if err != nil {
-		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
+		return swaps, fmt.Errorf("error checking for active seeds: %w", err)
 	}
 	defer rows.Close()
 
@@ -166,7 +166,7 @@ func (pql Postgresql) GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error) {
 	var swaps []utils.LiquiditySwap
 	rows, err := pql.pool.Query(context.Background(), "SELECT amount, id, lightning_invoice, state,type,expiration, checking_id FROM liquidity_swaps ORDER BY expiration DESC")
 	if err != nil {
-		return swaps, fmt.Errorf("Error checking for Active seeds: %w", err)
+		return swaps, fmt.Errorf("error checking for active seeds: %w", err)
 	}
 	defer rows.Close()
 
@@ -187,7 +187,7 @@ func (pql Postgresql) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapSt
 		if errors.Is(err, pgx.ErrNoRows) {
 			return swapIds, nil
 		}
-		return nil, fmt.Errorf("Error checking for liquidity swaps: %w", err)
+		return nil, fmt.Errorf("error checking for liquidity swaps: %w", err)
 	}
 	defer rows.Close()
 

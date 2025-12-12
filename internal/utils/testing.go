@@ -44,7 +44,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	if err != nil {
 		// log.Fatalln("Error: ", err)
-		return nil, nil, nil, nil, fmt.Errorf("Could not setup network: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("could not setup network: %w", err)
 	}
 
 	// Create bitcoind regtest node

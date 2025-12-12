@@ -66,7 +66,7 @@ func strikePaymentStateToCashuState(state strikePaymentState) (PaymentStatus, er
 	case FAILED_STRIKE_PAYMENT:
 		return FAILED, nil
 	default:
-		return PENDING, fmt.Errorf("Could not get payement status from strike state")
+		return PENDING, fmt.Errorf("could not get payment status from strike state")
 	}
 }
 
@@ -204,11 +204,11 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 
 		switch errorBody.Data.Status {
 		case 400:
-			return fmt.Errorf("Bad request %+v, %+v", errorBody, reqBody)
+			return fmt.Errorf("bad request %+v, %+v", errorBody, reqBody)
 		case 401:
-			return fmt.Errorf("Unauthorized %+v", errorBody)
+			return fmt.Errorf("unauthorized %+v", errorBody)
 		default:
-			return fmt.Errorf("Unknown error %+v", errorBody)
+			return fmt.Errorf("unknown error %+v", errorBody)
 
 		}
 
@@ -230,7 +230,7 @@ func (l Strike) convertStrikeAmountToUInt(amount strikeAmount) (cashu.Amount, er
 		val = val * 100
 		unit = cashu.EUR
 	default:
-		return cashuAmount, fmt.Errorf("Could not get the correct unit")
+		return cashuAmount, fmt.Errorf("could not get the correct unit")
 	}
 
 	cashuAmount.Amount = uint64(val)

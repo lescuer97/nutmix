@@ -15,7 +15,7 @@ func AuthActivatedMiddleware(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		if !mint.Config.MINT_REQUIRE_AUTH {
-			slog.Warn(fmt.Errorf("Tried using route that does not exists because auth not being active").Error())
+			slog.Warn(fmt.Errorf("tried using route that does not exist because auth not being active").Error())
 			c.JSON(404, "route does not exists")
 			c.Abort()
 			return

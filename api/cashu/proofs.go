@@ -78,7 +78,7 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 	// append all posibles keys for signing
 	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
-		for pubkey, _ := range pubkeys {
+		for pubkey := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {
 				amountValidSigs += 1
 				delete(pubkeys, pubkey)
@@ -142,7 +142,7 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 	// append all posibles keys for signing
 	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
-		for pubkey, _ := range pubkeys {
+		for pubkey := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {
 				amountValidSigs += 1
 				delete(pubkeys, pubkey)

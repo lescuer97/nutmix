@@ -36,8 +36,6 @@ func LiquidityButton(mint *m.Mint) gin.HandlerFunc {
 			_ = c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
 			return
 		}
-
-		return
 	}
 }
 
@@ -105,8 +103,6 @@ func SwapOutForm(mint *m.Mint) gin.HandlerFunc {
 			_ = c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
 			return
 		}
-
-		return
 	}
 }
 
@@ -121,8 +117,6 @@ func LightningSwapForm() gin.HandlerFunc {
 			_ = c.Error(errors.New("component.Render(ctx, c.Writer)"))
 			return
 		}
-
-		return
 	}
 }
 
@@ -203,13 +197,13 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 
 		defer func() {
 			if p := recover(); p != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", err))
 				}
 
 			} else if err != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", err))
 				}
@@ -220,7 +214,7 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			log.Printf("\n Could not add swap request %+v \n", err)
-			_ = c.Error(fmt.Errorf("\n Could not add swap request %+v \n", err))
+			_ = c.Error(fmt.Errorf("could not add swap request %+v", err))
 			return
 		}
 		err = mint.MintDB.Commit(context.Background(), tx)
@@ -237,8 +231,6 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 			_ = c.Error(errors.New(`templates.LiquidSwapSummary(decodedInvoice.MilliSat.ToSatoshis().String(), string(amount),  "test address", uuid)`))
 			return
 		}
-
-		return
 	}
 }
 
@@ -287,7 +279,7 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			log.Printf("\n zpay32.Decode(resp.PaymentRequest, %+v \n", err)
-			_ = c.Error(fmt.Errorf("\n zpay32.Decode(resp.PaymentRequest, %+v \n", err))
+			_ = c.Error(fmt.Errorf("zpay32.Decode(resp.PaymentRequest): %+v", err))
 			return
 		}
 
@@ -306,13 +298,13 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 
 		defer func() {
 			if p := recover(); p != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", err))
 				}
 
 			} else if err != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", err))
 				}
@@ -323,7 +315,7 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
 			log.Printf("\n Could not add swap request %+v \n", err)
-			_ = c.Error(fmt.Errorf("\n Could not add swap request %+v \n", err))
+			_ = c.Error(fmt.Errorf("could not add swap request %+v", err))
 			return
 		}
 		err = mint.MintDB.Commit(context.Background(), tx)
@@ -351,8 +343,6 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 			_ = c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
 			return
 		}
-
-		return
 	}
 }
 
@@ -374,13 +364,13 @@ func SwapStateCheck(mint *m.Mint) gin.HandlerFunc {
 
 		defer func() {
 			if p := recover(); p != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", err))
 				}
 
 			} else if err != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", err))
 				}
@@ -404,8 +394,6 @@ func SwapStateCheck(mint *m.Mint) gin.HandlerFunc {
 			_ = c.Error(fmt.Errorf("component.Render(ctx, c.Writer). %w", err))
 			return
 		}
-		return
-
 	}
 }
 
@@ -432,13 +420,13 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 
 		defer func() {
 			if p := recover(); p != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", err))
 				}
 
 			} else if err != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", err))
 				}
@@ -452,7 +440,7 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 		}
 
 		if swapRequest.State != utils.WaitingUserConfirmation {
-			_ = c.Error(fmt.Errorf("Can't pay lightning invoice %w", utils.ErrAlreadyLNPaying))
+			_ = c.Error(fmt.Errorf("can't pay lightning invoice %w", utils.ErrAlreadyLNPaying))
 			return
 		}
 

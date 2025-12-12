@@ -184,7 +184,7 @@ func GetSignerFromValue(signerType string, db database.MintDB) (signer.Signer, e
 		return &signer, nil
 
 	default:
-		return nil, fmt.Errorf("No signer type has been selected")
+		return nil, fmt.Errorf("no signer type has been selected")
 	}
 
 }

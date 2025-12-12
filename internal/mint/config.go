@@ -22,8 +22,8 @@ func getConfigFile() ([]byte, error) {
 		return []byte{}, fmt.Errorf("os.UserHomeDir(), %w", err)
 	}
 
-	var pathToProjectDir string = dir + "/" + ConfigDirName
-	var pathToProjectConfigFile string = pathToProjectDir + "/" + ConfigFileName
+	var pathToProjectDir = dir + "/" + ConfigDirName
+	var pathToProjectConfigFile = pathToProjectDir + "/" + ConfigFileName
 	err = utils.CreateDirectoryAndPath(pathToProjectDir, ConfigFileName)
 
 	if err != nil {

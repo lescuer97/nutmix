@@ -14,8 +14,8 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-var ErrUnitNotCorrect = errors.New("Unit not correct")
-var ErrNoExpiryTime = errors.New("No expiry time provided")
+var ErrUnitNotCorrect = errors.New("unit not correct")
+var ErrNoExpiryTime = errors.New("no expiry time provided")
 
 func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 

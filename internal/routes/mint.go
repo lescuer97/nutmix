@@ -78,9 +78,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 
 		nuts := make(map[string]any)
-		var baseNuts []string = []string{"1", "2", "3", "4", "5", "6"}
+		var baseNuts = []string{"1", "2", "3", "4", "5", "6"}
 
-		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12", "17", "20"}
+		var optionalNuts = []string{"7", "8", "9", "10", "11", "12", "17", "20"}
 
 		if mint.LightningBackend.ActiveMPP() {
 			optionalNuts = append(optionalNuts, "15")

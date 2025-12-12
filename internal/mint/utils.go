@@ -58,12 +58,12 @@ func (m *Mint) checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []
 			units[val.Unit] = true
 		}
 		if len(units) > 1 {
-			return cashu.Sat, fmt.Errorf("Proofs are not the same unit")
+			return cashu.Sat, fmt.Errorf("proofs are not the same unit")
 		}
 	}
 
 	if len(units) == 0 {
-		return cashu.Sat, fmt.Errorf("No units found")
+		return cashu.Sat, fmt.Errorf("no units found")
 	}
 
 	var returnedUnit cashu.Unit
@@ -107,7 +107,7 @@ func (m *Mint) VerifyOutputs(tx pgx.Tx, outputs []cashu.BlindedMessage, keys []c
 	}
 
 	if len(blindRecoverySigs) != 0 {
-		return unit, fmt.Errorf("Blind Message already has been signed. %w", cashu.ErrBlindMessageAlreadySigned)
+		return unit, fmt.Errorf("blind message already has been signed: %w", cashu.ErrBlindMessageAlreadySigned)
 	}
 	return unit, nil
 }

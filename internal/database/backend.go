@@ -26,7 +26,7 @@ type AuthUser struct {
 	LastLoggedIn uint64  `db:"last_logged_in"`
 }
 
-var DBError = errors.New("ERROR DATABASE")
+var ErrDB = errors.New("ERROR DATABASE")
 
 var DATABASE_URL_ENV = "DATABASE_URL"
 

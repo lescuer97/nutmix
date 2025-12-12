@@ -33,11 +33,11 @@ func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB) (c
 	}
 
 	if meltQuote.Unit != mintRequest.Unit {
-		return meltQuote, fmt.Errorf("Unit for internal mint are not the same. %w", cashu.ErrUnitNotSupported)
+		return meltQuote, fmt.Errorf("unit for internal mint are not the same: %w", cashu.ErrUnitNotSupported)
 	}
 
 	if mintRequest.State != cashu.UNPAID {
-		return meltQuote, fmt.Errorf("Mint request has already been paid. Mint State: %v", cashu.UNPAID)
+		return meltQuote, fmt.Errorf("mint request has already been paid. mint state: %v", cashu.UNPAID)
 	}
 
 	meltQuote.FeePaid = 0

@@ -15,7 +15,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-var DBError = errors.New("ERROR DATABASE")
+var ErrDB = errors.New("ERROR DATABASE")
 
 var DATABASE_URL_ENV = "DATABASE_URL"
 
@@ -34,7 +34,7 @@ type MockDB struct {
 }
 
 func databaseError(err error) error {
-	return errors.Join(DBError, err)
+	return errors.Join(ErrDB, err)
 }
 
 func (m *MockDB) GetAllSeeds() ([]cashu.Seed, error) {

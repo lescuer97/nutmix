@@ -27,8 +27,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
@@ -52,10 +51,10 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	t.Setenv("MINT_LIGHTNING_BACKEND", "FakeWallet")
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
-	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
-	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, ctxKeyNetwork, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, ctxKeyLightningBackend, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, ctxKeyDatabaseURL, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, ctxKeyNetwork, os.Getenv(mint.NETWORK_ENV))
 
 	router, mint := SetupRoutingForTesting(ctx, false)
 
@@ -239,7 +238,7 @@ func CreateP2PKBlindedMessages(amount uint64, keyset signer.GetKeysResponse, pub
 		}
 
 		var B_ *secp256k1.PublicKey
-		var secret string = jsonSpend
+		var secret = jsonSpend
 		// generate random secret until it finds valid point
 		for {
 			B_, r, err = crypto.BlindMessage(secret, r)
@@ -319,8 +318,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
@@ -344,10 +342,10 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	t.Setenv(mint.MINT_LIGHTNING_BACKEND_ENV, "FakeWallet")
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
-	ctx = context.WithValue(ctx, mint.MINT_LIGHTNING_BACKEND_ENV, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
-	ctx = context.WithValue(ctx, database.DATABASE_URL_ENV, os.Getenv(database.DATABASE_URL_ENV))
-	ctx = context.WithValue(ctx, mint.NETWORK_ENV, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, ctxKeyNetwork, os.Getenv(mint.NETWORK_ENV))
+	ctx = context.WithValue(ctx, ctxKeyLightningBackend, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	ctx = context.WithValue(ctx, ctxKeyDatabaseURL, os.Getenv(database.DATABASE_URL_ENV))
+	ctx = context.WithValue(ctx, ctxKeyNetwork, os.Getenv(mint.NETWORK_ENV))
 
 	router, mint := SetupRoutingForTesting(ctx, false)
 

@@ -36,7 +36,7 @@ func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 				// Don't forget to validate the alg is what you expect:
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					slog.Warn("Unexpected signing method", slog.Any("alg", token.Header["alg"]))
-					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 				}
 				return secret, nil
 			})
@@ -74,8 +74,8 @@ func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 			}
 		}
 
-		switch {
-		case c.Request.URL.Path == "/admin/login":
+		switch c.Request.URL.Path {
+		case "/admin/login":
 			return
 		default:
 			c.Redirect(http.StatusTemporaryRedirect, "/admin/login")
@@ -87,7 +87,7 @@ func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 	}
 }
 
-var ErrIncorrectNpub = errors.New("Incorrect npub used in signature")
+var ErrIncorrectNpub = errors.New("incorrect npub used in signature")
 
 func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey *btcec.PublicKey) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -118,16 +118,16 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 
 		defer func() {
 			if p := recover(); p != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				_ = mint.MintDB.Rollback(ctx, tx)
 
 			} else if err != nil {
-				_ = c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				_ = mint.MintDB.Rollback(ctx, tx)
 			} else {
 				err = mint.MintDB.Commit(context.Background(), tx)
 				if err != nil {
-					_ = c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
+					_ = c.Error(fmt.Errorf("failed to commit transaction: %+v", err))
 				}
 			}
 		}()
