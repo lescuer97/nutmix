@@ -148,6 +148,9 @@ func TestValidPreimageAndSignature(t *testing.T) {
 	// checkOutputs := false
 	// check if a proof is locked to a spend condition and verifies it
 	isProofLocked, spendCondition, err := proof.IsProofSpendConditioned()
+	if err != nil {
+		t.Errorf("Error checking proof spend condition: %+v", err)
+	}
 
 	if isProofLocked == false {
 		t.Errorf("Error in isProofLocked %+v", isProofLocked)
@@ -189,6 +192,9 @@ func TestInvalidSignatureAndValidPreimageHTLC(t *testing.T) {
 
 	// check if a proof is locked to a spend condition and verifies it
 	isProofLocked, spendCondition, err := proof.IsProofSpendConditioned()
+	if err != nil {
+		t.Errorf("Error checking proof spend condition: %+v", err)
+	}
 
 	if isProofLocked == false {
 		t.Errorf("Error in isProofLocked %+v", isProofLocked)
@@ -227,6 +233,9 @@ func TestValidSignatureAndInvalidPreimageHTLC(t *testing.T) {
 
 	// check if a proof is locked to a spend condition and verifies it
 	isProofLocked, spendCondition, err := proof.IsProofSpendConditioned()
+	if err != nil {
+		t.Errorf("Error checking proof spend condition: %+v", err)
+	}
 
 	if isProofLocked == false {
 		t.Errorf("Error in isProofLocked %+v", isProofLocked)

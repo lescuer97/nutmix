@@ -49,7 +49,7 @@ func (l *LndGrpcWallet) SetupGrpc(host string, macaroon string, tlsCrt string) e
 		tlsDialOption,
 	}
 
-	clientConn, err := grpc.Dial(host, dialOpts...)
+	clientConn, err := grpc.NewClient(host, dialOpts...)
 
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(invoice string,
 				lightningResponse.PaymentRequest = invoice
 				lightningResponse.PaymentState = SETTLED
 				lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
-				lightningResponse.PaidFeeSat = res.Route.TotalAmt
+				lightningResponse.PaidFeeSat = res.Route.TotalFeesMsat / 1000
 				lightningResponse.PaymentState = SETTLED
 				return nil
 			default:
@@ -301,13 +301,13 @@ func (l LndGrpcWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 		return FAILED, "", fmt.Errorf(`l.getInvoiceStatus(quote) %w`, err)
 	}
 
-	switch {
-	case invoiceStatus.State == lnrpc.Invoice_SETTLED:
+	switch invoiceStatus.State {
+	case lnrpc.Invoice_SETTLED:
 		return SETTLED, hex.EncodeToString(invoiceStatus.RPreimage), nil
-	case invoiceStatus.State == lnrpc.Invoice_CANCELED:
+	case lnrpc.Invoice_CANCELED:
 		return FAILED, hex.EncodeToString(invoiceStatus.RPreimage), nil
 
-	case invoiceStatus.State == lnrpc.Invoice_OPEN:
+	case lnrpc.Invoice_OPEN:
 		return PENDING, hex.EncodeToString(invoiceStatus.RPreimage), nil
 
 	}
@@ -330,7 +330,7 @@ func convert_route_hints(routes [][]zpay32.HopHint) []*lnrpc.RouteHint {
 		}
 
 		routehints = append(routehints, &lnrpc.RouteHint{
-			HopHints: *&hopHints,
+			HopHints: hopHints,
 		})
 	}
 	return routehints
@@ -372,7 +372,7 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 		return feesResponse, err
 	}
 	if res == nil {
-		return feesResponse, fmt.Errorf("No routes found")
+		return feesResponse, fmt.Errorf("no routes found")
 	}
 
 	fee := GetAverageRouteFee(res.Routes) / 1000
@@ -391,7 +391,7 @@ func (l LndGrpcWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 	var response InvoiceResponse
 	supported := l.VerifyUnitSupport(amount.Unit)
 	if !supported {
-		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit). %w.", cashu.ErrUnitNotSupported)
+		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit): %w", cashu.ErrUnitNotSupported)
 	}
 
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)

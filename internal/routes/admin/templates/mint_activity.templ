@@ -15,33 +15,27 @@ css progressBarColor(percent string) {
 	--progress: { percent };
 }
 
-templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs MintReserve) {
-	{{ proofAmount := strconv.FormatUint(proofs.Amount, 10) }}
-	{{ proofSatAmount := strconv.FormatUint(proofs.SatAmount, 10) }}
-	{{ sigsAmount := strconv.FormatUint(sigs.Amount, 10) }}
-	{{ sigsSatAmount := strconv.FormatUint(sigs.SatAmount, 10) }}
-	{{ balanceString := strconv.FormatUint(balance, 10) }}
-	{{ neededBalance := sigs.SatAmount - proofs.SatAmount }}
-	{{ neededBalanceString := strconv.FormatUint(neededBalance, 10) }}
-	{{ enoughLiquidity := balance < neededBalance }}
-	{{ percentageOfLiquidity := (float64(balance) / float64(neededBalance)) * 100 }}
-	{{ percentageOfLiquidityStr := strconv.FormatFloat(percentageOfLiquidity, 'f', 2, 64) }}
-	{{ ratioProofSigAmount := (float64(proofs.Amount) / float64(sigs.Amount)) * 100 }}
-	{{ ratioProofSigAmountStr := strconv.FormatFloat(ratioProofSigAmount, 'f', 2, 64) }}
-	{{ ratioProofSigAmountSats := (float64(proofs.SatAmount) / float64(sigs.SatAmount)) * 100 }}
-	{{ ratioProofSigAmountSatsStr := strconv.FormatFloat(ratioProofSigAmountSats, 'f', 2, 64) }}
+type Balance struct {
+	ProofsAmount      uint64
+	ProofsQuantity    uint64
+	BlindSigsAmount   uint64
+	BlindSigsQuantity uint64
+	NeededBalance     uint64
+	Ratio             float64
+}
+
+templ MintBalance(lnBalance uint64, fakeWallet bool, balance Balance) {
 	<div class="flex-card">
 		<div class="card">
 			if fakeWallet {
 				<h2>Fake Wallet doesn't have a balance</h2>
 			} else {
 				<h2>Node Balance:</h2>
-				<h3><b>{ balanceString }</b> Sats</h3>
-				<p>Your node has <b>{ percentageOfLiquidityStr } %</b> of liquidity needed.</p>
+				<h3><b>{ lnBalance }</b> Sats</h3>
 			}
 		</div>
 		<div class="card">
-			<div class={ "reserves-data", templ.KV("iliquid", enoughLiquidity) }>
+			<div class={ "reserves-data" , templ.KV("iliquid", lnBalance < balance.NeededBalance && !fakeWallet) }>
 				<div class="reserve-titles">
 					<h3>
 						Proofs
@@ -52,24 +46,22 @@ templ MintBalance(balance uint64, fakeWallet bool, proofs MintReserve, sigs Mint
 				</div>
 				<div class="data">
 					<span>
-						{  proofAmount }
+						{ balance.BlindSigsQuantity }
 					</span>
-					<meter min="0" max="100" value={ ratioProofSigAmountStr }></meter>
 					<span>
-						{ sigsAmount }
+						{ balance.ProofsQuantity }
 					</span>
 				</div>
 				<div class="data">
 					<span>
-						{ proofSatAmount } <small>Sats</small>
+						{ balance.BlindSigsAmount } <small>Sats</small>
 					</span>
-					<meter min="0" max="100" value={ ratioProofSigAmountSatsStr }></meter>
 					<span>
-						{  sigsSatAmount } <small>Sats</small>
+						{ balance.ProofsAmount } <small>Sats</small>
 					</span>
 				</div>
 				<h3>
-					Needed Balance: { neededBalanceString }(Sats)
+					Needed Balance: { balance.NeededBalance }(Sats)
 				</h3>
 			</div>
 		</div>
@@ -161,60 +153,90 @@ templ MintMeltEventList(eventList []MintMeltRequestVisual) {
 	</div>
 }
 
-templ MintActivityLayout(liquidityManagerAvailable bool) {
-	@Layout() {
-		<main class="activity">
-			<div class="time-select">
-				<button class="time-button selected" value="24h" hx-target="#mint-summary" hx-trigger="click" type="button">24h</button>
-				<button class="time-button" value="48h" type="button">48h</button>
-				<button class="time-button" value="72h" type="button">72h</button>
-				<button class="time-button" value="7d" type="button">7d</button>
-				<button class="time-button" value="all" type="button">All</button>
+templ MintActivityLayout(liquidityManagerAvailable bool, selectedRange string) {
+	@Layout("stats") {
+		<main class="main-content">
+			@TimeRangeSelector(selectedRange)
+			<div
+				id="summary-placeholder"
+				class="mt-4 mb-4"
+				hx-get="/admin/summary"
+				hx-trigger="load, change from:#timeRangeSelect"
+				hx-include="#timeRangeSelect"
+				hx-swap="outerHTML"
+				hx-indicator="#date-range-loading"
+			></div>
+			<div
+				id="proofs-chart-placeholder"
+				class="mt-4 mb-4"
+				hx-get="/admin/proofs-chart"
+				hx-trigger="load, change from:#timeRangeSelect"
+				hx-include="#timeRangeSelect"
+				hx-swap="outerHTML"
+				hx-indicator="#date-range-loading"
+			>
+				<div class="card card-md">
+					<div class="chart-loading-placeholder">
+						<span class="loading-spinner"></span>
+						<span>Loading chart...</span>
+					</div>
+				</div>
 			</div>
-			<div class="balance">
-				<div
-					hx-get="/admin/mint-balance"
-					hx-trigger="load"
-					hx-target="this"
-					hx-swap="innerHTML"
-					class=""
-				></div>
-				<div
-					hx-get="/admin/mint-melt-summary"
-					hx-target="this"
-					hx-swap="innerHTML"
-					hx-trigger="load, reload"
-					hx-headers="javascript:{time: event?.detail?.time}"
-					id="mint-summary"
-					class="summary-table"
-				></div>
-				if liquidityManagerAvailable {
-					<div
-						hx-get="/admin/liquidity-button"
-						hx-target="this"
-						hx-swap="outerHTML"
-						hx-trigger="load, reload"
-					></div>
-				}
-			</div>
-			<div class="data-list">
-				<div
-					hx-get="/admin/logs"
-					hx-target="this"
-					hx-swap="innerHTML"
-					hx-trigger="load, reload"
-					hx-headers="javascript:{time: event?.detail?.time}"
-					class=""
-				></div>
-				<div
-					hx-get="/admin/mint-melt-list"
-					hx-target="this"
-					hx-swap="innerHTML"
-					hx-trigger="load, reload"
-					hx-headers="javascript:{time: event?.detail?.time}"
-					class=""
-				></div>
+			<div
+				id="blindsigs-chart-placeholder"
+				hx-get="/admin/blindsigs-chart"
+				hx-trigger="load, change from:#timeRangeSelect"
+				hx-include="#timeRangeSelect"
+				hx-swap="outerHTML"
+				hx-indicator="#date-range-loading"
+			>
+				<div class="card card-md">
+					<div class="chart-loading-placeholder">
+						<span class="loading-spinner"></span>
+						<span>Loading chart...</span>
+					</div>
+				</div>
 			</div>
 		</main>
+		<script src="/js/modules/chart.js"></script>
 	}
+}
+
+type Summary struct {
+	LnBalance  uint64
+	FakeWallet bool
+	Fees       uint64
+	SinceDate  string // Formatted date string showing the start date
+}
+
+templ SummaryComponent(summary Summary) {
+	<div
+		id="summary-placeholder"
+		class="flex gap-4 mb-4 mt-4 flex-wrap"
+		hx-get="/admin/summary"
+		hx-trigger="change from:#timeRangeSelect"
+		hx-include="#timeRangeSelect"
+		hx-swap="outerHTML"
+		hx-indicator="#date-range-loading"
+	>
+		<div class="card card-md flex-1">
+			if summary.FakeWallet {
+				<div class="text-secondary font-semibold">Fake Wallet doesn't have a balance</div>
+			} else {
+				<div class="text-secondary font-semibold uppercase text-xs mb-2">Node Balance</div>
+				<div class="text-2xl font-bold text-primary">
+					{ FormatNumber(summary.LnBalance) } <span class="text-sm font-normal text-secondary">Sats</span>
+				</div>
+			}
+		</div>
+		<div class="card card-md flex-1">
+			<div class="text-secondary font-semibold uppercase text-xs mb-2">Fees</div>
+			<div class="text-2xl font-bold text-primary">
+				{ FormatNumber(summary.Fees) } <span class="text-sm font-normal text-secondary">Sats</span>
+			</div>
+			<div class="text-xs text-secondary mt-2">
+				Fees generated since: { summary.SinceDate }
+			</div>
+		</div>
+	</div>
 }

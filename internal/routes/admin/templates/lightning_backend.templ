@@ -6,58 +6,65 @@ import (
 )
 
 templ LightningBackendPage(config utils.Config) {
-	@Layout() {
+	@Layout("lightning") {
 		<main class="bolt11">
-			<form class=".form" hx-post="/admin/bolt11" hx-target="#notifications" hx-swap="innerHTML">
-				<h2>Lightning Node info</h2>
-				<label for="NETWORK" class="settings-input">
-					Network Type
-					<select name="NETWORK">
-						<option selected?={ config.NETWORK == lightning.MAINNET } value="mainnet">Mainnet</option>
-						<option selected?={ config.NETWORK == lightning.TESTNET || config.NETWORK == lightning.TESTNET3 } value="testnet">Testnet</option>
-						<option selected?={ config.NETWORK == lightning.SIGNET } value="signet">Signet</option>
-						<option selected?={ config.NETWORK == lightning.REGTEST } value="regtest">Regtest</option>
-					</select>
-				</label>
-				<label for="MINT_LIGHTNING_BACKEND" class="settings-input">
-					Lightning Node Backend
-					<select hx-trigger="change, load" hx-get="/admin/lightningdata" hx-target="#lightning-data" name="MINT_LIGHTNING_BACKEND">
-						<option value="FakeWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" selected?={ config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET }>Fake Wallet</option>
-						<option
-							value="LndGrpcWallet"
-							hx-trigger="selected"
-							hx-get="/admin/lightningdata"
-							hx-target="#lightning-data"
-							selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNDGRPC }
-						>LND Grpc wallet</option>
-						<option
-							value="ClnGrpcWallet"
-							hx-trigger="selected"
-							hx-get="/admin/lightningdata"
-							hx-target="#lightning-data"
-							selected?={ config.MINT_LIGHTNING_BACKEND == utils.CLNGRPC }
-						>Core-Lightning Grpc wallet</option>
-						<option
-							value="LNbitsWallet"
-							hx-trigger="selected"
-							hx-get="/admin/lightningdata"
-							hx-target="#lightning-data"
-							selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNBITS }
-						>LNBITS wallet</option>
-						<option
-							value="Strike"
-							hx-trigger="selected"
-							hx-get="/admin/lightningdata"
-							hx-target="#lightning-data"
-							selected?={ config.MINT_LIGHTNING_BACKEND == utils.Strike }
-						>Strike</option>
-					</select>
-				</label>
-				<div id="lightning-data"></div>
-				<button class="md-button" type="submit">Save Settings</button>
-			</form>
+			@LightningConnectionSettings(config)
 		</main>
 	}
+}
+
+templ LightningConnectionSettings(config utils.Config) {
+	<form class="form-group" hx-post="/admin/bolt11" hx-target="#notifications" hx-swap="innerHTML">
+		<div class="form-section">
+			<label for="NETWORK" class="settings-input">
+				Network Type
+				<select name="NETWORK">
+					<option selected?={ config.NETWORK == lightning.MAINNET } value="mainnet">Mainnet</option>
+					<option selected?={ config.NETWORK == lightning.TESTNET || config.NETWORK == lightning.TESTNET3 } value="testnet">Testnet</option>
+					<option selected?={ config.NETWORK == lightning.SIGNET } value="signet">Signet</option>
+					<option selected?={ config.NETWORK == lightning.REGTEST } value="regtest">Regtest</option>
+				</select>
+			</label>
+			<label for="MINT_LIGHTNING_BACKEND" class="settings-input">
+				Lightning Node Backend
+				<select hx-trigger="change, load" hx-get="/admin/lightningdata" hx-target="#lightning-data" name="MINT_LIGHTNING_BACKEND">
+					<option value="FakeWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" selected?={ config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET }>Fake Wallet</option>
+					<option
+						value="LndGrpcWallet"
+						hx-trigger="selected"
+						hx-get="/admin/lightningdata"
+						hx-target="#lightning-data"
+						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNDGRPC }
+					>LND Grpc wallet</option>
+					<option
+						value="ClnGrpcWallet"
+						hx-trigger="selected"
+						hx-get="/admin/lightningdata"
+						hx-target="#lightning-data"
+						selected?={ config.MINT_LIGHTNING_BACKEND == utils.CLNGRPC }
+					>Core-Lightning Grpc wallet</option>
+					<option
+						value="LNbitsWallet"
+						hx-trigger="selected"
+						hx-get="/admin/lightningdata"
+						hx-target="#lightning-data"
+						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNBITS }
+					>LNBITS wallet</option>
+					<option
+						value="Strike"
+						hx-trigger="selected"
+						hx-get="/admin/lightningdata"
+						hx-target="#lightning-data"
+						selected?={ config.MINT_LIGHTNING_BACKEND == utils.Strike }
+					>Strike</option>
+				</select>
+			</label>
+		</div>
+		<div id="lightning-data" class="top-divider border-gray-200 pt-6 mt-2"></div>
+		<div class="form-actions" style="margin-top: var(--space-4); display: flex; justify-content: flex-end;">
+			<button class="btn btn-primary" type="submit">Save Settings</button>
+		</div>
+	</form>
 }
 
 templ SetupForms(lightningBackend string, config utils.Config) {
@@ -76,65 +83,82 @@ templ SetupForms(lightningBackend string, config utils.Config) {
 }
 
 templ LndGrpc(host string, tls string, macaroon string) {
-	<label for="LND_GRPC_HOST" class="settings-input">
-		LND GRPC Host
-		<input type="text" name="LND_GRPC_HOST" value={ host }/>
-	</label>
-	<label for="LND_TLS_CERT" class="settings-input">
-		LND TLS Certificate
-		<textarea name="LND_TLS_CERT" type="password">{ tls }</textarea>
-	</label>
-	<label for="LND_MACAROON" class="settings-input">
-		LND Macaroon (HEX)
-		<input type="password" name="LND_MACAROON" value={ macaroon }/>
-	</label>
+	<div class="form-section mt-4">
+		<label for="LND_GRPC_HOST" class="settings-input">
+			LND GRPC Host
+			<input type="text" name="LND_GRPC_HOST" value={ host } placeholder="localhost:10009"/>
+		</label>
+		<label for="LND_TLS_CERT" class="settings-input">
+			LND TLS Certificate
+			<textarea name="LND_TLS_CERT" type="password" rows="4" placeholder="-----BEGIN CERTIFICATE----- ...">{ tls }</textarea>
+		</label>
+		<label for="LND_MACAROON" class="settings-input">
+			LND Macaroon (HEX)
+			<input type="password" name="LND_MACAROON" value={ macaroon } placeholder="020103lnd..."/>
+		</label>
+	</div>
 }
 
 templ ClnGrpc(host string, ca_cer string, client_cert string, client_key string, macaroon string) {
-	<label for="CLN_GRPC_HOST" class="settings-input">
-		Core-Lightning GRPC Host
-		<input type="text" name="CLN_GRPC_HOST" value={ host }/>
-	</label>
-	<label for="CLN_CA_CERT" class="settings-input">
-		Core-Lightning CA Certificate
-		<textarea name="CLN_CA_CERT" type="password">{ ca_cer }</textarea>
-	</label>
-	<label for="CLN_CLIENT_CERT" class="settings-input">
-		Core-Lightning Client Certificate
-		<textarea name="CLN_CLIENT_CERT" type="password">{ client_cert }</textarea>
-	</label>
-	<label for="CLN_CLIENT_KEY" class="settings-input">
-		Core-Lightning Client KEY
-		<textarea name="CLN_CLIENT_KEY" type="password">{ client_key }</textarea>
-	</label>
-	<label for="CLN_MACAROON" class="settings-input">
-		Core-Lightning Rune (HEX)
-		<input type="password" name="CLN_MACAROON" value={ macaroon }/>
-	</label>
+	<div class="form-section mt-4">
+		<label for="CLN_GRPC_HOST" class="settings-input">
+			Core-Lightning GRPC Host
+			<input type="text" name="CLN_GRPC_HOST" value={ host } placeholder="localhost:10009"/>
+		</label>
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<label for="CLN_CA_CERT" class="settings-input">
+				Core-Lightning CA Certificate
+				<textarea name="CLN_CA_CERT" type="password" rows="3" placeholder="-----BEGIN CERTIFICATE----- ...">{ ca_cer }</textarea>
+			</label>
+			<label for="CLN_CLIENT_CERT" class="settings-input">
+				Core-Lightning Client Certificate
+				<textarea name="CLN_CLIENT_CERT" type="password" rows="3" placeholder="-----BEGIN CERTIFICATE----- ...">{ client_cert }</textarea>
+			</label>
+			<label for="CLN_CLIENT_KEY" class="settings-input">
+				Core-Lightning Client KEY
+				<textarea name="CLN_CLIENT_KEY" type="password" rows="3" placeholder="-----BEGIN PRIVATE KEY----- ...">{ client_key }</textarea>
+			</label>
+			<label for="CLN_MACAROON" class="settings-input">
+				Core-Lightning Rune (HEX)
+				<textarea name="CLN_MACAROON" type="password" rows="3" placeholder="020103rune...">{ macaroon }</textarea>
+			</label>
+		</div>
+	</div>
 }
 
 templ Lnbits(endpoint string, key string) {
-	<label for="MINT_LNBITS_ENDPOINT" class="settings-input">
-		LNBITS endpoint
-		<input type="text" name="MINT_LNBITS_ENDPOINT" value={ endpoint }/>
-	</label>
-	<label for="MINT_LNBITS_KEY" class="settings-input">
-		LNBITS Key
-		<input type="password" name="MINT_LNBITS_KEY" value={ key }/>
-	</label>
+	<div class="form-section mt-4">
+		<label for="MINT_LNBITS_ENDPOINT" class="settings-input">
+			LNBITS endpoint
+			<input type="text" name="MINT_LNBITS_ENDPOINT" value={ endpoint } placeholder="https://legend.lnbits.com"/>
+		</label>
+		<label for="MINT_LNBITS_KEY" class="settings-input">
+			LNBITS Key (Admin Key)
+			<input type="password" name="MINT_LNBITS_KEY" value={ key } placeholder="ea0..."/>
+		</label>
+	</div>
 }
 
 templ Strike(key string, endpoint string) {
-	<label for="STRIKE_ENDPOINT" class="settings-input">
-		Strike endpoint
-		<input type="text" required name="STRIKE_ENDPOINT" value={ endpoint }/>
-	</label>
-	<label for="STRIKE_KEY" class="settings-input">
-		Strike key
-		<input type="password" required name="STRIKE_KEY" value={ key }/>
-	</label>
+	<div class="form-section mt-4">
+		<label for="STRIKE_ENDPOINT" class="settings-input">
+			Strike endpoint
+			<input type="text" required name="STRIKE_ENDPOINT" value={ endpoint } placeholder="https://api.strike.me"/>
+		</label>
+		<label for="STRIKE_KEY" class="settings-input">
+			Strike API key
+			<input type="password" required name="STRIKE_KEY" value={ key } placeholder="sk_..."/>
+		</label>
+	</div>
 }
 
 templ FakeFallet() {
-	It's a fake lightning wallet so you don't have to set anything up
+	<div class="flex flex-col items-center justify-center p-6 my-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+		<h3 class="text-lg font-semibold text-blue-800 mb-2">Fake Wallet Enabled</h3>
+		<p class="text-blue-600">
+			It's a fake lightning wallet so you don't have to set anything up.
+			<br/>
+			<span class="text-sm mt-2 block opacity-75">Payments are simulated internally.</span>
+		</p>
+	</div>
 }

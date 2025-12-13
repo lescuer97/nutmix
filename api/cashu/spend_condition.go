@@ -15,22 +15,22 @@ import (
 )
 
 var (
-	ErrInvalidSpendCondition         = errors.New("Invalid spend condition")
-	ErrConvertSpendConditionToString = errors.New("Failed to convert spend condition to string")
-	ErrInvalidTagName                = errors.New("Invalid tag name")
-	ErrConvertTagToString            = errors.New("Failed to convert tag to string")
-	ErrInvalidTagValue               = errors.New("Invalid tag value")
-	ErrInvalidSigFlag                = errors.New("Invalid sig flag")
-	ErrConvertSigFlagToString        = errors.New("Failed to convert sig flag to string")
-	ErrMalformedTag                  = errors.New("Malformed tag")
-	ErrCouldNotParseSpendCondition   = errors.New("Could not parse spend condition")
-	ErrCouldNotParseWitness          = errors.New("Could not parse witness")
-	ErrEmptyWitness                  = errors.New("Witness is empty")
-	ErrNoValidSignatures             = errors.New("No valid signatures found")
-	ErrNotEnoughSignatures           = errors.New("Not enough signatures")
-	ErrLocktimePassed                = errors.New("Locktime has passed and no refund key was found")
-	ErrInvalidHexPreimage            = errors.New("Preimage is not a valid hex string")
-	ErrInvalidPreimage               = errors.New("Invalid preimage")
+	ErrInvalidSpendCondition         = errors.New("invalid spend condition")
+	ErrConvertSpendConditionToString = errors.New("failed to convert spend condition to string")
+	ErrInvalidTagName                = errors.New("invalid tag name")
+	ErrConvertTagToString            = errors.New("failed to convert tag to string")
+	ErrInvalidTagValue               = errors.New("invalid tag value")
+	ErrInvalidSigFlag                = errors.New("invalid sig flag")
+	ErrConvertSigFlagToString        = errors.New("failed to convert sigu flag to string")
+	ErrMalformedTag                  = errors.New("malformed tag")
+	ErrCouldNotParseSpendCondition   = errors.New("could not parse spend condition")
+	ErrCouldNotParseWitness          = errors.New("could not parse witness")
+	ErrEmptyWitness                  = errors.New("witness is empty")
+	ErrNoValidSignatures             = errors.New("no valid signatures found")
+	ErrNotEnoughSignatures           = errors.New("not enough signatures")
+	ErrLocktimePassed                = errors.New("locktime has passed and no refund key was found")
+	ErrInvalidHexPreimage            = errors.New("preimage is not a valid hex string")
+	ErrInvalidPreimage               = errors.New("invalid preimage")
 )
 
 type SpendCondition struct {
@@ -535,7 +535,7 @@ func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]struct{}, sign
 	log.Printf("msg hash: %x", hashMessage)
 
 	for _, sig := range signatures {
-		for pubkey, _ := range pubkeys {
+		for pubkey := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {
 				amountValidSigs += 1
 				delete(pubkeys, pubkey)

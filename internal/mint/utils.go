@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -57,12 +58,12 @@ func (m *Mint) checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []
 			units[val.Unit] = true
 		}
 		if len(units) > 1 {
-			return cashu.Sat, fmt.Errorf("Proofs are not the same unit")
+			return cashu.Sat, fmt.Errorf("proofs are not the same unit")
 		}
 	}
 
 	if len(units) == 0 {
-		return cashu.Sat, fmt.Errorf("No units found")
+		return cashu.Sat, fmt.Errorf("no units found")
 	}
 
 	var returnedUnit cashu.Unit
@@ -106,7 +107,7 @@ func (m *Mint) VerifyOutputs(tx pgx.Tx, outputs []cashu.BlindedMessage, keys []c
 	}
 
 	if len(blindRecoverySigs) != 0 {
-		return unit, fmt.Errorf("Blind Message already has been signed. %w", cashu.ErrBlindMessageAlreadySigned)
+		return unit, fmt.Errorf("blind message already has been signed: %w", cashu.ErrBlindMessageAlreadySigned)
 	}
 	return unit, nil
 }
@@ -217,7 +218,11 @@ func (m *Mint) IsInternalTransaction(request string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("m.MintDB.GetTx(context.Background()). %w", err)
 	}
-	defer m.MintDB.Rollback(ctx, tx)
+	defer func() {
+		if err := m.MintDB.Rollback(ctx, tx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 
 	mintRequest, err := m.MintDB.GetMintRequestByRequest(tx, request)
 	if err != nil {

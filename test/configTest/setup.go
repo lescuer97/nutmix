@@ -19,7 +19,7 @@ func CopyConfigFiles(filepath string) (ConfigFiles, error) {
 
 	if err != nil {
 
-		return config, fmt.Errorf("Could not read file %w", err)
+		return config, fmt.Errorf("could not read file: %w", err)
 
 	}
 
@@ -44,8 +44,8 @@ func WriteConfigFile(file []byte) error {
 	if err != nil {
 		return fmt.Errorf("os.UserHomeDir(), %w", err)
 	}
-	var pathToProjectDir string = dir + "/" + mint.ConfigDirName
-	var pathToProjectConfigFile string = pathToProjectDir + "/" + mint.ConfigFileName
+	var pathToProjectDir = dir + "/" + mint.ConfigDirName
+	var pathToProjectConfigFile = pathToProjectDir + "/" + mint.ConfigFileName
 
 	err = os.WriteFile(pathToProjectConfigFile, file, 0764)
 	if err != nil {

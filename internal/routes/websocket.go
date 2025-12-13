@@ -12,12 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/mint"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-var ErrAlreadySubscribed = errors.New("Filter already subscribed")
+var ErrAlreadySubscribed = errors.New("filter already subscribed")
 
 func checkOrigin(r *http.Request) bool {
 	return true
@@ -37,7 +36,11 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 			slog.Warn("upgrader.Upgrade(c.Writer, c.Request, nil)", slog.Any("error", err))
 			return
 		}
-		defer conn.Close()
+		defer func() {
+			if err := conn.Close(); err != nil {
+				slog.Warn("failed to close websocket connection", slog.Any("error", err))
+			}
+		}()
 
 		var request cashu.WsRequest
 
@@ -154,7 +157,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 					}
 				}
 
-			case _ = <-closeChan:
+			case <-closeChan:
 				return
 			}
 		}
@@ -162,7 +165,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 	})
 }
 
-func handleWSRequest(request cashu.WsRequest, observer *mint.Observer, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB,
+func handleWSRequest(request cashu.WsRequest, observer *m.Observer, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB,
 	closeChan chan string,
 ) error {
 	switch request.Method {
@@ -171,15 +174,15 @@ func handleWSRequest(request cashu.WsRequest, observer *mint.Observer, proofChan
 		switch request.Params.Kind {
 		case cashu.ProofStateWs:
 			for _, filter := range request.Params.Filters {
-				observer.AddProofWatch(filter, mint.ProofWatchChannel{Channel: proofChan, SubId: request.Params.SubId})
+				observer.AddProofWatch(filter, m.ProofWatchChannel{Channel: proofChan, SubId: request.Params.SubId})
 			}
 		case cashu.Bolt11MintQuote:
 			for _, filter := range request.Params.Filters {
-				observer.AddMintWatch(filter, mint.MintQuoteChannel{Channel: mintChan, SubId: request.Params.SubId})
+				observer.AddMintWatch(filter, m.MintQuoteChannel{Channel: mintChan, SubId: request.Params.SubId})
 			}
 		case cashu.Bolt11MeltQuote:
 			for _, filter := range request.Params.Filters {
-				observer.AddMeltWatch(filter, mint.MeltQuoteChannel{Channel: meltChan, SubId: request.Params.SubId})
+				observer.AddMeltWatch(filter, m.MeltQuoteChannel{Channel: meltChan, SubId: request.Params.SubId})
 			}
 
 		}
@@ -191,7 +194,7 @@ func handleWSRequest(request cashu.WsRequest, observer *mint.Observer, proofChan
 	return nil
 }
 
-func ListenToIncommingMessage(subs *mint.Observer, conn *websocket.Conn, listenChannel chan error, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB, closeChan chan string) {
+func ListenToIncommingMessage(subs *m.Observer, conn *websocket.Conn, listenChannel chan error, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB, closeChan chan string) {
 	for {
 		var request cashu.WsRequest
 		err := conn.ReadJSON(&request)
@@ -241,7 +244,11 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 		if err != nil {
 			return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 		}
-		defer mint.MintDB.Rollback(ctx, tx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		switch request.Params.Kind {
 		case cashu.Bolt11MintQuote:
@@ -310,7 +317,7 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 				return fmt.Errorf("btcec.ParsePubKey(hexBytes). %w", err)
 			}
 
-			wrappedPubkey := cashu.WrappedPublicKey{pubkey}
+			wrappedPubkey := cashu.WrappedPublicKey{PublicKey: pubkey}
 
 			proofsState, err := m.CheckProofState(mint, []cashu.WrappedPublicKey{wrappedPubkey})
 			if err != nil {

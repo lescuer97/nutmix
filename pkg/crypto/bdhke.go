@@ -45,7 +45,7 @@ func HashToCurve(message []byte) (*secp256k1.PublicKey, error) {
 			return point, nil
 		}
 	}
-	return nil, errors.New("No valid point found")
+	return nil, errors.New("no valid point found")
 }
 
 // B_ = Y + rG

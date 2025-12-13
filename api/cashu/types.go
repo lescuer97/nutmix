@@ -21,32 +21,32 @@ import (
 )
 
 var (
-	ErrCouldNotParseUnitString = errors.New("Could not parse unit string")
-	ErrCouldNotParsePublicKey  = errors.New("Could not parse public key string")
-	ErrCouldNotEncryptSeed     = errors.New("Could not encrypt seed")
-	ErrCouldNotDecryptSeed     = errors.New("Could not decrypt seed")
-	ErrKeysetNotFound          = errors.New("Keyset not found")
-	ErrKeysetForProofNotFound  = errors.New("Keyset for proof not found")
+	ErrCouldNotParseUnitString = errors.New("could not parse unit string")
+	ErrCouldNotParsePublicKey  = errors.New("could not parse public key string")
+	ErrCouldNotEncryptSeed     = errors.New("could not encrypt seed")
+	ErrCouldNotDecryptSeed     = errors.New("could not decrypt seed")
+	ErrKeysetNotFound          = errors.New("keyset not found")
+	ErrKeysetForProofNotFound  = errors.New("keyset for proof not found")
 
-	AlreadyActiveProof             = errors.New("Proof already being spent")
-	AlreadyActiveQuote             = errors.New("Quote already being spent")
-	UsingInactiveKeyset            = errors.New("Trying to use an inactive keyset")
-	ErrInvalidProof                = errors.New("Invalid proof")
-	ErrQuoteNotPaid                = errors.New("Quote not paid")
-	ErrMessageAmountToBig          = errors.New("Message amount is to big")
-	ErrInvalidBlindMessage         = errors.New("Invalid blind message")
-	ErrInvalidBlindSignature       = errors.New("Invalid blind signature")
-	ErrCouldNotConvertUnit         = errors.New("Could not convert unit")
-	ErrCouldNotParseAmountToString = errors.New("Could not parse amount to string")
-	ErrUnbalanced                  = errors.New("Unbalanced transactions")
-	ErrNotSameUnits                = errors.New("Not same units")
-	ErrRepeatedOutput              = errors.New("Duplicate outputs provided")
-	ErrRepeatedInput               = errors.New("Duplicate inputs provided")
-	ErrPaymentFailed               = errors.New("Lightning payment failed")
-	ErrPaymentNoRoute              = errors.New("No route found for lightning payment")
+	ErrAlreadyActiveProof          = errors.New("proof already being spent")
+	ErrAlreadyActiveQuote             = errors.New("quote already being spent")
+	ErrUsingInactiveKeyset            = errors.New("trying to use an inactive keyset")
+	ErrInvalidProof                = errors.New("invalid proof")
+	ErrQuoteNotPaid                = errors.New("quote not paid")
+	ErrMessageAmountToBig          = errors.New("message amount is to big")
+	ErrInvalidBlindMessage         = errors.New("invalid blind message")
+	ErrInvalidBlindSignature       = errors.New("invalid blind signature")
+	ErrCouldNotConvertUnit         = errors.New("could not convert unit")
+	ErrCouldNotParseAmountToString = errors.New("could not parse amount to string")
+	ErrUnbalanced                  = errors.New("unbalanced transactions")
+	ErrNotSameUnits                = errors.New("not same units")
+	ErrRepeatedOutput              = errors.New("duplicate outputs provided")
+	ErrRepeatedInput               = errors.New("duplicate inputs provided")
+	ErrPaymentFailed               = errors.New("lightning payment failed")
+	ErrPaymentNoRoute              = errors.New("no route found for lightning payment")
 
-	ErrMintQuoteNoPublicKey      = errors.New("No valid pubkey for mint quote")
-	ErrMintQuoteNoValidSignature = errors.New("No valid signature for mint quote")
+	ErrMintQuoteNoPublicKey      = errors.New("no valid pubkey for mint quote")
+	ErrMintQuoteNoValidSignature = errors.New("no valid signature for mint quote")
 )
 
 const (
@@ -673,12 +673,13 @@ func (a *Amount) To(toUnit Unit) error {
 	return nil
 }
 func (a *Amount) ToFloatString() (string, error) {
-	if a.Unit == USD || a.Unit == EUR {
+	switch a.Unit {
+	case USD, EUR:
 		return a.CentsToUSD()
-	} else if a.Unit == Sat {
+	case Sat:
 		return a.SatToBTC()
-	} else {
-		return "", fmt.Errorf("Amount must be in satoshis or cents")
+	default:
+		return "", fmt.Errorf("amount must be in satoshis or cents")
 	}
 }
 
@@ -706,7 +707,7 @@ func (p WrappedPublicKey) Value() (driver.Value, error) {
 	if p.PublicKey == nil {
 		return nil, nil
 	}
-	return hex.EncodeToString(p.PublicKey.SerializeCompressed()), nil
+	return hex.EncodeToString(p.SerializeCompressed()), nil
 }
 
 func (p *WrappedPublicKey) Scan(value any) error {
@@ -744,7 +745,7 @@ func (p WrappedPublicKey) MarshalJSON() ([]byte, error) {
 	if p.PublicKey == nil {
 		return json.Marshal(nil)
 	}
-	s := hex.EncodeToString(p.PublicKey.SerializeCompressed())
+	s := hex.EncodeToString(p.SerializeCompressed())
 	return json.Marshal(s)
 }
 
@@ -783,7 +784,7 @@ func (p WrappedPublicKey) MarshalText() ([]byte, error) {
 		return nil, nil
 	}
 
-	return p.PublicKey.SerializeCompressed(), nil
+	return p.SerializeCompressed(), nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
@@ -806,7 +807,7 @@ func (p WrappedPublicKey) ToHex() string {
 	if p.PublicKey == nil {
 		return ""
 	}
-	return hex.EncodeToString(p.PublicKey.SerializeCompressed())
+	return hex.EncodeToString(p.SerializeCompressed())
 }
 
 // String implements fmt.Stringer and returns the hex representation (or empty

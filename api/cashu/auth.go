@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	ErrInvalidAuthToken  = errors.New("Invalid auth token")
-	ErrClearTokenExpired = errors.New("Clear to token is expired")
+	ErrInvalidAuthToken  = errors.New("invalid auth token")
+	ErrClearTokenExpired = errors.New("clear token is expired")
 )
 
 type ProtectedRoute struct {

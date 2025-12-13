@@ -6,7 +6,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
-var ErrNoKeysetFound = errors.New("No keyset found")
+var ErrNoKeysetFound = errors.New("no keyset found")
 
 type GetKeysResponse struct {
 	Keysets []KeysetResponse `json:"keysets"`

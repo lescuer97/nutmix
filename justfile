@@ -22,60 +22,40 @@ default:
 
 # Help recipe
 help:
-    @echo "Available recipe:"
-    @echo "End User:"
-    @echo "  run              - Build and run the application locally"
-    @echo "  docker-run       - Run application in Docker"
-    @echo "  docker-up        - Start all services with docker-compose"
-    @echo "  docker-down      - Stop all services"
-
-    @echo "\nDeveloper Focused:"
-    @echo "  install-deps     - Install required dependencies"
-    @echo "  gen-proto        - Generate protobuf code"
-    @echo "  gen-templ        - Generate go code from templ files"
-    @echo "  gen-test-keys    - Generate test keys for MINT_PRIVATE_KEY"
-    @echo "  dev              - Start database and run application locally"
-    @echo "  test             - Run tests"
-    @echo "  lint             - Run linter"
-    @echo "  clean-all        - Clean build artifacts and cache"
-    @echo "  docker-db        - Start only the database service"
-    @echo "  docker-db-down   - Stop the database service"
-    @echo "  docker-mint      - Start only the mint service"
-    @echo "  docker-mint-down - Stop the mint service"
-    @echo "  docker-clean     - Clean up Docker resources"
-
-    @echo "\nBuild and Release:"
-    @echo "  build            - Build the application"
-    @echo "  build-platform <platform>  - Build the application for a specified platform, linux/amd64 linux/arm64 and darwin/arm64"
-    @echo "  clean            - Clean build artifacts"
-    @echo "  release          - Builds all artifacts for release"
-    @echo "  docker-build     - Build Docker image with version tags"
-    @echo "  docker-push      - Push Docker images to registry"
-
-    @echo "\nVersioning:"
-    @echo "  version          - Show current version"
-    @echo "  version-bump     - Bump version (patch by default)"
-    @echo "  version-set      - Set specific version (e.g., just version-set 1.2.3)"
-    @echo "  version-major    - Bump major version"
-    @echo "  version-minor    - Bump minor version"
-    @echo "  version-patch    - Bump patch version"
+    just --list
 
 # Run recipe
-run:
+run: build
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running {{APP_NAME}} v{{VERSION}} locally..."
-    just build
+    ./{{BUILD_DIR}}/{{APP_NAME}} {{RUN_ARGS}}
+
+# Run recipe with local dev enviroment
+run-dev: build-dev
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Running {{APP_NAME}} v{{VERSION}} locally..."
     ./{{BUILD_DIR}}/{{APP_NAME}} {{RUN_ARGS}}
 
 # Build recipe
-build:
+build: gen-proto gen-templ web-build-prod
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Building {{APP_NAME}} v{{VERSION}}..."
     mkdir -p {{BUILD_DIR}}
-    just gen-proto
-    just gen-templ
+    go build -ldflags="-s -w \
+        -X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
+        -X '{{MODULE}}/internal/utils.BuildTime={{BUILD_TIME}}' \
+        -X '{{MODULE}}/internal/utils.GitCommit={{COMMIT_HASH}}'" \
+        -trimpath -o {{BUILD_DIR}}/{{APP_NAME}} cmd/nutmix/*.go
+
+# Build recipe
+build-dev: gen-proto gen-templ web-build-dev
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Building {{APP_NAME}} v{{VERSION}}..."
+    mkdir -p {{BUILD_DIR}}
     go build -ldflags="-s -w \
         -X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
         -X '{{MODULE}}/internal/utils.BuildTime={{BUILD_TIME}}' \
@@ -92,9 +72,6 @@ install-deps:
     go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.0
     go install github.com/a-h/templ/cmd/templ@v0.3.960
-
-    # lint tools
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.6.0
 
     # Check protobuf-compiler
     if ! command -v protoc >/dev/null 2>&1; then
@@ -119,30 +96,63 @@ install-deps:
       echo "Go modules up to date"
     fi
 
+    echo "Installing bun..."
+    curl -fsSL https://bun.sh/install | bash
+
+    echo "Installing web dependencies"
+    just web-install
+
+
     echo "Dependencies check completed"
 
 # Generate protobuf code
 gen-proto:
     #!/usr/bin/env bash
-    set -euo pipefail
     echo "Generating protobuf code..."
     protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
+
+# ============================
+# Web Dashaboard
+# ============================
 
 # Generate Go code from templ files
 gen-templ:
     #!/usr/bin/env bash
-    set -euo pipefail
     echo "Generating Go code from templ files..."
     templ generate .
 
+# installs all necesary web packages
+web-install:
+    echo "Intalling npm dependencies"
+    cd internal/routes/admin/static  && bun install
+
+# builds web packages for deployment
+web-build-prod:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Building web packages (prod, minified)"
+    cd internal/routes/admin/static
+    mkdir -p dist/js dist/css
+    bun build src/index.js src/modules/*js --outdir=dist/js --target=browser --format=esm --minify
+    cp *.css dist/css/
+
+# builds web packages for local development
+web-build-dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Building web packages (dev, unminified)"
+    cd internal/routes/admin/static
+    mkdir -p dist/js dist/css
+    bun build src/index.js src/modules/*js --outdir=dist/js --target=browser --minify --format=esm --sourcemap=inline
+    cp *.css dist/css/
 
 # Dev recipe
-dev:
+dev: 
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Starting development environment..."
     just docker-db
-    just run
+    just run-dev
 
 # Generate test keys
 gen-test-keys:
@@ -157,8 +167,17 @@ test:
     echo "Running tests..."
     go test -v ./...
 
+# Lint prerequisites
+ensure-golangci-lint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v golangci-lint >/dev/null 2>&1; then
+      echo "golangci-lint not found. Please install it (https://golangci-lint.run/usage/install/)." >&2
+      exit 1
+    fi
+
 # Lint recipe
-lint:
+lint: ensure-golangci-lint
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running linter..."
@@ -212,7 +231,7 @@ build-platform target:
     echo "Built $OUTPUT"
 
 # Build for all platforms
-release:
+release: build
     #!/usr/bin/env bash
     set -euo pipefail
 

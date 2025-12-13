@@ -12,7 +12,6 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/invoicesrpc"
 	"github.com/lightningnetwork/lnd/lntypes"
-	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
@@ -72,6 +71,9 @@ func CreateMockInvoice(amountSats uint64, description string, network chaincfg.P
 	}
 
 	_, paymentHash, err := mockMppPaymentHashAndPreimage(&invoiceData)
+	if err != nil {
+		return "", fmt.Errorf("mockMppPaymentHashAndPreimage: %w", err)
+	}
 
 	var options []func(*zpay32.Invoice)
 
@@ -90,10 +92,6 @@ func CreateMockInvoice(amountSats uint64, description string, network chaincfg.P
 
 	creationTime := time.Now()
 	payReq, err := zpay32.NewInvoice(&network, paymentHash, creationTime, options...)
-
-	// Set our desired invoice features and add them to our list of options.
-	var invoiceFeatures *lnwire.FeatureVector
-	options = append(options, zpay32.Features(invoiceFeatures))
 
 	if err != nil {
 		return "", err

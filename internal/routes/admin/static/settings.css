@@ -1,29 +1,153 @@
-.settings {
-  width: 50%;
-  align-self: center;
-}
-.settings h2 {
-  text-align: center;
+/* Settings form styles */
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
 }
 
+.form-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-4);
+}
+
+/* Labels */
+.settings-input, 
+.settings-input-checkbox {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+}
+
+.settings-input-checkbox {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    background: var(--bg-input);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-primary);
+    transition: border-color var(--transition-fast);
+}
+
+.settings-input-checkbox:hover {
+    border-color: var(--border-secondary);
+}
+
+/* Inputs & Textarea */
+.settings-input input,
+.settings-input textarea,
+.settings-input select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: var(--text-base);
+    transition: all var(--transition-fast);
+    width: 100%;
+}
+
+.settings-input textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.settings-input input:focus,
+.settings-input textarea:focus,
+.settings-input select:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 1px var(--accent-cyan);
+}
+
+.settings-input input:hover,
+.settings-input textarea:hover,
+.settings-input select:hover {
+    border-color: var(--border-secondary);
+}
+
+/* Checkbox specific styling */
+.settings-input-checkbox input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-secondary);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: all var(--transition-fast);
+    display: grid;
+    place-content: center;
+    margin: 0;
+}
+
+.settings-input-checkbox input[type="checkbox"]:checked {
+    background: var(--accent-cyan);
+    border-color: var(--accent-cyan);
+}
+
+.settings-input-checkbox input[type="checkbox"]::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    box-shadow: inset 1em 1em var(--bg-primary);
+    transform-origin: center;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.settings-input-checkbox input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+
+.settings-input-checkbox input[type="checkbox"]:hover {
+    border-color: var(--accent-cyan);
+}
+
+.settings-input-checkbox input[type="checkbox"]:focus {
+    box-shadow: 0 0 0 2px rgba(0, 217, 177, 0.2);
+    border-color: var(--accent-cyan);
+    outline: none;
+}
+
+/* Multiple Select */
 select[multiple] {
-  min-height: 150px;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+    min-height: 150px;
+    padding: var(--space-2);
 }
 
 select[multiple] option {
-  padding: 8px;
-  margin-bottom: 3px;
-  border-radius: 4px;
-  cursor: pointer;
+    padding: var(--space-2);
+    margin-bottom: 2px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-secondary);
 }
 
 select[multiple] option:checked {
-  border: 1px solid var(--white);
+    background: var(--accent-cyan);
+    color: #000000;
 }
 
 select[multiple] option:hover:not(:checked) {
-  border: 1px solid var(--white);
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+/* Form Actions */
+.form-actions {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border-primary);
+    margin-top: var(--space-6);
 }

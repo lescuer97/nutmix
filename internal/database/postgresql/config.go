@@ -45,15 +45,14 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
             icon_url,
             tos_url
          FROM config WHERE id = 1`)
-	defer rows.Close()
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return config, fmt.Errorf("No rows found: %w", err)
+			return config, fmt.Errorf("no rows found: %w", err)
 		}
 
-		return config, fmt.Errorf("Error checking for  seeds: %w", err)
+		return config, fmt.Errorf("error checking for seeds: %w", err)
 	}
+	defer rows.Close()
 
 	config, err = pgx.CollectOneRow(rows, pgx.RowToStructByName[utils.Config])
 

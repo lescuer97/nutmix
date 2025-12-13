@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -57,7 +58,9 @@ func CacheMiddleware(store *persistence.InMemoryStore) gin.HandlerFunc {
 		c.Writer = w
 		c.Next()
 		if c.Writer.Status() == http.StatusOK {
-			store.Set(cacheKey, w.body.Bytes(), 45*time.Minute)
+			if err := store.Set(cacheKey, w.body.Bytes(), 45*time.Minute); err != nil {
+				slog.Warn("failed to set cache", slog.Any("error", err))
+			}
 		}
 	}
 }

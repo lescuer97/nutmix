@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-const logFileName string = "nutmix.log"
 const LogExtraInfo string = "extra-info"
 
 var (
@@ -149,9 +148,9 @@ func GetLogsDirectory() (string, error) {
 	dir, err := os.UserConfigDir()
 
 	if err != nil {
-		return "", fmt.Errorf("Could not get config dir: %w", err)
+		return "", fmt.Errorf("could not get config dir: %w", err)
 	}
-	var pathToProjectDir string = dir + "/" + ConfigDirName
+	var pathToProjectDir = dir + "/" + ConfigDirName
 
 	if os.Getenv(DOCKER_ENV) == "true" {
 		pathToProjectDir = "/var/log/nutmix"

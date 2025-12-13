@@ -1,0 +1,36 @@
+name: Docker Build Test
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+
+jobs:
+  test-docker-build:
+    name: Test Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          platforms: linux/amd64
+          tags: nutmix:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify build succeeded
+        run: |
+          echo "Docker build completed successfully"
+          docker images nutmix:test
+

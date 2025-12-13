@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -21,7 +22,11 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer m.MintDB.Rollback(ctx, tx)
+	defer func() {
+		if err := m.MintDB.Rollback(ctx, tx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 
 	now := time.Now()
 	authUser, err := m.MintDB.GetAuthUser(tx, clams.Sub)
@@ -90,7 +95,11 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer m.MintDB.Rollback(ctx, tx)
+	defer func() {
+		if err := m.MintDB.Rollback(ctx, tx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 
 	proofsList, err := m.MintDB.GetProofsFromSecretCurve(tx, []cashu.WrappedPublicKey{y})
 	if err != nil {

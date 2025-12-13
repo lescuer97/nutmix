@@ -78,9 +78,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 
 		nuts := make(map[string]any)
-		var baseNuts []string = []string{"1", "2", "3", "4", "5", "6"}
+		var baseNuts = []string{"1", "2", "3", "4", "5", "6"}
 
-		var optionalNuts []string = []string{"7", "8", "9", "10", "11", "12", "17", "20"}
+		var optionalNuts = []string{"7", "8", "9", "10", "11", "12", "17", "20"}
 
 		if mint.LightningBackend.ActiveMPP() {
 			optionalNuts = append(optionalNuts, "15")
@@ -297,10 +297,14 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		ctx := context.Background()
 		preparationTx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, preparationTx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, preparationTx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		// VerifyInputsAndOutputs now only checks balance/unit and BDHKE (spend conditions already verified)
 		err = mint.VerifyInputsAndOutputs(preparationTx, swapRequest.Inputs, swapRequest.Outputs)
@@ -347,7 +351,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.Commit(ctx, preparationTx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 
@@ -365,10 +369,14 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 		afterSigningTx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, afterSigningTx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, afterSigningTx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		swapRequest.Inputs.SetProofsState(cashu.PROOF_SPENT)
 		err = mint.MintDB.SetProofsState(afterSigningTx, swapRequest.Inputs, cashu.PROOF_SPENT)
@@ -389,7 +397,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 		err = mint.MintDB.Commit(ctx, afterSigningTx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, afterSigningTx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, afterSigningTx). %w", err))
 			return
 		}
 
@@ -411,6 +419,10 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 
 		states, err := m.CheckProofState(mint, checkStateRequest.Ys)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
 		checkStateResponse.States = states
 
 		c.JSON(200, checkStateResponse)
@@ -435,7 +447,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err))
 			return
 		}
 		blindRecoverySigs, err := mint.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)
@@ -446,7 +458,7 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 

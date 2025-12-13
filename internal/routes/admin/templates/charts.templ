@@ -1,0 +1,228 @@
+package templates
+
+import "github.com/lescuer97/nutmix/internal/database"
+import "time"
+
+// ChartSummary holds the summary statistics for a chart
+type ChartSummary struct {
+	TotalSats  uint64
+	TotalCount uint64
+}
+
+// MintMeltTimeSeriesPoint represents a single data point for mint/melt charting
+type MintMeltTimeSeriesPoint struct {
+	Timestamp  int64  `json:"timestamp"`  // Unix timestamp for bucket start
+	MintAmount int64  `json:"mintAmount"` // Sum of mint amounts (positive/inflows)
+	MeltAmount int64  `json:"meltAmount"` // Sum of melt amounts (outflows)
+	MintCount  uint64 `json:"mintCount"`  // Number of mint requests
+	MeltCount  uint64 `json:"meltCount"`  // Number of melt requests
+}
+
+// LnChartSummary holds the summary statistics for the LN chart
+type LnChartSummary struct {
+	TotalMint int64
+	TotalMelt int64
+	NetFlow   int64
+}
+
+// formatNumber formats a number with thousand separators (periods)
+func formatNumber(n uint64) string {
+	return FormatNumber(n)
+}
+
+// formatNetFlow formats the net flow with a sign prefix
+func formatNetFlow(n int64) string {
+	if n >= 0 {
+		return "+" + formatNumber(uint64(n))
+	}
+	return "-" + formatNumber(uint64(-n))
+}
+
+// ProofsChartContent renders just the chart canvas and data - used for HTMX date updates
+templ ProofsChartContent(data []database.ProofTimeSeriesPoint) {
+	<div id="chart-container" style="position: relative; height: 400px; width: 100%;">
+		<canvas
+			id="proofsChart"
+			data-chart={ templ.JSONString(data) }
+		></canvas>
+	</div>
+}
+
+// ProofsChartCard renders the chart card without date picker - date picker is now in MintActivityLayout
+templ ProofsChartCard(data []database.ProofTimeSeriesPoint, summary ChartSummary) {
+	<div
+		id="proofs-chart-card"
+		class="card card-md mt-4 mb-4"
+		hx-get="/admin/proofs-chart"
+		hx-trigger="change from:#timeRangeSelect"
+		hx-include="#timeRangeSelect"
+		hx-swap="outerHTML"
+		hx-indicator="#date-range-loading"
+	>
+		<div class="chart-header-content">
+			<h2 class="mb-5 text-xl font-semibold">Proofs</h2>
+			if len(data) > 0 {
+				{{ sinceDate := time.Unix(data[0].Timestamp, 0).Format("Jan 2, 2006") }}
+				<div class="text-xs text-secondary mt-2 mb-2">
+					Proofs generated since: { sinceDate }
+				</div>
+			}
+			<div class="chart-summary-container">
+				<div class="summary-card">
+					<div class="summary-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 18V6"></path></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Total Value</span>
+						<span class="summary-value">{ formatNumber(summary.TotalSats) } <span class="text-sm text-secondary font-normal">sats</span></span>
+					</div>
+				</div>
+				<div class="summary-card">
+					<div class="summary-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Proofs Count</span>
+						<span class="summary-value">{ formatNumber(summary.TotalCount) }</span>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="chart-legend-info">
+			<span class="legend-item legend-purple">Sats Value</span>
+			<span class="legend-item legend-cyan">Proof Count</span>
+		</div>
+		<div id="chart-wrapper">
+			@ProofsChartContent(data)
+		</div>
+	</div>
+}
+
+// BlindSigsChartContent renders just the chart canvas and data - used for HTMX date updates
+templ BlindSigsChartContent(data []database.ProofTimeSeriesPoint) {
+	<div id="blindsigs-chart-container" style="position: relative; height: 400px; width: 100%;">
+		<canvas
+			id="blindSigsChart"
+			data-chart={ templ.JSONString(data) }
+		></canvas>
+	</div>
+}
+
+// BlindSigsChartCard renders the chart card without date picker - date picker is now in MintActivityLayout
+templ BlindSigsChartCard(data []database.ProofTimeSeriesPoint, summary ChartSummary) {
+	<div
+		id="blindsigs-chart-card"
+		class="card card-md"
+		hx-get="/admin/blindsigs-chart"
+		hx-trigger="change from:#timeRangeSelect"
+		hx-include="#timeRangeSelect"
+		hx-swap="outerHTML"
+		hx-indicator="#date-range-loading"
+	>
+		<div class="chart-header-content">
+			<h2 class="mb-5 text-xl font-semibold">Blind Signatures</h2>
+			if len(data) > 0 {
+				{{ sinceDate := time.Unix(data[0].Timestamp, 0).Format("Jan 2, 2006") }}
+				<div class="text-xs text-secondary mt-2 mb-2">
+					Blind signatures generated since: { sinceDate }
+				</div>
+			}
+			<div class="chart-summary-container">
+				<div class="summary-card">
+					<div class="summary-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Total Value</span>
+						<span class="summary-value">{ formatNumber(summary.TotalSats) } <span class="text-sm text-secondary font-normal">sats</span></span>
+					</div>
+				</div>
+				<div class="summary-card">
+					<div class="summary-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Signatures</span>
+						<span class="summary-value">{ formatNumber(summary.TotalCount) }</span>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="chart-legend-info">
+			<span class="legend-item legend-purple">Sats Value</span>
+			<span class="legend-item legend-cyan">Signature Count</span>
+		</div>
+		<div id="blindsigs-chart-wrapper">
+			@BlindSigsChartContent(data)
+		</div>
+	</div>
+}
+
+// LnChartContent renders just the chart canvas and data - used for HTMX date updates
+templ LnChartContent(data []MintMeltTimeSeriesPoint) {
+	<div id="ln-chart-container" style="position: relative; height: 400px; width: 100%;">
+		<canvas
+			id="lnChart"
+			data-chart={ templ.JSONString(data) }
+		></canvas>
+	</div>
+}
+
+// LnChartCard renders the chart card without date picker - date picker is in LightningActivityLayout
+templ LnChartCard(data []MintMeltTimeSeriesPoint, summary LnChartSummary) {
+	<div
+		id="ln-chart-card"
+		class="card card-md mt-4 mb-4"
+		hx-get="/admin/ln-chart"
+		hx-trigger="change from:#timeRangeSelect"
+		hx-include="#timeRangeSelect"
+		hx-swap="outerHTML"
+		hx-indicator="#date-range-loading"
+	>
+		<div class="chart-header-content">
+			<h2 class="mb-5 text-xl font-semibold">Lightning Activity</h2>
+			if len(data) > 0 {
+				{{ sinceDate := time.Unix(data[0].Timestamp, 0).Format("Jan 2, 2006") }}
+				<div class="text-xs text-secondary mt-2 mb-2">
+					Lightning activity accounted for since: { sinceDate }
+				</div>
+			}
+			<div class="chart-summary-container">
+				<div class="summary-card">
+					<div class="summary-icon summary-icon-green">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Inflows (Mint)</span>
+						<span class="summary-value summary-value-green">{ formatNumber(uint64(summary.TotalMint)) } <span class="text-sm text-secondary font-normal">sats</span></span>
+					</div>
+				</div>
+				<div class="summary-card">
+					<div class="summary-icon summary-icon-red">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Outflows (Melt)</span>
+						<span class="summary-value summary-value-red">{ formatNumber(uint64(summary.TotalMelt)) } <span class="text-sm text-secondary font-normal">sats</span></span>
+					</div>
+				</div>
+				<div class="summary-card">
+					<div class="summary-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 18V6"></path></svg>
+					</div>
+					<div class="summary-content">
+						<span class="summary-label">Net Flow</span>
+						<span class="summary-value">{ formatNetFlow(summary.NetFlow) } <span class="text-sm text-secondary font-normal">sats</span></span>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="chart-legend-info">
+			<span class="legend-item legend-green">Mint (Inflows)</span>
+			<span class="legend-item legend-red">Melt (Outflows)</span>
+		</div>
+		<div id="ln-chart-wrapper">
+			@LnChartContent(data)
+		</div>
+	</div>
+}
