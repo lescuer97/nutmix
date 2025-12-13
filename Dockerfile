@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:alpine3.22 AS builder
+FROM --platform=$BUILDPLATFORM golang:alpine3.22 AS builder
 
 # Install build dependencies (bash needed for just installer)
 RUN apk add --no-cache protobuf curl unzip bash
