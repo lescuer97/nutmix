@@ -58,7 +58,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		keys, err := mint.Signer.GetAuthKeys()
 		if err != nil {
 			slog.Error("mint.Signer.GetAuthKeys()", slog.Any("error", err))
-			c.JSON(500, "Server side error")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
 

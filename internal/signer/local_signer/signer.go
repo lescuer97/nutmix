@@ -376,7 +376,9 @@ func (l *LocalSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error)
 
 // gets all keys from the signer
 func (l *LocalSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
-	var response signer.GetKeysetsResponse
+	response := signer.GetKeysetsResponse{
+		Keysets: make([]cashu.BasicKeysetResponse, 0),
+	}
 	seeds, err := l.db.GetAllSeeds()
 	if err != nil {
 		return response, fmt.Errorf(" l.db.GetAllSeeds(). %w", err)

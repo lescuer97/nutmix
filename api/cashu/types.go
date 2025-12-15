@@ -29,8 +29,8 @@ var (
 	ErrKeysetForProofNotFound  = errors.New("keyset for proof not found")
 
 	ErrAlreadyActiveProof          = errors.New("proof already being spent")
-	ErrAlreadyActiveQuote             = errors.New("quote already being spent")
-	ErrUsingInactiveKeyset            = errors.New("trying to use an inactive keyset")
+	ErrAlreadyActiveQuote          = errors.New("quote already being spent")
+	ErrUsingInactiveKeyset         = errors.New("trying to use an inactive keyset")
 	ErrInvalidProof                = errors.New("invalid proof")
 	ErrQuoteNotPaid                = errors.New("quote not paid")
 	ErrMessageAmountToBig          = errors.New("message amount is to big")
