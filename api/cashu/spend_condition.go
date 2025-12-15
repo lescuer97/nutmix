@@ -487,18 +487,26 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 		if isLocked && spendCondition != nil {
 			if spendCondition.Data.Tags.Sigflag == SigAll {
 				sigflagValidation.sigFlag = SigAll
-				sigflagValidation.signaturesRequired = uint(spendCondition.Data.Tags.NSigs)
+				if spendCondition.Data.Tags.NSigs > 1 {
+					sigflagValidation.signaturesRequired = uint(spendCondition.Data.Tags.NSigs)
+				}
 				pubkeys, err := proof.pubkeysForVerification(spendCondition)
 				if err != nil {
 					return SigflagValidation{}, fmt.Errorf("proof.pubkeysForVerification(spendCondition). %w", err)
 				}
+
 				sigflagValidation.pubkeys = pubkeys
-				sigflagValidation.signaturesRequiredRefund = uint(spendCondition.Data.Tags.NSigRefund)
-				refundPubkeys, err := proof.pubkeysForRefund(spendCondition)
-				if err != nil {
-					return SigflagValidation{}, fmt.Errorf("proof.pubkeysForRefund(spendCondition). %w", err)
+				if len(spendCondition.Data.Tags.Refund) > 0 {
+					sigflagValidation.signaturesRequiredRefund = 1
+					if spendCondition.Data.Tags.NSigRefund > 1 {
+						sigflagValidation.signaturesRequiredRefund = uint(spendCondition.Data.Tags.NSigRefund)
+					}
+					refundPubkeys, err := proof.pubkeysForRefund(spendCondition)
+					if err != nil {
+						return SigflagValidation{}, fmt.Errorf("proof.pubkeysForRefund(spendCondition). %w", err)
+					}
+					sigflagValidation.refundPubkeys = refundPubkeys
 				}
-				sigflagValidation.refundPubkeys = refundPubkeys
 				return sigflagValidation, nil
 			}
 		}

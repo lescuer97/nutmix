@@ -73,7 +73,7 @@ func (p Proof) verifyP2PKSpendCondition(spendCondition *SpendCondition, witness 
 	amountValidSigs := uint(0)
 	hashMessage := sha256.Sum256([]byte(p.Secret))
 	for _, sig := range witness.Signatures {
-		for pubkey, _ := range pubkeys {
+		for pubkey := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {
 				amountValidSigs += 1
 				delete(pubkeys, pubkey)
@@ -102,7 +102,10 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 	}
 	valid, err := p.verifyP2PKSpendCondition(spendCondition, witness)
 	if err != nil {
-		return false, fmt.Errorf("p.verifyP2PKSpendCondition(spendCondition, witness). %w", err)
+		if errors.Is(err, ErrNoValidSignatures) || errors.Is(err, ErrNotEnoughSignatures) {
+		} else {
+			return false, fmt.Errorf("p.verifyP2PKSpendCondition(spendCondition, witness). %w", err)
+		}
 	}
 	if valid {
 		return true, nil
@@ -110,7 +113,7 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 	if p.timelockPassed(spendCondition) {
 		valid, err = p.verifyTimelockPassedSpendCondition(spendCondition, witness)
 	}
-	return valid, nil
+	return valid, err
 }
 
 func (p Proof) verifyHtlcSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {
@@ -166,18 +169,18 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 
 	valid, err := p.verifyHtlcSpendCondition(spendCondition, witness)
 	if err != nil {
-		return false, fmt.Errorf("p.verifyHtlcSpendCondition(spendCondition, witness). %w", err)
+		if errors.Is(err, ErrNoValidSignatures) || errors.Is(err, ErrNotEnoughSignatures) {
+		} else {
+			return false, fmt.Errorf("p.verifyP2PKSpendCondition(spendCondition, witness). %w", err)
+		}
 	}
 	if valid {
 		return true, nil
 	}
 	if p.timelockPassed(spendCondition) {
 		valid, err = p.verifyTimelockPassedSpendCondition(spendCondition, witness)
-		if err != nil {
-			return false, fmt.Errorf("p.verifyTimelockPassedSpendCondition(spendCondition, witness). %w", err)
-		}
 	}
-	return valid, nil
+	return valid, err
 }
 
 func (p Proof) timelockPassed(spendCondition *SpendCondition) bool {
@@ -186,22 +189,22 @@ func (p Proof) timelockPassed(spendCondition *SpendCondition) bool {
 }
 
 func (p Proof) verifyTimelockPassedSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {
-	if p.timelockPassed(spendCondition) {
-		return false, nil
-	}
-
-	hashMessage := sha256.Sum256([]byte(p.Secret))
 	pubkeys, err := p.pubkeysForRefund(spendCondition)
 	if err != nil {
 		return false, fmt.Errorf("p.pubkeysForRefund(spendCondition). %w", err)
 	}
 
-	nsigToCheck := uint(1)
+	nsigToCheck := uint(0)
+	if len(spendCondition.Data.Tags.Refund) > 0 {
+		nsigToCheck = 1
+	}
+
 	if spendCondition.Data.Tags.NSigRefund > nsigToCheck {
 		nsigToCheck = spendCondition.Data.Tags.NSigRefund
 	}
 
 	amountValidSigs := uint(0)
+	hashMessage := sha256.Sum256([]byte(p.Secret))
 	for _, sig := range witness.Signatures {
 		for pubkey := range pubkeys {
 			if sig.Verify(hashMessage[:], pubkey) {
@@ -260,11 +263,9 @@ func (p Proof) pubkeysForVerification(spendCondition *SpendCondition) (map[*btce
 
 func (p Proof) pubkeysForRefund(spendCondition *SpendCondition) (map[*btcec.PublicKey]struct{}, error) {
 	pubkeysMap := make(map[*btcec.PublicKey]struct{}, 0)
-	if p.timelockPassed(spendCondition) {
-		for i := range spendCondition.Data.Tags.Refund {
-			if spendCondition.Data.Tags.Refund[i] != nil {
-				pubkeysMap[spendCondition.Data.Tags.Refund[i]] = struct{}{}
-			}
+	for i := range spendCondition.Data.Tags.Refund {
+		if spendCondition.Data.Tags.Refund[i] != nil {
+			pubkeysMap[spendCondition.Data.Tags.Refund[i]] = struct{}{}
 		}
 	}
 	return pubkeysMap, nil
