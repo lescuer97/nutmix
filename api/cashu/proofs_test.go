@@ -176,3 +176,65 @@ func TestCheckP2PKProofInvalidLocktimeRefundKey(t *testing.T) {
 		t.Errorf("proof should have been valid")
 	}
 }
+
+// NOTE: NUT-11 Multisig Test Vectors
+
+// TestCheckP2PKProofValidLocktimeMultisig tests the multisig proof with locktime=21
+// using 2 valid signatures from data + pubkeys set. This verifies that when locktime
+// has passed, the proof can still be spent via the Locktime Multisig path (2-of-2 signatures).
+func TestCheckP2PKProofValidLocktimeMultisig(t *testing.T) {
+	proofJsonBytes := []byte(`{
+  "amount": 64,
+  "C": "02d7cd858d866fca404b5cb1ffd813946e6d19efa1af00d654080fd20266bdc0b1",
+  "id": "001b6c716bf42c7e",
+  "secret": "[\"P2PK\",{\"nonce\":\"395162bf2d0add3c66aea9f22c45251dbee6e04bd9282addbb366a94cd4fb482\",\"data\":\"03ab50a667926fac858bac540766254c14b2b0334d10e8ec766455310224bbecf4\",\"tags\":[[\"locktime\",\"21\"],[\"pubkeys\",\"0229a91adec8dd9badb228c628a07fc1bf707a9b7d95dd505c490b1766fa7dc541\",\"033281c37677ea273eb7183b783067f5244933ef78d8c3f15b1a77cb246099c26e\"],[\"n_sigs\",\"2\"],[\"refund\",\"03ab50a667926fac858bac540766254c14b2b0334d10e8ec766455310224bbecf4\",\"033281c37677ea273eb7183b783067f5244933ef78d8c3f15b1a77cb246099c26e\"]]}]",
+  "witness": "{\"signatures\":[\"6a4dd46f929b4747efe7380d655be5cfc0ea943c679a409ea16d4e40968ce89de885d995937d5b85f24fa33a25df10990c5e11d5397199d779d5cf87d42f6627\",\"0c266fffe2ea2358fb93b5d30dfbcefe52a5bb53d6c85f37d54723613224a256165d20dd095768f168ab2e97bc5a879f7c2a84eee8963c9bcedcd39552dbe093\"]}"
+}`)
+	var proof Proof
+	err := json.Unmarshal(proofJsonBytes, &proof)
+	if err != nil {
+		t.Fatalf("json.Unmarshal(proofJsonBytes, &proof) %+v", err)
+	}
+	spendCondition, err := proof.parseSpendCondition()
+	if err != nil {
+		t.Fatalf("could not parse spend condition. %+v", err)
+	}
+
+	valid, err := proof.VerifyP2PK(spendCondition)
+	if err != nil {
+		t.Errorf("should not have errored. %+v", err)
+	}
+	if !valid {
+		t.Errorf("proof should have been valid")
+	}
+}
+
+// TestCheckP2PKProofValidRefundMultisig tests the same multisig proof but using
+// 1 valid signature from the refund tag. This verifies the Refund Multisig path
+// when locktime has passed.
+func TestCheckP2PKProofValidRefundMultisig(t *testing.T) {
+	proofJsonBytes := []byte(`{
+  "amount": 64,
+  "C": "02d7cd858d866fca404b5cb1ffd813946e6d19efa1af00d654080fd20266bdc0b1",
+  "id": "001b6c716bf42c7e",
+  "secret": "[\"P2PK\",{\"nonce\":\"395162bf2d0add3c66aea9f22c45251dbee6e04bd9282addbb366a94cd4fb482\",\"data\":\"03ab50a667926fac858bac540766254c14b2b0334d10e8ec766455310224bbecf4\",\"tags\":[[\"locktime\",\"21\"],[\"pubkeys\",\"0229a91adec8dd9badb228c628a07fc1bf707a9b7d95dd505c490b1766fa7dc541\",\"033281c37677ea273eb7183b783067f5244933ef78d8c3f15b1a77cb246099c26e\"],[\"n_sigs\",\"2\"],[\"refund\",\"03ab50a667926fac858bac540766254c14b2b0334d10e8ec766455310224bbecf4\",\"033281c37677ea273eb7183b783067f5244933ef78d8c3f15b1a77cb246099c26e\"]]}]",
+  "witness": "{\"signatures\":[\"d39631363480adf30433ee25c7cec28237e02b4808d4143469d4f390d4eae6ec97d18ba3cc6494ab1d04372f0838426ea296f25cb4bd8bddb296adc292eeaa96\"]}"
+}`)
+	var proof Proof
+	err := json.Unmarshal(proofJsonBytes, &proof)
+	if err != nil {
+		t.Fatalf("json.Unmarshal(proofJsonBytes, &proof) %+v", err)
+	}
+	spendCondition, err := proof.parseSpendCondition()
+	if err != nil {
+		t.Fatalf("could not parse spend condition. %+v", err)
+	}
+
+	valid, err := proof.VerifyP2PK(spendCondition)
+	if err != nil {
+		t.Errorf("should not have errored. %+v", err)
+	}
+	if !valid {
+		t.Errorf("proof should have been valid")
+	}
+}
