@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
-	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -466,52 +464,46 @@ func (wit *Witness) UnmarshalJSON(b []byte) error {
 }
 
 type SigflagValidation struct {
-	sigFlag            SigFlag
-	signaturesRequired uint
-	pubkeys            map[*btcec.PublicKey]struct{}
-	expired            bool
+	sigFlag                  SigFlag
+	signaturesRequired       uint
+	pubkeys                  map[*btcec.PublicKey]struct{}
+	signaturesRequiredRefund uint
+	refundPubkeys            map[*btcec.PublicKey]struct{}
 }
 
 func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
-	sigFlagValidation := SigflagValidation{
-		sigFlag:            SigInputs,
-		signaturesRequired: 1,
-		pubkeys:            make(map[*btcec.PublicKey]struct{}),
-		expired:            false,
+	sigflagValidation := SigflagValidation{
+		sigFlag:                  SigInputs,
+		signaturesRequired:       1,
+		signaturesRequiredRefund: 0,
+		pubkeys:                  make(map[*btcec.PublicKey]struct{}),
+		refundPubkeys:            make(map[*btcec.PublicKey]struct{}),
 	}
 	for _, proof := range proofs {
 		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
 		if err != nil {
-			return sigFlagValidation, fmt.Errorf("proof.parseSpendCondition(). %w", err)
+			return SigflagValidation{}, fmt.Errorf("proof.parseSpendCondition(). %w", err)
 		}
 		if isLocked && spendCondition != nil {
 			if spendCondition.Data.Tags.Sigflag == SigAll {
-				sigFlagValidation.sigFlag = SigAll
-			}
-			if sigFlagValidation.signaturesRequired < uint(spendCondition.Data.Tags.NSigs) {
-				sigFlagValidation.signaturesRequired = uint(spendCondition.Data.Tags.NSigs)
-			}
-
-			for _, pubkey := range spendCondition.Data.Tags.Pubkeys {
-				sigFlagValidation.pubkeys[pubkey] = struct{}{}
-			}
-
-			currentTime := time.Now().Unix()
-			// Incase of expiration we set the refund pubkeys and the n_sigs_refund
-			if spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
-				sigFlagValidation.expired = true
-				refundPubkeys := make(map[*btcec.PublicKey]struct{})
-				for i := range spendCondition.Data.Tags.Refund {
-					if spendCondition.Data.Tags.Refund[i] != nil {
-						refundPubkeys[spendCondition.Data.Tags.Refund[i]] = struct{}{}
-					}
+				sigflagValidation.sigFlag = SigAll
+				sigflagValidation.signaturesRequired = uint(spendCondition.Data.Tags.NSigs)
+				pubkeys, err := proof.pubkeysForVerification(spendCondition)
+				if err != nil {
+					return SigflagValidation{}, fmt.Errorf("proof.pubkeysForVerification(spendCondition). %w", err)
 				}
-				sigFlagValidation.pubkeys = refundPubkeys
-				sigFlagValidation.signaturesRequired = max(1, spendCondition.Data.Tags.NSigRefund)
+				sigflagValidation.pubkeys = pubkeys
+				sigflagValidation.signaturesRequiredRefund = uint(spendCondition.Data.Tags.NSigRefund)
+				refundPubkeys, err := proof.pubkeysForRefund(spendCondition)
+				if err != nil {
+					return SigflagValidation{}, fmt.Errorf("proof.pubkeysForRefund(spendCondition). %w", err)
+				}
+				sigflagValidation.refundPubkeys = refundPubkeys
+				return sigflagValidation, nil
 			}
 		}
 	}
-	return sigFlagValidation, nil
+	return sigflagValidation, nil
 }
 
 // ProofsHaveSigAll returns true if any proof in the slice has SIG_ALL flag set.
@@ -532,7 +524,6 @@ func ProofsHaveSigAll(proofs Proofs) (bool, error) {
 func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]struct{}, signatures []*schnorr.Signature) (uint, error) {
 	hashMessage := sha256.Sum256([]byte(msg))
 	amountValidSigs := uint(0)
-	log.Printf("msg hash: %x", hashMessage)
 
 	for _, sig := range signatures {
 		for pubkey := range pubkeys {

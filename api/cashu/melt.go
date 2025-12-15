@@ -85,17 +85,17 @@ type PostMeltBolt11Request struct {
 }
 
 func (p *PostMeltBolt11Request) ValidateSigflag() error {
-	sigFlagValidation, err := checkForSigAll(p.Inputs)
+	sigAllCheck, err := checkForSigAll(p.Inputs)
 	if err != nil {
 		return fmt.Errorf("checkForSigAll(p.Inputs). %w", err)
 	}
-	if sigFlagValidation.sigFlag == SigAll {
-
-		firstSpendCondition, err := p.Inputs[0].parseSpendCondition()
+	if sigAllCheck.sigFlag == SigAll {
+		firstProof := p.Inputs[0]
+		firstSpendCondition, err := firstProof.parseSpendCondition()
 		if err != nil {
 			return fmt.Errorf("p.Inputs[0].parseSpendCondition(). %w", err)
 		}
-		firstWitness, err := p.Inputs[0].parseWitness()
+		firstWitness, err := firstProof.parseWitness()
 		if err != nil {
 			return fmt.Errorf("p.Inputs[0].parseWitness(). %w", err)
 		}
@@ -118,18 +118,22 @@ func (p *PostMeltBolt11Request) ValidateSigflag() error {
 		msg := p.makeSigAllMsg()
 		fmt.Println("melt message: ", msg)
 
-		pubkeys, err := p.Inputs[0].PubkeysForVerification()
+		signatures, err := checkValidSignature(msg, sigAllCheck.pubkeys, firstWitness.Signatures)
 		if err != nil {
-			return fmt.Errorf("p.Inputs[0].Pubkeys(). %w", err)
+			return fmt.Errorf("checkValidSignature(msg, pubkeys, firstWitness.Signatures). %w", err)
 		}
-
-		amountOfSigs, err := checkValidSignature(msg, pubkeys, firstWitness.Signatures)
-		if err != nil {
-			return err
-		}
-
-		if amountOfSigs >= sigFlagValidation.signaturesRequired {
+		if signatures >= sigAllCheck.signaturesRequired {
 			return nil
+		}
+
+		if firstProof.timelockPassed(firstSpendCondition) {
+			signatures, err := checkValidSignature(msg, sigAllCheck.refundPubkeys, firstWitness.Signatures)
+			if err != nil {
+				return fmt.Errorf("checkValidSignature(msg, refundPubkeys, firstWitness.Signatures). %w", err)
+			}
+			if signatures >= sigAllCheck.signaturesRequiredRefund {
+				return nil
+			}
 		}
 
 		return ErrNotEnoughSignatures

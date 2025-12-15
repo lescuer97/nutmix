@@ -160,49 +160,6 @@ func (m *Mint) VerifyInputsAndOutputs(tx pgx.Tx, proofs cashu.Proofs, outputs []
 	return nil
 }
 
-// VerifyProofsSpendConditions verifies P2PK and HTLC conditions for each proof individually.
-// This should NOT be called when SIG_ALL is present - use ValidateSigflag() instead.
-func (m *Mint) VerifyProofsSpendConditions(proofs cashu.Proofs) error {
-	for _, proof := range proofs {
-		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
-		if err != nil {
-			return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
-		}
-		if isLocked {
-
-			err = spendCondition.CheckValid()
-			if err != nil {
-				return fmt.Errorf("spendCondition.CheckValid(). %w", err)
-			}
-			switch spendCondition.Type {
-			case cashu.P2PK:
-				valid, err := proof.VerifyP2PK(spendCondition)
-				if err != nil {
-					return fmt.Errorf("proof.VerifyP2PK(spendCondition). %w", err)
-				}
-				if !valid {
-					return cashu.ErrInvalidSpendCondition
-				}
-			case cashu.HTLC:
-				valid, err := proof.VerifyHTLC(spendCondition)
-				if err != nil {
-					return fmt.Errorf("proof.VerifyHTLC(spendCondition). %w", err)
-				}
-				if !valid {
-					return cashu.ErrInvalidSpendCondition
-				}
-			}
-
-		}
-		if !isLocked {
-			if len(proof.Secret) != 64 {
-				return cashu.ErrCommonSecretNotCorrectSize
-			}
-		}
-	}
-	return nil
-}
-
 // VerifyProofsBDHKE verifies the BDHKE cryptographic signatures of the proofs.
 // This should always be called regardless of SIG_ALL.
 func (m *Mint) VerifyProofsBDHKE(proofs cashu.Proofs) error {

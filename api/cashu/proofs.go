@@ -60,22 +60,79 @@ type Proof struct {
 	Quote   *string          `json:"quote" db:"quote"`
 }
 
-func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
-	currentTime := time.Now().Unix()
+func (p Proof) verifyP2PKSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {
+	pubkeys, err := p.pubkeysForVerification(spendCondition)
+	if err != nil {
+		return false, fmt.Errorf("p.pubkeysForVerification(spendCondition). %w", err)
+	}
+	nsigToCheck := uint(1)
+	if spendCondition.Data.Tags.NSigs > nsigToCheck {
+		nsigToCheck = spendCondition.Data.Tags.NSigs
+	}
+
+	amountValidSigs := uint(0)
 	hashMessage := sha256.Sum256([]byte(p.Secret))
+	for _, sig := range witness.Signatures {
+		for pubkey, _ := range pubkeys {
+			if sig.Verify(hashMessage[:], pubkey) {
+				amountValidSigs += 1
+				delete(pubkeys, pubkey)
+				continue
+			}
+		}
+	}
+	switch {
+	case amountValidSigs == 0:
+		return false, ErrNoValidSignatures
+	case nsigToCheck > 0 && amountValidSigs < nsigToCheck:
+		return false, ErrNotEnoughSignatures
+	case nsigToCheck > 0 && amountValidSigs >= nsigToCheck:
+		return true, nil
+	case amountValidSigs >= 1:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 	witness, err := p.parseWitness()
 	if err != nil {
 		return false, fmt.Errorf("p.parseWitness(). %+v", err)
 	}
-	pubkeys, err := p.PubkeysForVerification()
+	valid, err := p.verifyP2PKSpendCondition(spendCondition, witness)
 	if err != nil {
-		return false, fmt.Errorf("p.Pubkeys(). %+v", err)
+		return false, fmt.Errorf("p.verifyP2PKSpendCondition(spendCondition, witness). %w", err)
+	}
+	if valid {
+		return true, nil
+	}
+	if p.timelockPassed(spendCondition) {
+		valid, err = p.verifyTimelockPassedSpendCondition(spendCondition, witness)
+	}
+	return valid, nil
+}
 
+func (p Proof) verifyHtlcSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {
+	err := spendCondition.VerifyPreimage(witness)
+	if err != nil {
+		return false, fmt.Errorf("spendCondition.VerifyPreimage(witness). %w", err)
 	}
 
-	locktimePassed := spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime)
+	if len(spendCondition.Data.Tags.Pubkeys) == 0 {
+		return false, ErrInvalidPreimage
+	}
 
-	// append all posibles keys for signing
+	pubkeys, err := p.pubkeysForVerification(spendCondition)
+	if err != nil {
+		return false, fmt.Errorf("p.pubkeysForVerification(spendCondition). %w", err)
+	}
+	nsigToCheck := uint(1)
+	if spendCondition.Data.Tags.NSigs > nsigToCheck {
+		nsigToCheck = spendCondition.Data.Tags.NSigs
+	}
+
+	hashMessage := sha256.Sum256([]byte(p.Secret))
 	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
 		for pubkey := range pubkeys {
@@ -87,20 +144,6 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 		}
 	}
 
-	// INFO:  if the locktime is passed and we have a nsigrefund we set it
-	nsigToCheck := uint(1)
-	if spendCondition.Data.Tags.NSigs > nsigToCheck {
-		nsigToCheck = spendCondition.Data.Tags.NSigs
-	}
-
-	if locktimePassed {
-		nsigToCheck = 1
-		if spendCondition.Data.Tags.NSigRefund > nsigToCheck {
-			nsigToCheck = spendCondition.Data.Tags.NSigRefund
-		}
-	}
-
-	// check if there is a multisig set up if not check if there is only one valid signature
 	switch {
 	case amountValidSigs == 0:
 		return false, ErrNoValidSignatures
@@ -111,35 +154,53 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 	case amountValidSigs >= 1:
 		return true, nil
 	default:
-		if locktimePassed {
-			return false, ErrLocktimePassed
-		}
 		return false, nil
 	}
 }
 
 func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
-	currentTime := time.Now().Unix()
-	hashMessage := sha256.Sum256([]byte(p.Secret))
 	witness, err := p.parseWitness()
 	if err != nil {
 		return false, fmt.Errorf("p.parseWitness(). %+v", err)
 	}
-	pubkeys, err := p.PubkeysForVerification()
+
+	valid, err := p.verifyHtlcSpendCondition(spendCondition, witness)
 	if err != nil {
-		return false, fmt.Errorf("p.Pubkeys(). %+v", err)
+		return false, fmt.Errorf("p.verifyHtlcSpendCondition(spendCondition, witness). %w", err)
 	}
-
-	locktimePassed := spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime)
-
-	if !locktimePassed {
-		err = spendCondition.VerifyPreimage(witness)
+	if valid {
+		return true, nil
+	}
+	if p.timelockPassed(spendCondition) {
+		valid, err = p.verifyTimelockPassedSpendCondition(spendCondition, witness)
 		if err != nil {
-			return false, fmt.Errorf("spendCondition.VerifyPreimage(witness). %w", err)
+			return false, fmt.Errorf("p.verifyTimelockPassedSpendCondition(spendCondition, witness). %w", err)
 		}
 	}
+	return valid, nil
+}
 
-	// append all posibles keys for signing
+func (p Proof) timelockPassed(spendCondition *SpendCondition) bool {
+	currentTime := time.Now().Unix()
+	return spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime)
+}
+
+func (p Proof) verifyTimelockPassedSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {
+	if p.timelockPassed(spendCondition) {
+		return false, nil
+	}
+
+	hashMessage := sha256.Sum256([]byte(p.Secret))
+	pubkeys, err := p.pubkeysForRefund(spendCondition)
+	if err != nil {
+		return false, fmt.Errorf("p.pubkeysForRefund(spendCondition). %w", err)
+	}
+
+	nsigToCheck := uint(1)
+	if spendCondition.Data.Tags.NSigRefund > nsigToCheck {
+		nsigToCheck = spendCondition.Data.Tags.NSigRefund
+	}
+
 	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
 		for pubkey := range pubkeys {
@@ -150,21 +211,6 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 			}
 		}
 	}
-
-	// INFO:  if the locktime is passed and we have a nsigrefund we set it
-	nsigToCheck := uint(1)
-	if spendCondition.Data.Tags.NSigs > nsigToCheck {
-		nsigToCheck = spendCondition.Data.Tags.NSigs
-	}
-
-	if locktimePassed {
-		nsigToCheck = 1
-		if spendCondition.Data.Tags.NSigRefund > nsigToCheck {
-			nsigToCheck = spendCondition.Data.Tags.NSigRefund
-		}
-	}
-
-	// check if there is a multisig set up if not check if there is only one valid signature
 	switch {
 	case amountValidSigs == 0:
 		return false, ErrNoValidSignatures
@@ -175,20 +221,11 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 	case amountValidSigs >= 1:
 		return true, nil
 	default:
-		if locktimePassed {
-			return false, ErrLocktimePassed
-		}
 		return false, nil
 	}
 }
 
-// Retuns the pubkeys available for signing
-func (p Proof) PubkeysForVerification() (map[*btcec.PublicKey]struct{}, error) {
-	spendCondition, err := p.parseSpendCondition()
-	if err != nil {
-		return nil, err
-	}
-
+func (p Proof) pubkeysForVerification(spendCondition *SpendCondition) (map[*btcec.PublicKey]struct{}, error) {
 	pubkeysMap := make(map[*btcec.PublicKey]struct{}, 0)
 	switch spendCondition.Type {
 	case P2PK:
@@ -209,16 +246,6 @@ func (p Proof) PubkeysForVerification() (map[*btcec.PublicKey]struct{}, error) {
 				}
 			}
 		}
-
-		if spendCondition.Data.Tags.Locktime != 0 && time.Now().Unix() > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
-			pubkeysMap = make(map[*btcec.PublicKey]struct{})
-			for i := range spendCondition.Data.Tags.Refund {
-				if spendCondition.Data.Tags.Refund[i] != nil {
-					pubkeysMap[spendCondition.Data.Tags.Refund[i]] = struct{}{}
-				}
-			}
-		}
-
 	case HTLC:
 		if spendCondition.Data.Tags.Pubkeys != nil {
 			for i := range spendCondition.Data.Tags.Pubkeys {
@@ -227,17 +254,19 @@ func (p Proof) PubkeysForVerification() (map[*btcec.PublicKey]struct{}, error) {
 				}
 			}
 		}
+	}
+	return pubkeysMap, nil
+}
 
-		if spendCondition.Data.Tags.Locktime != 0 && time.Now().Unix() > int64(spendCondition.Data.Tags.Locktime) && len(spendCondition.Data.Tags.Refund) > 0 {
-			pubkeysMap = make(map[*btcec.PublicKey]struct{})
-			for i := range spendCondition.Data.Tags.Refund {
-				if spendCondition.Data.Tags.Refund[i] != nil {
-					pubkeysMap[spendCondition.Data.Tags.Refund[i]] = struct{}{}
-				}
+func (p Proof) pubkeysForRefund(spendCondition *SpendCondition) (map[*btcec.PublicKey]struct{}, error) {
+	pubkeysMap := make(map[*btcec.PublicKey]struct{}, 0)
+	if p.timelockPassed(spendCondition) {
+		for i := range spendCondition.Data.Tags.Refund {
+			if spendCondition.Data.Tags.Refund[i] != nil {
+				pubkeysMap[spendCondition.Data.Tags.Refund[i]] = struct{}{}
 			}
 		}
 	}
-
 	return pubkeysMap, nil
 }
 
@@ -385,5 +414,47 @@ func (p *Proof) UnmarshalJSON(data []byte) error {
 
 	// Assign the parsed public key to the struct
 	p.C = WrappedPublicKey{PublicKey: pubKey}
+	return nil
+}
+
+// VerifyProofsSpendConditions verifies P2PK and HTLC conditions for each proof individually.
+func VerifyProofsSpendConditions(proofs Proofs) error {
+	for _, proof := range proofs {
+		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
+		if err != nil {
+			return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
+		}
+		if isLocked {
+
+			err = spendCondition.CheckValid()
+			if err != nil {
+				return fmt.Errorf("spendCondition.CheckValid(). %w", err)
+			}
+			switch spendCondition.Type {
+			case P2PK:
+				valid, err := proof.VerifyP2PK(spendCondition)
+				if err != nil {
+					return fmt.Errorf("proof.VerifyP2PK(spendCondition). %w", err)
+				}
+				if !valid {
+					return ErrInvalidSpendCondition
+				}
+			case HTLC:
+				valid, err := proof.VerifyHTLC(spendCondition)
+				if err != nil {
+					return fmt.Errorf("proof.VerifyHTLC(spendCondition). %w", err)
+				}
+				if !valid {
+					return ErrInvalidSpendCondition
+				}
+			}
+
+		}
+		if !isLocked {
+			if len(proof.Secret) != 64 {
+				return ErrCommonSecretNotCorrectSize
+			}
+		}
+	}
 	return nil
 }
