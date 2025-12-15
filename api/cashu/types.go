@@ -104,34 +104,6 @@ type BlindedMessage struct {
 	Witness string           `json:"witness,omitempty" db:"witness"`
 }
 
-func (b BlindedMessage) VerifyBlindMessageSignature(pubkeys map[*btcec.PublicKey]bool) error {
-	if b.Witness == "" {
-		return ErrEmptyWitness
-	}
-	var p2pkWitness Witness
-
-	err := json.Unmarshal([]byte(b.Witness), &p2pkWitness)
-
-	if err != nil {
-		return fmt.Errorf("json.Unmarshal([]byte(b.Witness), &p2pkWitness)  %w", err)
-	}
-
-	serializedPubKey := b.B_.SerializeCompressed()
-	hash := sha256.Sum256(serializedPubKey)
-
-	for _, sig := range p2pkWitness.Signatures {
-		for pubkey := range pubkeys {
-
-			ok := sig.Verify(hash[:], pubkey)
-			if !ok {
-				return nil
-			}
-		}
-	}
-
-	return nil
-}
-
 func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
 
 	C_ := crypto.SignBlindedMessage(b.B_.PublicKey, k)

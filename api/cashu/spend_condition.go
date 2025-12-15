@@ -466,9 +466,9 @@ func (wit *Witness) UnmarshalJSON(b []byte) error {
 type SigflagValidation struct {
 	sigFlag                  SigFlag
 	signaturesRequired       uint
-	pubkeys                  map[*btcec.PublicKey]struct{}
+	pubkeys                  map[string]struct{}
 	signaturesRequiredRefund uint
-	refundPubkeys            map[*btcec.PublicKey]struct{}
+	refundPubkeys            map[string]struct{}
 }
 
 func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
@@ -476,8 +476,8 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 		sigFlag:                  SigInputs,
 		signaturesRequired:       1,
 		signaturesRequiredRefund: 0,
-		pubkeys:                  make(map[*btcec.PublicKey]struct{}),
-		refundPubkeys:            make(map[*btcec.PublicKey]struct{}),
+		pubkeys:                  make(map[string]struct{}),
+		refundPubkeys:            make(map[string]struct{}),
 	}
 	for _, proof := range proofs {
 		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
@@ -529,13 +529,17 @@ func ProofsHaveSigAll(proofs Proofs) (bool, error) {
 	return false, nil
 }
 
-func checkValidSignature(msg string, pubkeys map[*btcec.PublicKey]struct{}, signatures []*schnorr.Signature) (uint, error) {
+func checkValidSignature(msg string, pubkeys map[string]struct{}, signatures []*schnorr.Signature) (uint, error) {
 	hashMessage := sha256.Sum256([]byte(msg))
 	amountValidSigs := uint(0)
 
 	for _, sig := range signatures {
 		for pubkey := range pubkeys {
-			if sig.Verify(hashMessage[:], pubkey) {
+			parsedPubkey, err := btcec.ParsePubKey([]byte(pubkey))
+			if err != nil {
+				return 0, fmt.Errorf("btcec.ParsePubKey([]byte(pubkey)). %w", err)
+			}
+			if sig.Verify(hashMessage[:], parsedPubkey) {
 				amountValidSigs += 1
 				delete(pubkeys, pubkey)
 				continue
