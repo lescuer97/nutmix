@@ -11,10 +11,13 @@ templ head() {
 }
 
 templ Layout(route string) {
-	@head()
-	@Header()
-	<body data-route={ route }>
-		<div hx-ext="remove-me" id="notifications"></div>
-		{ children... }
-	</body>
+	<!DOCTYPE html>
+	<html lang="en">
+		@head()
+		@Header()
+		<body data-route={ route }>
+			<div hx-ext="remove-me" id="notifications"></div>
+			{ children... }
+		</body>
+	</html>
 }
