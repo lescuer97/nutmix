@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/internal/database"
@@ -116,8 +115,8 @@ func main() {
 	corsConfig.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
 
 	r.Use(cors.Default())
-	// gzip compression
-	r.Use(gzip.Gzip(gzip.DefaultCompression))
+	// // gzip compression
+	// r.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	store := persistence.NewInMemoryStore(45 * time.Minute)
 
