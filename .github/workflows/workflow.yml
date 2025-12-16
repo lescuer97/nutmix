@@ -34,6 +34,7 @@ jobs:
         run: |
           just gen-proto
           just gen-templ
+          just web-install
 
       - name: Build
         run: just build
@@ -68,6 +69,7 @@ jobs:
         run: |
           just gen-proto
           just gen-templ
+          just web-install
 
       - name: Test build
         run: just build
@@ -119,6 +121,8 @@ jobs:
         run: |
           just gen-proto
           just gen-templ
+          just web-install
+          just web-build-prod
 
       - name: Test ${{ matrix.test-dir }}
         run: go test -v ./${{ matrix.test-dir }}/...
