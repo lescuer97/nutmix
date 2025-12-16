@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	ErrAlreadyPaid = errors.New("Invoice already paid")
+	ErrAlreadyPaid = errors.New("invoice already paid")
 )
 
 type Backend uint

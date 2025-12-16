@@ -9,49 +9,50 @@ import (
 templ LiquidityButton() {
 	<a
 		href="/admin/liquidity"
-		class="action-button"
+		class="nav-tab"
+		data-tab="liquidity"
 	>
-		Manage node's liquidity
+		Liquidity
 	</a>
 }
 
-templ LiquidityDashboard(swapForm string, nodeBalance string) {
-	@Layout() {
-		<main class="liquidity-dashboard">
-			<div class="actions-container">
-				<div class="liquidity-actions">
-					<button
-						hx-get="/admin/liquid-swap-form"
-						hx-target=".active-swaps"
-						hx-swap="innerHTML"
-						hx-push-url="/admin/liquidity?swapForm=out"
-						type="button"
+templ LiquidityDashboard() {
+	@Layout("liquidity") {
+		<main class="liquidity-dashboard main-content">
+			<div class="content-header">
+				<h2>Liquidity Management</h2>
+				<div class="page-actions">
+					<a
+						href="/admin/ln-send"
+						class="btn btn-primary"
 					>
-						Send funds out
-					</button>
-					<button
-						hx-get="/admin/lightning-swap-form"
-						hx-target=".active-swaps"
-						hx-swap="innerHTML"
-						hx-push-url="/admin/liquidity?swapForm=in"
-						type="button"
-					>Send funds to mint</button>
+						Send Funds
+					</a>
+					<a
+						href="/admin/ln-receive"
+						class="btn btn-secondary"
+					>
+						Receive Funds
+					</a>
 				</div>
+			</div>
+			// liquidity summary should show the total amount of sats owned and the total amount of sats in the ln node
+			<div class="mt-4 mb-4">
+				<div
+					hx-get="/admin/liquidity-summary"
+					hx-trigger="load"
+					hx-swap="innerHTML"
+				></div>
+			</div>
+			<div class="actions-container">
+				<h3 class="mb-4">Recent Swaps</h3>
 				<div class="active-swaps">
-					switch  swapForm {
-						case "out":
-							@SwapOutPostForm(nodeBalance)
-						case "in":
-							@SwapInPostForm()
-						default:
-							<h3 style="margin-left: 15px;">List of Liquidity Movements</h3>
-							<div
-								hx-get="/admin/swaps-list"
-								hx-trigger="load"
-								class="swap-list"
-								hx-swap="innerHTML"
-							></div>
-					}
+					<div
+						hx-get="/admin/swaps-list"
+						hx-trigger="load"
+						class="swap-list"
+						hx-swap="innerHTML"
+					></div>
 				</div>
 			</div>
 		</main>
@@ -59,22 +60,20 @@ templ LiquidityDashboard(swapForm string, nodeBalance string) {
 }
 
 templ ListOfSwaps(swaps []utils.LiquiditySwap) {
-	<table class="">
-		<thead>
-			<tr>
-				<th class="level" scope="col">Amount (sats)</th>
-				<th scope="col">Type</th>
-				<th scope="col">Expiration</th>
-				<th scope="col">State</th>
-				<th scope="col"></th>
-			</tr>
-		</thead>
-		<tbody>
+	<div class="table">
+		<div class="table-header">
+			<div class="cell" style="width: 25%">Amount (sats)</div>
+			<div class="cell" style="width: 20%">Type</div>
+			<div class="cell" style="width: 25%">Expiration</div>
+			<div class="cell" style="width: 20%">State</div>
+			<div class="cell" style="width: 10%"></div>
+		</div>
+		<div class="rows">
 			for _, item := range swaps {
 				@ListItem(item)
 			}
-		</tbody>
-	</table>
+		</div>
+	</div>
 }
 
 templ ListItem(swap utils.LiquiditySwap) {
@@ -85,13 +84,13 @@ templ ListItem(swap utils.LiquiditySwap) {
 	{{ state := swap.State.ToString() }}
 	{{ url := "liquidity/" + swap.Id }}
 	{{ escapedUrl := templ.EscapeString(url) }}
-	<tr>
-		<th scope="row">{ amount }</th>
-		<td class="request-row">{ liquidityType }</td>
-		<td class="time">{ formattedDate }</td>
-		<td class="request-row">{ state }</td>
-		<td class="request-row"><a href={ escapedUrl }>INFO</a></td>
-	</tr>
+	<div class="row-item">
+		<div class="cell font-mono" style="width: 25%">{ amount }</div>
+		<div class="cell" style="width: 20%">{ liquidityType }</div>
+		<div class="cell text-secondary" style="width: 25%">{ formattedDate }</div>
+		<div class="cell" style="width: 20%">{ state }</div>
+		<div class="cell" style="width: 10%"><a href={ escapedUrl } class="btn btn-sm btn-secondary">INFO</a></div>
+	</div>
 }
 
 templ SwapOutPostForm(nodeBalance string) {
@@ -111,6 +110,84 @@ templ SwapOutPostForm(nodeBalance string) {
 	</form>
 }
 
+templ LnSendPage(nodeBalance string) {
+	@Layout("liquidity") {
+		<main class="main-content">
+			<div class="content-header">
+				<h2>Send Funds</h2>
+			</div>
+			<div class="card p-6" style="max-width: 600px; margin: 0 auto;">
+				<div class="mb-6 text-center">
+					<h3 class="text-secondary text-sm uppercase mb-2">Available Balance</h3>
+					<div class="text-3xl font-bold font-mono text-accent">{ nodeBalance } <span class="text-lg text-secondary">sats</span></div>
+				</div>
+				<form
+					class="form-group"
+					hx-post="/admin/out-swap-req"
+					hx-target="#send-result"
+					hx-swap="innerHTML"
+				>
+					<div class="form-section">
+						<label class="settings-input" for="invoice">
+							Lightning Invoice
+							<textarea
+								name="invoice"
+								required
+								placeholder="lnbc..."
+								class="font-mono text-sm"
+								rows="5"
+							></textarea>
+						</label>
+					</div>
+					<div class="form-actions flex justify-end mt-4">
+						<button hx-disabled-elt="this" type="submit" class="btn btn-primary">
+							Send Payment
+						</button>
+					</div>
+				</form>
+				<div id="send-result" class="mt-6"></div>
+			</div>
+		</main>
+	}
+}
+
+templ LnReceivePage() {
+	@Layout("liquidity") {
+		<main class="main-content">
+			<div class="content-header">
+				<h2>Receive Funds</h2>
+			</div>
+			<div class="card p-6" style="max-width: 600px; margin: 0 auto;">
+				<form
+					class="form-group"
+					hx-post="/admin/in-swap-req"
+					hx-target="#receive-result"
+					hx-swap="innerHTML"
+				>
+					<div class="form-section">
+						<label class="settings-input" for="amount">
+							Amount (Sats)
+							<input
+								name="amount"
+								required
+								min="1"
+								type="number"
+								placeholder="0"
+							/>
+						</label>
+					</div>
+					<div class="form-actions flex justify-end mt-4">
+						<button hx-disabled-elt="this" type="submit" class="btn btn-primary">
+							Generate Invoice
+						</button>
+					</div>
+				</form>
+				<div id="receive-result" class="mt-6"></div>
+			</div>
+		</main>
+	}
+}
+
 templ SwapInPostForm() {
 	<form
 		class="swap-form"
@@ -128,44 +205,58 @@ templ SwapInPostForm() {
 }
 
 templ LightningReceiveSummary(recieveSats string, address string, qrCode string, swapId string) {
-	<h3 style="margin-left: 15px;">Liquidity In</h3>
-	<div class="summary">
-		<p>
-			Please pay this invoice: 
-		</p>
-		<p>
-			{ address }
-		</p>
-		<p>
-			For receiving:  { recieveSats }
-		</p>
-		@QRCode(qrCode)
-		<div
-			hx-get={ "/admin/swap/" + swapId }
-			hx-trigger="load"
-			hx-swap="innerHTML"
-			hx-target="this"
-			class="swap-state"
-		></div>
-	</div>
-}
-
-templ LightningSendSummary(recieveSats string, address string, swapId string) {
-	<div>
-		<h3 style="margin-left: 15px;">Liquidity Out</h3>
-		<div class="summary">
-			<p>
-				Please confirm you want to send:  { recieveSats }. To this invoice:
-			</p>
-			<p>
-				{ address }
-			</p>
+	<div class="card p-4 mt-4 border border-secondary">
+		<h3 class="text-lg font-bold mb-4">Liquidity In</h3>
+		<div class="summary flex flex-col gap-4">
+			<div class="text-center">
+				<p class="text-secondary text-sm mb-2">Scan to Pay</p>
+				<div class="inline-block p-2 bg-white rounded">
+					@QRCode(qrCode)
+				</div>
+			</div>
+			<div>
+				<p class="text-sm text-secondary mb-1">
+					Amount to Receive
+				</p>
+				<div class="font-mono font-bold text-xl">
+					{ recieveSats } <span class="text-sm text-secondary">sats</span>
+				</div>
+			</div>
+			<div>
+				<p class="text-sm text-secondary mb-1">
+					Lightning Invoice
+				</p>
+				<div class="p-3 bg-secondary rounded font-mono text-xs break-all text-secondary">
+					{ address }
+				</div>
+			</div>
 			<div
 				hx-get={ "/admin/swap/" + swapId }
 				hx-trigger="load"
 				hx-swap="innerHTML"
 				hx-target="this"
-				class="swap-state"
+				class="swap-state mt-2"
+			></div>
+		</div>
+	</div>
+}
+
+templ LightningSendSummary(recieveSats string, address string, swapId string) {
+	<div class="card p-4 mt-4 border border-secondary">
+		<h3 class="text-lg font-bold mb-4">Payment Request Created</h3>
+		<div class="summary flex flex-col gap-2">
+			<p>
+				Please confirm you want to send <span class="font-mono font-bold">{ recieveSats }</span> to:
+			</p>
+			<div class="p-3 bg-secondary rounded font-mono text-xs break-all text-secondary">
+				{ address }
+			</div>
+			<div
+				hx-get={ "/admin/swap/" + swapId }
+				hx-trigger="load"
+				hx-swap="innerHTML"
+				hx-target="this"
+				class="swap-state mt-4"
 			></div>
 		</div>
 	</div>
@@ -174,36 +265,53 @@ templ LightningSendSummary(recieveSats string, address string, swapId string) {
 templ SwapState(state utils.SwapState, swapId string) {
 	{{ waitingConfirm := state == utils.WaitingUserConfirmation }}
 	{{ stringState := state.ToString() }}
-	<div class="state">
-		<h3>Swap State</h3>
-		<div>
-			Current state: <b>{ stringState } </b>
+	<div class="state bg-card p-4 rounded border border-subtle">
+		<div class="flex items-center justify-between mb-4">
+			<h3 class="text-sm uppercase text-secondary">Status</h3>
+			<div class="font-bold">{ stringState }</div>
 		</div>
 		if waitingConfirm {
 			<form
-				class="swap-form"
+				class="swap-form flex justify-end"
 				hx-post={ "/admin/swap/" + swapId + "/confirm" }
 				hx-swap="outerHTML"
-				hx-target=".state"
+				hx-target="closest .state"
 				hx-disabled-elt="find button"
 			>
-				<button style="margin-top: 10px;" hx-disabled-elt="this" type="submit">Confirm Swap</button>
+				<button class="btn btn-primary w-full" type="submit">Confirm Payment</button>
 			</form>
 		}
 	</div>
 }
 
 templ SwapStatusPage(summary templ.Component) {
-	@Layout() {
-		<main class="liquidity-dashboard">
-			<div class="actions-container">
+	@Layout("liquidity") {
+		<main class="liquidity-dashboard main-content">
+			<div class="actions-container" style="max-width: 600px; margin: 0 auto;">
 				@summary
 			</div>
 		</main>
 	}
 }
 
-// QR component
-templ QRCode(qrData string) {
-	<img src={ "data:image/png;base64," + qrData } alt="QR Code"/>
+// two cards ln sats balance and sats needed
+templ LiquiditySummaryComponent(lnSatsBalance uint64, balance Balance) {
+	{{ iliquid := lnSatsBalance < balance.NeededBalance }}
+	<div class="flex gap-4 mb-4 mt-4 flex-wrap">
+		<div class="card card-md flex-1">
+			<div class={ "text-secondary font-semibold uppercase text-xs mb-2" }>Sats needed</div>
+			<div class={ "text-2xl font-bold text-primary", templ.KV("iliquid", iliquid) }>
+				{ FormatNumber(balance.NeededBalance) } <span class="text-sm font-normal text-secondary">Sats</span>
+				if iliquid {
+					<span class="text-sm font-normal text-secondary">(Insufficient balance)</span>
+				}
+			</div>
+		</div>
+		<div class="card card-md flex-1">
+			<div class="text-secondary font-semibold uppercase text-xs mb-2">Lightning Balance</div>
+			<div class="text-2xl font-bold text-primary">
+				{ FormatNumber(lnSatsBalance) } <span class="text-sm font-normal text-secondary">Sats</span>
+			</div>
+		</div>
+	</div>
 }

@@ -16,6 +16,9 @@ func TestGeneratingAuthKeyset(t *testing.T) {
 	Seed := cashu.Seed{Version: 1, Unit: cashu.AUTH.String()}
 
 	generatedKeysets, err := DeriveKeyset(key, Seed)
+	if err != nil {
+		t.Errorf("Error deriving keyset: %+v", err)
+	}
 
 	if len(generatedKeysets) != 1 {
 		t.Errorf("There shouls only be 1 keyset for auth")

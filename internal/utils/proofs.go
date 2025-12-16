@@ -40,7 +40,7 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrLocktimePassed):
 		message := cashu.ErrLocktimePassed.Error()
 		return cashu.UNKNOWN, &message
-	case errors.Is(proofError, cashu.UsingInactiveKeyset):
+	case errors.Is(proofError, cashu.ErrUsingInactiveKeyset):
 		return cashu.INACTIVE_KEYSET, nil
 	case errors.Is(proofError, cashu.ErrMeltAlreadyPaid):
 		message := cashu.ErrMeltAlreadyPaid.Error()

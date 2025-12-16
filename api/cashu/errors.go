@@ -6,15 +6,15 @@ import (
 )
 
 var (
-	ErrMeltAlreadyPaid            = errors.New("Melt already Paid")
-	ErrQuoteIsPending             = errors.New("Quote is pending")
-	ErrUnitNotSupported           = errors.New("Unit not supported")
-	ErrDifferentInputOutputUnit   = errors.New("Different input output unit")
-	ErrNotEnoughtProofs           = errors.New("Not enought proofs")
-	ErrProofSpent                 = errors.New("Proof already spent")
-	ErrBlindMessageAlreadySigned  = errors.New("Blind message already signed")
-	ErrCommonSecretNotCorrectSize = errors.New("Proof secret is not correct size")
-	ErrUnknown                    = errors.New("Unknown error")
+	ErrMeltAlreadyPaid            = errors.New("melt already paid")
+	ErrQuoteIsPending             = errors.New("quote is pending")
+	ErrUnitNotSupported           = errors.New("unit not supported")
+	ErrDifferentInputOutputUnit   = errors.New("different input output unit")
+	ErrNotEnoughtProofs           = errors.New("not enough proofs")
+	ErrProofSpent                 = errors.New("proof already spent")
+	ErrBlindMessageAlreadySigned  = errors.New("blind message already signed")
+	ErrCommonSecretNotCorrectSize = errors.New("proof secret is not correct size")
+	ErrUnknown                    = errors.New("unknown error")
 )
 
 type ErrorCode uint

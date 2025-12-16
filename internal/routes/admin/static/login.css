@@ -1,0 +1,11 @@
+.center-content-login {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Login card max-width for better visual balance */
+.main-content-full .card {
+    max-width: 500px;
+    width: 100%;
+}

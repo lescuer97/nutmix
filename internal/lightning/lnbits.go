@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"net/http"
 
@@ -52,7 +53,7 @@ type lnbitsFeeResponse struct {
 }
 
 var ErrLnbitsFailedPayment = errors.New("failed payment")
-var ErrLnBitsNoRouteFound = errors.New("No route found")
+var ErrLnBitsNoRouteFound = errors.New("no route found")
 
 func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{}
@@ -75,7 +76,11 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 	}
 
 	body, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("failed to close response body", slog.Any("error", err))
+		}
+	}()
 
 	if err != nil {
 		return fmt.Errorf("ioutil.ReadAll: %w", err)
@@ -92,7 +97,7 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 		return fmt.Errorf("LNBITS payment failed %+v. Request Body %+v, %w", detailBody, reqBody, ErrLnbitsFailedPayment)
 
 	case detailBody.Detail == "Payment failed: no_route":
-		return fmt.Errorf("No Route found %+v. Request Body %+v, %w", detailBody, reqBody, ErrLnBitsNoRouteFound)
+		return fmt.Errorf("no route found %+v. Request Body %+v, %w", detailBody, reqBody, ErrLnBitsNoRouteFound)
 
 	case detailBody.Detail == "Payment does not exist.":
 		val, ok := responseType.(LNBitsPaymentStatus)

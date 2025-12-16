@@ -15,7 +15,7 @@ func AuthActivatedMiddleware(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		if !mint.Config.MINT_REQUIRE_AUTH {
-			slog.Warn(fmt.Errorf("Tried using route that does not exists because auth not being active").Error())
+			slog.Warn(fmt.Errorf("tried using route that does not exist because auth not being active").Error())
 			c.JSON(404, "route does not exists")
 			c.Abort()
 			return
@@ -58,7 +58,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		keys, err := mint.Signer.GetAuthKeys()
 		if err != nil {
 			slog.Error("mint.Signer.GetAuthKeys()", slog.Any("error", err))
-			c.JSON(500, "Server side error")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
 
@@ -77,10 +77,14 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
-		defer mint.MintDB.Rollback(ctx, tx)
+		defer func() {
+			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+				slog.Warn("rollback error", slog.Any("error", err))
+			}
+		}()
 
 		keysets, err := mint.Signer.GetAuthKeys()
 		if err != nil {
@@ -133,7 +137,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 
 		err = mint.MintDB.Commit(ctx, tx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return
 		}
 

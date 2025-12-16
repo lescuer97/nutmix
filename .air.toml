@@ -4,17 +4,17 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "./tmp/main"
-  cmd = "go build -o ./tmp/main cmd/nutmix/*.go"
+  bin = "./build/nutmix"
+  cmd = "just build-dev"
   delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata", "keycloak", "keycloak_pq_data"]
+  exclude_dir = ["internal/routes/admin/static/node_modules", "tmp", "vendor", "testdata", "keycloak", "keycloak_pq_data", "internal/routes/admin/static/dist"]
   exclude_file = []
-  exclude_regex = ["_test.go"]
+  exclude_regex = [ "_templ.go", "pb.go"]
   exclude_unchanged = false
   follow_symlink = false
   full_bin = ""
   include_dir = []
-  include_ext = ["go", "tpl", "tmpl", "html"]
+  include_ext = ["go", "tpl", "templ", "html", "css", "js"]
   include_file = []
   kill_delay = "0s"
   log = "build-errors.log"

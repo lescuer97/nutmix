@@ -119,6 +119,9 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	mint.LightningBackend = &fakeWallet
 
 	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
+	if err != nil {
+		t.Fatalf("Error generating melt proofs: %v", err)
+	}
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -145,7 +148,9 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	proofs, err := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
 	if err != nil {
@@ -198,8 +203,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
@@ -317,6 +321,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	mint.LightningBackend = &fakeWallet
 
 	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
+	if err != nil {
+		t.Fatalf("Error generating melt proofs: %v", err)
+	}
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -345,7 +352,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	proofs, _ := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
 
@@ -381,7 +390,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {
@@ -501,6 +512,9 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	mint.LightningBackend = &fakeWallet
 
 	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
+	if err != nil {
+		t.Fatalf("Error generating melt proofs: %v", err)
+	}
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
@@ -534,7 +548,9 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
 	}
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {

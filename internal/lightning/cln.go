@@ -101,12 +101,12 @@ func (l *CLNGRPCWallet) clnGrpcPayInvoice(invoice string, feeReserve uint64, lig
 	}
 
 	if res.Status == cln_grpc.PayResponse_FAILED {
-		return fmt.Errorf("Payment failed")
+		return fmt.Errorf("payment failed")
 	}
 	switch res.Status {
 	case cln_grpc.PayResponse_FAILED:
 		lightningResponse.PaymentState = FAILED
-		return fmt.Errorf("Payment failed")
+		return fmt.Errorf("payment failed")
 	case cln_grpc.PayResponse_PENDING:
 		lightningResponse.PaymentState = PENDING
 		return nil
@@ -153,12 +153,12 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 	}
 
 	if res.Status == cln_grpc.PayResponse_FAILED {
-		return fmt.Errorf("Payment failed")
+		return fmt.Errorf("payment failed")
 	}
 	switch res.Status {
 	case cln_grpc.PayResponse_FAILED:
 		lightningResponse.PaymentState = FAILED
-		return fmt.Errorf("Payment failed")
+		return fmt.Errorf("payment failed")
 	case cln_grpc.PayResponse_PENDING:
 		lightningResponse.PaymentState = PENDING
 		return nil
@@ -218,13 +218,13 @@ func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkin
 	}
 
 	for _, pay := range pays.Pays {
-		switch {
-		case pay.Status == cln_grpc.ListpaysPays_COMPLETE:
+		switch pay.Status {
+		case cln_grpc.ListpaysPays_COMPLETE:
 			fee := (pay.AmountSentMsat.Msat - pay.AmountMsat.Msat) / 1000
 			return SETTLED, hex.EncodeToString(pay.PaymentHash), fee, nil
-		case pay.Status == cln_grpc.ListpaysPays_PENDING:
+		case cln_grpc.ListpaysPays_PENDING:
 			return PENDING, hex.EncodeToString(pay.PaymentHash), fee, nil
-		case pay.Status == cln_grpc.ListpaysPays_FAILED:
+		case cln_grpc.ListpaysPays_FAILED:
 			return FAILED, hex.EncodeToString(pay.PaymentHash), fee, nil
 
 		}
@@ -248,11 +248,11 @@ func (l CLNGRPCWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 	}
 
 	for _, invoice := range invoices.Invoices {
-		switch {
-		case invoice.Status == cln_grpc.ListinvoicesInvoices_PAID:
+		switch invoice.Status {
+		case cln_grpc.ListinvoicesInvoices_PAID:
 			return SETTLED, hex.EncodeToString(invoice.PaymentHash), nil
 
-		case invoice.Status == cln_grpc.ListinvoicesInvoices_UNPAID:
+		case cln_grpc.ListinvoicesInvoices_UNPAID:
 			return PENDING, hex.EncodeToString(invoice.PaymentHash), nil
 
 		}
@@ -293,14 +293,14 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 		return feesResponse, err
 	}
 	if res == nil {
-		return feesResponse, fmt.Errorf("No routes found")
+		return feesResponse, fmt.Errorf("no routes found")
 	}
 
 	if len(res.Route) == 0 {
-		return feesResponse, fmt.Errorf("No routes found")
+		return feesResponse, fmt.Errorf("no routes found")
 	}
 
-	fee := amountGrpc.Msat - *&res.Route[len(res.Route)-1].AmountMsat.Msat
+	fee := amountGrpc.Msat - res.Route[len(res.Route)-1].AmountMsat.Msat
 
 	// turn to sats
 	fee = fee / 1000
@@ -320,7 +320,7 @@ func (l CLNGRPCWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 	var response InvoiceResponse
 	supported := l.VerifyUnitSupport(amount.Unit)
 	if !supported {
-		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit). %w.", cashu.ErrUnitNotSupported)
+		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit): %w", cashu.ErrUnitNotSupported)
 	}
 
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)

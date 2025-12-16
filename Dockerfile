@@ -1,24 +1,54 @@
-FROM golang:alpine3.22
+# Build stage
+FROM --platform=$BUILDPLATFORM golang:alpine3.22 AS builder
 
-RUN apk add --no-cache protobuf
+ARG TARGETOS
+ARG TARGETARCH
 
-RUN mkdir /app
+# Install build dependencies
+RUN apk add --no-cache protobuf curl unzip bash git
 
-ADD . /app
+# Install just
+RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
+# Set up working directory
+WORKDIR /app
+
+# Set PATH early so bun and go tools are available after installation
+ENV PATH="${PATH}:/root/go/bin:/root/.bun/bin"
+
+# Copy all source files
+COPY . .
+
+# Install all tools using just
+RUN just install-deps
+
+# Generate protobuf code
+RUN just gen-proto
+
+# Generate templ files
+RUN just gen-templ
+
+# Build web assets
+RUN just web-build-prod
+
+# Build Go binary with correct target architecture
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" \
+    -trimpath -o build/nutmix cmd/nutmix/*.go
+
+# Runtime stage
+FROM alpine:3.22
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-# Install protobuf generators
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+# Copy the binary from builder
+COPY --from=builder /app/build/nutmix ./main
 
-# Generate protobuf code
-RUN protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
-
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.960
-RUN templ generate .
-RUN go build -o main cmd/nutmix/*.go
-
+# # Copy web assets
+# COPY --from=builder /app/internal/routes/admin/static/dist ./internal/routes/admin/static/dist
 
 EXPOSE 8080
-CMD [ "/app/main" ]
+
+CMD ["/app/main"]

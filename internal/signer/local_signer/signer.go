@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"sort"
 	"time"
@@ -63,7 +64,6 @@ func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
 	localsigner.keysets = keysets
 	localsigner.activeKeysets = activeKeysets
 
-	masterKey = nil
 	return localsigner, nil
 
 }
@@ -122,7 +122,7 @@ func (l *LocalSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 func (l *LocalSigner) getSignerPrivateKey() (*secp256k1.PrivateKey, error) {
 	mint_privkey := os.Getenv("MINT_PRIVATE_KEY")
 	if mint_privkey == "" {
-		return nil, fmt.Errorf(`os.Getenv("MINT_PRIVATE_KEY").`)
+		return nil, fmt.Errorf(`os.Getenv("MINT_PRIVATE_KEY")`)
 	}
 
 	decodedPrivKey, err := hex.DecodeString(mint_privkey)
@@ -174,10 +174,14 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 	if err != nil {
 		return fmt.Errorf("l.db.GetTx(ctx). %w", err)
 	}
-	defer l.db.Rollback(ctx, tx)
+	defer func() {
+		if err := l.db.Rollback(ctx, tx); err != nil {
+			slog.Warn("rollback error", slog.Any("error", err))
+		}
+	}()
 
 	// get current highest seed version
-	var highestSeed cashu.Seed = cashu.Seed{Version: 0}
+	var highestSeed = cashu.Seed{Version: 0}
 	seeds, err := l.db.GetSeedsByUnit(tx, unit)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -246,27 +250,7 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 	l.keysets = keysets
 	l.activeKeysets = activeKeysets
 
-	signerMasterKey = nil
 	return nil
-}
-
-func (l *LocalSigner) signBlindMessage(k *secp256k1.PrivateKey, message cashu.BlindedMessage) (cashu.BlindSignature, error) {
-
-	C_ := crypto.SignBlindedMessage(message.B_.PublicKey, k)
-
-	blindSig := cashu.BlindSignature{
-		Amount: message.Amount,
-		Id:     message.Id,
-		C_:     cashu.WrappedPublicKey{PublicKey: C_},
-	}
-
-	err := blindSig.GenerateDLEQ(message.B_.PublicKey, k)
-
-	if err != nil {
-		return blindSig, fmt.Errorf("blindSig.GenerateDLEQ: %w", err)
-	}
-
-	return blindSig, nil
 }
 
 func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
@@ -277,7 +261,7 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 		correctKeyset := l.activeKeysets[output.Id][output.Amount]
 
 		if correctKeyset.PrivKey == nil || !correctKeyset.Active {
-			return nil, nil, cashu.UsingInactiveKeyset
+			return nil, nil, cashu.ErrUsingInactiveKeyset
 		}
 
 		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
@@ -392,7 +376,9 @@ func (l *LocalSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error)
 
 // gets all keys from the signer
 func (l *LocalSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
-	var response signer.GetKeysetsResponse
+	response := signer.GetKeysetsResponse{
+		Keysets: make([]cashu.BasicKeysetResponse, 0),
+	}
 	seeds, err := l.db.GetAllSeeds()
 	if err != nil {
 		return response, fmt.Errorf(" l.db.GetAllSeeds(). %w", err)

@@ -81,7 +81,7 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 	case "signet":
 		return chaincfg.SigNetParams, nil
 	default:
-		return chaincfg.MainNetParams, fmt.Errorf("Invalid network: %s", network)
+		return chaincfg.MainNetParams, fmt.Errorf("invalid network: %s", network)
 	}
 
 }
@@ -165,7 +165,7 @@ func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig
 
 	if config.MINT_REQUIRE_AUTH {
 		if config.MINT_AUTH_OICD_URL == "" {
-			return nil, fmt.Errorf("There is no oidc url for stepup")
+			return nil, fmt.Errorf("there is no oidc url for stepup")
 		}
 		err = mint.SetupOidcService(ctx, config.MINT_AUTH_OICD_URL)
 		if err != nil {

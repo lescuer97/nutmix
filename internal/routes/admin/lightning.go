@@ -18,9 +18,8 @@ func LightningDataFormFields(mint *m.Mint) gin.HandlerFunc {
 		err := templates.SetupForms(backend, mint.Config).Render(ctx, c.Writer)
 
 		if err != nil {
-			c.Error(fmt.Errorf("templates.SetupForms(mint.Config).Render(ctx, c.Writer). %w", err))
+			_ = c.Error(fmt.Errorf("templates.SetupForms(mint.Config).Render(ctx, c.Writer). %w", err))
 			return
 		}
-		return
 	}
 }

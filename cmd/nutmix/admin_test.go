@@ -60,8 +60,7 @@ func TestSetupMintAdminLoginSuccess(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
@@ -150,8 +149,7 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
@@ -236,19 +234,14 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 400 {
+	if w.Code != 200 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
 
 	var res string
 
-	err = json.Unmarshal(w.Body.Bytes(), &res)
-	if err != nil {
-		t.Errorf("Error unmarshalling response: %v", err)
-	}
-
-	if res != "Private key used is not correct" {
-		t.Errorf("Expected to get Private key used is not correct %s", res)
+	if !strings.Contains(w.Body.String(), "incorrect npub used in signature") {
+		t.Errorf("Expected to get Incorrect npub used in signature %s", res)
 	}
 }
 
@@ -257,8 +250,7 @@ func TestRotateKeyUpCall(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),

@@ -3,10 +3,10 @@ package database
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -26,7 +26,7 @@ type AuthUser struct {
 	LastLoggedIn uint64  `db:"last_logged_in"`
 }
 
-var DBError = errors.New("ERROR DATABASE")
+var ErrDB = errors.New("ERROR DATABASE")
 
 var DATABASE_URL_ENV = "DATABASE_URL"
 
@@ -34,6 +34,27 @@ const (
 	DOCKERDATABASE = "DOCKERDATABASE"
 	CUSTOMDATABASE = "CUSTOMDATABASE"
 )
+
+// ProofTimeSeriesPoint represents a single data point for charting proofs over time
+type ProofTimeSeriesPoint struct {
+	Timestamp   int64  `json:"timestamp"`   // Unix timestamp (seconds) for the bucket start
+	TotalAmount uint64 `json:"totalAmount"` // Sum of proof amounts in this bucket
+	Count       uint64 `json:"count"`       // Number of proofs in this bucket
+}
+
+// ProofsCountByKeyset represents the total amount and count of proofs grouped by keyset ID
+type ProofsCountByKeyset struct {
+	KeysetId    string `json:"keyset_id"`
+	TotalAmount uint64 `json:"total_amount"`
+	Count       uint64 `json:"count"`
+}
+
+// BlindSigsCountByKeyset represents the total amount and count of blind signatures grouped by keyset ID
+type BlindSigsCountByKeyset struct {
+	KeysetId    string `json:"keyset_id"`
+	TotalAmount uint64 `json:"total_amount"`
+	Count       uint64 `json:"count"`
+}
 
 type MintDB interface {
 	GetTx(ctx context.Context) (pgx.Tx, error)
@@ -72,9 +93,17 @@ type MintDB interface {
 	GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
 
-	GetProofsMintReserve() (templates.MintReserve, error)
-	GetBlindSigsMintReserve() (templates.MintReserve, error)
+	// GetProofsTimeSeries returns proofs aggregated by time buckets for charting
+	// since: lower bound unix timestamp (inclusive)
+	// bucketMinutes: size of each time bucket in minutes
+	GetProofsTimeSeries(since int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
+	// GetBlindSigsTimeSeries returns blind signatures aggregated by time buckets for charting
+	// since: lower bound unix timestamp (inclusive)
+	// bucketMinutes: size of each time bucket in minutes
+	GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
 
+	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
+	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	GetConfig() (utils.Config, error)
 	SetConfig(config utils.Config) error
 	UpdateConfig(config utils.Config) error
@@ -86,6 +115,12 @@ type MintDB interface {
 	/// Calls for the admin dashboard
 
 	GetMintMeltBalanceByTime(time int64) (MintMeltBalance, error)
+	// GetProofsCountByKeyset returns the total amount and count of proofs grouped by keyset ID
+	// since: lower bound time (inclusive)
+	GetProofsCountByKeyset(since time.Time) (map[string]ProofsCountByKeyset, error)
+	// GetBlindSigsCountByKeyset returns the total amount and count of blind signatures grouped by keyset ID
+	// since: lower bound time (inclusive)
+	GetBlindSigsCountByKeyset(since time.Time) (map[string]BlindSigsCountByKeyset, error)
 
 	SaveNostrAuth(auth NostrLoginAuth) error
 	UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error
@@ -96,7 +131,7 @@ type MintDB interface {
 	GetLiquiditySwapById(tx pgx.Tx, id string) (utils.LiquiditySwap, error)
 	ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.SwapState) error
 	GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error)
-	GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error)
+	GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapState) ([]string, error)
 
 	// Mint Auth
 	GetAuthUser(tx pgx.Tx, sub string) (AuthUser, error)

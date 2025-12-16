@@ -21,8 +21,7 @@ func TestAddAndRequestMintRequestValidPubkey(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
@@ -126,8 +125,7 @@ func TestAddAndRequestMintRequestNilPubkey(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
@@ -267,7 +265,9 @@ func TestGetMintMeltBalanceByTime_OnlyPubkey(t *testing.T) {
 	if err := db.SaveMintRequest(tx, mint2); err != nil {
 		t.Fatal(err)
 	}
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// Melt Requests
 	// Melt Request 1: Old, Issued (Excluded by time)
@@ -304,7 +304,9 @@ func TestGetMintMeltBalanceByTime_OnlyPubkey(t *testing.T) {
 	if err := db.SaveMeltRequest(tx, melt2); err != nil {
 		t.Fatal(err)
 	}
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// Query
 	res, err := db.GetMintMeltBalanceByTime(queryTime)
@@ -388,7 +390,9 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 	if err := db.SaveMintRequest(tx, mint2); err != nil {
 		t.Fatal(err)
 	}
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// Melt Requests
 	melt1 := cashu.MeltRequestDB{
@@ -409,7 +413,9 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 	if err := db.SaveMeltRequest(tx, melt1); err != nil {
 		t.Fatal(err)
 	}
-	tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	// Query
 	res, err := db.GetMintMeltBalanceByTime(queryTime)
@@ -423,14 +429,15 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 
 	var foundWithKey, foundNoKey bool
 	for _, m := range res.Mint {
-		if m.Quote == "mintWithKey" {
+		switch m.Quote {
+		case "mintWithKey":
 			foundWithKey = true
 			if m.Pubkey.PublicKey == nil {
 				t.Error("Expected mintWithKey to have a pubkey")
 			} else if hex.EncodeToString(m.Pubkey.SerializeCompressed()) != pubkeyStr {
 				t.Errorf("Pubkey mismatch. Got %x, expected %s", m.Pubkey.SerializeCompressed(), pubkeyStr)
 			}
-		} else if m.Quote == "mintNoKey" {
+		case "mintNoKey":
 			foundNoKey = true
 			if m.Pubkey.PublicKey != nil {
 				t.Errorf("Expected mintNoKey to have NO pubkey, but got %v", m.Pubkey.PublicKey)
@@ -859,7 +866,8 @@ func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
 		b_Str := hex.EncodeToString(sig.B_.SerializeCompressed())
 		c_Str := hex.EncodeToString(sig.C_.SerializeCompressed())
 
-		if b_Str == b1_PubkeyStr {
+		switch b_Str {
+		case b1_PubkeyStr:
 			foundSig1 = true
 			if c_Str != c1_PubkeyStr {
 				t.Errorf("Sig1 C_ mismatch: expected %s, got %s", c1_PubkeyStr, c_Str)
@@ -867,7 +875,7 @@ func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
 			if sig.Amount != 100 {
 				t.Errorf("Sig1 Amount mismatch: expected 100, got %d", sig.Amount)
 			}
-		} else if b_Str == b2_PubkeyStr {
+		case b2_PubkeyStr:
 			foundSig2 = true
 			if c_Str != c2_PubkeyStr {
 				t.Errorf("Sig2 C_ mismatch: expected %s, got %s", c2_PubkeyStr, c_Str)
@@ -891,8 +899,7 @@ func setupTestDB(t *testing.T) (Postgresql, context.Context) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:16.2"),
+	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),

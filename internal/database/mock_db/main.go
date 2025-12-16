@@ -4,17 +4,18 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
-	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-var DBError = errors.New("ERROR DATABASE")
+var ErrDB = errors.New("ERROR DATABASE")
 
 var DATABASE_URL_ENV = "DATABASE_URL"
 
@@ -33,7 +34,7 @@ type MockDB struct {
 }
 
 func databaseError(err error) error {
-	return errors.Join(DBError, err)
+	return errors.Join(ErrDB, err)
 }
 
 func (m *MockDB) GetAllSeeds() ([]cashu.Seed, error) {
@@ -312,23 +313,138 @@ func (m *MockDB) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) e
 
 }
 
-func (m *MockDB) GetProofsMintReserve() (templates.MintReserve, error) {
-	var mintReserve templates.MintReserve
+func (m *MockDB) GetProofsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+	bucketSeconds := int64(bucketMinutes * 60)
+
+	// Determine upper bound
+	upperBound := time.Now().Unix()
+
+	// Group proofs by time bucket
+	buckets := make(map[int64]*database.ProofTimeSeriesPoint)
 
 	for _, p := range m.Proofs {
-		mintReserve.SatAmount += p.Amount
-		mintReserve.Amount += 1
+		if p.SeenAt < since || p.SeenAt >= upperBound {
+			continue
+		}
+
+		// Calculate bucket timestamp using floor division
+		bucketTimestamp := (p.SeenAt / bucketSeconds) * bucketSeconds
+
+		if _, exists := buckets[bucketTimestamp]; !exists {
+			buckets[bucketTimestamp] = &database.ProofTimeSeriesPoint{
+				Timestamp:   bucketTimestamp,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		buckets[bucketTimestamp].TotalAmount += p.Amount
+		buckets[bucketTimestamp].Count++
 	}
 
-	return mintReserve, nil
+	// Convert map to sorted slice
+	var points []database.ProofTimeSeriesPoint
+	for _, point := range buckets {
+		points = append(points, *point)
+	}
+
+	// Sort by timestamp
+	sort.Slice(points, func(i, j int) bool {
+		return points[i].Timestamp < points[j].Timestamp
+	})
+
+	return points, nil
 }
-func (m *MockDB) GetBlindSigsMintReserve() (templates.MintReserve, error) {
 
-	var mintReserve templates.MintReserve
+func (m *MockDB) GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
+	bucketSeconds := int64(bucketMinutes * 60)
 
-	for _, p := range m.RecoverSigDB {
-		mintReserve.SatAmount += p.Amount
-		mintReserve.Amount += 1
+	// Determine upper bound
+	upperBound := time.Now().Unix()
+
+	// Group blind sigs by time bucket
+	buckets := make(map[int64]*database.ProofTimeSeriesPoint)
+
+	for _, sig := range m.RecoverSigDB {
+		if sig.CreatedAt < since || sig.CreatedAt >= upperBound {
+			continue
+		}
+
+		// Calculate bucket timestamp using floor division
+		bucketTimestamp := (sig.CreatedAt / bucketSeconds) * bucketSeconds
+
+		if _, exists := buckets[bucketTimestamp]; !exists {
+			buckets[bucketTimestamp] = &database.ProofTimeSeriesPoint{
+				Timestamp:   bucketTimestamp,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		buckets[bucketTimestamp].TotalAmount += sig.Amount
+		buckets[bucketTimestamp].Count++
 	}
-	return mintReserve, nil
+
+	// Convert map to sorted slice
+	var points []database.ProofTimeSeriesPoint
+	for _, point := range buckets {
+		points = append(points, *point)
+	}
+
+	// Sort by timestamp
+	sort.Slice(points, func(i, j int) bool {
+		return points[i].Timestamp < points[j].Timestamp
+	})
+
+	return points, nil
+}
+
+func (m *MockDB) GetProofsCountByKeyset(since time.Time) (map[string]database.ProofsCountByKeyset, error) {
+	results := make(map[string]database.ProofsCountByKeyset)
+
+	for _, p := range m.Proofs {
+		if p.SeenAt < since.Unix() {
+			continue
+		}
+
+		item, exists := results[p.Id]
+		if !exists {
+			item = database.ProofsCountByKeyset{
+				KeysetId:    p.Id,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		item.TotalAmount += p.Amount
+		item.Count++
+		results[p.Id] = item
+	}
+
+	return results, nil
+}
+
+func (m *MockDB) GetBlindSigsCountByKeyset(since time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
+	results := make(map[string]database.BlindSigsCountByKeyset)
+
+	for _, sig := range m.RecoverSigDB {
+		if sig.CreatedAt < since.Unix() {
+			continue
+		}
+
+		item, exists := results[sig.Id]
+		if !exists {
+			item = database.BlindSigsCountByKeyset{
+				KeysetId:    sig.Id,
+				TotalAmount: 0,
+				Count:       0,
+			}
+		}
+
+		item.TotalAmount += sig.Amount
+		item.Count++
+		results[sig.Id] = item
+	}
+
+	return results, nil
 }

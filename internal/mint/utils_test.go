@@ -16,7 +16,9 @@ func TestIsInternalTransactionSuccess(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	ctx := context.Background()
 	tx, err := mint.MintDB.GetTx(ctx)
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v ", err)
@@ -50,7 +52,9 @@ func TestIsInternalTransactionFail(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	ctx := context.Background()
 	tx, err := mint.MintDB.GetTx(ctx)
-	defer mint.MintDB.Rollback(ctx, tx)
+	defer func() {
+		_ = mint.MintDB.Rollback(ctx, tx)
+	}()
 
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx(): %+v ", err)
@@ -140,9 +144,21 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}
 	b_bytes1, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2")
+	if err != nil {
+		t.Fatalf("Error decoding b_bytes1: %+v", err)
+	}
 	B_1, err := secp256k1.ParsePubKey(b_bytes1)
+	if err != nil {
+		t.Fatalf("Error parsing B_1: %+v", err)
+	}
 	b_bytes2, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107bb2")
+	if err != nil {
+		t.Fatalf("Error decoding b_bytes2: %+v", err)
+	}
 	B_2, err := secp256k1.ParsePubKey(b_bytes2)
+	if err != nil {
+		t.Fatalf("Error parsing B_2: %+v", err)
+	}
 	outputs := []cashu.BlindedMessage{{Id: "00bfa73302d12ffd", B_: cashu.WrappedPublicKey{PublicKey: B_1}}, {Id: "00bfa73302d12ffd", B_: cashu.WrappedPublicKey{PublicKey: B_2}}, {Id: "00bfa73302d12ffd", B_: cashu.WrappedPublicKey{PublicKey: B_2}}}
 
 	tx, err := mint.MintDB.GetTx(context.Background())

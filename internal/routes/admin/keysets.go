@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -15,8 +14,8 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-var ErrUnitNotCorrect = errors.New("Unit not correct")
-var ErrNoExpiryTime = errors.New("No expiry time provided")
+var ErrUnitNotCorrect = errors.New("unit not correct")
+var ErrNoExpiryTime = errors.New("no expiry time provided")
 
 func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 
@@ -25,91 +24,25 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 		err := templates.KeysetsPage().Render(ctx, c.Writer)
 
 		if err != nil {
-			c.Error(fmt.Errorf("templates.KeysetsPage().Render(ctx, c.Writer). %w", err))
+			_ = c.Error(fmt.Errorf("templates.KeysetsPage().Render(ctx, c.Writer). %w", err))
 			// c.HTML(400,"", nil)
 			return
 		}
 
 	}
 }
-func KeysetsLayoutPage(mint *m.Mint) gin.HandlerFunc {
+func KeysetsLayoutPage(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		keysets, err := mint.Signer.GetKeysets()
+		keysetMap, orderedUnits, err := adminHandler.getKeysets(nil)
 		if err != nil {
-			slog.Error("mint.Signer.GetKeysets()", slog.Any("error", err))
-			c.JSON(500, "Server side error")
+			_ = c.Error(fmt.Errorf("adminHandler.getKeysets(nil). %w", err))
 			return
 		}
-		authKeysets, err := mint.Signer.GetAuthKeys()
-		if err != nil {
-			slog.Error("mint.Signer.GetAuthKeys()", slog.Any("error", err))
-			c.JSON(500, "Server side error")
-			return
-		}
-
-		keysetMap := make(map[string][]templates.KeysetData)
-		for _, seed := range keysets.Keysets {
-			val, exits := keysetMap[seed.Unit]
-			if exits {
-				val = append(val, templates.KeysetData{
-					Id:      seed.Id,
-					Active:  seed.Active,
-					Unit:    seed.Unit,
-					Fees:    seed.InputFeePpk,
-					Version: seed.Version,
-				})
-
-				keysetMap[seed.Unit] = val
-
-			} else {
-				keysetMap[seed.Unit] = []templates.KeysetData{
-					{
-						Id:      seed.Id,
-						Active:  seed.Active,
-						Unit:    seed.Unit,
-						Fees:    seed.InputFeePpk,
-						Version: seed.Version,
-					},
-				}
-			}
-		}
-		for _, seed := range authKeysets.Keysets {
-			val, exits := keysetMap[seed.Unit]
-			if exits {
-				val = append(val, templates.KeysetData{
-					Id:      seed.Id,
-					Active:  seed.Active,
-					Unit:    seed.Unit,
-					Fees:    seed.InputFeePpk,
-					Version: seed.Version,
-				})
-
-				keysetMap[seed.Unit] = val
-
-			} else {
-				keysetMap[seed.Unit] = []templates.KeysetData{
-					{
-						Id:      seed.Id,
-						Active:  seed.Active,
-						Unit:    seed.Unit,
-						Fees:    seed.InputFeePpk,
-						Version: seed.Version,
-					},
-				}
-			}
-		}
-
-		// order the keysets by version
-		for unit, ranges := range keysetMap {
-			sort.Slice(ranges, func(i, j int) bool { return ranges[i].Version > ranges[j].Version })
-			keysetMap[unit] = ranges
-		}
-
 		ctx := context.Background()
-		err = templates.KeysetsList(keysetMap).Render(ctx, c.Writer)
+		err = templates.KeysetsList(keysetMap, orderedUnits).Render(ctx, c.Writer)
 
 		if err != nil {
-			c.Error(fmt.Errorf("templates.KeysetsList(keysetArr.Keysets).Render(ctx, c.Writer). %w", err))
+			_ = c.Error(fmt.Errorf("templates.KeysetsList(keysetArr.Keysets).Render(ctx, c.Writer). %w", err))
 			return
 		}
 	}
@@ -121,7 +54,7 @@ type RotateRequest struct {
 	ExpireLimitHours uint
 }
 
-func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
+func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rotateRequest RotateRequest
 		if c.ContentType() == gin.MIMEJSON {
@@ -137,19 +70,19 @@ func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
 			unitStr := c.Request.PostFormValue("UNIT")
 
 			if unitStr == "" {
-				c.Error(ErrUnitNotCorrect)
+				_ = c.Error(ErrUnitNotCorrect)
 				return
 			}
 
 			expireLimitStr := c.Request.PostFormValue("EXPIRE_LIMIT")
 			if expireLimitStr == "" {
-				c.Error(ErrNoExpiryTime)
+				_ = c.Error(ErrNoExpiryTime)
 				return
 			}
 
 			unit, err := cashu.UnitFromString(unitStr)
 			if err != nil {
-				c.Error(fmt.Errorf("cashu.UnitFromString(unitStr). %w. %w", err, ErrUnitNotCorrect))
+				_ = c.Error(fmt.Errorf("cashu.UnitFromString(unitStr). %w. %w", err, ErrUnitNotCorrect))
 				return
 			}
 			rotateRequest.Unit = unit
@@ -160,11 +93,10 @@ func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
 					"Err: There was a problem rotating the key",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
-				errorMessage := ErrorNotif{
-					Error: "Fee was not an integer",
+				err := RenderError(c, "Fee was not an integer")
+				if err != nil {
+					slog.Error("RenderError", slog.Any("error", err))
 				}
-
-				c.HTML(200, "settings-error", errorMessage)
 				return
 			}
 			rotateRequest.Fee = uint(newSeedFee)
@@ -175,28 +107,25 @@ func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
 					"Err: There was a problem rotating the key",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
-				errorMessage := ErrorNotif{
-					Error: "Expire limit is not an integer",
+				err := RenderError(c, "Expire limit is not an integer")
+				if err != nil {
+					slog.Error("RenderError", slog.Any("error", err))
 				}
-
-				c.HTML(200, "settings-error", errorMessage)
 				return
 			}
 			rotateRequest.ExpireLimitHours = uint(expiryLimit)
 		}
 
-		err := mint.Signer.RotateKeyset(rotateRequest.Unit, rotateRequest.Fee, rotateRequest.ExpireLimitHours)
-
+		err := adminHandler.rotateKeyset(rotateRequest.Unit, rotateRequest.Fee, rotateRequest.ExpireLimitHours)
 		if err != nil {
 			slog.Error(
 				"mint.Signer.RotateKeyset(cashu.Sat, rotateRequest.Fee)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			errorMessage := ErrorNotif{
-				Error: "There was an error getting the seeds",
+			err := RenderError(c, "There was an error getting the seeds")
+			if err != nil {
+				slog.Error("RenderError", slog.Any("error", err))
 			}
-
-			c.HTML(200, "settings-error", errorMessage)
 			return
 		}
 
@@ -204,13 +133,11 @@ func RotateSatsSeed(mint *m.Mint) gin.HandlerFunc {
 			c.JSON(200, nil)
 		} else {
 
-			successMessage := struct {
-				Success string
-			}{
-				Success: "Key succesfully rotated",
-			}
 			c.Header("HX-Trigger", "recharge-keyset")
-			c.HTML(200, "settings-success", successMessage)
+			err := RenderSuccess(c, "Key succesfully rotated")
+			if err != nil {
+				slog.Error("RenderSuccess", slog.Any("error", err))
+			}
 		}
 	}
 }

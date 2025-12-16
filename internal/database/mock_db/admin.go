@@ -87,11 +87,11 @@ func (m *MockDB) GetAllLiquiditySwaps() ([]utils.LiquiditySwap, error) {
 	return m.LiquiditySwap, nil
 }
 
-func (m *MockDB) GetLiquiditySwapsByStates(states []utils.SwapState) ([]utils.LiquiditySwap, error) {
-	var liquiditySwaps []utils.LiquiditySwap
+func (m *MockDB) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapState) ([]string, error) {
+	liquiditySwaps := make([]string, 0)
 	for i := 0; i < len(m.LiquiditySwap); i++ {
 		if slices.Contains(states, m.LiquiditySwap[i].State) {
-			liquiditySwaps = append(liquiditySwaps, m.LiquiditySwap[i])
+			liquiditySwaps = append(liquiditySwaps, m.LiquiditySwap[i].Id)
 		}
 
 	}

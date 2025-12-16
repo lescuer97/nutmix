@@ -21,14 +21,22 @@ import (
 
 const AdminAuthKey = "admin-cookie"
 
-func AuthMiddleware(secret []byte) gin.HandlerFunc {
+func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
+			// Check if token is blacklisted first
+			if blacklist.IsTokenBlacklisted(cookie) {
+				c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
+				c.Header("HX-Redirect", "/admin/login")
+				c.Abort()
+				return
+			}
+
 			token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
 				// Don't forget to validate the alg is what you expect:
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					slog.Warn("Unexpected signing method", slog.Any("alg", token.Header["alg"]))
-					return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 				}
 				return secret, nil
 			})
@@ -58,15 +66,16 @@ func AuthMiddleware(secret []byte) gin.HandlerFunc {
 				if c.Request.URL.Path == "/admin/login" {
 					return
 				}
+				slog.Debug("token is not valid", slog.Any("token", token))
 				c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
-				c.Header("HX-Redirect", "/admin/login")
+				c.Header("HX-Location", "/admin/login")
 				return
 
 			}
 		}
 
-		switch {
-		case c.Request.URL.Path == "/admin/login":
+		switch c.Request.URL.Path {
+		case "/admin/login":
 			return
 		default:
 			c.Redirect(http.StatusTemporaryRedirect, "/admin/login")
@@ -78,7 +87,7 @@ func AuthMiddleware(secret []byte) gin.HandlerFunc {
 	}
 }
 
-var ErrIncorrectNpub = errors.New("Incorrect npub used in signature")
+var ErrIncorrectNpub = errors.New("incorrect npub used in signature")
 
 func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey *btcec.PublicKey) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -103,33 +112,29 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
-			c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
 			return
 		}
 
 		defer func() {
 			if p := recover(); p != nil {
-				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				mint.MintDB.Rollback(ctx, tx)
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
+				_ = mint.MintDB.Rollback(ctx, tx)
 
 			} else if err != nil {
-				c.Error(fmt.Errorf("\n Rolling back  because of failure %+v\n", err))
-				mint.MintDB.Rollback(ctx, tx)
+				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
+				_ = mint.MintDB.Rollback(ctx, tx)
 			} else {
 				err = mint.MintDB.Commit(context.Background(), tx)
 				if err != nil {
-					c.Error(fmt.Errorf("\n Failed to commit transaction: %+v \n", err))
+					_ = c.Error(fmt.Errorf("failed to commit transaction: %+v", err))
 				}
 			}
 		}()
 
 		nostrLogin, err := mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)
 		if err != nil {
-			slog.Error(
-				"mint.MintDB.GetNostrAuth(tx, nostrEvent.Content)",
-				slog.Any("error", err),
-			)
-			c.JSON(400, "Content is not available")
+			_ = c.Error(errors.Join(ErrCouldNotParseLogin, err))
 			return
 		}
 
@@ -141,57 +146,45 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 		// check valid signature
 		validSig, err := nostrEvent.CheckSignature()
 		if err != nil {
-			slog.Info("nostrEvent.CheckSignature()", slog.Any("error", err))
-			c.JSON(400, "Invalid signature")
+			_ = c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		if !validSig {
-			slog.Warn("Invalid Signature")
-			c.JSON(403, "Invalid signature")
+			_ = c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		// check signature happened with the correct private key.
 		sigBytes, err := hex.DecodeString(nostrEvent.Sig)
 		if err != nil {
-			slog.Info("hex.DecodeString(nostrEvent.Sig)", slog.Any("error", err))
-			c.JSON(500, "Something happend!")
+			_ = c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		sig, err := schnorr.ParseSignature(sigBytes)
 		if err != nil {
-			slog.Info("schnorr.ParseSignature(sigBytes)", slog.Any("error", err))
-			c.JSON(500, "Something happend!")
+			_ = c.Error(errors.Join(ErrInvalidNostrSignature, err))
 			return
 		}
 
 		eventHash := sha256.Sum256(nostrEvent.Serialize())
 		verified := sig.Verify(eventHash[:], adminNostrPubkey)
 		if !verified {
-			if c.ContentType() == gin.MIMEJSON {
-				c.JSON(400, "Private key used is not correct")
-				return
-			} else {
-				c.Error(ErrIncorrectNpub)
-				return
-			}
+			_ = c.Error(ErrIncorrectNpub)
+			return
 		}
 
 		nostrLogin.Activated = verified
 		err = mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated)
 		if err != nil {
-			slog.Error("database.UpdateNostrLoginActivation(pool, nostrLogin)", slog.Any("error", err))
-			c.JSON(500, "Opps!, something wrong happened")
+			_ = c.Error(errors.Join(ErrCouldNotParseLogin, fmt.Errorf("mint.MintDB.UpdateNostrAuthActivation(tx, nostrLogin.Nonce, nostrLogin.Activated). %w", err)))
 			return
 		}
 
 		token, err := makeJWTToken(loginKey.Serialize())
-
 		if err != nil {
-			slog.Warn("Could not makeJWTToken", slog.Any("error", err))
-			c.JSON(500, nil)
+			_ = c.Error(fmt.Errorf("makeJWTToken(loginKey.Serialize()). %w", err))
 			return
 		}
 

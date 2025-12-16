@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/internal/database"
@@ -53,7 +54,11 @@ func main() {
 	if err != nil {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
-	defer logFile.Close()
+	defer func() {
+		if err := logFile.Close(); err != nil {
+			slog.Warn("failed to close log file", slog.Any("error", err))
+		}
+	}()
 
 	w := io.MultiWriter(os.Stdout, logFile)
 
@@ -68,6 +73,7 @@ func main() {
 
 	if os.Getenv("DEBUG") == "true" {
 		opts.Level = slog.LevelDebug
+		opts.AddSource = true
 	}
 
 	logger := slog.New(slog.NewJSONHandler(w, opts))
@@ -116,6 +122,8 @@ func main() {
 	corsConfig.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
 
 	r.Use(cors.Default())
+	// gzip compression
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	store := persistence.NewInMemoryStore(45 * time.Minute)
 
@@ -143,7 +151,10 @@ func main() {
 
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
-	r.Run(PORT)
+	if err := r.Run(PORT); err != nil {
+		slog.Error("server failed", slog.Any("error", err))
+		os.Exit(1)
+	}
 }
 
 const MemorySigner = "memory"
@@ -173,7 +184,7 @@ func GetSignerFromValue(signerType string, db database.MintDB) (signer.Signer, e
 		return &signer, nil
 
 	default:
-		return nil, fmt.Errorf("No signer type has been selected")
+		return nil, fmt.Errorf("no signer type has been selected")
 	}
 
 }
