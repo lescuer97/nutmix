@@ -256,7 +256,7 @@ docker-build:
     set -euo pipefail
     echo "Building Docker image for {{APP_NAME}} v{{VERSION}}..."
     just build
-    docker build -t {{DOCKER_IMAGE}}:latest -t {{DOCKER_IMAGE}}:{{VERSION}} .
+    docker build  -t {{DOCKER_IMAGE}}:latest -t {{DOCKER_IMAGE}}:{{VERSION}} .
 
 # Docker run recipe
 docker-run:
@@ -264,7 +264,7 @@ docker-run:
     set -euo pipefail
     echo "Running {{APP_NAME}} v{{VERSION}} in Docker..."
     just docker-build
-    docker run --rm -p 8080:8080 {{DOCKER_IMAGE}}:{{VERSION}}
+    docker run --env-file .env --rm -p 8080:8080 {{DOCKER_IMAGE}}:{{VERSION}}
 
 # Docker push recipe
 docker-push:

@@ -71,7 +71,10 @@ func main() {
 		log.Printf("Did not find any .env file using enviroment variables!")
 	}
 
+	gin.SetMode(gin.ReleaseMode)
+
 	if os.Getenv("DEBUG") == "true" {
+		gin.SetMode(gin.DebugMode)
 		opts.Level = slog.LevelDebug
 		opts.AddSource = true
 	}
@@ -80,15 +83,6 @@ func main() {
 	slog.SetDefault(logger)
 
 	ctx := context.Background()
-
-	if os.Getenv(DOCKER_ENV) == "true" {
-		slog.Info("Running in docker")
-	}
-
-	if os.Getenv(MODE_ENV) == "prod" {
-		gin.SetMode(gin.ReleaseMode)
-		slog.Info("Running in Release mode")
-	}
 
 	db, err := postgresql.DatabaseSetup(ctx, "migrations")
 	if err != nil {

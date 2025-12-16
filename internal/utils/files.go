@@ -14,7 +14,6 @@ import (
 const LogExtraInfo string = "extra-info"
 
 var (
-	DOCKER_ENV           = "DOCKER"
 	MODE_ENV             = "MODE"
 	MINT_PRIVATE_KEY_ENV = "MINT_PRIVATE_KEY"
 )
@@ -151,10 +150,6 @@ func GetLogsDirectory() (string, error) {
 		return "", fmt.Errorf("could not get config dir: %w", err)
 	}
 	var pathToProjectDir = dir + "/" + ConfigDirName
-
-	if os.Getenv(DOCKER_ENV) == "true" {
-		pathToProjectDir = "/var/log/nutmix"
-	}
 
 	return pathToProjectDir, nil
 }

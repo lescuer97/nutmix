@@ -20,7 +20,7 @@ services:
       - path: ".env"
         required: true
     environment:
-      DOCKER: "true"
+      MODE: "prod"
     build: ./
     ports:
       - 8080:8080

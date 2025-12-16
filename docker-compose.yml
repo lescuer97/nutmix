@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.0.0"
+    image: "traefik:v3.6.4"
     container_name: "traefik"
     restart: unless-stopped
     ports:
@@ -45,8 +45,6 @@ services:
     env_file:
       - path: ".env"
         required: true
-    environment:
-      DOCKER: "true"
     image: nutmixbtc/nutmix:latest
     restart: on-failure:10
     depends_on:
@@ -74,7 +72,7 @@ services:
       - "traefik.http.routers.mint-http.rule=Host(`${MINT_HOSTNAME}`)"
       - "traefik.http.routers.mint-http.middlewares=mint-https@docker"
     volumes:
-      - /var/log/nutmix:/var/log/nutmix
+      - /var/log/nutmix:/root/.config/nutmix
       - ${HOME}/.config/nutmix:/root/.config/nutmix
 
   # keycloak:
