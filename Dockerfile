@@ -22,6 +22,9 @@ COPY . .
 # Install all tools using just
 RUN just install-deps
 
+# install the web dependencies
+RUN just web-install
+
 # Generate protobuf code
 RUN just gen-proto
 
