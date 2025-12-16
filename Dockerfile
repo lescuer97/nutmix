@@ -1,8 +1,11 @@
 # Build stage
 FROM --platform=$BUILDPLATFORM golang:alpine3.22 AS builder
 
+ARG TARGETOS
+ARG TARGETARCH
+
 # Install build dependencies
-RUN apk add --no-cache protobuf curl unzip bash
+RUN apk add --no-cache protobuf curl unzip bash git
 
 # Install just
 RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
@@ -10,20 +13,27 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash 
 # Set up working directory
 WORKDIR /app
 
-# Copy justfile and go module files for install-deps
-COPY justfile go.mod go.sum ./
+# Set PATH early so bun and go tools are available after installation
+ENV PATH="${PATH}:/root/go/bin:/root/.bun/bin"
+
+# Copy all source files
+COPY . .
 
 # Install all tools using just
 RUN just install-deps
 
-ENV PATH="${PATH}:/root/go/bin:/root/.bun/bin"
+# Generate protobuf code
+RUN just gen-proto
 
-# Copy the rest of the source code
-COPY . .
+# Generate templ files
+RUN just gen-templ
 
-# Build using just
-RUN just web-install && \
-    just build
+# Build web assets
+RUN just web-build-prod
+
+# Build Go binary with correct target architecture
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" \
+    -trimpath -o build/nutmix cmd/nutmix/*.go
 
 # Runtime stage
 FROM alpine:3.22
@@ -34,10 +44,11 @@ RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /app/bin/app .
+COPY --from=builder /app/build/nutmix ./main
 
-# Expose the application port
+# # Copy web assets
+# COPY --from=builder /app/internal/routes/admin/static/dist ./internal/routes/admin/static/dist
+
 EXPOSE 8080
 
-# Run the application
-ENTRYPOINT ["./app"]
+CMD ["/app/main"]
