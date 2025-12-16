@@ -1,11 +1,14 @@
 package templates
 
 templ LayoutEmpty() {
-	@head()
-	<body class="app-layout">
-		<div hx-ext="remove-me" id="notifications"></div>
-		{ children... }
-	</body>
+	<!DOCTYPE html>
+	<html lang="en">
+		@head()
+		<body class="app-layout">
+			<div hx-ext="remove-me" id="notifications"></div>
+			{ children... }
+		</body>
+	</html>
 }
 
 templ LockedLockSvgIcon() {
