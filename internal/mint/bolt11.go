@@ -41,8 +41,10 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 	}
 
 	defer func() {
-		if err := mint.MintDB.Rollback(context.Background(), tx); err != nil {
-			slog.Warn("rollback error", slog.Any("error", err))
+		if err != nil {
+			if rollbackErr := mint.MintDB.Rollback(context.Background(), tx); rollbackErr != nil {
+				slog.Warn("rollback error", slog.Any("error", rollbackErr))
+			}
 		}
 	}()
 

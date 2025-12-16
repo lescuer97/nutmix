@@ -301,8 +301,10 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err := mint.MintDB.Rollback(ctx, preparationTx); err != nil {
-				slog.Warn("rollback error", slog.Any("error", err))
+			if err != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, preparationTx); rollbackErr != nil {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
 			}
 		}()
 
@@ -373,8 +375,10 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err := mint.MintDB.Rollback(ctx, afterSigningTx); err != nil {
-				slog.Warn("rollback error", slog.Any("error", err))
+			if err != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, afterSigningTx); rollbackErr != nil {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
 			}
 		}()
 

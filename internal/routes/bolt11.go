@@ -118,8 +118,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-				slog.Warn("rollback error", slog.Any("error", err))
+			if err != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
 			}
 		}()
 
@@ -150,8 +152,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-				slog.Warn("rollback error", slog.Any("error", err))
+			if err != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
 			}
 		}()
 
@@ -222,8 +226,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err := mint.MintDB.Rollback(ctx, preparationTx); err != nil {
-				slog.Warn("rollback error", slog.Any("error", err))
+			if err != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, preparationTx); rollbackErr != nil {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
 			}
 		}()
 
@@ -328,8 +334,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 				return
 			}
 			defer func() {
-				if err := mint.MintDB.Rollback(ctx, afterCheckTx); err != nil {
-					slog.Warn("rollback error", slog.Any("error", err))
+				if err != nil {
+					if rollbackErr := mint.MintDB.Rollback(ctx, afterCheckTx); rollbackErr != nil {
+						slog.Warn("rollback error", slog.Any("error", rollbackErr))
+					}
 				}
 			}()
 
@@ -368,8 +376,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err := mint.MintDB.Rollback(ctx, afterBlindSignTx); err != nil {
-				slog.Warn("rollback error", slog.Any("error", err))
+			if err != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, afterBlindSignTx); rollbackErr != nil {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
 			}
 		}()
 
@@ -541,8 +551,10 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-				slog.Warn("rollback error", slog.Any("error", err))
+			if err != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
 			}
 		}()
 

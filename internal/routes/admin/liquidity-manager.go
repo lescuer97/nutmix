@@ -198,14 +198,14 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", err))
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", err))
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			}
 		}()
@@ -299,14 +299,14 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", err))
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", err))
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			}
 		}()
@@ -365,14 +365,14 @@ func SwapStateCheck(mint *m.Mint) gin.HandlerFunc {
 		defer func() {
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", err))
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", err))
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			}
 		}()
@@ -421,14 +421,14 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 		defer func() {
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", err))
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", err))
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			}
 		}()

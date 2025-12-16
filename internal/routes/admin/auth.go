@@ -119,11 +119,15 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 		defer func() {
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				_ = mint.MintDB.Rollback(ctx, tx)
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				_ = mint.MintDB.Rollback(ctx, tx)
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+				}
 			} else {
 				err = mint.MintDB.Commit(context.Background(), tx)
 				if err != nil {

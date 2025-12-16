@@ -219,8 +219,10 @@ func (m *Mint) IsInternalTransaction(request string) (bool, error) {
 		return false, fmt.Errorf("m.MintDB.GetTx(context.Background()). %w", err)
 	}
 	defer func() {
-		if err := m.MintDB.Rollback(ctx, tx); err != nil {
-			slog.Warn("rollback error", slog.Any("error", err))
+		if err != nil {
+			if rollbackErr := m.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				slog.Warn("rollback error", slog.Any("error", rollbackErr))
+			}
 		}
 	}()
 
