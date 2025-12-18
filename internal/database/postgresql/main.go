@@ -224,14 +224,7 @@ func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintReques
 	err := tx.QueryRow(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote = $1 FOR UPDATE", id).
 		Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
 
-		// log.Println("err")
-
 	if err != nil {
-		// // Check specifically for no rows found
-		// if errors.Is(err, pgx.ErrNoRows) {
-		// 	return cashu.MintRequestDB{}, fmt.Errorf("could not find mint request: %s", id)
-		// }
-		// Handle other DB errors
 		return cashu.MintRequestDB{}, fmt.Errorf("database error: %w", err)
 	}
 
@@ -240,24 +233,18 @@ func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintReques
 }
 
 func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error) {
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE request = $1 FOR UPDATE", request)
-	if err != nil {
-		return cashu.MintRequestDB{}, fmt.Errorf("could not find mint request from invoice %w", err)
-	}
-	defer rows.Close()
+	var amount *uint64
 
 	var mintRequest cashu.MintRequestDB
-	for rows.Next() {
-		var amount *uint64
-		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
-		if err != nil {
-			return mintRequest, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
-		}
+	// Use QueryRow instead of Query
+	err := tx.QueryRow(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE request = $1 FOR UPDATE", request).
+		Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
 
-		mintRequest.Amount = amount
-
+	if err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("database error: %w", err)
 	}
 
+	mintRequest.Amount = amount
 	return mintRequest, nil
 }
 
