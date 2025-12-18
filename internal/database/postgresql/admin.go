@@ -66,24 +66,24 @@ func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBal
 
 	mintRows, err := results.Query()
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return mintMeltBalance, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return mintMeltBalance, nil
 		}
 		return mintMeltBalance, databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
 	mintRequest, err := pgx.CollectRows(mintRows, pgx.RowToStructByName[cashu.MintRequestDB])
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return mintMeltBalance, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return mintMeltBalance, nil
 		}
 		return mintMeltBalance, databaseError(fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MintRequestDB]): %w", err))
 	}
 
 	meltRows, err := results.Query()
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return mintMeltBalance, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return mintMeltBalance, nil
 		}
 		return mintMeltBalance, databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
@@ -91,8 +91,8 @@ func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBal
 	meltRequest, err := pgx.CollectRows(meltRows, pgx.RowToStructByName[cashu.MeltRequestDB])
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return mintMeltBalance, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return mintMeltBalance, nil
 		}
 		return mintMeltBalance, databaseError(fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MintRequestDB]): %w", err))
 	}
