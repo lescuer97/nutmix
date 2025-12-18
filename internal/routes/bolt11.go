@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"strings"
 	"time"
@@ -67,6 +68,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			slog.Uint64("amount", mintRequest.Amount),
 			slog.Any("backend", mint.LightningBackend.LightningType()))
 
+		log.Printf("\n MINT REQUEST: %+v", mintRequest)
 		unit, err := cashu.UnitFromString(mintRequest.Unit)
 
 		if err != nil {
@@ -168,6 +170,11 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		}
 
+		err = mint.MintDB.Commit(ctx, tx)
+		if err != nil {
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx stateChangeTX). %w", err))
+			return
+		}
 		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
 			c.JSON(200, quote)
 			return
@@ -184,15 +191,27 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			c.JSON(500, "Opps!, something went wrong")
 			return
 		}
+		stateChangeTX, err := mint.MintDB.GetTx(ctx)
+		if err != nil {
+			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			return
+		}
+		defer func() {
+			if err != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, stateChangeTX); rollbackErr != nil {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
+			}
+		}()
 
-		err = mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
+		err = mint.MintDB.ChangeMintRequestState(stateChangeTX, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
 		if err != nil {
 			slog.Error("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)", slog.Any("error", err))
 		}
 
-		err = mint.MintDB.Commit(ctx, tx)
+		err = mint.MintDB.Commit(ctx, stateChangeTX)
 		if err != nil {
-			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx stateChangeTX). %w", err))
 			return
 		}
 
@@ -264,6 +283,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			}
 		}
 
+		fmt.Printf("\n mintRequestDB: %+v\n ", mintRequestDB)
 		err = mint.VerifyUnitSupport(mintRequestDB.Unit)
 		if err != nil {
 			slog.Error("mint.VerifyUnitSupport(quote.Unit)", slog.Any("error", err))

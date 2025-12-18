@@ -278,7 +278,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	}
 	if errorResponse.Error != "Quote has already been issued" {
-		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+		t.Fatalf("Incorrect error string, got %s", errorResponse.Error)
 
 	}
 

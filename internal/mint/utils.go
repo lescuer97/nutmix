@@ -29,6 +29,7 @@ func (m *Mint) GetChangeOutput(messages []cashu.BlindedMessage, overPaidFees uin
 }
 
 func (m *Mint) VerifyUnitSupport(unitStr string) error {
+	fmt.Printf("\n unitString: %+v\n ", unitStr)
 	unit, err := cashu.UnitFromString(unitStr)
 	if err != nil {
 		return fmt.Errorf(" cashu.UnitFromString(unitStr). %w. %w", err, cashu.ErrUnitNotSupported)

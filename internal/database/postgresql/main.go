@@ -216,23 +216,26 @@ func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool,
 }
 
 func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintRequestDB, error) {
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote = $1 FOR UPDATE", id)
-	if err != nil {
-		return cashu.MintRequestDB{}, fmt.Errorf("Could not find hte mint error. %w", err)
-	}
-	defer rows.Close()
+
+	var amount *uint64
 
 	var mintRequest cashu.MintRequestDB
-	for rows.Next() {
-		var amount *uint64
-		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
-		if err != nil {
-			return mintRequest, databaseError(fmt.Errorf("rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, pubkeyBytes, &mintRequest.Description ): %w", err))
-		}
+	// Use QueryRow instead of Query
+	err := tx.QueryRow(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote = $1 FOR UPDATE", id).
+		Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
 
-		mintRequest.Amount = amount
+		// log.Println("err")
+
+	if err != nil {
+		// // Check specifically for no rows found
+		// if errors.Is(err, pgx.ErrNoRows) {
+		// 	return cashu.MintRequestDB{}, fmt.Errorf("could not find mint request: %s", id)
+		// }
+		// Handle other DB errors
+		return cashu.MintRequestDB{}, fmt.Errorf("database error: %w", err)
 	}
 
+	mintRequest.Amount = amount
 	return mintRequest, nil
 }
 

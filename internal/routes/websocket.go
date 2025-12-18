@@ -255,9 +255,13 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 		switch request.Params.Kind {
 		case cashu.Bolt11MintQuote:
 			quote, err := mint.MintDB.GetMintRequestById(tx, filter)
-
 			if err != nil {
 				return fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)
+			}
+
+			err = mint.MintDB.Commit(ctx, tx)
+			if err != nil {
+				return fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
 			}
 
 			decodedInvoice, err := zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork())
@@ -344,10 +348,6 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 					return fmt.Errorf("m.SendJson(conn, statusNotif). %w", err)
 				}
 			}
-		}
-		err = mint.MintDB.Commit(ctx, tx)
-		if err != nil {
-			return fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
 		}
 
 	}
