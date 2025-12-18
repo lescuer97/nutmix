@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -46,8 +47,8 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
             tos_url
          FROM config WHERE id = 1`)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return config, fmt.Errorf("no rows found: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return config, fmt.Errorf("could not find config in database: %w", err)
 		}
 
 		return config, fmt.Errorf("error checking for seeds: %w", err)

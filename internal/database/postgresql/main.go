@@ -78,7 +78,7 @@ func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 
 	rows, err := pql.pool.Query(context.Background(), `SELECT  created_at, active, version, unit, id,  "input_fee_ppk", final_expiry FROM seeds ORDER BY version DESC`)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return seeds, fmt.Errorf("no rows found: %w", err)
 		}
 
@@ -105,7 +105,7 @@ func (pql Postgresql) GetSeedsByUnit(tx pgx.Tx, unit cashu.Unit) ([]cashu.Seed, 
 	seeds, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed])
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return seeds, nil
 		}
 		return seeds, databaseError(fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Seed]): %w", err))
@@ -179,9 +179,6 @@ func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) err
 
 	rows, err := results.Query()
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return err
-		}
 		return databaseError(fmt.Errorf(" results.Query(): %w", err))
 	}
 	defer rows.Close()
@@ -219,68 +216,48 @@ func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool,
 }
 
 func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintRequestDB, error) {
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote = $1 FOR UPDATE", id)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return cashu.MintRequestDB{}, err
-		}
-	}
-	defer rows.Close()
+
+	var amount *uint64
 
 	var mintRequest cashu.MintRequestDB
-	for rows.Next() {
-		var amount *uint64
-		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
-		if err != nil {
-			return mintRequest, databaseError(fmt.Errorf("rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, pubkeyBytes, &mintRequest.Description ): %w", err))
-		}
+	// Use QueryRow instead of Query
+	err := tx.QueryRow(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote = $1 FOR UPDATE", id).
+		Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
 
-		mintRequest.Amount = amount
+	if err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("database error: %w", err)
 	}
 
+	mintRequest.Amount = amount
 	return mintRequest, nil
 }
 
 func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error) {
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE request = $1 FOR UPDATE", request)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return cashu.MintRequestDB{}, err
-		}
-	}
-	defer rows.Close()
+	var amount *uint64
 
 	var mintRequest cashu.MintRequestDB
-	for rows.Next() {
-		var amount *uint64
-		err := rows.Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
-		if err != nil {
-			return mintRequest, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
-		}
+	// Use QueryRow instead of Query
+	err := tx.QueryRow(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE request = $1 FOR UPDATE", request).
+		Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
 
-		mintRequest.Amount = amount
-
+	if err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("database error: %w", err)
 	}
 
+	mintRequest.Amount = amount
 	return mintRequest, nil
 }
 
 func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, error) {
 	rows, err := tx.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return cashu.MeltRequestDB{}, err
-		}
+		return cashu.MeltRequestDB{}, fmt.Errorf("could not find melt request from id %w", err)
 	}
 	defer rows.Close()
 
 	quote, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return cashu.MeltRequestDB{}, err
-		}
-
 		return quote, databaseError(fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MeltRequestDB]): %w", err))
 	}
 
@@ -291,19 +268,13 @@ func (pql Postgresql) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.Me
 
 	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE state = $1", state)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return []cashu.MeltRequestDB{}, err
-		}
+		return nil, fmt.Errorf("could not find melt requests from state %w", err)
 	}
 	defer rows.Close()
 
 	quote, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return []cashu.MeltRequestDB{}, err
-		}
-
 		return quote, databaseError(fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MeltRequestDB]): %w", err))
 	}
 
@@ -357,7 +328,7 @@ func (pql Postgresql) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu
 	rows, err := tx.Query(ctx, "SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE secret = ANY($1) FOR UPDATE NOWAIT", SecretList)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return proofList, nil
 		}
 		return proofList, databaseError(fmt.Errorf("query error: %w", err))
@@ -367,7 +338,7 @@ func (pql Postgresql) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu
 	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return proofList, nil
 		}
 		return proofList, databaseError(fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof]): %w", err))
@@ -399,22 +370,22 @@ func (pql Postgresql) SaveProof(tx pgx.Tx, proofs []cashu.Proof) error {
 
 func (pql Postgresql) GetProofsFromSecretCurve(tx pgx.Tx, Ys []cashu.WrappedPublicKey) (cashu.Proofs, error) {
 
-	var proofList cashu.Proofs
+	proofList := make(cashu.Proofs, 0)
 
 	rows, err := tx.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE y = ANY($1) FOR UPDATE NOWAIT`, Ys)
 
 	if err != nil {
-
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return proofList, nil
 		}
+		return proofList, databaseError(fmt.Errorf("query error could not get prrofs: %w", err))
 	}
 	defer rows.Close()
 
 	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return proofList, nil
 		}
 		return proofList, fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof]): %w", err)
@@ -431,19 +402,19 @@ func (pql Postgresql) GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs,
 
 	rows, err := tx.Query(context.Background(), `SELECT amount, id, secret, c, y, witness, seen_at, state, quote FROM proofs WHERE quote = $1 FOR UPDATE NOWAIT`, quote)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return proofList, nil
 		}
-		return proofList, fmt.Errorf("query error: %w", err)
+		return proofList, databaseError(fmt.Errorf("query error could not get prrofs: %w", err))
 	}
 	defer rows.Close()
 
 	proof, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof])
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return proofList, nil
 		}
-		return proofList, fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof]): %w", err)
+		return proofList, databaseError(fmt.Errorf("query error could not get prrofs: %w", err))
 	}
 
 	proofList = proof
@@ -466,10 +437,7 @@ func (pql Postgresql) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu
 
 	rows, err := results.Query()
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return err
-		}
-		return databaseError(fmt.Errorf(" results.Query(): %w", err))
+		return databaseError(fmt.Errorf(" could not set proofs state: %w", err))
 	}
 	defer rows.Close()
 
@@ -492,10 +460,7 @@ func (pql Postgresql) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
 
 	rows, err := results.Query()
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return err
-		}
-		return databaseError(fmt.Errorf(" results.Query(): %w", err))
+		return databaseError(fmt.Errorf(" could not delete proofs: %w", err))
 	}
 	defer rows.Close()
 
@@ -534,11 +499,11 @@ func privateKeysToDleq(s_key *string, e_key *string, sig *cashu.RecoverSigDB) er
 
 func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error) {
 
-	var signaturesList []cashu.RecoverSigDB
+	signaturesList := make([]cashu.RecoverSigDB, 0)
 
 	rows, err := tx.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return signaturesList, nil
 		}
 		return signaturesList, databaseError(fmt.Errorf("error checking for recovery_signature: %w", err))
@@ -599,7 +564,7 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSig
 }
 
 func (pql Postgresql) GetProofsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
-	var points []database.ProofTimeSeriesPoint
+	points := make([]database.ProofTimeSeriesPoint, 0)
 
 	bucketSeconds := int64(bucketMinutes * 60)
 
@@ -623,7 +588,7 @@ func (pql Postgresql) GetProofsTimeSeries(since int64, bucketMinutes int) ([]dat
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return points, nil
 		}
 		return points, databaseError(fmt.Errorf("GetProofsTimeSeries query error: %w", err))
@@ -667,7 +632,7 @@ func (pql Postgresql) GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return points, nil
 		}
 		return points, databaseError(fmt.Errorf("GetBlindSigsTimeSeries query error: %w", err))
@@ -701,7 +666,7 @@ func (pql Postgresql) GetProofsCountByKeyset(since time.Time) (map[string]databa
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return results, nil
 		}
 		return results, databaseError(fmt.Errorf("GetProofsCountByKeyset query error: %w", err))
@@ -735,7 +700,7 @@ func (pql Postgresql) GetBlindSigsCountByKeyset(since time.Time) (map[string]dat
 
 	rows, err := pql.pool.Query(context.Background(), query, args...)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return results, nil
 		}
 		return results, databaseError(fmt.Errorf("GetBlindSigsCountByKeyset query error: %w", err))

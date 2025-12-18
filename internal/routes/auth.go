@@ -81,8 +81,10 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err := mint.MintDB.Rollback(ctx, tx); err != nil {
-				slog.Warn("rollback error", slog.Any("error", err))
+			if err != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
 			}
 		}()
 

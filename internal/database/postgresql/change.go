@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -39,12 +40,12 @@ func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, q
 
 func (pql Postgresql) GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error) {
 
-	var meltChangeList []cashu.MeltChange
+	meltChangeList := make([]cashu.MeltChange, 0)
 
 	rows, err := tx.Query(context.Background(), `SELECT "B_", id, quote, created_at FROM melt_change_message WHERE quote = $1 FOR UPDATE NOWAIT`, quote)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return meltChangeList, nil
 		}
 	}
@@ -53,7 +54,7 @@ func (pql Postgresql) GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.Mel
 	meltChange, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MeltChange])
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return meltChangeList, nil
 		}
 		return meltChangeList, fmt.Errorf("pgx.CollectRows(rows, pgx.RowToStructByName[cashu.Proof]): %w", err)

@@ -4,11 +4,94 @@ on:
     branches: [master, signet, admin_dashboard]
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.4'
+          cache: true
+
+      - name: Go Toolchain info
+        run: |
+          go version
+
+      - name: Install Just
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: just install-deps
+
+      - name: Generate code (proto, templ)
+        run: |
+          just gen-proto
+          just gen-templ
+          just web-install
+
+      - name: Build
+        run: just build
+
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.4'
+          cache: true
+
+      - name: Go Toolchain info
+        run: |
+          go version
+
+      - name: Install Just
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: just install-deps
+
+      - name: Generate code (proto, templ)
+        run: |
+          just gen-proto
+          just gen-templ
+          just web-install
+
+      - name: Test build
+        run: just build
+
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        test-dir:
+          - api/cashu
+          - cmd/nutmix
+          - internal/mint
+          - internal/signer
+          - internal/database/postgresql
+          - internal/lightning
+          - internal/routes/admin
+          - internal/routes/middleware
+          - internal/utils
+          - pkg/crypto
+          - test/configTest
+          - test/setupTest
 
     steps:
       - uses: actions/checkout@v5
@@ -34,8 +117,12 @@ jobs:
       - name: Install dependencies
         run: just install-deps
 
-      - name: Build
-        run: just build
+      - name: Generate code (proto, templ)
+        run: |
+          just gen-proto
+          just gen-templ
+          just web-install
+          just web-build-prod
 
-      - name: Test
-        run: just test
+      - name: Test ${{ matrix.test-dir }}
+        run: go test -v ./${{ matrix.test-dir }}/...

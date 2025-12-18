@@ -57,15 +57,23 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	const postgresuser = "user"
 	ctx := context.Background()
 
-	postgresContainer, err := postgres.Run(ctx, "postgres:16.2",
+	postgresContainer, err := postgres.Run(t.Context(), "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
+				WithOccurrence(2).                   // Postgres prints this twice (init + start)
+				WithStartupTimeout(60*time.Second)), // FIX 2: Increase to 60s
 	)
+	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
+	if postgresContainer != nil {
+		t.Cleanup(func() {
+			if err := postgresContainer.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +278,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	}
 	if errorResponse.Error != "Quote has already been issued" {
-		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
+		t.Fatalf("Incorrect error string, got %s", errorResponse.Error)
 
 	}
 
@@ -677,16 +685,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	}
 
-	// MELTING TESTING ENDS
-
-	// Clean up the container
-	defer func() {
-		if err := postgresContainer.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container: %s", err)
-		}
-
-	}()
-
 }
 
 func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
@@ -825,16 +823,23 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 
 	const posgrespassword = "password"
 	const postgresuser = "user"
-	postgresContainer, err := postgres.Run(t.Context(),
-		"postgres:16.2",
+	postgresContainer, err := postgres.Run(t.Context(), "postgres:16.2",
 		postgres.WithDatabase("postgres"),
 		postgres.WithUsername(postgresuser),
 		postgres.WithPassword(posgrespassword),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
+				WithOccurrence(2).                   // Postgres prints this twice (init + start)
+				WithStartupTimeout(60*time.Second)), // FIX 2: Increase to 60s
 	)
+	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
+	if postgresContainer != nil {
+		t.Cleanup(func() {
+			if err := postgresContainer.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -856,6 +861,35 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	ctx = context.WithValue(ctx, ctxKeyNetwork, os.Getenv(mint.NETWORK_ENV))
 
 	aliceLnd, bobLnd, btcD, lnbitsAlice, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
+	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
+	if aliceLnd != nil {
+		t.Cleanup(func() {
+			if err := aliceLnd.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
+	if bobLnd != nil {
+		t.Cleanup(func() {
+			if err := bobLnd.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
+	if btcD != nil {
+		t.Cleanup(func() {
+			if err := btcD.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
+	if lnbitsAlice != nil {
+		t.Cleanup(func() {
+			if err := lnbitsAlice.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
 
 	ctx = context.WithValue(ctx, ctxKeyLndHost, os.Getenv(utils.LND_HOST))
 	ctx = context.WithValue(ctx, ctxKeyLndTLSCert, os.Getenv(utils.LND_TLS_CERT))
@@ -866,26 +900,6 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	}
 
 	LightningBolt11Test(t, ctx, bobLnd)
-
-	// Clean up the container
-	defer func() {
-		if err := aliceLnd.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container aliceContainer: %s", err)
-		}
-		if err := bobLnd.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container aliceContainer: %s", err)
-		}
-		if err := btcD.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container btcD: %s", err)
-		}
-		if err := lnbitsAlice.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container lnbits: %s", err)
-		}
-		if err := postgresContainer.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container: %s", err)
-		}
-
-	}()
 
 }
 func TestMintBolt11LNBITSLigthning(t *testing.T) {
@@ -923,32 +937,41 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	ctx = context.WithValue(ctx, ctxKeyMintLnbitsEndpoint, os.Getenv(utils.MINT_LNBITS_ENDPOINT))
 	ctx = context.WithValue(ctx, ctxKeyMintLnbitsKey, os.Getenv(utils.MINT_LNBITS_KEY))
 	aliceLnd, bobLnd, btcD, lnbitsAlice, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-bolt11-tests")
+	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
+	if aliceLnd != nil {
+		t.Cleanup(func() {
+			if err := aliceLnd.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
+	if bobLnd != nil {
+		t.Cleanup(func() {
+			if err := bobLnd.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
+	if btcD != nil {
+		t.Cleanup(func() {
+			if err := btcD.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
+	if lnbitsAlice != nil {
+		t.Cleanup(func() {
+			if err := lnbitsAlice.Terminate(context.Background()); err != nil {
+				t.Fatalf("failed to terminate container: %s", err)
+			}
+		})
+	}
 
 	if err != nil {
 		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
 	}
 
 	LightningBolt11Test(t, ctx, bobLnd)
-
-	// Clean up the container
-	defer func() {
-		if err := aliceLnd.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container aliceContainer: %s", err)
-		}
-		if err := bobLnd.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container aliceContainer: %s", err)
-		}
-		if err := btcD.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container btcD: %s", err)
-		}
-		if err := lnbitsAlice.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container lnbits: %s", err)
-		}
-		if err := postgresContainer.Terminate(ctx); err != nil {
-			log.Fatalf("failed to terminate container: %s", err)
-		}
-
-	}()
 
 }
 

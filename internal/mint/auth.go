@@ -23,8 +23,10 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 		return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if err := m.MintDB.Rollback(ctx, tx); err != nil {
-			slog.Warn("rollback error", slog.Any("error", err))
+		if err != nil {
+			if rollbackErr := m.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				slog.Warn("rollback error", slog.Any("error", rollbackErr))
+			}
 		}
 	}()
 
@@ -96,8 +98,10 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 		return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if err := m.MintDB.Rollback(ctx, tx); err != nil {
-			slog.Warn("rollback error", slog.Any("error", err))
+		if err != nil {
+			if rollbackErr := m.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				slog.Warn("rollback error", slog.Any("error", rollbackErr))
+			}
 		}
 	}()
 
