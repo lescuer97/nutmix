@@ -69,7 +69,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
 	if postgresContainer != nil {
 		t.Cleanup(func() {
-			if err := postgresContainer.Terminate(t.Context()); err != nil {
+			if err := postgresContainer.Terminate(context.Background()); err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
