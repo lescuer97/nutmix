@@ -864,28 +864,28 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
 	if aliceLnd != nil {
 		t.Cleanup(func() {
-			if err := aliceLnd.Terminate(t.Context()); err != nil {
+			if err := aliceLnd.Terminate(context.Background()); err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if bobLnd != nil {
 		t.Cleanup(func() {
-			if err := bobLnd.Terminate(t.Context()); err != nil {
+			if err := bobLnd.Terminate(context.Background()); err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if btcD != nil {
 		t.Cleanup(func() {
-			if err := btcD.Terminate(t.Context()); err != nil {
+			if err := btcD.Terminate(context.Background()); err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if lnbitsAlice != nil {
 		t.Cleanup(func() {
-			if err := lnbitsAlice.Terminate(t.Context()); err != nil {
+			if err := lnbitsAlice.Terminate(context.Background()); err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
@@ -940,28 +940,28 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
 	if aliceLnd != nil {
 		t.Cleanup(func() {
-			if err := aliceLnd.Terminate(t.Context()); err != nil {
+			if err := aliceLnd.Terminate(context.Background()); err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if bobLnd != nil {
 		t.Cleanup(func() {
-			if err := bobLnd.Terminate(t.Context()); err != nil {
+			if err := bobLnd.Terminate(context.Background()); err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if btcD != nil {
 		t.Cleanup(func() {
-			if err := btcD.Terminate(t.Context()); err != nil {
+			if err := btcD.Terminate(context.Background()); err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if lnbitsAlice != nil {
 		t.Cleanup(func() {
-			if err := lnbitsAlice.Terminate(t.Context()); err != nil {
+			if err := lnbitsAlice.Terminate(context.Background()); err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
