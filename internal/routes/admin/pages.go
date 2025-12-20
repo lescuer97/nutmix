@@ -116,11 +116,15 @@ func calculateChartSummary(data []database.ProofTimeSeriesPoint) templates.Chart
 			TotalCount: 0,
 		}
 	}
-	// Get the last (most recent) data point
-	latest := data[len(data)-1]
+	totalSats := uint64(0)
+	totalCount := uint64(0)
+	for _, point := range data {
+		totalSats += point.TotalAmount
+		totalCount += point.Count
+	}
 	return templates.ChartSummary{
-		TotalSats:  latest.TotalAmount,
-		TotalCount: latest.Count,
+		TotalSats:  totalSats,
+		TotalCount: totalCount,
 	}
 }
 
