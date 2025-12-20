@@ -11,20 +11,21 @@ type PostSwapRequest struct {
 }
 
 func (p *PostSwapRequest) ValidateSigflag() error {
-	sigFlagValidation, err := checkForSigAll(p.Inputs)
+	sigAllCheck, err := checkForSigAll(p.Inputs)
 	if err != nil {
 		return fmt.Errorf("checkForSigAll(p.Inputs). %w", err)
 	}
-	if sigFlagValidation.sigFlag == SigAll {
+	if sigAllCheck.sigFlag == SigAll {
+		firstProof := p.Inputs[0]
+		firstSpendCondition, err := firstProof.parseSpendCondition()
+		if err != nil {
+			return fmt.Errorf("p.Inputs[0].parseSpendCondition(). %w", err)
+		}
+		firstWitness, err := firstProof.parseWitness()
+		if err != nil {
+			return fmt.Errorf("p.Inputs[0].parseWitness(). %w", err)
+		}
 
-		firstSpendCondition, err := p.Inputs[0].parseSpendCondition()
-		if err != nil {
-			return fmt.Errorf("p.Inputs[0].parseWitnessAndSecret(). %w", err)
-		}
-		firstWitness, err := p.Inputs[0].parseWitness()
-		if err != nil {
-			return fmt.Errorf("p.Inputs[0].parseWitnessAndSecret(). %w", err)
-		}
 		if firstSpendCondition == nil || firstWitness == nil {
 			return ErrInvalidSpendCondition
 		}
@@ -33,7 +34,7 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 			return ErrNoValidSignatures
 		}
 
-		// check tha conditions are met
+		// check the conditions are met
 		err = p.verifyConditions()
 		if err != nil {
 			return fmt.Errorf("p.verifyConditions(). %w", err)
@@ -42,18 +43,22 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 		// makes message
 		msg := p.makeSigAllMsg()
 
-		pubkeys, err := p.Inputs[0].PubkeysForVerification()
+		signatures, err := checkValidSignature(msg, sigAllCheck.pubkeys, firstWitness.Signatures)
 		if err != nil {
-			return fmt.Errorf("p.Inputs[0].Pubkeys(). %w", err)
+			return fmt.Errorf("checkValidSignature(msg, pubkeys, firstWitness.Signatures). %w", err)
 		}
-
-		amountOfSigs, err := checkValidSignature(msg, pubkeys, firstWitness.Signatures)
-		if err != nil {
-			return err
-		}
-
-		if amountOfSigs >= sigFlagValidation.signaturesRequired {
+		if signatures >= sigAllCheck.signaturesRequired {
 			return nil
+		}
+
+		if firstProof.timelockPassed(firstSpendCondition) {
+			signatures, err := checkValidSignature(msg, sigAllCheck.refundPubkeys, firstWitness.Signatures)
+			if err != nil {
+				return fmt.Errorf("checkValidSignature(msg, refundPubkeys, firstWitness.Signatures). %w", err)
+			}
+			if signatures >= sigAllCheck.signaturesRequiredRefund {
+				return nil
+			}
 		}
 
 		return ErrNotEnoughSignatures

@@ -304,7 +304,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 		}
 	} else {
 		// Individual verification path: verify each proof's P2PK/HTLC spend conditions
-		err = m.VerifyProofsSpendConditions(meltRequest.Inputs)
+		err = cashu.VerifyProofsSpendConditions(meltRequest.Inputs)
 		if err != nil {
 			slog.Debug("m.VerifyProofsSpendConditions(meltRequest.Inputs)", slog.String(utils.LogExtraInfo, err.Error()))
 			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.VerifyProofsSpendConditions(meltRequest.Inputs) %w", err)
