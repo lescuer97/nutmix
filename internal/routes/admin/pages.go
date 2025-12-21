@@ -460,8 +460,6 @@ func LnChartCard(mint *mint.Mint) gin.HandlerFunc {
 			mintMeltBalance = database.MintMeltBalance{}
 		}
 
-		fmt.Printf("\n mintMeltBalance: %+v\n", mintMeltBalance)
-
 		// Process and aggregate into time series using zpay32 for invoice decoding
 		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime, bucketMinutes)
 

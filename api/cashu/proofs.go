@@ -142,7 +142,6 @@ func (p Proof) verifyHtlcSpendCondition(spendCondition *SpendCondition, witness 
 		nsigToCheck = spendCondition.Data.Tags.NSigs
 	}
 
-	fmt.Printf("nsig to check: %d\n", nsigToCheck)
 	hashMessage := sha256.Sum256([]byte(p.Secret))
 	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
@@ -153,14 +152,11 @@ func (p Proof) verifyHtlcSpendCondition(spendCondition *SpendCondition, witness 
 			}
 			if sig.Verify(hashMessage[:], parsedPubkey) {
 				amountValidSigs += 1
-				fmt.Printf("pubkeys: %+v\n", pubkeys)
 				delete(pubkeys, pubkey)
-				fmt.Printf("pubkeys after delete: %+v\n", pubkeys)
 				continue
 			}
 		}
 	}
-	fmt.Printf("amount valid sigs: %d\n", amountValidSigs)
 
 	switch {
 	case amountValidSigs == 0:
@@ -184,7 +180,6 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 
 	valid, err := p.verifyHtlcSpendCondition(spendCondition, witness)
 	if err != nil {
-		fmt.Printf("\n err htlc: %+v\n", err)
 		if errors.Is(err, ErrNoValidSignatures) || errors.Is(err, ErrNotEnoughSignatures) {
 		} else {
 			return false, fmt.Errorf("p.verifyP2PKSpendCondition(spendCondition, witness). %w", err)
@@ -442,7 +437,6 @@ func (p *Proof) UnmarshalJSON(data []byte) error {
 // VerifyProofsSpendConditions verifies P2PK and HTLC conditions for each proof individually.
 func VerifyProofsSpendConditions(proofs Proofs) error {
 	for _, proof := range proofs {
-		fmt.Printf("\n proof: %+v\n", proof)
 		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
 		if err != nil {
 			return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)

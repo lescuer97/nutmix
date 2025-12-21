@@ -5,7 +5,6 @@ import (
 	"embed"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -145,7 +144,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 	// This is /admin pages
 	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
 
-	fmt.Println("can use liquidity manager", utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND))
+	newLiquidity := make(chan string)
 	if nostrPubkey != nil {
 		adminRoute.GET("/summary", SummaryComponent(mint, &adminHandler))
 		adminRoute.GET("/proofs-chart", ProofsChartCard(mint))
@@ -173,25 +172,32 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(&adminHandler))
 		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
 
-		// only have swap routes if liquidity manager is possible
-		if utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
-			newLiquidity := make(chan string)
-
-			adminRoute.GET("/liquidity", LigthningLiquidityPage(mint))
-			adminRoute.GET("/liquidity-button", LiquidityButton(mint))
-			adminRoute.GET("/liquidity/:swapId", SwapStatusPage(mint))
-			adminRoute.GET("/swaps-list", SwapsList(mint))
-			adminRoute.GET("/ln-send", LnSendPage(mint))
-			adminRoute.GET("/ln-receive", LnReceivePage(mint))
-			adminRoute.GET("/liquid-swap-form", SwapOutForm(mint))
-			adminRoute.GET("/lightning-swap-form", LightningSwapForm())
-			adminRoute.POST("/out-swap-req", SwapOutRequest(mint))
-			adminRoute.POST("/in-swap-req", SwapInRequest(mint, newLiquidity))
-			adminRoute.GET("/liquidity-summary", LiquiditySummaryComponent(&adminHandler))
-			adminRoute.GET("/swap/:swapId", SwapStateCheck(mint))
-			adminRoute.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(mint, newLiquidity))
-			go CheckStatusOfLiquiditySwaps(mint, newLiquidity)
-		}
+		liquidityMangerRouter := adminRoute.Group("")
+		liquidityMangerRouter.Use(liquidityManagerMiddleware(mint))
+		liquidityMangerRouter.GET("/liquidity", LigthningLiquidityPage(mint))
+		liquidityMangerRouter.GET("/liquidity-button", LiquidityButton(mint))
+		liquidityMangerRouter.GET("/liquidity/:swapId", SwapStatusPage(mint))
+		liquidityMangerRouter.GET("/swaps-list", SwapsList(mint))
+		liquidityMangerRouter.GET("/ln-send", LnSendPage(mint))
+		liquidityMangerRouter.GET("/ln-receive", LnReceivePage(mint))
+		liquidityMangerRouter.GET("/liquid-swap-form", SwapOutForm(mint))
+		liquidityMangerRouter.GET("/lightning-swap-form", LightningSwapForm())
+		liquidityMangerRouter.POST("/out-swap-req", SwapOutRequest(mint))
+		liquidityMangerRouter.POST("/in-swap-req", SwapInRequest(mint, newLiquidity))
+		liquidityMangerRouter.GET("/liquidity-summary", LiquiditySummaryComponent(&adminHandler))
+		liquidityMangerRouter.GET("/swap/:swapId", SwapStateCheck(mint))
+		liquidityMangerRouter.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(mint, newLiquidity))
+		go CheckStatusOfLiquiditySwaps(mint, newLiquidity)
 	}
 
+}
+func liquidityManagerMiddleware(mint *m.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
+			slog.Debug("Liquidity manager is not available", slog.String("backend", string(mint.Config.MINT_LIGHTNING_BACKEND)))
+			c.Status(404)
+			return
+		}
+		c.Next()
+	}
 }

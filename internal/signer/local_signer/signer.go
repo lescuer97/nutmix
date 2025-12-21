@@ -321,7 +321,6 @@ func (l *LocalSigner) validateProof(proof cashu.Proof) error {
 	}
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, proof.C.PublicKey)
 	if !verified {
-		fmt.Printf("Proof verification failed for proof with Id: %s, Amount: %d, C: %s\n", proof.Id, proof.Amount, proof.C.String())
 		return cashu.ErrInvalidProof
 	}
 
