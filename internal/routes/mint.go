@@ -277,7 +277,6 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 		} else {
 			// Individual verification path: verify each proof's P2PK/HTLC spend conditions
 			err = cashu.VerifyProofsSpendConditions(swapRequest.Inputs)
-			fmt.Println("err: ", err)
 			if err != nil {
 				slog.Error(fmt.Errorf("mint.VerifyProofsSpendConditions(swapRequest.Inputs). %w", err).Error())
 				errorCode, details := utils.ParseErrorToCashuErrorCode(err)

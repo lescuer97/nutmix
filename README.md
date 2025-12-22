@@ -67,13 +67,10 @@ SIGNER_CA_CERT=<route to file>
 
 ## Video Walkthrough
 #### Video on .env setup
-[![Video on .env setup](https://cdn.hzrd149.com/0930b6e46cfe03a70345930d55b2eff51b0eb39d6e6eb4305b42b7736398f49c.png)](https://cdn.hzrd149.com/0ef3cb33401dbdd002039d01c0f749491c26720a80b23b885ae0f569ebd9f7b3.mp4)
-
-#### Setup Lightning node
-[![Setup Lightning node](https://cdn.hzrd149.com/c2175c7a310026f0450f98146f9dd180979909aaa464aa4376a75eb25b013b10.png)](https://cdn.hzrd149.com/905025ea49d48e36890f87ab05a7be75b141331e25ec8a326a29adfc9cb4cd0a.mp4)
+https://github.com/user-attachments/assets/4b626a1f-4107-4ba0-be87-634424e0b565
 
 #### Walkthrough of dashboard
-[![Walkthrough of dashboard](https://cdn.hzrd149.com/9f967999398e74ffb5ae079bb7e06b58ef8470204b05a21647c5b4e18c71c8d9.png)](https://cdn.hzrd149.com/72a5a65e027370084d45586084098f97ae3631f86bad932656b5c9532be7ba93.mp4)
+https://github.com/user-attachments/assets/29943daa-9429-40c0-8df5-97ca3b044a77
 
 
 ## Supported NUTs
@@ -110,19 +107,22 @@ If you want to develop for the project I personally run a hybrid setup. I run th
 
 I have a special development docker compose called: `docker-compose-dev.yml`. This is for simpler development without having traefik in the middle.
 
-1. run the database in docker. Please check you have the necessary info in the `.env` file. 
+The project uses just for building the project and development.
 
-``` docker compose -f docker-compose-dev.yml up db ```
+0. Install the dependencies needed to build the node packages and server.
+
+` just install-deps `
+
+1. run the database in docker. 
+
+` docker compose up db -d `
 
 2. Run the mint locally. 
+    - You have to write the necessary info into enviroment variables. use the env.example
+   file for ideas.
 
-``` # build the project go run cmd/nutmix/*.go ```
+` just run-dev `
 
-#### Generate remote-signer proto code
-
-```
-protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
-```
 ### Support 
 
 Pull requests and suggestions are always welcomed. The more people have eyes on this the better.

@@ -101,7 +101,7 @@ func (a *adminHandler) lnSatsBalance() (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("a.mint.LightningBackend.WalletBalance(). %w", err)
 	}
-	return milillisatBalance, nil
+	return milillisatBalance / 1000, nil
 }
 
 func (a *adminHandler) EcashBalance(since time.Time) (templates.Balance, error) {

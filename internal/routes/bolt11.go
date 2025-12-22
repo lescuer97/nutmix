@@ -283,7 +283,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			}
 		}
 
-		fmt.Printf("\n mintRequestDB: %+v\n ", mintRequestDB)
 		err = mint.VerifyUnitSupport(mintRequestDB.Unit)
 		if err != nil {
 			slog.Error("mint.VerifyUnitSupport(quote.Unit)", slog.Any("error", err))

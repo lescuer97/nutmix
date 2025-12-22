@@ -116,7 +116,6 @@ func (p *PostMeltBolt11Request) ValidateSigflag() error {
 
 		// makes message
 		msg := p.makeSigAllMsg()
-		fmt.Println("melt message: ", msg)
 
 		signatures, err := checkValidSignature(msg, sigAllCheck.pubkeys, firstWitness.Signatures)
 		if err != nil {
