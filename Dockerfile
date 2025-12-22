@@ -34,9 +34,9 @@ RUN just gen-templ
 # Build web assets
 RUN just web-build-prod
 
-# Build Go binary with correct target architecture
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" \
-    -trimpath -o build/nutmix cmd/nutmix/*.go
+
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} just build
+
 
 # Runtime stage
 FROM alpine:3.22
