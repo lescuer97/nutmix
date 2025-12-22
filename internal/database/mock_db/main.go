@@ -294,12 +294,12 @@ func (m *MockDB) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.Proo
 	return nil
 }
 
-func (m *MockDB) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []string) ([]cashu.RecoverSigDB, error) {
+func (m *MockDB) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error) {
 	var restore []cashu.RecoverSigDB
 	for _, blindMessage := range B_ {
 		for _, record := range m.RecoverSigDB {
 			B_Hex := hex.EncodeToString(record.B_.SerializeCompressed())
-			if blindMessage == B_Hex {
+			if blindMessage.ToHex() == B_Hex {
 				restore = append(restore, record)
 			}
 		}

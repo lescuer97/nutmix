@@ -443,10 +443,10 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		blindingFactors := []string{}
+		blindingFactors := []cashu.WrappedPublicKey{}
 
 		for _, output := range restoreRequest.Outputs {
-			blindingFactors = append(blindingFactors, output.B_.String())
+			blindingFactors = append(blindingFactors, output.B_)
 		}
 
 		ctx := context.Background()
