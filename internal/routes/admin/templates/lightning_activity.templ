@@ -1,8 +1,45 @@
 package templates
 
 import "github.com/lescuer97/nutmix/internal/utils"
+import "time"
+import "strings"
 
-templ LightningActivityLayout(config utils.Config, selectedRange string) {
+type LightningInvoiceVisual struct {
+	Id      string
+	Type    string
+	Invoice string
+	Status  string
+	Unit    string
+	Time    int64
+}
+
+templ LightningActivityTable(invoices []LightningInvoiceVisual) {
+	<div class="table">
+		<div class="table-header">
+			<div class="cell cell-id" style="width: 25%;"><span class="cell-text">ID</span></div>
+			<div class="cell" style="width: 5%;"><span class="cell-text">Type</span></div>
+			<div class="cell" style="width: 35%;"><span class="cell-text">Invoice</span></div>
+			<div class="cell" style="width: 10%;"><span class="cell-text">Status</span></div>
+			<div class="cell" style="width: 10%;"><span class="cell-text">Unit</span></div>
+			<div class="cell" style="width: 15%;"><span class="cell-text">Time</span></div>
+		</div>
+		<div class="rows">
+			for _, invoice := range invoices {
+				{{ formattedTime := time.Unix(invoice.Time, 0).Format(time.UnixDate) }}
+				<div class={ "row-item", invoice.Type }>
+					<div class="cell cell-id" style="width: 25%;" title={ invoice.Id }><span class="cell-text">{ invoice.Id }</span></div>
+					<div class="cell" style="width: 5%;" title={ invoice.Type }><span class={ "pill", "pill-" + invoice.Type }>{ invoice.Type }</span></div>
+					<div class="cell" style="width: 35%;" title={ invoice.Invoice }><span class="cell-text">{ invoice.Invoice }</span></div>
+					<div class="cell" style="width: 10%;" title={ invoice.Status }><span class={ "cell-text", "status-" + strings.ToLower(invoice.Status) }>{ invoice.Status }</span></div>
+					<div class="cell" style="width: 10%; text-transform: uppercase;" title={ invoice.Unit }><span class="cell-text">{ invoice.Unit }</span></div>
+					<div class="cell" style="width: 15%;" title={ formattedTime }><span class="cell-text">{ formattedTime }</span></div>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ LightningActivityLayout(config utils.Config, selectedRange string, searchQuery string) {
 	@Layout("lightning") {
 		<main class="main-content">
 			@TimeRangeSelector(selectedRange)
@@ -22,6 +59,31 @@ templ LightningActivityLayout(config utils.Config, selectedRange string) {
 					</div>
 				</div>
 			</div>
+			<div class="search-container mb-4 flex justify-end">
+				<input
+					type="text"
+					id="ln-search-input"
+					name="search"
+					placeholder="Search by ID..."
+					class="input search-input"
+					value={ searchQuery }
+				/>
+			</div>
+			<div
+				id="ln-table-container"
+				class="mt-6 mb-6"
+				hx-get="/admin/ln-table"
+				hx-trigger="load, change from:#timeRangeSelect, input from:#ln-search-input delay:500ms"
+				hx-include="#timeRangeSelect, #ln-search-input"
+				hx-swap="innerHTML"
+			>
+				<div class="card card-md">
+					<div class="chart-loading-placeholder">
+						<span class="loading-spinner"></span>
+						<span>Loading activity...</span>
+					</div>
+				</div>
+			</div>
 			<div class="mt-6">
 				@ExpansionPanel("Connection Settings", "Configure Lightning node connection", nil) {
 					@LightningConnectionSettings(config)
@@ -29,5 +91,42 @@ templ LightningActivityLayout(config utils.Config, selectedRange string) {
 			</div>
 		</main>
 		<script src="/js/modules/chart.js"></script>
+		<script>
+			// Update URL when search or time range changes
+			(function() {
+				const updateUrl = () => {
+					const searchInput = document.getElementById('ln-search-input');
+					const rangeSelect = document.getElementById('timeRangeSelect');
+					
+					if (!searchInput || !rangeSelect) return;
+
+					const search = searchInput.value;
+					const range = rangeSelect.value;
+					const url = new URL(window.location);
+					
+					if (search) {
+						url.searchParams.set('search', search);
+					} else {
+						url.searchParams.delete('search');
+					}
+					
+					if (range) {
+						url.searchParams.set('since', range);
+					}
+					
+					window.history.replaceState({}, '', url);
+				};
+
+				const searchInput = document.getElementById('ln-search-input');
+				const rangeSelect = document.getElementById('timeRangeSelect');
+
+				if (searchInput) {
+					searchInput.addEventListener('input', updateUrl);
+				}
+				if (rangeSelect) {
+					rangeSelect.addEventListener('change', updateUrl);
+				}
+			})();
+		</script>
 	}
 }

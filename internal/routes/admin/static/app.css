@@ -121,16 +121,18 @@
 
 /*  make reactive scrollable div with max height of the size of the screen remaining */
 .table .rows {
-  max-height: calc(100vh - 200px);
+  max-height: 600px;
   min-height: 100px;
-  overflow-y: auto; 
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 @media (max-height: 768px) {
   .table .rows {
-    max-height: calc(100vh - 200px);
+    max-height: 400px;
     min-height: 100px;
-    overflow-y: auto; 
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 }
 
@@ -154,14 +156,30 @@
 
 .cell {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   padding-right: var(--space-4);
   font-size: var(--text-sm);
   color: var(--text-primary);
   display: flex;
   align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.cell-id {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: fit-content;
+}
+
+.cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.cell-id .cell-text {
+  max-width: none;
 }
 
 .cell:last-child {
@@ -216,4 +234,43 @@
   border-radius: var(--radius-md);
   border: 1px solid var(--border-primary);
   padding: var(--space-2);
+}
+.search-input {
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+
+}
+
+/* Status Colors */
+.status-unpaid { color: var(--text-secondary); }
+.status-paid { color: var(--accent-green); }
+.status-pending { color: var(--accent-blue); }
+.status-issued { color: var(--accent-green); }
+
+/* Pill Styles */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.pill-mint {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pill-melt {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--accent-red);
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }

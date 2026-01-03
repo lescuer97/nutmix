@@ -164,12 +164,12 @@ func (a *adminHandler) getTotalBalanceBlindSignaturesByTime(until time.Time) (ui
 }
 
 //nolint:unused // Placeholder for future implementation
-func (a *adminHandler) getMintRequestByTime(since time.Time) (uint64, error) {
+func (a *adminHandler) getMintRequestsByTimeAndId(since time.Time, id *string) (uint64, error) {
 	panic("still not implemented")
 }
 
 //nolint:unused // Placeholder for future implementation
-func (a *adminHandler) getMeltRequestByTime(since time.Time) (uint64, error) {
+func (a *adminHandler) getMeltRequestsByTimeAndId(since time.Time, id *string) (uint64, error) {
 	panic("still not implemented")
 }
 

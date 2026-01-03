@@ -18,6 +18,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
+	"golang.org/x/sync/errgroup"
 )
 
 func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
@@ -324,10 +325,86 @@ func LnPage(mint *mint.Mint) gin.HandlerFunc {
 		ctx := context.Background()
 
 		// Default time range is 1 week
-		selectedRange := "1w"
+		selectedRange := c.DefaultQuery("since", "1w")
+		searchQuery := c.Query("search")
 
-		err := templates.LightningActivityLayout(mint.Config, selectedRange).Render(ctx, c.Writer)
+		err := templates.LightningActivityLayout(mint.Config, selectedRange, searchQuery).Render(ctx, c.Writer)
 
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+	}
+}
+
+func LightningTable(adminHandler *adminHandler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := context.Background()
+
+		searchQuery := c.Query("search")
+		timeRange := c.Query("since")
+		startTime, _ := parseTimeRange(timeRange)
+
+		fmt.Printf("startTime: %s\n", startTime)
+
+		mintRequests := make([]cashu.MintRequestDB, 0)
+		meltRequests := make([]cashu.MeltRequestDB, 0)
+
+		var searchQueryPtr *string
+		if searchQuery != "" {
+			searchQueryPtr = &searchQuery
+		}
+
+		errgroup := errgroup.Group{}
+		errgroup.Go(func() error {
+			mintRequestsDb, err := adminHandler.mint.MintDB.GetMintRequestsByTimeAndId(c.Request.Context(), startTime, searchQueryPtr)
+			if err != nil {
+				return err
+			}
+			mintRequests = mintRequestsDb
+			return nil
+		})
+		errgroup.Go(func() error {
+			meltRequestsDb, err := adminHandler.mint.MintDB.GetMeltRequestsByTimeAndId(c.Request.Context(), startTime, searchQueryPtr)
+			if err != nil {
+				return err
+			}
+			meltRequests = meltRequestsDb
+			return nil
+		})
+		err := errgroup.Wait()
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		filtered := make([]templates.LightningInvoiceVisual, len(mintRequests)+len(meltRequests))
+		for i, mintRequest := range mintRequests {
+			filtered[i] = templates.LightningInvoiceVisual{
+				Id:      mintRequest.Quote,
+				Type:    "mint",
+				Invoice: mintRequest.Request,
+				Status:  string(mintRequest.State),
+				Unit:    mintRequest.Unit,
+				Time:    mintRequest.SeenAt,
+			}
+		}
+		for i, meltRequest := range meltRequests {
+			filtered[i+len(mintRequests)] = templates.LightningInvoiceVisual{
+				Id:      meltRequest.Quote,
+				Type:    "melt",
+				Invoice: meltRequest.Request,
+				Status:  string(meltRequest.State),
+				Unit:    meltRequest.Unit,
+				Time:    meltRequest.SeenAt,
+			}
+		}
+
+		sort.Slice(filtered, func(i, j int) bool {
+			return filtered[i].Time > filtered[j].Time
+		})
+
+		err = templates.LightningActivityTable(filtered).Render(ctx, c.Writer)
 		if err != nil {
 			_ = c.Error(err)
 			return
