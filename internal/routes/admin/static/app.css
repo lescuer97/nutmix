@@ -211,3 +211,9 @@
     transform: translateY(0);
   }
 }
+
+.icon-preview {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  padding: var(--space-2);
+}

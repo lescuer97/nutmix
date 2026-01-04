@@ -24,6 +24,7 @@ templ MintSettings(config utils.Config) {
 	}
 }
 
+
 templ General(config utils.Config) {
 	<form
 		class="form-group"
@@ -64,10 +65,15 @@ templ General(config utils.Config) {
 			</label>
 		</div>
 		<div class="form-section">
-			<label for="ICON_URL" class="settings-input">
+			<div class="flex flex-row gap-2 w-full justify-between align-items-center">
+			<label for="ICON_URL" class="settings-input w-full">
 				Icon URL
 				<input name="ICON_URL" value={ stringOrEmpty(config.IconUrl) } type="text"/>
 			</label>
+			if config.IconUrl != nil && *config.IconUrl != "" {
+				<img src={ templ.URL( *config.IconUrl) } alt="Icon" class="icon-preview" style="width: 100px; height: 100px;"/>
+			}
+         </div>
 			<label for="TOS_URL" class="settings-input">
 				Terms of Service URL
 				<input name="TOS_URL" value={ stringOrEmpty(config.TosUrl) } type="text"/>
