@@ -228,11 +228,22 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 			slog.Error(
 				"mint.MintDB.UpdateConfig(mint.Config) - Mocking success despite error",
 				slog.String(utils.LogExtraInfo, err.Error()))
+			return
 		}
 
-		if err := RenderSuccess(c, "General settings successfully set"); err != nil {
-			slog.Error("failed to render success", slog.Any("error", err))
+		// render the settings page
+		if err := templates.General(mint.Config).Render(c.Request.Context(), c.Writer); err != nil {
+			slog.Error("failed to render settings", slog.Any("error", err))
+			return
 		}
+
+		// obb success and render the settings page
+		err = templates.ObbNotification(templates.SuccessNotif("General settings successfully set")).Render(c.Request.Context(), c.Writer)
+		if err != nil {
+			slog.Error("failed to render success", slog.Any("error", err))
+			return
+		}
+		return
 	}
 }
 
@@ -279,8 +290,17 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 		}
 
-		if err := RenderSuccess(c, "Lightning settings successfully set"); err != nil {
+		// render the settings page
+		if err := templates.Lightning(mint.Config).Render(c.Request.Context(), c.Writer); err != nil {
+			slog.Error("failed to render settings", slog.Any("error", err))
+			return
+		}
+
+		// obb success and render the settings page
+		err = templates.ObbNotification(templates.SuccessNotif("General settings successfully set")).Render(c.Request.Context(), c.Writer)
+		if err != nil {
 			slog.Error("failed to render success", slog.Any("error", err))
+			return
 		}
 	}
 }
@@ -306,9 +326,19 @@ func MintSettingsAuth(mint *m.Mint) gin.HandlerFunc {
 			// return // Mocking success
 		}
 
-		if err := RenderSuccess(c, "Auth settings successfully set"); err != nil {
-			slog.Error("failed to render success", slog.Any("error", err))
+		// render the settings page
+		if err := templates.Auth(mint.Config).Render(c.Request.Context(), c.Writer); err != nil {
+			slog.Error("failed to render settings", slog.Any("error", err))
+			return
 		}
+
+		// obb success and render the settings page
+		err = templates.ObbNotification(templates.SuccessNotif("Auth settings successfully set")).Render(c.Request.Context(), c.Writer)
+		if err != nil {
+			slog.Error("failed to render success", slog.Any("error", err))
+			return
+		}
+		return
 	}
 }
 
