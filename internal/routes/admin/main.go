@@ -154,6 +154,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.GET("", InitPage(mint))
 		adminRoute.GET("/ln", LnPage(mint))
 		adminRoute.GET("/ln-chart", LnChartCard(mint))
+		adminRoute.GET("/ln-table", LightningTable(&adminHandler))
 		adminRoute.GET("/api/ln-chart-data", LnChartDataAPI(mint))
 		adminRoute.GET("/keysets", KeysetsPage(mint))
 		adminRoute.GET("/settings", MintSettingsPage(mint))

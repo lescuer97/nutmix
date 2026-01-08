@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -201,4 +202,43 @@ func (pql Postgresql) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapSt
 	}
 
 	return swapIds, nil
+}
+
+func (pql Postgresql) GetMintRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MintRequestDB, error) {
+	if id != nil {
+		searchQuery := "%" + *id + "%"
+		rows, err := pql.pool.Query(ctx, "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote LIKE $1", searchQuery)
+		if err != nil {
+			return nil, fmt.Errorf("error checking for mint request by id: %w", err)
+		}
+		defer rows.Close()
+		return pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MintRequestDB])
+	}
+
+	sinceUnix := since.Unix()
+	rows, err := pql.pool.Query(ctx, "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE seen_at >= $1", sinceUnix)
+	if err != nil {
+		return nil, fmt.Errorf("error checking for mint requests: %w", err)
+	}
+	defer rows.Close()
+	return pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MintRequestDB])
+}
+
+func (pql Postgresql) GetMeltRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MeltRequestDB, error) {
+	if id != nil {
+		searchQuery := "%" + *id + "%"
+		rows, err := pql.pool.Query(ctx, "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE quote LIKE $1", searchQuery)
+		if err != nil {
+			return nil, fmt.Errorf("error checking for melt request by id: %w", err)
+		}
+		defer rows.Close()
+		return pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
+	}
+	sinceUnix := since.Unix()
+	rows, err := pql.pool.Query(ctx, "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE seen_at >= $1", sinceUnix)
+	if err != nil {
+		return nil, fmt.Errorf("error checking for melt requests: %w", err)
+	}
+	defer rows.Close()
+	return pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
 }

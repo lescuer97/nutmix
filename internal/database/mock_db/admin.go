@@ -1,7 +1,9 @@
 package mockdb
 
 import (
+	"context"
 	"slices"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -98,4 +100,43 @@ func (m *MockDB) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapState) 
 
 	return liquiditySwaps, nil
 
+}
+
+func (m *MockDB) GetMintRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MintRequestDB, error) {
+
+	if id != nil {
+		for i := 0; i < len(m.MintRequest); i++ {
+			if m.MintRequest[i].Quote == *id {
+				return []cashu.MintRequestDB{m.MintRequest[i]}, nil
+			}
+			return []cashu.MintRequestDB{}, nil
+		}
+	}
+	mintRequests := make([]cashu.MintRequestDB, 0)
+	sinceUnix := since.Unix()
+	for i := 0; i < len(m.MintRequest); i++ {
+		if m.MintRequest[i].SeenAt >= sinceUnix {
+			mintRequests = append(mintRequests, m.MintRequest[i])
+		}
+	}
+	return mintRequests, nil
+}
+
+func (m *MockDB) GetMeltRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MeltRequestDB, error) {
+
+	if id != nil {
+		for i := 0; i < len(m.MeltRequest); i++ {
+			if m.MeltRequest[i].Quote == *id {
+				return []cashu.MeltRequestDB{m.MeltRequest[i]}, nil
+			}
+		}
+	}
+	meltRequests := make([]cashu.MeltRequestDB, 0)
+	sinceUnix := since.Unix()
+	for i := 0; i < len(m.MintRequest); i++ {
+		if m.MeltRequest[i].SeenAt >= sinceUnix {
+			meltRequests = append(meltRequests, m.MeltRequest[i])
+		}
+	}
+	return meltRequests, nil
 }

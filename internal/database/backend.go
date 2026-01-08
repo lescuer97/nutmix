@@ -138,5 +138,6 @@ type MintDB interface {
 	MakeAuthUser(tx pgx.Tx, auth AuthUser) error
 	UpdateLastLoggedIn(tx pgx.Tx, sub string, lastLoggedIn uint64) error
 
-	// liquidity provider state
+	GetMintRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MintRequestDB, error)
+	GetMeltRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MeltRequestDB, error)
 }
