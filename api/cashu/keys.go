@@ -3,8 +3,9 @@ package cashu
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"math"
-	"strconv"
+	"slices"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -25,21 +26,55 @@ func DeriveKeysetId(keysets []*secp256k1.PublicKey) (string, error) {
 	return "00" + hex[:14], nil
 }
 
-func DeriveKeysetIdV2(pubKeysArray []*secp256k1.PublicKey, unit Unit, finalExpiry *time.Time) string {
-	var keysetIDBytes []byte
+type pubkeyWithAmount struct {
+	Amount uint64
+	Pubkey *secp256k1.PublicKey
+}
 
-	for _, key := range pubKeysArray {
-		if key == nil {
-			panic("pubkey should have never been nil at this time")
+func sortPubkeyMapToOrganizedArray(pubkeyMap map[uint64]*secp256k1.PublicKey) []pubkeyWithAmount {
+	arrayPubkeys := make([]pubkeyWithAmount, len(pubkeyMap))
+
+	i := 0
+	for amount, key := range pubkeyMap {
+		arrayPubkeys[i] = pubkeyWithAmount{
+			Amount: amount,
+			Pubkey: key,
 		}
-		keysetIDBytes = append(keysetIDBytes, key.SerializeCompressed()...)
+		i++
 	}
 
-	keysetIDBytes = append(keysetIDBytes, []byte("unit:"+unit.String())...)
-	if finalExpiry != nil {
-		keysetIDBytes = append(keysetIDBytes, []byte("final_expiry:"+strconv.Itoa(int(finalExpiry.Unix())))...)
+	slices.SortFunc(arrayPubkeys, func(a, b pubkeyWithAmount) int {
+		return int(a.Amount) - int(b.Amount)
+	})
+	return arrayPubkeys
+
+}
+
+func generateKeysetV2Preimage(sortedPubkeyArray []pubkeyWithAmount, unit string, fee uint, finalExpiry *time.Time) string {
+	preimage := ""
+	for i := range sortedPubkeyArray {
+		preimage += fmt.Sprintf("%v:%x", sortedPubkeyArray[i].Amount, sortedPubkeyArray[i].Pubkey.SerializeCompressed())
+		if i != len(sortedPubkeyArray)-1 {
+			preimage += ","
+		}
 	}
-	hash := sha256.Sum256(keysetIDBytes)
+
+	preimage += fmt.Sprintf("|unit:%s", unit)
+	if fee > 0 {
+		preimage += fmt.Sprintf("|input_fee_ppk:%v", fee)
+	}
+
+	if finalExpiry != nil {
+		preimage += fmt.Sprintf("|final_expiry:%v", finalExpiry.Unix())
+	}
+
+	return preimage
+}
+
+func DeriveKeysetIdV2(pubKeysMap map[uint64]*secp256k1.PublicKey, unit string, fee uint, finalExpiry *time.Time) string {
+	arrayPubkeys := sortPubkeyMapToOrganizedArray(pubKeysMap)
+	preimage := generateKeysetV2Preimage(arrayPubkeys, unit, fee, finalExpiry)
+	hash := sha256.Sum256([]byte(preimage))
 	return "01" + hex.EncodeToString(hash[:])
 }
 
