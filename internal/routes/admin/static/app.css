@@ -235,6 +235,7 @@
   border: 1px solid var(--border-primary);
   padding: var(--space-2);
 }
+
 .search-input {
   padding: 0.5rem;
   border-radius: 0.25rem;

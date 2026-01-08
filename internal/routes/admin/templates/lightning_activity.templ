@@ -23,19 +23,43 @@ templ LightningActivityTable(invoices []LightningInvoiceVisual) {
 			<div class="cell" style="width: 10%;"><span class="cell-text">Unit</span></div>
 			<div class="cell" style="width: 15%;"><span class="cell-text">Time</span></div>
 		</div>
-		<div class="rows">
-			for _, invoice := range invoices {
-				{{ formattedTime := time.Unix(invoice.Time, 0).Format(time.UnixDate) }}
-				<div class={ "row-item", invoice.Type }>
-					<div class="cell cell-id" style="width: 25%;" title={ invoice.Id }><span class="cell-text">{ invoice.Id }</span></div>
-					<div class="cell" style="width: 5%;" title={ invoice.Type }><span class={ "pill", "pill-" + invoice.Type }>{ invoice.Type }</span></div>
-					<div class="cell" style="width: 35%;" title={ invoice.Invoice }><span class="cell-text">{ invoice.Invoice }</span></div>
-					<div class="cell" style="width: 10%;" title={ invoice.Status }><span class={ "cell-text", "status-" + strings.ToLower(invoice.Status) }>{ invoice.Status }</span></div>
-					<div class="cell" style="width: 10%; text-transform: uppercase;" title={ invoice.Unit }><span class="cell-text">{ invoice.Unit }</span></div>
-					<div class="cell" style="width: 15%;" title={ formattedTime }><span class="cell-text">{ formattedTime }</span></div>
-				</div>
-			}
-		</div>
+		if len(invoices) == 0 {
+			<div class="h-full flex items-center justify-center p-4">
+				<h2 class="text-gray-500">No Mint or Melt activity found</h2>
+			</div>
+		} else {
+			<div class="rows">
+				for _, invoice := range invoices {
+					{{ formattedTime := time.Unix(invoice.Time, 0).Format(time.UnixDate) }}
+					<div class={ "row-item" , invoice.Type }>
+						<div class="cell cell-id" style="width: 25%;" title={ invoice.Id }>
+							<span class="cell-text">
+								{ invoice.Id }
+							</span>
+						</div>
+						<div class="cell" style="width: 5%;" title={ invoice.Type }>
+							<span class={ "pill" , "pill-" + invoice.Type }>{ invoice.Type }</span>
+						</div>
+						<div class="cell" style="width: 35%;" title={ invoice.Invoice }>
+							<span class="cell-text">
+								{ invoice.Invoice }
+							</span>
+						</div>
+						<div class="cell" style="width: 10%;" title={ invoice.Status }>
+							<span class={ "cell-text" , "status-" + strings.ToLower(invoice.Status) }>{ invoice.Status }</span>
+						</div>
+						<div class="cell" style="width: 10%; text-transform: uppercase;" title={ invoice.Unit }>
+							<span class="cell-text">{ invoice.Unit }</span>
+						</div>
+						<div class="cell" style="width: 15%;" title={ formattedTime }>
+							<span class="cell-text">
+								{ formattedTime }
+							</span>
+						</div>
+					</div>
+				}
+			</div>
+		}
 	</div>
 }
 
@@ -92,41 +116,41 @@ templ LightningActivityLayout(config utils.Config, selectedRange string, searchQ
 		</main>
 		<script src="/js/modules/chart.js"></script>
 		<script>
-			// Update URL when search or time range changes
-			(function() {
-				const updateUrl = () => {
-					const searchInput = document.getElementById('ln-search-input');
-					const rangeSelect = document.getElementById('timeRangeSelect');
-					
-					if (!searchInput || !rangeSelect) return;
+	// Update URL when search or time range changes
+	(function () {
+		const updateUrl = () => {
+			const searchInput = document.getElementById('ln-search-input');
+			const rangeSelect = document.getElementById('timeRangeSelect');
 
-					const search = searchInput.value;
-					const range = rangeSelect.value;
-					const url = new URL(window.location);
-					
-					if (search) {
-						url.searchParams.set('search', search);
-					} else {
-						url.searchParams.delete('search');
-					}
-					
-					if (range) {
-						url.searchParams.set('since', range);
-					}
-					
-					window.history.replaceState({}, '', url);
-				};
+			if (!searchInput || !rangeSelect) return;
 
-				const searchInput = document.getElementById('ln-search-input');
-				const rangeSelect = document.getElementById('timeRangeSelect');
+			const search = searchInput.value;
+			const range = rangeSelect.value;
+			const url = new URL(window.location);
 
-				if (searchInput) {
-					searchInput.addEventListener('input', updateUrl);
-				}
-				if (rangeSelect) {
-					rangeSelect.addEventListener('change', updateUrl);
-				}
-			})();
-		</script>
+			if (search) {
+				url.searchParams.set('search', search);
+			} else {
+				url.searchParams.delete('search');
+			}
+
+			if (range) {
+				url.searchParams.set('since', range);
+			}
+
+			window.history.replaceState({}, '', url);
+		};
+
+		const searchInput = document.getElementById('ln-search-input');
+		const rangeSelect = document.getElementById('timeRangeSelect');
+
+		if (searchInput) {
+			searchInput.addEventListener('input', updateUrl);
+		}
+		if (rangeSelect) {
+			rangeSelect.addEventListener('change', updateUrl);
+		}
+	})();
+</script>
 	}
 }
