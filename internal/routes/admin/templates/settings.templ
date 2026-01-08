@@ -28,8 +28,8 @@ templ General(config utils.Config) {
 	<form
 		class="form-group"
 		hx-post="/admin/mintsettings/general"
-		hx-target="#notifications"
-		hx-swap="innerHTML"
+		hx-target="this"
+		hx-swap="outerHTML"
 	>
 		<div class="form-section">
 			<label for="MOTD" class="settings-input">
@@ -64,10 +64,15 @@ templ General(config utils.Config) {
 			</label>
 		</div>
 		<div class="form-section">
-			<label for="ICON_URL" class="settings-input">
-				Icon URL
-				<input name="ICON_URL" value={ stringOrEmpty(config.IconUrl) } type="text"/>
-			</label>
+			<div class="flex flex-row gap-2 w-full justify-between align-items-center">
+				<label for="ICON_URL" class="settings-input w-full">
+					Icon URL
+					<input name="ICON_URL" value={ stringOrEmpty(config.IconUrl) } type="text"/>
+				</label>
+				if config.IconUrl != nil && *config.IconUrl != "" {
+					<img src={ templ.URL(*config.IconUrl) } alt="Icon" class="icon-preview" style="width: 100px; height: 100px;"/>
+				}
+			</div>
 			<label for="TOS_URL" class="settings-input">
 				Terms of Service URL
 				<input name="TOS_URL" value={ stringOrEmpty(config.TosUrl) } type="text"/>
@@ -85,8 +90,8 @@ templ Lightning(config utils.Config) {
 	<form
 		class="form-group"
 		hx-post="/admin/mintsettings/lightning"
-		hx-target="#notifications"
-		hx-swap="innerHTML"
+		hx-target="this"
+		hx-swap="outerHTML"
 	>
 		<div class="form-section">
 			<label for="PEG_OUT_ONLY" class="settings-input-checkbox">
@@ -146,8 +151,8 @@ templ Auth(config utils.Config) {
 	<form
 		class="form-group"
 		hx-post="/admin/mintsettings/auth"
-		hx-target="#notifications"
-		hx-swap="innerHTML"
+		hx-target="this"
+		hx-swap="outerHTML"
 	>
 		<div class="form-section">
 			<label for="MINT_REQUIRE_AUTH" class="settings-input-checkbox">
