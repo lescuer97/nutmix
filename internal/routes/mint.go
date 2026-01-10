@@ -2,11 +2,13 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -326,9 +328,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, preparationTx); rollbackErr != nil {
-					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+			if rollbackErr := mint.MintDB.Rollback(ctx, preparationTx); rollbackErr != nil {
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+					slog.Warn("could not swap state", slog.Any("error", rollbackErr))
 				}
 			}
 		}()
@@ -400,9 +402,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, afterSigningTx); rollbackErr != nil {
-					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+			if rollbackErr := mint.MintDB.Rollback(ctx, afterSigningTx); rollbackErr != nil {
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+					slog.Warn("could not swap state", slog.Any("error", rollbackErr))
 				}
 			}
 		}()
@@ -449,7 +451,8 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 
 		states, err := m.CheckProofState(c.Request.Context(), mint, checkStateRequest.Ys)
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			slog.Info("could not check proofs state", slog.Any("error", err))
+			c.JSON(400, "could not validate proofs state")
 			return
 		}
 		checkStateResponse.States = states

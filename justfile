@@ -71,6 +71,7 @@ install-deps:
     # Install Go tools (pinned versions)
     go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.0
+    go install github.com/favadi/protoc-go-inject-tag@v1.4.0
     go install github.com/a-h/templ/cmd/templ@v0.3.960
 
     # Check protobuf-compiler
@@ -110,7 +111,7 @@ gen-proto:
     #!/usr/bin/env bash
     echo "Generating protobuf code..."
     protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
-
+    protoc-go-inject-tag -input="./internal/gen/*.pb.go"
 # ============================
 # Web Dashaboard
 # ============================

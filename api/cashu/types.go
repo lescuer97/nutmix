@@ -174,14 +174,18 @@ func OrderedListOfPubkeys(listKeys []MintKey) []*secp256k1.PublicKey {
 	return pubkeys
 }
 
-type Seed struct {
-	FinalExpiry *uint64 `json:"final_expiry" db:"final_expiry"`
-	Unit        string
-	Id          string
-	CreatedAt   int64
-	InputFeePpk uint `json:"input_fee_ppk" db:"input_fee_ppk"`
-	Version     uint32
-	Active      bool
+type Seed struct { //nolint:govet
+	Amounts        []uint64 `json:"amounts" db:"amounts"`
+	Unit           string
+	Id             string
+	DerivationPath string `json:"derivation_path" db:"derivation_path"`
+	CreatedAt      int64
+	InputFeePpk    uint `json:"input_fee_ppk" db:"input_fee_ppk"`
+	Version        uint32
+	Active         bool
+	Legacy         bool    `json:"legacy" db:"legacy"`
+	FinalExpiry    *uint64 `json:"final_expiry" db:"final_expiry"`
+	IssuerVersion  *string `json:"issuer_version" db:"issuer_version"`
 }
 
 type SwapMintMethod struct {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"log"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -112,13 +111,12 @@ func TestVerifyUnitOfProofFail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}
-	log.Printf("\n keysets: %+v\n ", keysets)
 	proofs := cashu.Proofs{
 		cashu.Proof{
 			C:       cashu.WrappedPublicKey{PublicKey: nil},
 			Y:       cashu.WrappedPublicKey{PublicKey: nil},
 			Quote:   nil,
-			Id:      "0199c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Id:      "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52",
 			Secret:  "",
 			Witness: "",
 			State:   "",
@@ -129,7 +127,7 @@ func TestVerifyUnitOfProofFail(t *testing.T) {
 			C:       cashu.WrappedPublicKey{PublicKey: nil},
 			Y:       cashu.WrappedPublicKey{PublicKey: nil},
 			Quote:   nil,
-			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Id:      "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52",
 			Secret:  "",
 			Witness: "",
 			State:   "",
@@ -140,7 +138,7 @@ func TestVerifyUnitOfProofFail(t *testing.T) {
 			C:       cashu.WrappedPublicKey{PublicKey: nil},
 			Y:       cashu.WrappedPublicKey{PublicKey: nil},
 			Quote:   nil,
-			Id:      "01f36438a5cd4b6a6fa3c1091161c03ddff5deb8f15722c25171eb2c5156610668",
+			Id:      "01ae47b82aea68f5c349f482d58ae8e171b5bd4e96e7650b9729ec5f87fc5f9471",
 			Secret:  "",
 			Witness: "",
 			State:   "",
@@ -174,7 +172,7 @@ func TestVerifyUnitOfProofPass(t *testing.T) {
 			C:       cashu.WrappedPublicKey{PublicKey: nil},
 			Y:       cashu.WrappedPublicKey{PublicKey: nil},
 			Quote:   nil,
-			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Id:      "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52",
 			Secret:  "",
 			Witness: "",
 			State:   "",
@@ -185,7 +183,7 @@ func TestVerifyUnitOfProofPass(t *testing.T) {
 			C:       cashu.WrappedPublicKey{PublicKey: nil},
 			Y:       cashu.WrappedPublicKey{PublicKey: nil},
 			Quote:   nil,
-			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Id:      "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52",
 			Secret:  "",
 			Witness: "",
 			State:   "",
@@ -196,7 +194,7 @@ func TestVerifyUnitOfProofPass(t *testing.T) {
 			C:       cashu.WrappedPublicKey{PublicKey: nil},
 			Y:       cashu.WrappedPublicKey{PublicKey: nil},
 			Quote:   nil,
-			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Id:      "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52",
 			Secret:  "",
 			Witness: "",
 			State:   "",
@@ -244,9 +242,9 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 		t.Fatalf("Error parsing B_2: %+v", err)
 	}
 	outputs := []cashu.BlindedMessage{
-		{B_: cashu.WrappedPublicKey{PublicKey: B_1}, Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", Witness: "", Amount: 0},
-		{B_: cashu.WrappedPublicKey{PublicKey: B_2}, Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", Witness: "", Amount: 0},
-		{B_: cashu.WrappedPublicKey{PublicKey: B_2}, Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", Witness: "", Amount: 0},
+		{B_: cashu.WrappedPublicKey{PublicKey: B_1}, Id: "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52", Witness: "", Amount: 0},
+		{B_: cashu.WrappedPublicKey{PublicKey: B_2}, Id: "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52", Witness: "", Amount: 0},
+		{B_: cashu.WrappedPublicKey{PublicKey: B_2}, Id: "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52", Witness: "", Amount: 0},
 	}
 
 	tx, err := mint.MintDB.GetTx(context.Background())
