@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"math"
 	"time"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -74,7 +73,6 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 	emptyRequest := sig.EmptyRequest{}
 
 	keys, err := s.grpcClient.Keysets(ctx, &emptyRequest)
-	// log.Printf("keys: %+v", keys)
 	if err != nil {
 		return fmt.Errorf("s.grpcClient.Keysets(ctx, &emptyRequest). %w", err)
 	}
@@ -170,9 +168,9 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hour
 	now := time.Now()
 	now = now.Add(time.Duration(expiry_limit_hours) * time.Hour)
 
-	amounts := GetAmountsFromMaxOrder(64)
+	amounts := cashu.GetAmountsForKeysets(cashu.MaxKeysetAmount)
 	if unit == cashu.AUTH {
-		amounts = []uint64{1}
+		amounts = []uint64{amounts[0]}
 	}
 
 	unixTime := uint64(now.Unix())
@@ -339,11 +337,11 @@ func (l *RemoteSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	return response, nil
 }
 
-func GetAmountsFromMaxOrder(max_order uint32) []uint64 {
-	keys := make([]uint64, 0)
-
-	for i := 0; i < int(max_order); i++ {
-		keys = append(keys, uint64(math.Pow(2, float64(i))))
-	}
-	return keys
-}
+// func GetAmountsFromMaxOrder(max_order uint32) []uint64 {
+// 	keys := make([]uint64, 0)
+//
+// 	for i := 0; i < int(max_order); i++ {
+// 		keys = append(keys, uint64(math.Pow(2, float64(i))))
+// 	}
+// 	return keys
+// }

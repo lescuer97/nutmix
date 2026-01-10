@@ -2,10 +2,12 @@ package mint
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
@@ -17,9 +19,9 @@ func CheckProofState(mint *Mint, Ys []cashu.WrappedPublicKey) ([]cashu.CheckStat
 		return states, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if err != nil {
-			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
+		if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+			if !errors.Is(err, pgx.ErrTxClosed) {
+				slog.Warn("rotate keyset sql transaction error", slog.Any("error", err))
 			}
 		}
 	}()

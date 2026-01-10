@@ -3,11 +3,13 @@ package admin
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
@@ -30,13 +32,17 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 		if p := recover(); p != nil {
 			slog.Error("Rolling back because of failure", slog.Any("error", err))
 			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-				slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+				}
 			}
 
 		} else if err != nil {
 			slog.Error("Rolling back because of failure", slog.Any("error", err))
 			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-				slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+				}
 			}
 		}
 	}()
@@ -82,13 +88,17 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 						if p := recover(); p != nil {
 							slog.Error("Rolling back because of failure", slog.Any("error", err))
 							if rollbackErr := mint.MintDB.Rollback(ctx, swapTx); rollbackErr != nil {
-								slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+								if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+									slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+								}
 							}
 
 						} else if err != nil {
 							slog.Error("Rolling back because of failure", slog.Any("error", err))
 							if rollbackErr := mint.MintDB.Rollback(ctx, swapTx); rollbackErr != nil {
-								slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+								if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+									slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+								}
 							}
 						}
 					}()
@@ -175,7 +185,9 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 						if p := recover(); p != nil {
 							slog.Error("Rolling back because of failure", slog.Any("error", err))
 							if rollbackErr := mint.MintDB.Rollback(ctx, afterCheckTx); rollbackErr != nil {
-								slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+								if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+									slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+								}
 							}
 						}
 					}()

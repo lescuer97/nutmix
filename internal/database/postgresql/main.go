@@ -68,14 +68,11 @@ func (pql Postgresql) Commit(ctx context.Context, tx pgx.Tx) error {
 func (pql Postgresql) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return tx.Rollback(ctx)
 }
-func (pql Postgresql) SubTx(ctx context.Context, tx pgx.Tx) (pgx.Tx, error) {
-	return tx.Begin(ctx)
-}
 
 func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 	var seeds []cashu.Seed
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT  created_at, active, version, unit, id,  "input_fee_ppk", final_expiry FROM seeds ORDER BY version DESC`)
+	rows, err := pql.pool.Query(context.Background(), `SELECT  created_at, active, version, unit, id,  "input_fee_ppk", final_expiry, derivation_path, amounts, legacy FROM seeds ORDER BY version DESC`)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return seeds, fmt.Errorf("no rows found: %w", err)
@@ -95,7 +92,7 @@ func (pql Postgresql) GetAllSeeds() ([]cashu.Seed, error) {
 }
 
 func (pql Postgresql) GetSeedsByUnit(tx pgx.Tx, unit cashu.Unit) ([]cashu.Seed, error) {
-	rows, err := tx.Query(context.Background(), "SELECT  created_at, active, version, unit, id, input_fee_ppk, final_expiry FROM seeds WHERE unit = $1", unit.String())
+	rows, err := tx.Query(context.Background(), "SELECT  created_at, active, version, unit, id, input_fee_ppk, final_expiry, derivation_path, amounts, legacy FROM seeds WHERE unit = $1", unit.String())
 	if err != nil {
 		return []cashu.Seed{}, fmt.Errorf("error checking for active seeds: %w", err)
 	}
@@ -119,7 +116,7 @@ func (pql Postgresql) SaveNewSeed(tx pgx.Tx, seed cashu.Seed) error {
 
 	for {
 		tries += 1
-		_, err := tx.Exec(context.Background(), "INSERT INTO seeds ( active, created_at, unit, id, version, input_fee_ppk, final_expiry) VALUES ($1, $2, $3, $4, $5, $6, $7)", seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk, seed.FinalExpiry)
+		_, err := tx.Exec(context.Background(), "INSERT INTO seeds ( active, created_at, unit, id, version, input_fee_ppk, final_expiry, derivation_path, amounts, legacy) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)", seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk, seed.FinalExpiry, seed.DerivationPath, seed.Amounts, seed.Legacy)
 
 		switch {
 		case err != nil && tries < 3:
@@ -137,11 +134,11 @@ func (pql Postgresql) SaveNewSeeds(seeds []cashu.Seed) error {
 	tries := 0
 
 	entries := [][]any{}
-	columns := []string{"active", "created_at", "unit", "id", "version", "input_fee_ppk", "final_expiry"}
+	columns := []string{"active", "created_at", "unit", "id", "version", "input_fee_ppk", "final_expiry", "derivation_path", "amounts", "legacy"}
 	tableName := "seeds"
 
 	for _, seed := range seeds {
-		entries = append(entries, []any{seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk, seed.FinalExpiry})
+		entries = append(entries, []any{seed.Active, seed.CreatedAt, seed.Unit, seed.Id, seed.Version, seed.InputFeePpk, seed.FinalExpiry, seed.DerivationPath, seed.Amounts, seed.Legacy})
 	}
 
 	for {

@@ -2,7 +2,6 @@ package cashu
 
 import (
 	"errors"
-	"log"
 )
 
 var (
@@ -134,7 +133,6 @@ type ErrorResponse struct {
 
 func ErrorCodeToResponse(code ErrorCode, detail *string) ErrorResponse {
 
-	log.Printf("\n code: %+v \n", code)
 	return ErrorResponse{
 		Code:   code,
 		Error:  code.String(),
