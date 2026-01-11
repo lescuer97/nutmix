@@ -18,6 +18,7 @@ type GetKeysetsResponse struct {
 type KeysetResponse struct {
 	Id          string            `json:"id"`
 	Unit        string            `json:"unit"`
+	Active      bool              `json:"active"`
 	Keys        map[uint64]string `json:"keys"`
 	InputFeePpk uint              `json:"input_fee_ppk"`
 }

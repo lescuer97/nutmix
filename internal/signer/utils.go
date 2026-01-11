@@ -27,6 +27,7 @@ func OrderKeysetByUnit(keysets []cashu.MintKey) GetKeysResponse {
 	for _, value := range typesOfUnits {
 		var keysetResponse KeysetResponse
 		keysetResponse.Id = value[0].Id
+		keysetResponse.Active = value[0].Active
 		keysetResponse.Unit = value[0].Unit
 		keysetResponse.Keys = make(map[uint64]string)
 		keysetResponse.InputFeePpk = value[0].InputFeePpk

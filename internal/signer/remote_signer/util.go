@@ -71,6 +71,7 @@ func OrderKeysetByUnit(keysets []MintPublicKeyset) signer.GetKeysResponse {
 		for _, mintKey := range unitKeysets {
 			keyset := signer.KeysetResponse{}
 			keyset.Id = hex.EncodeToString(mintKey.Id)
+			keyset.Active = mintKey.Active
 			keyset.Unit = mintKey.Unit
 			keyset.Keys = mintKey.Keys
 			res.Keysets = append(res.Keysets, keyset)
