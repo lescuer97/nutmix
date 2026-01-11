@@ -21,69 +21,71 @@ import (
 
 const AdminAuthKey = "admin-cookie"
 
+func handleUnauthorized(c *gin.Context) {
+	slog.Debug("Handling unauthorized request", slog.String("path", c.Request.URL.Path), slog.String("method", c.Request.Method))
+	c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
+	if c.GetHeader("HX-Request") == "true" {
+		c.Header("HX-Redirect", "/admin/login")
+		c.Status(http.StatusOK) // HTMX expects 200 for redirects
+	} else {
+		c.Redirect(http.StatusFound, "/admin/login")
+	}
+	c.Abort()
+}
+
 func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if cookie, err := c.Cookie(AdminAuthKey); err == nil {
-			// Check if token is blacklisted first
-			if blacklist.IsTokenBlacklisted(cookie) {
-				c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
-				c.Header("HX-Redirect", "/admin/login")
-				c.Abort()
+		cookie, err := c.Cookie(AdminAuthKey)
+		if err != nil {
+			slog.Debug("No admin cookie found", slog.String("error", err.Error()))
+			if c.Request.URL.Path == "/admin/login" {
 				return
 			}
-
-			token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
-				// Don't forget to validate the alg is what you expect:
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					slog.Warn("Unexpected signing method", slog.Any("alg", token.Header["alg"]))
-					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-				}
-				return secret, nil
-			})
-
-			if err != nil {
-				slog.Debug(
-					"jwt.Parse(cookie)",
-					slog.String(utils.LogExtraInfo, err.Error()),
-				)
-
-				c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
-				c.Redirect(http.StatusTemporaryRedirect, "/admin/login")
-				return
-			}
-
-			// if token is valid an navigating /admin/login redirect to /admin
-			switch token.Valid {
-			case true:
-				if c.Request.URL.Path == "/admin/login" {
-					c.Header("HX-Redirect", "/admin")
-					c.Redirect(http.StatusTemporaryRedirect, "/admin")
-
-					return
-				}
-				return
-			case false:
-				if c.Request.URL.Path == "/admin/login" {
-					return
-				}
-				slog.Debug("token is not valid", slog.Any("token", token))
-				c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
-				c.Header("HX-Location", "/admin/login")
-				return
-
-			}
-		}
-
-		switch c.Request.URL.Path {
-		case "/admin/login":
+			handleUnauthorized(c)
 			return
-		default:
-			c.Redirect(http.StatusTemporaryRedirect, "/admin/login")
-			c.Header("HX-Location", "/admin/login")
-			c.Abort()
-			c.JSON(200, nil)
-
 		}
+
+		// Check if token is blacklisted first
+		if blacklist.IsTokenBlacklisted(cookie) {
+			slog.Debug("Token is blacklisted")
+			handleUnauthorized(c)
+			return
+		}
+
+		token, err := jwt.Parse(cookie, func(token *jwt.Token) (interface{}, error) {
+			// Don't forget to validate the alg is what you expect:
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				slog.Warn("Unexpected signing method", slog.Any("alg", token.Header["alg"]))
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return secret, nil
+		})
+
+		if err != nil {
+			slog.Debug(
+				"jwt.Parse(cookie)",
+				slog.String(utils.LogExtraInfo, err.Error()),
+			)
+			handleUnauthorized(c)
+			return
+		}
+
+		if !token.Valid {
+			slog.Debug("token is not valid", slog.Any("token", token))
+			handleUnauthorized(c)
+			return
+		}
+
+		// Success path
+		if c.Request.URL.Path == "/admin/login" {
+			slog.Debug("Redirecting to /admin from login page")
+			c.Header("HX-Redirect", "/admin")
+			c.Redirect(http.StatusTemporaryRedirect, "/admin")
+			c.Abort()
+			return
+		}
+
+		c.Next()
 	}
 }
 

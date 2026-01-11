@@ -58,8 +58,11 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rotateRequest RotateRequest
 		if c.ContentType() == gin.MIMEJSON {
-			err := c.BindJSON(rotateRequest)
+			// Use Decode instead of BindJSON to have more control if needed,
+			// but BindJSON calls UnmarshalJSON which we defined.
+			err := c.BindJSON(&rotateRequest)
 			if err != nil {
+				slog.Error("BindJSON error", slog.Any("error", err))
 				c.JSON(400, nil)
 				return
 			}

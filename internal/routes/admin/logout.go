@@ -15,8 +15,12 @@ func LogoutHandler(blacklist *TokenBlacklist) gin.HandlerFunc {
 		tokenString, err := c.Cookie(AdminAuthKey)
 		if err != nil {
 			// No token found, redirect to login
-			c.Header("HX-Redirect", "/admin/login")
-			c.Status(http.StatusOK)
+			if c.GetHeader("HX-Request") == "true" {
+				c.Header("HX-Redirect", "/admin/login")
+				c.Status(http.StatusOK)
+			} else {
+				c.Redirect(http.StatusFound, "/admin/login")
+			}
 			return
 		}
 
@@ -42,8 +46,12 @@ func LogoutHandler(blacklist *TokenBlacklist) gin.HandlerFunc {
 		// Clear the cookie
 		c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
 
-		// Send HTMX redirect to login page
-		c.Header("HX-Redirect", "/admin/login")
-		c.Status(http.StatusOK)
+		// Send redirect to login page
+		if c.GetHeader("HX-Request") == "true" {
+			c.Header("HX-Redirect", "/admin/login")
+			c.Status(http.StatusOK)
+		} else {
+			c.Redirect(http.StatusFound, "/admin/login")
+		}
 	}
 }
