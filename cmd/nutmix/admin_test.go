@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -342,11 +344,25 @@ func TestRotateKeyUpCall(t *testing.T) {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
 
+	// Extract cookie from login response
+	var adminCookie *http.Cookie
+	for _, cookie := range w.Result().Cookies() {
+		if cookie.Name == "admin-cookie" {
+			adminCookie = cookie
+			break
+		}
+	}
+
+	if adminCookie == nil {
+		t.Fatal("Could not find admin-cookie in login response")
+	}
+
 	// ask for fee
 	w = httptest.NewRecorder()
 
 	rotatingFeeRequest := admin.RotateRequest{
-		Fee: 100,
+		Fee:  100,
+		Unit: cashu.Sat,
 	}
 
 	jsonRequestBody, err = json.Marshal(rotatingFeeRequest)
@@ -355,6 +371,8 @@ func TestRotateKeyUpCall(t *testing.T) {
 	}
 
 	req = httptest.NewRequest("POST", "/admin/rotate/sats", strings.NewReader(string(jsonRequestBody)))
+	req.Header.Set("Content-Type", gin.MIMEJSON)
+	req.AddCookie(adminCookie)
 
 	router.ServeHTTP(w, req)
 
