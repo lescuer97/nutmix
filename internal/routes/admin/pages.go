@@ -345,7 +345,6 @@ func LightningTable(adminHandler *adminHandler) gin.HandlerFunc {
 		timeRange := c.Query("since")
 		startTime, _ := parseTimeRange(timeRange)
 
-
 		mintRequests := make([]cashu.MintRequestDB, 0)
 		meltRequests := make([]cashu.MeltRequestDB, 0)
 
