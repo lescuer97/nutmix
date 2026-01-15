@@ -1,4 +1,4 @@
-package templates 
+package templates
 
 import "strconv"
 import "time"
@@ -9,7 +9,7 @@ type KeysetData struct {
 	Unit        string
 	Fees        uint
 	CreatedAt   int64
-	Version     uint64
+	Version     uint32
 	ExpireLimit *time.Time
 }
 
@@ -77,14 +77,18 @@ templ KeysetsList(keysetMap map[string][]KeysetData, orderedUnits []string) {
 
 templ keysetCard(keyset KeysetData) {
 	{{ inputFeeStr := strconv.FormatUint(uint64(keyset.Fees), 10) }}
-	{{ versionStr := strconv.FormatUint(keyset.Version, 10) }}
+	{{ versionStr := strconv.FormatUint(uint64(keyset.Version), 10) }}
 	<div class="card card-hover transition-all w-full max-w-sm">
 		<div class="card-header">
 			<span class="font-mono text-sm text-secondary truncate" title={ keyset.Id }>Id: { keyset.Id }</span>
 			if keyset.Active {
-				<span class="text-xs font-bold text-success bg-opacity-10 bg-green-500 px-2 py-1 rounded-full uppercase">Active</span>
+				<span
+					class="text-xs font-bold text-success bg-opacity-10 bg-green-500 px-2 py-1 rounded-full uppercase"
+				>Active</span>
 			} else {
-				<span class="text-xs font-bold text-secondary bg-opacity-10 bg-gray-500 px-2 py-1 rounded-full uppercase">Inactive</span>
+				<span
+					class="text-xs font-bold text-secondary bg-opacity-10 bg-gray-500 px-2 py-1 rounded-full uppercase"
+				>Inactive</span>
 			}
 		</div>
 		<div class="card-body">

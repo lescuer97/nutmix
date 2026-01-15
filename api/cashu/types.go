@@ -169,7 +169,7 @@ func OrderedListOfPubkeys(listKeys []MintKey) []*secp256k1.PublicKey {
 type Seed struct {
 	Active      bool
 	CreatedAt   int64
-	Version     int
+	Version     uint32
 	Unit        string
 	Id          string
 	InputFeePpk uint    `json:"input_fee_ppk" db:"input_fee_ppk"`
@@ -393,7 +393,7 @@ type BasicKeysetResponse struct {
 	Unit        string `json:"unit"`
 	Active      bool   `json:"active"`
 	InputFeePpk uint   `json:"input_fee_ppk"`
-	Version     uint64
+	Version     uint32
 	FinalExpiry *uint64 `json:"final_expiry,omitempty"`
 }
 
