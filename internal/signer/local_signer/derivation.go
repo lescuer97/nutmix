@@ -157,7 +157,6 @@ func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *hdkeychain.ExtendedKey) (m
 	newActiveKeysets := make(map[string]cashu.MintKeysMap)
 
 	for _, seed := range seeds {
-		log.Println("making seedsb")
 		keysets, err := deriveSeed(seed, mintKey)
 		if err != nil {
 			return newKeysets, newActiveKeysets, fmt.Errorf("deriveSeed(seed, mintKey) %w", err)

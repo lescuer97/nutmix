@@ -3,7 +3,6 @@ package localsigner
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -27,7 +26,6 @@ func legacyGetMintPrivateKey() (*bip32.Key, error) {
 	}
 	mintKey := secp256k1.PrivKeyFromBytes(decodedPrivKey)
 
-	log.Printf("\n pubkey: %x \n", mintKey.PubKey().SerializeCompressed())
 	masterKey, err := bip32.NewMasterKey(mintKey.Serialize())
 	if err != nil {
 		return nil, fmt.Errorf(" bip32.NewMasterKey(privateKey.Serialize()). %w", err)
@@ -53,7 +51,6 @@ func legacyDeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, e
 	if err != nil {
 		return nil, fmt.Errorf("mintKey.NewChildKey(uint32(seed.Version)) %w", err)
 	}
-	log.Println("before: legacyDeriveKeyset")
 
 	keyset, err := legacyGenerateKeysets(versionKey, seed)
 	if err != nil {
