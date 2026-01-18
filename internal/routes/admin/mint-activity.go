@@ -58,12 +58,6 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 			return
 		}
 
-		fees, err := fees(proofsCount, keysets.Keysets)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
 		lnBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
 			_ = c.Error(err)
@@ -79,7 +73,7 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 		summary := templates.Summary{
 			LnBalance:  lnBalance / 1000,
 			FakeWallet: mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET,
-			Fees:       fees,
+			Fees:       fees(proofsCount, keysets.Keysets),
 			SinceDate:  sinceDate,
 		}
 
@@ -91,14 +85,14 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 	}
 }
 
-func fees(proofs map[string]database.ProofsCountByKeyset, keysets []cashu.BasicKeysetResponse) (uint64, error) {
+func fees(proofs map[string]database.ProofsCountByKeyset, keysets []cashu.BasicKeysetResponse) uint64 {
 	totalFees := uint64(0)
 
 	for _, keyset := range keysets {
 		if keyset.Unit != cashu.AUTH.String() {
 			for keysetId, proof := range proofs {
 				if keyset.Id == keysetId {
-					totalFees += uint64(proof.Count) * uint64(keyset.InputFeePpk)
+					totalFees += proof.Count * uint64(keyset.InputFeePpk)
 				}
 			}
 		}
@@ -107,6 +101,5 @@ func fees(proofs map[string]database.ProofsCountByKeyset, keysets []cashu.BasicK
 
 	totalFees = (totalFees + 999) / 1000
 
-	return totalFees, nil
-
+	return totalFees
 }

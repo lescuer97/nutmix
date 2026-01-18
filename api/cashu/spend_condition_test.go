@@ -671,6 +671,7 @@ func TestHasSigAllMethod(t *testing.T) {
 // TestAnyOneCanSpendDetection tests that non-JSON 64-byte secrets are identified correctly
 func TestAnyOneCanSpendDetection(t *testing.T) {
 	// Create a proof with a 64-byte hex secret (not JSON structured)
+	// #nosec G101
 	plainSecret := "a3d98f6b2c1e4f5d8c7b6a9e0f1d2c3b4a5e6f7d8c9b0a1e2f3d4c5b6a7e8f9d"
 	proofWithPlainSecret := Proof{
 		Amount: 1,
@@ -933,10 +934,10 @@ func TestInvalidNumericValues(t *testing.T) {
 // TestInvalidSpendConditionJSONStructure tests unmarshalling with invalid JSON structures
 func TestInvalidSpendConditionJSONStructure(t *testing.T) {
 	testCases := []struct {
+		validate  func(*testing.T, SpendCondition)
 		name      string
 		json      string
 		expectErr bool
-		validate  func(*testing.T, SpendCondition) // Optional validation function
 	}{
 		{
 			name:      "not an array",

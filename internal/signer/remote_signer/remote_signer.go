@@ -15,13 +15,13 @@ import (
 )
 
 type MintPublicKeyset struct {
-	Id          []byte
-	Unit        string
-	Active      bool
 	Keys        map[uint64]string
+	FinalExpiry *uint64
+	Unit        string
+	Id          []byte
 	InputFeePpk uint
 	Version     uint32
-	FinalExpiry *uint64
+	Active      bool
 }
 
 type RemoteSigner struct {

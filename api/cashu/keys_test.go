@@ -120,8 +120,8 @@ func TestChangeProofsStateToPendingAndQuoteSet(t *testing.T) {
 
 func convertJsonMapIntoOrderedArray(raw map[string]string) []*secp256k1.PublicKey {
 	arrays := []struct {
-		Amount uint64
 		Pubkey *secp256k1.PublicKey
+		Amount uint64
 	}{}
 	// Build the final map[uint64]*btcec.PublicKey
 	// pubkeys := make(map[uint64]*btcec.PublicKey)
@@ -149,8 +149,8 @@ func convertJsonMapIntoOrderedArray(raw map[string]string) []*secp256k1.PublicKe
 		}
 
 		arrays = append(arrays, struct {
-			Amount uint64
 			Pubkey *secp256k1.PublicKey
+			Amount uint64
 		}{
 			Amount: uKey,
 			Pubkey: pk,

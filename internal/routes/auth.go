@@ -116,7 +116,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			// check all blind messages have the same unit
 		}
 
-		if amountBlindMessages > uint64(mint.Config.MINT_AUTH_MAX_BLIND_TOKENS) {
+		if amountBlindMessages > mint.Config.MINT_AUTH_MAX_BLIND_TOKENS {
 			slog.Warn("Trying to mint auth tokens over the limit")
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.MAXIMUM_BAT_MINT_LIMIT_EXCEEDED, nil))
 			return

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,9 +17,9 @@ import (
 )
 
 type Strike struct {
-	Network  chaincfg.Params
 	endpoint string
 	key      string
+	Network  chaincfg.Params
 }
 
 type strikeAccountBalanceResponse struct {
@@ -100,12 +101,12 @@ type strikeInvoiceResponse struct {
 	State       strikeInvoiceState `json:"state"`
 }
 type strikeInvoiceQuoteResponse struct {
+	TargetAmount    strikeAmount `json:"targetAmount"`
 	QuoteId         string       `json:"quoteId"`
 	Description     string       `json:"description"`
 	LnInvoice       string       `json:"lnInvoice"`
 	Expiration      string       `json:"expiration"`
 	ExpirationInSec int64        `json:"expirationInSec"`
-	TargetAmount    strikeAmount `json:"targetAmount"`
 }
 
 type strikePaymentRequest struct {
@@ -181,6 +182,13 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 	if err != nil {
 		return fmt.Errorf("client.Do(req): %w", err)
 	}
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			slog.Error("could not close body from call.", slog.Any("error", err))
+
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

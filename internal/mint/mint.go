@@ -17,12 +17,12 @@ import (
 
 type Mint struct {
 	LightningBackend lightning.LightningBackend
-	Config           utils.Config
-	MintPubkey       string
 	MintDB           database.MintDB
 	Signer           signer.Signer
 	OICDClient       *oidc.Provider
 	Observer         *Observer
+	MintPubkey       string
+	Config           utils.Config
 }
 
 var (

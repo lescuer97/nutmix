@@ -55,7 +55,7 @@ func DeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, error) 
 		return nil, fmt.Errorf("mintKey.NewChildKey(uint32(unit.EnumIndex())). %w", err)
 	}
 
-	versionKey, err := unitKey.NewChildKey(uint32(seed.Version))
+	versionKey, err := unitKey.NewChildKey(seed.Version)
 	if err != nil {
 		return nil, fmt.Errorf("mintKey.NewChildKey(uint32(seed.Version)) %w", err)
 	}

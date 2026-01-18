@@ -98,10 +98,10 @@ func UnitFromString(s string) (Unit, error) {
 var AvailableSeeds []Unit = []Unit{Sat}
 
 type BlindedMessage struct {
-	Amount  uint64           `json:"amount"`
-	Id      string           `json:"id"`
 	B_      WrappedPublicKey `json:"B_"`
+	Id      string           `json:"id"`
 	Witness string           `json:"witness,omitempty" db:"witness"`
+	Amount  uint64           `json:"amount"`
 }
 
 func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
@@ -123,10 +123,10 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 }
 
 type BlindSignature struct {
-	Amount uint64              `json:"amount"`
-	Id     string              `json:"id"`
 	C_     WrappedPublicKey    `json:"C_"`
 	Dleq   *BlindSignatureDLEQ `json:"dleq,omitempty"`
+	Id     string              `json:"id"`
+	Amount uint64              `json:"amount"`
 }
 
 type MintError struct {
@@ -136,14 +136,14 @@ type MintError struct {
 
 type MintKeysMap map[uint64]MintKey
 type MintKey struct {
+	PrivKey     *secp256k1.PrivateKey `json:"priv_key"`
+	FinalExpiry *uint64               `json:"final_expiry"`
 	Id          string                `json:"id"`
-	Active      bool                  `json:"active" db:"active"`
 	Unit        string                `json:"unit"`
 	Amount      uint64                `json:"amount"`
-	PrivKey     *secp256k1.PrivateKey `json:"priv_key"`
 	CreatedAt   int64                 `json:"created_at"`
 	InputFeePpk uint                  `json:"input_fee_ppk"`
-	FinalExpiry *uint64               `json:"final_expiry"`
+	Active      bool                  `json:"active" db:"active"`
 }
 
 func (keyset *MintKey) GetPubKey() *secp256k1.PublicKey {
@@ -167,22 +167,22 @@ func OrderedListOfPubkeys(listKeys []MintKey) []*secp256k1.PublicKey {
 }
 
 type Seed struct {
-	Active      bool
-	CreatedAt   int64
-	Version     uint32
+	FinalExpiry *uint64 `json:"final_expiry" db:"final_expiry"`
 	Unit        string
 	Id          string
-	InputFeePpk uint    `json:"input_fee_ppk" db:"input_fee_ppk"`
-	FinalExpiry *uint64 `json:"final_expiry" db:"final_expiry"`
+	CreatedAt   int64
+	InputFeePpk uint `json:"input_fee_ppk" db:"input_fee_ppk"`
+	Version     uint32
+	Active      bool
 }
 
 type SwapMintMethod struct {
+	Options   *SwapMintMethodOptions `json:"options,omitempty"`
 	Method    string                 `json:"method"`
 	Unit      string                 `json:"unit"`
+	Commands  []SubscriptionKind     `json:"commands,omitempty"`
 	MinAmount int                    `json:"min_amount,omitempty"`
 	MaxAmount int                    `json:"max_amount,omitempty"`
-	Commands  []SubscriptionKind     `json:"commands,omitempty"`
-	Options   *SwapMintMethodOptions `json:"options,omitempty"`
 }
 type SwapMintMethodOptions struct {
 	Description *bool `json:"description,omitempty"`
@@ -205,57 +205,57 @@ type ContactInfo struct {
 }
 
 type GetInfoResponse struct {
+	Nuts            map[string]any `json:"nuts"`
+	TosUrl          *string        `json:"tos_url,omitempty"`
+	IconUrl         *string        `json:"icon_url,omitempty"`
 	Name            string         `json:"name"`
 	Version         string         `json:"version"`
 	Pubkey          string         `json:"pubkey"`
 	Description     string         `json:"description"`
 	DescriptionLong string         `json:"description_long"`
-	Contact         []ContactInfo  `json:"contact"`
 	Motd            string         `json:"motd"`
-	Nuts            map[string]any `json:"nuts"`
-	TosUrl          *string        `json:"tos_url,omitempty"`
-	IconUrl         *string        `json:"icon_url,omitempty"`
+	Contact         []ContactInfo  `json:"contact"`
 	Time            int64          `json:"time"`
 }
 
 type KeysResponse map[string][]Keyset
 
 type Keyset struct {
+	Keys        map[string]string `json:"keys"`
+	FinalExpiry *uint64           `json:"final_expiry,omitempty" db:"final_expiry"`
 	Id          string            `json:"id"`
 	Unit        string            `json:"unit"`
-	Keys        map[string]string `json:"keys"`
 	InputFeePpk uint              `json:"input_fee_ppk"`
-	FinalExpiry *uint64           `json:"final_expiry,omitempty" db:"final_expiry"`
 }
 
 type PostMintQuoteBolt11Request struct {
-	Amount      uint64           `json:"amount"`
-	Unit        string           `json:"unit"`
 	Description *string          `json:"description,omitempty"`
 	Pubkey      WrappedPublicKey `json:"pubkey"`
+	Unit        string           `json:"unit"`
+	Amount      uint64           `json:"amount"`
 }
 
 type PostMintQuoteBolt11Response struct {
-	Quote   string           `json:"quote"`
-	Request string           `json:"request"`
-	Expiry  int64            `json:"expiry"`
-	Unit    string           `json:"unit"`
-	Minted  bool             `json:"minted"`
-	State   ACTION_STATE     `json:"state"`
 	Amount  *uint64          `json:"amount,omitempty"`
 	Pubkey  WrappedPublicKey `json:"pubkey"`
+	Quote   string           `json:"quote"`
+	Request string           `json:"request"`
+	Unit    string           `json:"unit"`
+	State   ACTION_STATE     `json:"state"`
+	Expiry  int64            `json:"expiry"`
+	Minted  bool             `json:"minted"`
 }
 
 func (r PostMintQuoteBolt11Response) MarshalJSON() ([]byte, error) {
 	type Alias struct {
 		Pubkey  *string      `json:"pubkey,omitempty"`
+		Amount  *uint64      `json:"amount,omitempty"`
 		Quote   string       `json:"quote"`
 		Request string       `json:"request"`
-		Expiry  int64        `json:"expiry"`
 		Unit    string       `json:"unit"`
-		Minted  bool         `json:"minted"`
 		State   ACTION_STATE `json:"state"`
-		Amount  *uint64      `json:"amount,omitempty"`
+		Expiry  int64        `json:"expiry"`
+		Minted  bool         `json:"minted"`
 	}
 
 	var alias Alias
@@ -273,19 +273,17 @@ func (r PostMintQuoteBolt11Response) MarshalJSON() ([]byte, error) {
 }
 
 type MintRequestDB struct {
-	Quote   string `json:"quote"`
-	Request string `json:"request"`
-	// Deprecated: Should be removed after all main wallets change to the new State format
-	RequestPaid bool             `json:"paid" db:"request_paid"`
-	Expiry      int64            `json:"expiry"`
-	Unit        string           `json:"unit"`
-	Minted      bool             `json:"minted"`
-	State       ACTION_STATE     `json:"state"`
-	SeenAt      int64            `json:"seen_at"`
 	Amount      *uint64          `json:"amount"`
-	CheckingId  string           `json:"checking_id"`
 	Pubkey      WrappedPublicKey `json:"pubkey"`
 	Description *string          `json:"description,omitempty"`
+	Quote       string           `json:"quote"`
+	Request     string           `json:"request"`
+	Unit        string           `json:"unit"`
+	State       ACTION_STATE     `json:"state"`
+	CheckingId  string           `json:"checking_id"`
+	Expiry      int64            `json:"expiry"`
+	SeenAt      int64            `json:"seen_at"`
+	Minted      bool             `json:"minted"`
 }
 
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
@@ -307,16 +305,16 @@ func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Respons
 }
 
 type PostMintBolt11Request struct {
+	Signature *schnorr.Signature `json:"signature,omitempty"`
 	Quote     string             `json:"quote"`
 	Outputs   []BlindedMessage   `json:"outputs"`
-	Signature *schnorr.Signature `json:"signature,omitempty"`
 }
 
 func (p *PostMintBolt11Request) UnmarshalJSON(data []byte) error {
 	var aux struct {
+		Signature *string          `json:"signature,omitempty"`
 		Quote     string           `json:"quote"`
 		Outputs   []BlindedMessage `json:"outputs"`
-		Signature *string          `json:"signature,omitempty"`
 	}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("could not marshall into PostMintBolt11Request: %w", err)
@@ -389,12 +387,12 @@ type PostMintBolt11Response struct {
 }
 
 type BasicKeysetResponse struct {
-	Id          string `json:"id"`
-	Unit        string `json:"unit"`
-	Active      bool   `json:"active"`
-	InputFeePpk uint   `json:"input_fee_ppk"`
-	Version     uint32
 	FinalExpiry *uint64 `json:"final_expiry,omitempty"`
+	Id          string  `json:"id"`
+	Unit        string  `json:"unit"`
+	InputFeePpk uint    `json:"input_fee_ppk"`
+	Version     uint32
+	Active      bool `json:"active"`
 }
 
 type PostCheckStateRequest struct {
@@ -403,8 +401,8 @@ type PostCheckStateRequest struct {
 
 type CheckState struct {
 	Y       WrappedPublicKey `json:"Y"`
-	State   ProofState       `json:"state"`
 	Witness *string          `json:"witness,omitempty"`
+	State   ProofState       `json:"state"`
 }
 
 type PostCheckStateResponse struct {
@@ -412,15 +410,13 @@ type PostCheckStateResponse struct {
 }
 
 type RecoverSigDB struct {
-	Amount    uint64              `json:"amount"`
-	Id        string              `json:"id"`
 	B_        WrappedPublicKey    `json:"B_" db:"B_"`
 	C_        WrappedPublicKey    `json:"C_" db:"C_"`
-	CreatedAt int64               `json:"created_at" db:"created_at"`
 	Dleq      *BlindSignatureDLEQ `json:"dleq,omitempty"`
-
-	// This fields are use for melt_requests pending queries
-	MeltQuote string `json:"melt_quote" db:"melt_quote"`
+	Id        string              `json:"id"`
+	MeltQuote string              `json:"melt_quote" db:"melt_quote"`
+	Amount    uint64              `json:"amount"`
+	CreatedAt int64               `json:"created_at" db:"created_at"`
 }
 
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
@@ -679,7 +675,7 @@ func (p WrappedPublicKey) Value() (driver.Value, error) {
 	if p.PublicKey == nil {
 		return nil, nil
 	}
-	return p.PublicKey.SerializeCompressed(), nil
+	return p.SerializeCompressed(), nil
 }
 
 func (p *WrappedPublicKey) Scan(value any) error {

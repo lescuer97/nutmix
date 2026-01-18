@@ -150,4 +150,3 @@ func CheckIfSignerErrorExists(err *sig.Error) error {
 
 	return errResult
 }
-

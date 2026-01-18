@@ -54,23 +54,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 		meltChan := make(chan cashu.MeltRequestDB, 1)
 		closeChan := make(chan string, 1)
 		// parse request check if subscription or unsubscribe
-		err = handleWSRequest(request, mint.Observer, proofChan, mintChan, meltChan, closeChan)
-
-		if err != nil {
-			if errors.Is(err, ErrAlreadySubscribed) {
-				errMsg := cashu.WsError{
-					JsonRpc: "2.0",
-					Id:      request.Id,
-					Error: cashu.ErrorMsg{
-						Code:    uint64(cashu.UNKNOWN),
-						Message: "Already subscribed to filter",
-					},
-				}
-				err = m.SendJson(conn, errMsg)
-			}
-			slog.Error("Error on creating websocket", slog.Any("error", err))
-			return
-		}
+		handleWSRequest(request, mint.Observer, proofChan, mintChan, meltChan, closeChan)
 
 		slog.Debug("New request", slog.Any("request", request))
 		// confirm subscription or unsubscribe
@@ -167,7 +151,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 
 func handleWSRequest(request cashu.WsRequest, observer *m.Observer, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB,
 	closeChan chan string,
-) error {
+) {
 	switch request.Method {
 	case cashu.Subcribe:
 
@@ -191,7 +175,6 @@ func handleWSRequest(request cashu.WsRequest, observer *m.Observer, proofChan ch
 		go observer.RemoveWatch(request.Params.SubId)
 		closeChan <- "asked for unsubscribe"
 	}
-	return nil
 }
 
 func ListenToIncommingMessage(subs *m.Observer, conn *websocket.Conn, listenChannel chan error, proofChan chan cashu.Proof, mintChan chan cashu.MintRequestDB, meltChan chan cashu.MeltRequestDB, closeChan chan string) {
@@ -203,11 +186,7 @@ func ListenToIncommingMessage(subs *m.Observer, conn *websocket.Conn, listenChan
 			return
 		}
 
-		err = handleWSRequest(request, subs, proofChan, mintChan, meltChan, closeChan)
-		if err != nil {
-			listenChannel <- fmt.Errorf("handleWSRequest(request, subs) %w", err)
-			return
-		}
+		handleWSRequest(request, subs, proofChan, mintChan, meltChan, closeChan)
 		response := cashu.WsResponse{
 			JsonRpc: "2.0",
 			Id:      request.Id,
@@ -274,7 +253,11 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 			}
 			statusNotif.Params.Payload = mintState
 			if exists {
-				if value.(cashu.MintRequestDB).State != mintState.State {
+				mintRequest, ok := value.(cashu.MintRequestDB)
+				if !ok {
+					return fmt.Errorf("unexpected mint request type: %T", value)
+				}
+				if mintRequest.State != mintState.State {
 					alreadyCheckedFilter[filter] = mintState
 					err := m.SendJson(conn, statusNotif)
 					if err != nil {
@@ -296,8 +279,11 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 
 			statusNotif.Params.Payload = meltState
 			if exists {
-
-				if value.(cashu.MeltRequestDB).State != meltState.State {
+				meltRequest, ok := value.(cashu.MeltRequestDB)
+				if !ok {
+					return fmt.Errorf("unexpected melt request type: %T", value)
+				}
+				if meltRequest.State != meltState.State {
 					alreadyCheckedFilter[filter] = meltState
 					err := m.SendJson(conn, statusNotif)
 					if err != nil {
@@ -331,7 +317,11 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 			}
 			// check for subscription and if the state changed
 			if exists && len(proofsState) > 0 {
-				if value.(cashu.CheckState).State != proofsState[0].State {
+				checkState, ok := value.(cashu.CheckState)
+				if !ok {
+					return fmt.Errorf("unexpected check state type: %T", value)
+				}
+				if checkState.State != proofsState[0].State {
 					statusNotif.Params.Payload = proofsState[0]
 
 					alreadyCheckedFilter[filter] = proofsState[0]

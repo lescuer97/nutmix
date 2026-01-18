@@ -25,11 +25,10 @@ type MeltQuoteChannel struct {
 }
 
 type Observer struct {
-	sync.Mutex
-	// the string is the filters from the websockets
 	Proofs    map[string][]ProofWatchChannel
 	MintQuote map[string][]MintQuoteChannel
 	MeltQuote map[string][]MeltQuoteChannel
+	sync.Mutex
 }
 
 func (o *Observer) AddProofWatch(y string, proofChan ProofWatchChannel) {

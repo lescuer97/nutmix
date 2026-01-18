@@ -87,7 +87,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 		mintRequestDB := cashu.MintRequestDB{
 			Quote:       quoteId,
-			RequestPaid: false,
 			Expiry:      expireTime,
 			Unit:        unit.String(),
 			State:       cashu.UNPAID,
@@ -97,7 +96,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			Description: mintRequest.Description,
 		}
 
-		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: uint64(mintRequest.Amount)})
+		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: mintRequest.Amount})
 		if err != nil {
 			slog.Info("Payment request", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
@@ -204,9 +203,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			}
 		}()
 
-		err = mint.MintDB.ChangeMintRequestState(stateChangeTX, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)
+		err = mint.MintDB.ChangeMintRequestState(stateChangeTX, quote.Quote, quote.State, quote.Minted)
 		if err != nil {
-			slog.Error("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted)", slog.Any("error", err))
+			slog.Error("mint.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.State, quote.Minted)", slog.Any("error", err))
 		}
 
 		err = mint.MintDB.Commit(ctx, stateChangeTX)
@@ -332,7 +331,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			c.JSON(403, "Amounts in outputs are not the same")
 			return
 		}
-		if !mintRequestDB.RequestPaid && mintRequestDB.State == cashu.UNPAID {
+		if mintRequestDB.State == cashu.UNPAID {
 
 			slog.Debug(fmt.Sprintf("Checking payment state quote id: %v. ", mintRequestDB.Quote))
 			mintRequestDB, err = m.CheckMintRequest(mint, mintRequestDB, invoice)
@@ -361,9 +360,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			}()
 
 			slog.Debug(fmt.Sprintf("Changing state of mint request id %v. To: %v", mintRequestDB.Quote, mintRequestDB.State))
-			err = mint.MintDB.ChangeMintRequestState(afterCheckTx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
+			err = mint.MintDB.ChangeMintRequestState(afterCheckTx, mintRequestDB.Quote, mintRequestDB.State, mintRequestDB.Minted)
 			if err != nil {
-				slog.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterCheckTx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+				slog.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterCheckTx, quote.Quote, quote.State, quote.Minted): %w", err).Error())
 				return
 			}
 			err = mint.MintDB.Commit(ctx, afterCheckTx)
@@ -402,9 +401,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			}
 		}()
 
-		err = mint.MintDB.ChangeMintRequestState(afterBlindSignTx, mintRequestDB.Quote, mintRequestDB.RequestPaid, mintRequestDB.State, mintRequestDB.Minted)
+		err = mint.MintDB.ChangeMintRequestState(afterBlindSignTx, mintRequestDB.Quote, mintRequestDB.State, mintRequestDB.Minted)
 		if err != nil {
-			slog.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterBlindSignTx, quote.Quote, quote.RequestPaid, quote.State, quote.Minted): %w", err).Error())
+			slog.Error(fmt.Errorf("mint.MintDB.ChangeMintRequestState(afterBlindSignTx, quote.Quote, quote.State, quote.Minted): %w", err).Error())
 			return
 		}
 
@@ -417,7 +416,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		slog.Debug(fmt.Sprintf("Commiting transaction for: id %v", mintRequestDB.Quote))
+		slog.Debug(fmt.Sprintf("Committing transaction for: id %v", mintRequestDB.Quote))
 		err = mint.MintDB.Commit(ctx, afterBlindSignTx)
 		if err != nil {
 			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx, afterBlindSignTx). %w", err))
@@ -495,7 +494,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		cashuAmount := cashu.Amount{Unit: unit, Amount: uint64(amount)}
 
 		isMpp := false
-		mppAmount := cashu.Amount{Unit: cashu.Msat, Amount: uint64(meltRequest.IsMpp())}
+		mppAmount := cashu.Amount{Unit: cashu.Msat, Amount: meltRequest.IsMpp()}
 
 		// if mpp is valid than change amount to mpp amount
 		if mppAmount.Amount != 0 {
@@ -542,7 +541,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			Unit:            unit.String(),
 			Expiry:          expireTime,
 			FeeReserve:      (queryFee + 1),
-			RequestPaid:     false,
 			State:           cashu.UNPAID,
 			PaymentPreimage: "",
 			SeenAt:          now,

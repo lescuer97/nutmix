@@ -188,7 +188,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 						return
 					}
 
-					slog.Debug("Commiting swap", slog.String("swap_id", swap.Id))
+					slog.Debug("Committing swap", slog.String("swap_id", swap.Id))
 					err = afterCheckTx.Commit(ctx)
 					if err != nil {
 						slog.Error("Could not commit sub transaction", slog.Any("error", err))

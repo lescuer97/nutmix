@@ -25,10 +25,9 @@ func TestIsInternalTransactionSuccess(t *testing.T) {
 	}
 
 	mintRequest := cashu.MintRequestDB{
-		Quote:       "quote1",
-		Request:     RegtestRequest,
-		RequestPaid: false,
-		State:       cashu.UNPAID,
+		Quote:   "quote1",
+		Request: RegtestRequest,
+		State:   cashu.UNPAID,
 	}
 	err = mint.MintDB.SaveMintRequest(tx, mintRequest)
 	if err != nil {
@@ -61,10 +60,9 @@ func TestIsInternalTransactionFail(t *testing.T) {
 	}
 
 	mintRequest := cashu.MintRequestDB{
-		Quote:       "quote1",
-		Request:     "wrong request",
-		RequestPaid: false,
-		State:       cashu.UNPAID,
+		Quote:   "quote1",
+		Request: "wrong request",
+		State:   cashu.UNPAID,
 	}
 	err = mint.MintDB.SaveMintRequest(tx, mintRequest)
 	if err != nil {

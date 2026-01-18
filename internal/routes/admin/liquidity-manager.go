@@ -483,7 +483,7 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 				return
 			}
 
-			slog.Info("after check payed verification")
+			slog.Info("after check paid verification")
 			lnStatusTx, err := mint.MintDB.GetTx(ctx)
 			if err != nil {
 				return

@@ -26,8 +26,8 @@ const (
 )
 
 type FakeWallet struct {
-	Network         chaincfg.Params
 	UnpurposeErrors []FakeWalletError
+	Network         chaincfg.Params
 	InvoiceFee      uint64
 }
 

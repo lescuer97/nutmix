@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"net/http/httptest"
@@ -552,10 +551,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if postMeltQuoteResponse.Paid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
-	}
-
 	if postMeltQuoteResponse.State != cashu.UNPAID {
 		t.Errorf("Expected state to be UNPAID, got %v", postMeltQuoteResponse.State)
 	}
@@ -576,10 +571,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
 
-	}
-
-	if postMeltQuoteResponse.Paid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltQuoteResponse.Paid)
 	}
 
 	if postMeltQuoteResponse.State != cashu.UNPAID {
@@ -652,9 +643,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if !postMeltResponse.Paid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
-	}
 	if postMeltResponse.State != cashu.PAID {
 		t.Errorf("Expected state to be Paid, got %v", postMintQuoteResponseTwo.State)
 	}
@@ -896,7 +884,7 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	ctx = context.WithValue(ctx, ctxKeyLndMacaroon, os.Getenv(utils.LND_MACAROON))
 
 	if err != nil {
-		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
+		t.Fatalf("Error setting up lightning network environment: %+v", err)
 	}
 
 	LightningBolt11Test(t, ctx, bobLnd)
@@ -968,7 +956,7 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	}
 
 	if err != nil {
-		t.Fatalf("Error setting up lightning network enviroment: %+v", err)
+		t.Fatalf("Error setting up lightning network environment: %+v", err)
 	}
 
 	LightningBolt11Test(t, ctx, bobLnd)
@@ -1179,7 +1167,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Expected Amounts in outputs are not the same, got %s", w.Body.String())
 	}
 
-	// MINT SUCCESSFULY
+	// MINT SUCCESSFULLY
 	blindedMessages, mintingSecrets, mintingSecretKeys, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -1472,7 +1460,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	// I have to grab the Payment request from the cli reader
-	reader := io.Reader(invoiceReader)
 	buf := make([]byte, 3024)
 	type LncliInvoice struct {
 		PaymentRequest string `json:"payment_request"`
@@ -1480,7 +1467,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	var invoice LncliInvoice
 	for {
-		n, err := reader.Read(buf)
+		n, err := invoiceReader.Read(buf)
 		if n > 0 {
 			index := strings.Index(string(buf[:n]), "{")
 			err := json.Unmarshal(buf[index:n], &invoice)
@@ -1513,10 +1500,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if postMeltQuoteResponse.Paid {
-		t.Errorf("Expected paid to be false because it's a LND Node, got %v", postMeltQuoteResponse.Paid)
-	}
-
 	if postMeltQuoteResponse.State != cashu.UNPAID {
 		t.Errorf("Expected to not be paid have: %s ", postMeltQuoteResponse.State)
 	}
@@ -1538,9 +1521,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if postMeltQuoteResponse.Paid {
-		t.Errorf("Expected paid to be false because it's a Lnd Node, got %v", postMeltQuoteResponse.Paid)
-	}
 	if postMeltQuoteResponse.State != cashu.UNPAID {
 
 		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponseTwo.State)
@@ -1614,10 +1594,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	if postMeltResponse.State != cashu.PAID {
 		t.Errorf("Expected state to be PAID, got %v", postMintQuoteResponseTwo.State)
-	}
-
-	if !postMeltResponse.Paid {
-		t.Errorf("Expected paid to be true because it's a fake wallet, got %v", postMeltResponse.Paid)
 	}
 
 	// Test melt that has already been melted

@@ -49,7 +49,7 @@ func main() {
 	pathToConfigFile := logsdir + "/" + mint.LogFileName
 
 	// Manipulate Config file
-	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0764)
+	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
@@ -67,7 +67,7 @@ func main() {
 
 	err = godotenv.Load(".env")
 	if err != nil {
-		log.Printf("Did not find any .env file using enviroment variables!")
+		log.Printf("Did not find any .env file using environment variables!")
 	}
 
 	gin.SetMode(gin.ReleaseMode)
@@ -111,8 +111,6 @@ func main() {
 	r := gin.Default()
 
 	r.Use(gin.LoggerWithWriter(w))
-	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowOrigins = []string{"https://" + os.Getenv("MINT_HOSTNAME"), "http://" + os.Getenv("MINT_HOSTNAME")}
 
 	r.Use(cors.Default())
 	// // gzip compression

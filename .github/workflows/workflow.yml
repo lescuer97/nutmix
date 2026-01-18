@@ -12,16 +12,7 @@ jobs:
         with:
           go-version: '1.25.4'
           cache: true
-
-      - name: Go Toolchain info
-        run: |
-          go version
-
-      - name: Install Just
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y just
-
+      - uses: extractions/setup-just@v3
       - name: Set up Bun
         uses: oven-sh/setup-bun@v1
         with:
@@ -47,16 +38,7 @@ jobs:
         with:
           go-version: '1.25.4'
           cache: true
-
-      - name: Go Toolchain info
-        run: |
-          go version
-
-      - name: Install Just
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y just
-
+      - uses: extractions/setup-just@v3
       - name: Set up Bun
         uses: oven-sh/setup-bun@v1
         with:
@@ -99,20 +81,15 @@ jobs:
         with:
           go-version: '1.25.4'
           cache: true
-
-      - name: Go Toolchain info
-        run: |
-          go version
-
-      - name: Install Just
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y just
-
+      - uses: extractions/setup-just@v3
       - name: Set up Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
+
+      - name: Go Toolchain info
+        run: |
+          go version
 
       - name: Install dependencies
         run: just install-deps

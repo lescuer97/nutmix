@@ -83,7 +83,7 @@ func (p *PostSwapRequest) verifyConditions() error {
 			return fmt.Errorf("not same data field %w", ErrInvalidSpendCondition)
 		}
 
-		if string(spendCondition.Data.Tags.originalTag) != string(firstSpendCondition.Data.Tags.originalTag) {
+		if spendCondition.Data.Tags.originalTag != firstSpendCondition.Data.Tags.originalTag {
 			return fmt.Errorf("not same tags %w", ErrInvalidSpendCondition)
 		}
 

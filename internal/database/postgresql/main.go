@@ -35,7 +35,7 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error)
 
 	dbUrl := os.Getenv(DATABASE_URL_ENV)
 	if dbUrl == "" {
-		return postgresql, fmt.Errorf("%v enviroment variable empty", DATABASE_URL_ENV)
+		return postgresql, fmt.Errorf("%v environment variable empty", DATABASE_URL_ENV)
 
 	}
 
@@ -189,7 +189,7 @@ func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) err
 func (pql Postgresql) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error {
 	ctx := context.Background()
 
-	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)", request.Quote, request.Request, request.RequestPaid, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId, request.Pubkey, request.Description)
+	_, err := tx.Exec(ctx, "INSERT INTO mint_request (quote, request, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", request.Quote, request.Request, request.Expiry, request.Unit, request.Minted, request.State, request.SeenAt, request.Amount, request.CheckingId, request.Pubkey, request.Description)
 	if err != nil {
 		return databaseError(fmt.Errorf("inserting to mint_request: %w", err))
 
@@ -197,9 +197,9 @@ func (pql Postgresql) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) er
 	return nil
 }
 
-func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, minted bool) error {
+func (pql Postgresql) ChangeMintRequestState(tx pgx.Tx, quote string, state cashu.ACTION_STATE, minted bool) error {
 	// change the paid status of the quote
-	_, err := tx.Exec(context.Background(), "UPDATE mint_request SET request_paid = $1, state = $3, minted = $4 WHERE quote = $2", paid, quote, state, minted)
+	_, err := tx.Exec(context.Background(), "UPDATE mint_request SET state = $2, minted = $3 WHERE quote = $1", quote, state, minted)
 	if err != nil {
 		return databaseError(fmt.Errorf("inserting to mint_request: %w", err))
 
@@ -213,8 +213,8 @@ func (pql Postgresql) GetMintRequestById(tx pgx.Tx, id string) (cashu.MintReques
 
 	var mintRequest cashu.MintRequestDB
 	// Use QueryRow instead of Query
-	err := tx.QueryRow(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote = $1 FOR UPDATE", id).
-		Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
+	err := tx.QueryRow(context.Background(), "SELECT quote, request, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote = $1 FOR UPDATE", id).
+		Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
 
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf("database error: %w", err)
@@ -229,8 +229,8 @@ func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.
 
 	var mintRequest cashu.MintRequestDB
 	// Use QueryRow instead of Query
-	err := tx.QueryRow(context.Background(), "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE request = $1 FOR UPDATE", request).
-		Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.RequestPaid, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
+	err := tx.QueryRow(context.Background(), "SELECT quote, request, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE request = $1 FOR UPDATE", request).
+		Scan(&mintRequest.Quote, &mintRequest.Request, &mintRequest.Expiry, &mintRequest.Unit, &mintRequest.Minted, &mintRequest.State, &mintRequest.SeenAt, &amount, &mintRequest.CheckingId, &mintRequest.Pubkey, &mintRequest.Description)
 
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf("database error: %w", err)
@@ -241,7 +241,7 @@ func (pql Postgresql) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.
 }
 
 func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, error) {
-	rows, err := tx.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
+	rows, err := tx.Query(context.Background(), "SELECT quote, request, amount, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", id)
 	if err != nil {
 		return cashu.MeltRequestDB{}, fmt.Errorf("could not find melt request from id %w", err)
 	}
@@ -258,7 +258,7 @@ func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltReques
 
 func (pql Postgresql) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
 
-	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE state = $1", state)
+	rows, err := pql.pool.Query(context.Background(), "SELECT quote, request, amount, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id  FROM melt_request WHERE state = $1", state)
 	if err != nil {
 		return nil, fmt.Errorf("could not find melt requests from state %w", err)
 	}
@@ -276,8 +276,8 @@ func (pql Postgresql) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.Me
 func (pql Postgresql) SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error {
 
 	_, err := tx.Exec(context.Background(),
-		"INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, request_paid, melted, state, payment_preimage, seen_at, mpp, fee_paid, checking_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
-		request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.RequestPaid, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp, request.FeePaid, request.CheckingId)
+		"INSERT INTO melt_request (quote, request, fee_reserve, expiry, unit, amount, melted, state, payment_preimage, seen_at, mpp, fee_paid, checking_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+		request.Quote, request.Request, request.FeeReserve, request.Expiry, request.Unit, request.Amount, request.Melted, request.State, request.PaymentPreimage, request.SeenAt, request.Mpp, request.FeePaid, request.CheckingId)
 	if err != nil {
 		return databaseError(fmt.Errorf("inserting to mint_request: %w", err))
 	}
@@ -293,9 +293,9 @@ func (pql Postgresql) AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage s
 	}
 	return nil
 }
-func (pql Postgresql) ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error {
+func (pql Postgresql) ChangeMeltRequestState(tx pgx.Tx, quote string, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error {
 	// change the paid status of the quote
-	_, err := tx.Exec(context.Background(), "UPDATE melt_request SET request_paid = $1, state = $3, melted = $4, fee_paid = $5 WHERE quote = $2", paid, quote, state, melted, fee_paid)
+	_, err := tx.Exec(context.Background(), "UPDATE melt_request SET state = $2, melted = $3, fee_paid = $4 WHERE quote = $1", quote, state, melted, fee_paid)
 	if err != nil {
 		return databaseError(fmt.Errorf("updating mint_request: %w", err))
 
@@ -459,9 +459,9 @@ func (pql Postgresql) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
 
 }
 
-func privateKeysToDleq(s_key []byte, e_key []byte, sig *cashu.RecoverSigDB) error {
+func privateKeysToDleq(s_key []byte, e_key []byte, sig *cashu.RecoverSigDB) {
 	if s_key == nil || e_key == nil {
-		return nil
+		return
 	}
 
 	dleqTmp := &cashu.BlindSignatureDLEQ{
@@ -473,7 +473,6 @@ func privateKeysToDleq(s_key []byte, e_key []byte, sig *cashu.RecoverSigDB) erro
 	dleqTmp.E = secp256k1.PrivKeyFromBytes(e_key)
 
 	sig.Dleq = dleqTmp
-	return nil
 }
 
 func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error) {
@@ -501,10 +500,7 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.Wr
 			return nil, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
 		}
 
-		err = privateKeysToDleq(dleq_s_bytes, dleq_e_bytes, &sig)
-		if err != nil {
-			return nil, databaseError(fmt.Errorf("privateKeysToDleq(dleq_s_str, dleq_e_str, sig.Dleq). %w", err))
-		}
+		privateKeysToDleq(dleq_s_bytes, dleq_e_bytes, &sig)
 
 		signatures = append(signatures, sig)
 	}

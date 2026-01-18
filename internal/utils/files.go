@@ -20,10 +20,10 @@ var (
 
 type SlogRecordJSON struct {
 	Time      time.Time
-	Msg       string
-	Level     slog.Level
-	ExtraInfo string         `json:"extra-info"`
 	Extras    map[string]any `json:"-"`
+	Msg       string
+	ExtraInfo string `json:"extra-info"`
+	Level     slog.Level
 }
 
 // ParseLogFileByLevelAndTime parses the provided log file line-by-line assuming the file is in ascending time order
@@ -161,7 +161,7 @@ func CreateDirectoryAndPath(dirPath string, filename string) error {
 	_, err := os.Stat(dirPath)
 
 	if os.IsNotExist(err) {
-		err = os.MkdirAll(dirPath, 0764)
+		err = os.MkdirAll(dirPath, 0750)
 		if err != nil {
 			return fmt.Errorf("os.MkdirAll(pathToProjectDir, 0764) %w", err)
 		}
