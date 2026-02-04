@@ -177,11 +177,11 @@ ensure-golangci-lint:
     fi
 
 # Lint recipe
-lint: ensure-golangci-lint
+lint *flags: ensure-golangci-lint 
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running linter..."
-    golangci-lint run
+    golangci-lint run {{flags}}
 
 # Clean recipe
 clean:

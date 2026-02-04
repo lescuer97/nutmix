@@ -27,8 +27,8 @@ func DeriveKeysetId(keysets []*secp256k1.PublicKey) (string, error) {
 }
 
 type pubkeyWithAmount struct {
-	Amount uint64
 	Pubkey *secp256k1.PublicKey
+	Amount uint64
 }
 
 func sortPubkeyMapToOrganizedArray(pubkeyMap map[uint64]*secp256k1.PublicKey) []pubkeyWithAmount {
