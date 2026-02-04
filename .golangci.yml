@@ -11,7 +11,7 @@ linters:
     - gosec           # Security vulnerability scanner
     - bidichk         # Checks for dangerous unicode character sequences
     - bodyclose       # Checks HTTP response body is closed
-    # - contextcheck    # Check for non-inherited context
+    - contextcheck    # Check for non-inherited context
     
     # Bug detection
     - staticcheck     # Comprehensive static analysis

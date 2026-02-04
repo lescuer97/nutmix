@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/gin-gonic/gin"
@@ -14,7 +13,7 @@ func LightningDataFormFields(mint *m.Mint) gin.HandlerFunc {
 
 		backend := c.Query(m.MINT_LIGHTNING_BACKEND_ENV)
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		err := templates.SetupForms(backend, mint.Config).Render(ctx, c.Writer)
 
 		if err != nil {

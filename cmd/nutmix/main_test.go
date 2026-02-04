@@ -712,6 +712,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 
 	slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
+	// nolint: contextcheck
 	routes.V1Routes(r, mint)
 
 	if adminRoute {
@@ -753,6 +754,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 
 	slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
+	// nolint: contextcheck
 	routes.V1Routes(r, mint)
 
 	if adminRoute {

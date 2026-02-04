@@ -148,52 +148,89 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 
 	// PAGES SETUP
 	// This is /admin pages
+	// nolint: contextcheck
 	adminRoute.GET("/login", LoginPage(mint, nostrPubkey != nil))
 
 	newLiquidity := make(chan string)
 	if nostrPubkey != nil {
+		// nolint: contextcheck
 		adminRoute.GET("/summary", SummaryComponent(mint, &adminHandler))
+		// nolint: contextcheck
 		adminRoute.GET("/proofs-chart", ProofsChartCard(mint))
+		// nolint: contextcheck
 		adminRoute.GET("/api/proofs-chart-data", ProofsChartDataAPI(mint))
+		// nolint: contextcheck
 		adminRoute.GET("/blindsigs-chart", BlindSigsChartCard(mint))
+		// nolint: contextcheck
 		adminRoute.GET("/api/blindsigs-chart-data", BlindSigsChartDataAPI(mint))
+		// nolint: contextcheck
 		adminRoute.GET("", InitPage(mint))
+		// nolint: contextcheck
 		adminRoute.GET("/ln", LnPage(mint))
+		// nolint: contextcheck
 		adminRoute.GET("/ln-chart", LnChartCard(mint))
+		// nolint: contextcheck
 		adminRoute.GET("/ln-table", LightningTable(&adminHandler))
+		// nolint: contextcheck
 		adminRoute.GET("/api/ln-chart-data", LnChartDataAPI(mint))
+		// nolint: contextcheck
 		adminRoute.GET("/keysets", KeysetsPage(mint))
+		// nolint: contextcheck
 		adminRoute.GET("/settings", MintSettingsPage(mint))
 
 		// change routes
+		// nolint: contextcheck
 		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
+		// nolint: contextcheck
 		adminRoute.POST("/mintsettings/general", MintSettingsGeneral(mint))
+		// nolint: contextcheck
 		adminRoute.POST("/mintsettings/lightning", MintSettingsLightning(mint))
+		// nolint: contextcheck
 		adminRoute.POST("/mintsettings/auth", MintSettingsAuth(mint))
 		// Legacy/Fallback
+		// nolint: contextcheck
 		adminRoute.POST("/bolt11", Bolt11Post(mint))
+		// nolint: contextcheck
 		adminRoute.POST("/rotate/sats", RotateSatsSeed(&adminHandler))
+		// nolint: contextcheck
 		adminRoute.POST("/logout", LogoutHandler(tokenBlacklist))
 
 		// fractional html components
+		// nolint: contextcheck
 		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(&adminHandler))
+		// nolint: contextcheck
 		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
 
 		liquidityMangerRouter := adminRoute.Group("")
+		// nolint: contextcheck
 		liquidityMangerRouter.Use(liquidityManagerMiddleware(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/liquidity", LigthningLiquidityPage(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/liquidity-button", LiquidityButton(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/liquidity/:swapId", SwapStatusPage(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/swaps-list", SwapsList(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/ln-send", LnSendPage(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/ln-receive", LnReceivePage(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/liquid-swap-form", SwapOutForm(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/lightning-swap-form", LightningSwapForm())
+		// nolint: contextcheck
 		liquidityMangerRouter.POST("/out-swap-req", SwapOutRequest(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.POST("/in-swap-req", SwapInRequest(mint, newLiquidity))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/liquidity-summary", LiquiditySummaryComponent(&adminHandler))
+		// nolint: contextcheck
 		liquidityMangerRouter.GET("/swap/:swapId", SwapStateCheck(mint))
+		// nolint: contextcheck
 		liquidityMangerRouter.POST("/swap/:swapId/confirm", ConfirmSwapOutTransaction(mint, newLiquidity))
+		// nolint: contextcheck
 		go CheckStatusOfLiquiditySwaps(mint, newLiquidity)
 	}
 

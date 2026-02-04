@@ -81,7 +81,8 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(w, opts))
 	slog.SetDefault(logger)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Minute)
+	defer cancel()
 
 	db, err := postgresql.DatabaseSetup(ctx, "migrations")
 	if err != nil {

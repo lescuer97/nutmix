@@ -33,7 +33,7 @@ var (
 
 func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		err := templates.MintSettings(mint.Config).Render(ctx, c.Writer)
 		if err != nil {
@@ -347,7 +347,7 @@ func MintSettingsAuth(mint *m.Mint) gin.HandlerFunc {
 
 func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		err := templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer)
 
 		if err != nil {

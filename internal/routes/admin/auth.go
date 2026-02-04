@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -110,7 +109,7 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 			c.JSON(400, "Malformed body request")
 			return
 		}
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
@@ -131,7 +130,7 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			} else {
-				err = mint.MintDB.Commit(context.Background(), tx)
+				err = mint.MintDB.Commit(ctx, tx)
 				if err != nil {
 					_ = c.Error(fmt.Errorf("failed to commit transaction: %+v", err))
 				}

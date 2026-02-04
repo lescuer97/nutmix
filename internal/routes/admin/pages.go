@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -49,7 +48,7 @@ func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		err = templates.LoginPage(nonce, adminNostrKeyAvailable).Render(ctx, c.Writer)
 		if err != nil {
 			_ = c.Error(err)
@@ -61,7 +60,7 @@ func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 
 func InitPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Default time range is 1 week
 		selectedRange := "1w"
@@ -132,7 +131,7 @@ func calculateChartSummary(data []database.ProofTimeSeriesPoint) templates.Chart
 // ProofsChartCard returns the full chart card component (for HTMX load with optional date params)
 func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Parse time range from query params
 		timeRange := c.Query("since")
@@ -160,7 +159,7 @@ func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 // ProofsChartDataAPI returns HTML fragment for the proofs chart based on time range (for HTMX updates)
 func ProofsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Parse time range from query params
 		timeRange := c.Query("since")
@@ -187,7 +186,7 @@ func ProofsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 // BlindSigsChartCard returns the full blind sigs chart card component (for HTMX load with optional date params)
 func BlindSigsChartCard(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Parse time range from query params
 		timeRange := c.Query("since")
@@ -215,7 +214,7 @@ func BlindSigsChartCard(mint *mint.Mint) gin.HandlerFunc {
 // BlindSigsChartDataAPI returns HTML fragment for the blind sigs chart based on time range (for HTMX updates)
 func BlindSigsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Parse time range from query params
 		timeRange := c.Query("since")
@@ -241,7 +240,7 @@ func BlindSigsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 
 func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		err := templates.LiquidityDashboard().Render(ctx, c.Writer)
 
@@ -255,7 +254,7 @@ func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
 
 func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		swapId := c.Param("swapId")
 		tx, err := mint.MintDB.GetTx(ctx)
@@ -289,7 +288,7 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 			_ = c.Error(err)
 			return
 		}
-		if err := tx.Commit(context.Background()); err != nil {
+		if err := tx.Commit(ctx); err != nil {
 			_ = c.Error(fmt.Errorf("tx.Commit failed: %w", err))
 			return
 		}
@@ -322,7 +321,7 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 
 func LnPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Default time range is 1 week
 		selectedRange := c.DefaultQuery("since", "1w")
@@ -339,7 +338,7 @@ func LnPage(mint *mint.Mint) gin.HandlerFunc {
 
 func LightningTable(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		searchQuery := c.Query("search")
 		timeRange := c.Query("since")
@@ -520,7 +519,7 @@ func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *
 // LnChartCard returns the full LN chart card component (for HTMX load with optional date params)
 func LnChartCard(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Parse time range from query params
 		timeRange := c.Query("since")
@@ -551,7 +550,7 @@ func LnChartCard(mint *mint.Mint) gin.HandlerFunc {
 // LnChartDataAPI returns HTML fragment for the LN chart based on time range (for HTMX updates)
 func LnChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Parse time range from query params
 		timeRange := c.Query("since")

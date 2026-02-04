@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -20,7 +19,7 @@ var ErrNoExpiryTime = errors.New("no expiry time provided")
 func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		err := templates.KeysetsPage().Render(ctx, c.Writer)
 
 		if err != nil {
@@ -38,7 +37,7 @@ func KeysetsLayoutPage(adminHandler *adminHandler) gin.HandlerFunc {
 			_ = c.Error(fmt.Errorf("adminHandler.getKeysets(nil). %w", err))
 			return
 		}
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		err = templates.KeysetsList(keysetMap, orderedUnits).Render(ctx, c.Writer)
 
 		if err != nil {

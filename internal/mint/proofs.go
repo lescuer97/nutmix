@@ -9,9 +9,8 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
-func CheckProofState(mint *Mint, Ys []cashu.WrappedPublicKey) ([]cashu.CheckState, error) {
+func CheckProofState(ctx context.Context, mint *Mint, Ys []cashu.WrappedPublicKey) ([]cashu.CheckState, error) {
 	var states []cashu.CheckState
-	ctx := context.Background()
 	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
 		return states, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)

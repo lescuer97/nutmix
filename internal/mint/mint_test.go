@@ -176,7 +176,7 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 		t.Fatalf("SetupDataOnDB(mint): %+v ", err)
 	}
 
-	meltRequest, err := mint.CheckMeltQuoteState(quoteId)
+	meltRequest, err := mint.CheckMeltQuoteState(context.Background(), quoteId)
 	if err != nil {
 		t.Fatalf("mint.CheckMeltQuoteState(quoteId): %+v ", err)
 	}
@@ -255,7 +255,7 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 		t.Fatalf("SetupDataOnDB(mint): %+v ", err)
 	}
 
-	meltRequest, err := mint.CheckMeltQuoteState(quoteId)
+	meltRequest, err := mint.CheckMeltQuoteState(context.Background(), quoteId)
 	if err != nil {
 		t.Fatalf("mint.CheckMeltQuoteState(quoteId): %+v ", err)
 	}
@@ -326,7 +326,7 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNPending(t *testing.T) {
 		t.Fatalf("SetupDataOnDB(mint): %+v ", err)
 	}
 
-	meltRequest, err := mint.CheckMeltQuoteState(quoteId)
+	meltRequest, err := mint.CheckMeltQuoteState(context.Background(), quoteId)
 	if err != nil {
 		t.Fatalf("mint.CheckMeltQuoteState(quoteId): %+v ", err)
 	}
