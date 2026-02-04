@@ -2,9 +2,7 @@ package cashu
 
 import (
 	"encoding/hex"
-	"log"
 	"math/big"
-	"sort"
 	"testing"
 	"time"
 
@@ -118,59 +116,6 @@ func TestChangeProofsStateToPendingAndQuoteSet(t *testing.T) {
 
 }
 
-func convertJsonMapIntoOrderedArray(raw map[string]string) []*secp256k1.PublicKey {
-	arrays := []struct {
-		Pubkey *secp256k1.PublicKey
-		Amount uint64
-	}{}
-	// Build the final map[uint64]*btcec.PublicKey
-	// pubkeys := make(map[uint64]*btcec.PublicKey)
-	for k, hexStr := range raw {
-		// Parse the key as big.Int then to uint64 (safe since JSON keys are ≤ 2^63)
-		keyInt, ok := new(big.Int).SetString(k, 10)
-		if !ok {
-			log.Fatalf("invalid key: %s", k)
-		}
-		if !keyInt.IsUint64() {
-			log.Fatalf("key too large for uint64: %s", k)
-		}
-		uKey := keyInt.Uint64()
-
-		// Decode hex string to bytes
-		b, err := hex.DecodeString(hexStr)
-		if err != nil {
-			log.Fatalf("invalid hex for key %s: %v", k, err)
-		}
-
-		// Parse compressed secp256k1 public key
-		pk, err := btcec.ParsePubKey(b)
-		if err != nil {
-			log.Fatalf("invalid pubkey for key %s: %v", k, err)
-		}
-
-		arrays = append(arrays, struct {
-			Pubkey *secp256k1.PublicKey
-			Amount uint64
-		}{
-			Amount: uKey,
-			Pubkey: pk,
-		})
-
-	}
-
-	sort.Slice(arrays, func(i, j int) bool {
-		return arrays[i].Amount < arrays[j].Amount
-	})
-
-	justPubkeys := []*secp256k1.PublicKey{}
-
-	for i := range arrays {
-		justPubkeys = append(justPubkeys, arrays[i].Pubkey)
-	}
-
-	return justPubkeys
-}
-
 // V2 Generation keysets
 func TestKeysetIdGenerationV2Vector1(t *testing.T) {
 	keysStringMap := map[string]string{
@@ -179,13 +124,39 @@ func TestKeysetIdGenerationV2Vector1(t *testing.T) {
 		"4": "02648eccfa4c026960966276fa5a4cae46ce0fd432211a4f449bf84f13aa5f8303",
 		"8": "02fdfd6796bfeac490cbee12f778f867f0a2c68f6508d17c649759ea0dc3547528",
 	}
+	keysMap := make(map[uint64]*secp256k1.PublicKey)
 
-	pubkeyList := convertJsonMapIntoOrderedArray(keysStringMap)
+	for key, val := range keysStringMap {
+		// Parse the key as big.Int then to uint64 (safe since JSON keys are ≤ 2^63)
+		keyInt, ok := new(big.Int).SetString(key, 10)
+		if !ok {
+			t.Fatalf("invalid key: %s", key)
+		}
+		if !keyInt.IsUint64() {
+			t.Fatalf("key too large for uint64: %s", key)
+		}
+		uKey := keyInt.Uint64()
+
+		// Decode hex string to bytes
+		b, err := hex.DecodeString(val)
+		if err != nil {
+			t.Fatalf("invalid hex for key %s: %v", key, err)
+		}
+
+		// Parse compressed secp256k1 public key
+		pk, err := btcec.ParsePubKey(b)
+		if err != nil {
+			t.Fatalf("invalid pubkey for key %s: %v", key, err)
+		}
+
+		keysMap[uKey] = pk
+	}
 
 	finalExpiry := time.Unix(2059210353, 0)
-	keysetId := DeriveKeysetIdV2(pubkeyList, Sat, &finalExpiry)
+	fee := uint(100)
+	keysetId := DeriveKeysetIdV2(keysMap, Sat.String(), fee, &finalExpiry)
 
-	if keysetId != "01adc013fa9d85171586660abab27579888611659d357bc86bc09cb26eee8bc035" {
+	if keysetId != "015ba18a8adcd02e715a58358eb618da4a4b3791151a4bee5e968bb88406ccf76a" {
 		t.Errorf("keyset id is not correct.")
 	}
 }
@@ -258,13 +229,39 @@ func TestKeysetIdGenerationV2Vector2(t *testing.T) {
 		"4611686018427387904": "024a4b806cf413d14b294719090a9da36ba75209c7657135ad09bc65328fba9e6f",
 		"9223372036854775808": "0377a6fe114e291a8d8e991627c38001c8305b23b9e98b1c7b1893f5cd0dda6cad",
 	}
+	keysMap := make(map[uint64]*secp256k1.PublicKey)
 
-	pubkeyList := convertJsonMapIntoOrderedArray(keysStringMap)
+	for key, val := range keysStringMap {
+		// Parse the key as big.Int then to uint64 (safe since JSON keys are ≤ 2^63)
+		keyInt, ok := new(big.Int).SetString(key, 10)
+		if !ok {
+			t.Fatalf("invalid key: %s", key)
+		}
+		if !keyInt.IsUint64() {
+			t.Fatalf("key too large for uint64: %s", key)
+		}
+		uKey := keyInt.Uint64()
 
+		// Decode hex string to bytes
+		b, err := hex.DecodeString(val)
+		if err != nil {
+			t.Fatalf("invalid hex for key %s: %v", key, err)
+		}
+
+		// Parse compressed secp256k1 public key
+		pk, err := btcec.ParsePubKey(b)
+		if err != nil {
+			t.Fatalf("invalid pubkey for key %s: %v", key, err)
+		}
+
+		keysMap[uKey] = pk
+	}
+
+	fee := uint(0)
 	finalExpiry := time.Unix(2059210353, 0)
-	keysetId := DeriveKeysetIdV2(pubkeyList, Sat, &finalExpiry)
+	keysetId := DeriveKeysetIdV2(keysMap, Sat.String(), fee, &finalExpiry)
 
-	if keysetId != "0125bc634e270ad7e937af5b957f8396bb627d73f6e1fd2ffe4294c26b57daf9e0" {
+	if keysetId != "01ab6aa4ff30390da34986d84be5274b48ad7a74265d791095bfc39f4098d9764f" {
 		t.Errorf("keyset id is not correct.")
 	}
 }
@@ -337,12 +334,38 @@ func TestKeysetIdGenerationV2Vector3(t *testing.T) {
 		"4611686018427387904": "024a4b806cf413d14b294719090a9da36ba75209c7657135ad09bc65328fba9e6f",
 		"9223372036854775808": "0377a6fe114e291a8d8e991627c38001c8305b23b9e98b1c7b1893f5cd0dda6cad",
 	}
+	keysMap := make(map[uint64]*secp256k1.PublicKey)
 
-	pubkeyList := convertJsonMapIntoOrderedArray(keysStringMap)
+	for key, val := range keysStringMap {
+		// Parse the key as big.Int then to uint64 (safe since JSON keys are ≤ 2^63)
+		keyInt, ok := new(big.Int).SetString(key, 10)
+		if !ok {
+			t.Fatalf("invalid key: %s", key)
+		}
+		if !keyInt.IsUint64() {
+			t.Fatalf("key too large for uint64: %s", key)
+		}
+		uKey := keyInt.Uint64()
 
-	keysetId := DeriveKeysetIdV2(pubkeyList, Sat, nil)
+		// Decode hex string to bytes
+		b, err := hex.DecodeString(val)
+		if err != nil {
+			t.Fatalf("invalid hex for key %s: %v", key, err)
+		}
 
-	if keysetId != "016d72f27c8d22808ad66d1959b3dab83af17e2510db7ffd57d2365d9eec3ced75" {
+		// Parse compressed secp256k1 public key
+		pk, err := btcec.ParsePubKey(b)
+		if err != nil {
+			t.Fatalf("invalid pubkey for key %s: %v", key, err)
+		}
+
+		keysMap[uKey] = pk
+	}
+
+	fee := uint(0)
+	keysetId := DeriveKeysetIdV2(keysMap, Sat.String(), fee, nil)
+
+	if keysetId != "012fbb01a4e200c76df911eeba3b8fe1831202914b24664f4bccbd25852a6708f8" {
 		t.Errorf("keyset id is not correct.")
 	}
 }
