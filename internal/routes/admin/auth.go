@@ -14,6 +14,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
@@ -122,13 +123,17 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+						slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					}
 				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+						slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					}
 				}
 			} else {
 				err = mint.MintDB.Commit(context.Background(), tx)

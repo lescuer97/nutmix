@@ -2,10 +2,7 @@ package signer
 
 import (
 	"encoding/hex"
-	"fmt"
-
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/tyler-smith/go-bip32"
 )
 
 func OrderKeysetByUnit(keysets []cashu.MintKey) GetKeysResponse {
@@ -40,61 +37,5 @@ func OrderKeysetByUnit(keysets []cashu.MintKey) GetKeysResponse {
 		res.Keysets = append(res.Keysets, keysetResponse)
 	}
 	return res
-
-}
-func DeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, error) {
-	unit, err := cashu.UnitFromString(seed.Unit)
-	if err != nil {
-		return nil, fmt.Errorf("UnitFromString(seed.Unit) %w", err)
-	}
-
-	unitKey, err := mintKey.NewChildKey(uint32(unit.EnumIndex()))
-
-	if err != nil {
-
-		return nil, fmt.Errorf("mintKey.NewChildKey(uint32(unit.EnumIndex())). %w", err)
-	}
-
-	versionKey, err := unitKey.NewChildKey(seed.Version)
-	if err != nil {
-		return nil, fmt.Errorf("mintKey.NewChildKey(uint32(seed.Version)) %w", err)
-	}
-
-	amounts := cashu.GetAmountsForKeysets()
-
-	if unit == cashu.AUTH {
-		amounts = []uint64{amounts[0]}
-	}
-
-	keyset, err := cashu.GenerateKeysets(versionKey, amounts, seed)
-	if err != nil {
-		return nil, fmt.Errorf(`GenerateKeysets(versionKey,GetAmountsForKeysets(), "", unit, 0) %w`, err)
-	}
-
-	return keyset, nil
-}
-
-func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *bip32.Key) (map[string]cashu.MintKeysMap, map[string]cashu.MintKeysMap, error) {
-	newKeysets := make(map[string]cashu.MintKeysMap)
-	newActiveKeysets := make(map[string]cashu.MintKeysMap)
-
-	for _, seed := range seeds {
-		keysets, err := DeriveKeyset(mintKey, seed)
-		if err != nil {
-			return newKeysets, newActiveKeysets, fmt.Errorf("DeriveKeyset(mintKey, seed) %w", err)
-		}
-
-		mintkeyMap := make(cashu.MintKeysMap)
-		for _, keyset := range keysets {
-			mintkeyMap[keyset.Amount] = keyset
-		}
-
-		if seed.Active {
-			newActiveKeysets[seed.Id] = mintkeyMap
-		}
-
-		newKeysets[seed.Id] = mintkeyMap
-	}
-	return newKeysets, newActiveKeysets, nil
 
 }

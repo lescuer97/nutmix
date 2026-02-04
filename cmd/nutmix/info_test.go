@@ -77,7 +77,7 @@ func TestMintInfo(t *testing.T) {
 		t.Errorf("Incorrect version  %v", mintInfo.Version)
 	}
 
-	if mintInfo.Pubkey != "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798" {
+	if mintInfo.Pubkey != "032332a0f0ca8e1c7ff9a0fdc54b285940d7c3853c6118463ac6f8ae663cc703a5" {
 		t.Errorf("Incorrect Pubkey  %v", mintInfo.Pubkey)
 	}
 }

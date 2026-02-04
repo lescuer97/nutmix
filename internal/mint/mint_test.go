@@ -113,7 +113,7 @@ func SetupDataOnDB(mint *Mint) error {
 	proofs := cashu.Proofs{
 		cashu.Proof{
 			Amount: 2,
-			Id:     "00bfa73302d12ffd",
+			Id:     "00299ac0e7a8fe63",
 			Secret: "secret1",
 			C:      cashu.WrappedPublicKey{PublicKey: c1},
 			SeenAt: now,
@@ -122,7 +122,7 @@ func SetupDataOnDB(mint *Mint) error {
 		},
 		cashu.Proof{
 			Amount: 2,
-			Id:     "00bfa73302d12ffd",
+			Id:     "00299ac0e7a8fe63",
 			Secret: "secret2",
 			C:      cashu.WrappedPublicKey{PublicKey: c2},
 			SeenAt: now,

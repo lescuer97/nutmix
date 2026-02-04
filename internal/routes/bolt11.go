@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -68,7 +68,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			slog.Uint64("amount", mintRequest.Amount),
 			slog.Any("backend", mint.LightningBackend.LightningType()))
 
-		log.Printf("\n MINT REQUEST: %+v", mintRequest)
 		unit, err := cashu.UnitFromString(mintRequest.Unit)
 
 		if err != nil {
@@ -119,8 +118,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 					slog.Warn("rollback error", slog.Any("error", rollbackErr))
 				}
 			}
@@ -153,8 +152,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 					slog.Warn("rollback error", slog.Any("error", rollbackErr))
 				}
 			}
@@ -196,8 +195,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, stateChangeTX); rollbackErr != nil {
+			if rollbackErr := mint.MintDB.Rollback(ctx, stateChangeTX); rollbackErr != nil {
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 					slog.Warn("rollback error", slog.Any("error", rollbackErr))
 				}
 			}
@@ -244,8 +243,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, preparationTx); rollbackErr != nil {
+			if rollbackErr := mint.MintDB.Rollback(ctx, preparationTx); rollbackErr != nil {
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 					slog.Warn("rollback error", slog.Any("error", rollbackErr))
 				}
 			}
@@ -352,8 +351,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 				return
 			}
 			defer func() {
-				if err != nil {
-					if rollbackErr := mint.MintDB.Rollback(ctx, afterCheckTx); rollbackErr != nil {
+				if rollbackErr := mint.MintDB.Rollback(ctx, afterCheckTx); rollbackErr != nil {
+					if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 						slog.Warn("rollback error", slog.Any("error", rollbackErr))
 					}
 				}
@@ -394,8 +393,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, afterBlindSignTx); rollbackErr != nil {
+			if rollbackErr := mint.MintDB.Rollback(ctx, afterBlindSignTx); rollbackErr != nil {
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 					slog.Warn("rollback error", slog.Any("error", rollbackErr))
 				}
 			}
@@ -568,8 +567,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 					slog.Warn("rollback error", slog.Any("error", rollbackErr))
 				}
 			}

@@ -95,7 +95,7 @@ func TestVerifyUnitOfProofFail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}
-	proofs := cashu.Proofs{cashu.Proof{Id: "00bfa73302d12ffd"}, cashu.Proof{Id: "00bfa73302d12ffd"}, cashu.Proof{Id: "0061287798d19b10"}}
+	proofs := cashu.Proofs{cashu.Proof{Id: "00299ac0e7a8fe63"}, cashu.Proof{Id: "00299ac0e7a8fe63"}, cashu.Proof{Id: "0062624e2182bdb9"}}
 
 	_, err = mint.CheckProofsAreSameUnit(proofs, keysets.Keysets)
 	if err == nil {
@@ -117,7 +117,7 @@ func TestVerifyUnitOfProofPass(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}
-	proofs := cashu.Proofs{cashu.Proof{Id: "00bfa73302d12ffd"}, cashu.Proof{Id: "00bfa73302d12ffd"}, cashu.Proof{Id: "00bfa73302d12ffd"}}
+	proofs := cashu.Proofs{cashu.Proof{Id: "00299ac0e7a8fe63"}, cashu.Proof{Id: "00299ac0e7a8fe63"}, cashu.Proof{Id: "00299ac0e7a8fe63"}}
 
 	unit, err := mint.CheckProofsAreSameUnit(proofs, keysets.Keysets)
 	if err != nil {
@@ -157,7 +157,7 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error parsing B_2: %+v", err)
 	}
-	outputs := []cashu.BlindedMessage{{Id: "00bfa73302d12ffd", B_: cashu.WrappedPublicKey{PublicKey: B_1}}, {Id: "00bfa73302d12ffd", B_: cashu.WrappedPublicKey{PublicKey: B_2}}, {Id: "00bfa73302d12ffd", B_: cashu.WrappedPublicKey{PublicKey: B_2}}}
+	outputs := []cashu.BlindedMessage{{Id: "00299ac0e7a8fe63", B_: cashu.WrappedPublicKey{PublicKey: B_1}}, {Id: "00299ac0e7a8fe63", B_: cashu.WrappedPublicKey{PublicKey: B_2}}, {Id: "00299ac0e7a8fe63", B_: cashu.WrappedPublicKey{PublicKey: B_2}}}
 
 	tx, err := mint.MintDB.GetTx(context.Background())
 	if err != nil {
