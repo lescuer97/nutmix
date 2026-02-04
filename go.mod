@@ -27,6 +27,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
 	github.com/tyler-smith/go-bip32 v1.0.0
+	github.com/tyler-smith/go-bip39 v1.1.0
 	golang.org/x/net v0.47.0
 	golang.org/x/sync v0.18.0
 	golang.org/x/text v0.31.0

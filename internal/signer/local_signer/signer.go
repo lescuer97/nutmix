@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"os"
 	"sort"
@@ -18,6 +19,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/signer"
+	"github.com/tyler-smith/go-bip39"
 )
 
 type LocalSigner struct {
@@ -36,6 +38,7 @@ func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
 	if err != nil {
 		return localsigner, fmt.Errorf("signer.getSignerPrivateKey(). %w", err)
 	}
+
 	seeds, err := localsigner.db.GetAllSeeds()
 	if err != nil {
 		return localsigner, fmt.Errorf("signer.db.GetAllSeeds(). %w", err)
@@ -139,6 +142,11 @@ func (l *LocalSigner) getSignerPrivateKey() (*hdkeychain.ExtendedKey, error) {
 		decodedPrivKey = nil
 	}()
 
+	string, err := bip39.NewMnemonic(decodedPrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("bip39.NewMnemonic(decodedPrivKey). %w", err)
+	}
+	log.Println("\n seedphrase: ", string)
 	masterKey, err := hdkeychain.NewMaster(decodedPrivKey, &chaincfg.MainNetParams)
 	if err != nil {
 		return nil, fmt.Errorf(`hdkeychain.NewMaster(privateKey.Serialize(), &chaincfg.MainNetParams). %w`, err)
