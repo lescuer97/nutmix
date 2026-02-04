@@ -32,16 +32,16 @@ func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB, invoice *zpay32.Inv
 
 }
 
-func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Response, error) {
+func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Response, error) {
 
-	tx, err := mint.MintDB.GetTx(context.Background())
+	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 
 	defer func() {
 		if err != nil {
-			if rollbackErr := mint.MintDB.Rollback(context.Background(), tx); rollbackErr != nil {
+			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
 				slog.Warn("rollback error", slog.Any("error", rollbackErr))
 			}
 		}
@@ -87,9 +87,9 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("database.AddPaymentPreimageToMeltRequest(pool, preimage, quote.Quote) %w", err)
 	}
 
-	err = mint.MintDB.Commit(context.Background(), tx)
+	err = mint.MintDB.Commit(ctx, tx)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("mint.MintDB.Commit(ctx, tx). %w", err)
 	}
 
 	return quote.GetPostMeltQuoteResponse(), nil

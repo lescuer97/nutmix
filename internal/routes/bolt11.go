@@ -597,7 +597,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 	v1.GET("/melt/quote/bolt11/:quote", func(c *gin.Context) {
 		quoteId := c.Param("quote")
 
-		quote, err := mint.CheckMeltQuoteState(quoteId)
+		quote, err := mint.CheckMeltQuoteState(c.Request.Context(), quoteId)
 		if err != nil {
 			slog.Error("mint.CheckMeltQuoteState(quoteId)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -618,9 +618,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		quote, err := mint.Melt(meltRequest)
+		quote, err := mint.Melt(c.Request.Context(), meltRequest)
 		if err != nil {
-			slog.Error("mint.Melt(meltRequest)", slog.Any("error", err))
+			slog.Error("mint.Melt(ctx, meltRequest)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return

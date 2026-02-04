@@ -39,7 +39,7 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error)
 
 	}
 
-	pool, err := pgxpool.New(context.Background(), dbUrl)
+	pool, err := pgxpool.New(ctx, dbUrl)
 	if err != nil {
 		return postgresql, fmt.Errorf("pgxpool.New: %w", err)
 	}

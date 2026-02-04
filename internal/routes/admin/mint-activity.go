@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -29,7 +28,7 @@ func SwapsList(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		err = templates.ListOfSwaps(swaps).Render(ctx, c.Writer)
 		if err != nil {

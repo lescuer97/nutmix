@@ -72,7 +72,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 			slog.Warn("m.SendJson(conn, response)", slog.Any("error", err))
 			return
 		}
-		err = CheckStatusOfSub(request, mint, conn)
+		err = CheckStatusOfSub(c.Request.Context(), request, mint, conn)
 		if err != nil {
 			slog.Warn("CheckStatusOfSub(request, mint,conn)", slog.Any("error", err))
 			return
@@ -204,7 +204,7 @@ func ListenToIncommingMessage(subs *m.Observer, conn *websocket.Conn, listenChan
 	}
 }
 
-func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Conn) error {
+func CheckStatusOfSub(ctx context.Context, request cashu.WsRequest, mint *m.Mint, conn *websocket.Conn) error {
 
 	statusNotif := cashu.WsNotification{
 		JsonRpc: "2.0",
@@ -218,7 +218,6 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 		// check if a new stored notif has already been seen and if no send a status update and store state
 		value, exists := alreadyCheckedFilter[filter]
 
-		ctx := context.Background()
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
 			return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
@@ -272,9 +271,9 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 				}
 			}
 		case cashu.Bolt11MeltQuote:
-			meltState, err := m.CheckMeltRequest(mint, filter)
+			meltState, err := m.CheckMeltRequest(ctx, mint, filter)
 			if err != nil {
-				return fmt.Errorf("m.CheckMeltRequest(mint, filter). %w", err)
+				return fmt.Errorf("m.CheckMeltRequest(ctx, mint, filter). %w", err)
 			}
 
 			statusNotif.Params.Payload = meltState
@@ -311,7 +310,7 @@ func CheckStatusOfSub(request cashu.WsRequest, mint *m.Mint, conn *websocket.Con
 
 			wrappedPubkey := cashu.WrappedPublicKey{PublicKey: pubkey}
 
-			proofsState, err := m.CheckProofState(mint, []cashu.WrappedPublicKey{wrappedPubkey})
+			proofsState, err := m.CheckProofState(ctx, mint, []cashu.WrappedPublicKey{wrappedPubkey})
 			if err != nil {
 				return fmt.Errorf("m.CheckProofState(mint, []string{filter}). %w", err)
 			}

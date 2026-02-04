@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -81,7 +82,8 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(w, opts))
 	slog.SetDefault(logger)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Minute)
+	defer cancel()
 
 	db, err := postgresql.DatabaseSetup(ctx, "migrations")
 	if err != nil {
@@ -120,6 +122,9 @@ func main() {
 
 	r.Use(middleware.CacheMiddleware(store))
 
+	// Add per-request timeout middleware (sets context deadline for handlers)
+	r.Use(middleware.TimeoutMiddleware(90 * time.Second))
+
 	err = mint.CheckPendingQuoteAndProofs()
 	if err != nil {
 		slog.Error("SetUpMint", slog.Any("error", err))
@@ -142,7 +147,16 @@ func main() {
 
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
-	if err := r.Run(PORT); err != nil {
+	// Define a custom http.Server
+	srv := &http.Server{
+		Addr:         PORT,
+		Handler:      r,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 4 * time.Second,
+		IdleTimeout:  3 * time.Minute,
+	}
+	// Start the server
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server failed", slog.Any("error", err))
 		os.Exit(1)
 	}

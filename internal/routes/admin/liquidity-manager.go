@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -24,7 +23,7 @@ import (
 
 func LiquidityButton(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		if !utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
 			// c.Status(200)
 			return
@@ -42,7 +41,7 @@ func LiquidityButton(mint *m.Mint) gin.HandlerFunc {
 // LnSendPage handles the send funds page
 func LnSendPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		milillisatBalance, err := mint.LightningBackend.WalletBalance()
 		var balance string
@@ -68,7 +67,7 @@ func LnSendPage(mint *m.Mint) gin.HandlerFunc {
 // LnReceivePage handles the receive funds page
 func LnReceivePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		component := templates.LnReceivePage()
 
@@ -83,7 +82,7 @@ func LnReceivePage(mint *m.Mint) gin.HandlerFunc {
 // swaps out of the mint
 func SwapOutForm(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		milillisatBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
 
@@ -109,7 +108,7 @@ func SwapOutForm(mint *m.Mint) gin.HandlerFunc {
 // Swaps into the mint
 func LightningSwapForm() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		component := templates.SwapInPostForm()
 
 		err := component.Render(ctx, c.Writer)
@@ -122,7 +121,7 @@ func LightningSwapForm() gin.HandlerFunc {
 
 func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// need amount and liquid address
 		invoice := c.PostForm("invoice")
@@ -217,9 +216,9 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 			_ = c.Error(fmt.Errorf("could not add swap request %+v", err))
 			return
 		}
-		err = mint.MintDB.Commit(context.Background(), tx)
+		err = mint.MintDB.Commit(c.Request.Context(), tx)
 		if err != nil {
-			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(context.Background(), tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(c.Request.Context(), tx). %w", err))
 			return
 		}
 
@@ -236,7 +235,7 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 
 func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// only needs the amount and we generate an invoice from the mint directly
 		amountStr := c.PostForm("amount")
@@ -318,9 +317,9 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 			_ = c.Error(fmt.Errorf("could not add swap request %+v", err))
 			return
 		}
-		err = mint.MintDB.Commit(context.Background(), tx)
+		err = mint.MintDB.Commit(c.Request.Context(), tx)
 		if err != nil {
-			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(context.Background(), tx). %w", err))
+			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(c.Request.Context(), tx). %w", err))
 			return
 		}
 
@@ -348,7 +347,7 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 
 func SwapStateCheck(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		// only needs the amount and we generate an invoice from the mint directly
 		swapId := c.Param("swapId")
 
@@ -382,7 +381,7 @@ func SwapStateCheck(mint *m.Mint) gin.HandlerFunc {
 			_ = c.Error(fmt.Errorf("mint.MintDB.GetLiquiditySwapById(swapId). %w", err))
 			return
 		}
-		if err := tx.Commit(context.Background()); err != nil {
+		if err := tx.Commit(c.Request.Context()); err != nil {
 			_ = c.Error(fmt.Errorf("tx.Commit failed: %w", err))
 			return
 		}
@@ -399,7 +398,7 @@ func SwapStateCheck(mint *m.Mint) gin.HandlerFunc {
 
 func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// only needs the amount and we generate an invoice from the mint directly
 		swapId := c.Param("swapId")
@@ -568,7 +567,7 @@ func generateQR(data string) (string, error) {
 
 func LiquiditySummaryComponent(handler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		balance, err := handler.EcashBalance(time.Unix(0, 0))
 		if err != nil {
 			_ = c.Error(fmt.Errorf("mint.MintDB.GetNeededSats(). %w", err))

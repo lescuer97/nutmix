@@ -55,8 +55,7 @@ func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB) (c
 	return meltQuote, nil
 }
 
-func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) {
-	ctx := context.Background()
+func (m *Mint) CheckMeltQuoteState(ctx context.Context, quoteId string) (cashu.MeltRequestDB, error) {
 	initialTx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
@@ -83,7 +82,7 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 	if err != nil {
 		return quote, fmt.Errorf("m.MintDB.GetProofsFromQuote(quote.Quote). %w", err)
 	}
-	err = m.MintDB.Commit(context.Background(), initialTx)
+	err = m.MintDB.Commit(ctx, initialTx)
 	if err != nil {
 		return quote, fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
 	}
@@ -179,9 +178,9 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.AddPreimageMeltRequest(tx, quote.Quote, quote.PaymentPreimage) %w", err)
 			}
-			err = m.MintDB.Commit(context.Background(), settleTx)
+			err = m.MintDB.Commit(ctx, settleTx)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.Commit(context.Background(), settleTx). %w", err)
+				return quote, fmt.Errorf("m.MintDB.Commit(ctx, settleTx). %w", err)
 			}
 
 		}
@@ -215,9 +214,9 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				}
 			}
 
-			err = m.MintDB.Commit(context.Background(), failedLnTx)
+			err = m.MintDB.Commit(ctx, failedLnTx)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.Commit(context.Background(), failedLnTx). %w", err)
+				return quote, fmt.Errorf("m.MintDB.Commit(ctx, failedLnTx). %w", err)
 			}
 		}
 
@@ -234,9 +233,9 @@ func (m *Mint) CheckPendingQuoteAndProofs() error {
 
 	for _, quote := range quotes {
 		slog.Info("Attempting to solve pending quote for", slog.Any("quote", quote))
-		quote, err := m.CheckMeltQuoteState(quote.Quote)
+		quote, err := m.CheckMeltQuoteState(context.Background(), quote.Quote)
 		if err != nil {
-			return fmt.Errorf("m.CheckMeltQuoteState(quote.Quote). %w", err)
+			return fmt.Errorf("m.CheckMeltQuoteState(ctx, quote.Quote). %w", err)
 		}
 
 		slog.Info("Melt quote state", slog.String("quote", quote.Quote), slog.String("state", string(quote.State)))
@@ -245,14 +244,14 @@ func (m *Mint) CheckPendingQuoteAndProofs() error {
 	return nil
 }
 
-func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuoteBolt11Response, error) {
+func (m *Mint) Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuoteBolt11Response, error) {
 	if len(meltRequest.Inputs) == 0 {
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("outputs are empty")
 	}
 
-	quote, err := m.CheckMeltQuoteState(meltRequest.Quote)
+	quote, err := m.CheckMeltQuoteState(ctx, meltRequest.Quote)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("mint.CheckMeltQuoteState(quoteId): %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("mint.CheckMeltQuoteState(ctx, quoteId): %w", err)
 	}
 
 	if quote.State != cashu.UNPAID {
@@ -317,7 +316,6 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.VerifyProofsBDHKE(meltRequest.Inputs) %w", err)
 	}
 
-	ctx := context.Background()
 	preparationTx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
@@ -389,12 +387,12 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 
 	quote, err = m.settleIfInternalMelt(preparationTx, quote)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), tx). %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.settleIfInternalMelt(ctx, preparationTx, quote). %w", err)
 	}
 
-	err = m.MintDB.Commit(context.Background(), preparationTx)
+	err = m.MintDB.Commit(ctx, preparationTx)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), preparationTx). %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(ctx, preparationTx). %w", err)
 	}
 
 	// Commit all blind messages and proofs as pending before going over the network
@@ -435,9 +433,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 			if err != nil {
 				slog.Error(fmt.Errorf("m.MintDB.ChangeCheckingId(lnTx, quote.Quote, quote.CheckingId): %w", err).Error())
 			}
-			err = m.MintDB.Commit(context.Background(), lnTx)
+			err = m.MintDB.Commit(ctx, lnTx)
 			if err != nil {
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), lnTx). %w", err)
+				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(ctx, lnTx). %w", err)
 			}
 
 			// if exception of lightning payment says fail do a payment status recheck.
@@ -490,9 +488,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteChangeByQuote(lnStatusTx, quote.Quote) %w", err)
 				}
 			}
-			err = m.MintDB.Commit(context.Background(), lnStatusTx)
+			err = m.MintDB.Commit(ctx, lnStatusTx)
 			if err != nil {
-				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), lnStatusTx). %w", err)
+				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(ctx, lnStatusTx). %w", err)
 			}
 
 			return quote.GetPostMeltQuoteResponse(), nil
@@ -572,9 +570,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.DeleteChangeByQuote(tx, quote.Quote) %w", err)
 	}
 
-	err = m.MintDB.Commit(context.Background(), paidLnxTx)
+	err = m.MintDB.Commit(ctx, paidLnxTx)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(context.Background(), paidLnxTx). %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.Commit(ctx, paidLnxTx). %w", err)
 	}
 
 	go m.Observer.SendProofsEvent(meltRequest.Inputs)
