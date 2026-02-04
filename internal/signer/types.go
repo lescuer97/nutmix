@@ -16,11 +16,11 @@ type GetKeysetsResponse struct {
 }
 
 type KeysetResponse struct {
+	Keys        map[uint64]string `json:"keys"`
 	Id          string            `json:"id"`
 	Unit        string            `json:"unit"`
-	Active      bool              `json:"active"`
-	Keys        map[uint64]string `json:"keys"`
 	InputFeePpk uint              `json:"input_fee_ppk"`
+	Active      bool              `json:"active"`
 }
 
 type BasicKeysetResponse struct {

@@ -32,8 +32,8 @@ var (
 )
 
 type SpendCondition struct {
-	Type SpendConditionType
 	Data SpendConditionData
+	Type SpendConditionType
 }
 
 func (s *SpendCondition) UnmarshalJSON(b []byte) error {
@@ -126,11 +126,11 @@ func (sc SpendConditionType) IsSpendConditioned() bool {
 
 type TagsInfo struct {
 	originalTag string
-	Sigflag     SigFlag
 	Pubkeys     []*btcec.PublicKey
+	Refund      []*btcec.PublicKey
+	Sigflag     SigFlag
 	NSigs       uint
 	Locktime    uint
-	Refund      []*btcec.PublicKey
 	NSigRefund  uint
 }
 
@@ -419,7 +419,7 @@ func (wit *Witness) String() (string, error) {
 
 	b, err := json.Marshal(witness)
 	if err != nil {
-		return "", fmt.Errorf("json.Marshal(singatures): %w", err)
+		return "", fmt.Errorf("json.Marshal(signatures): %w", err)
 	}
 	return string(b), nil
 }
@@ -464,11 +464,11 @@ func (wit *Witness) UnmarshalJSON(b []byte) error {
 }
 
 type SigflagValidation struct {
+	pubkeys                  map[string]struct{}
+	refundPubkeys            map[string]struct{}
 	sigFlag                  SigFlag
 	signaturesRequired       uint
-	pubkeys                  map[string]struct{}
 	signaturesRequiredRefund uint
-	refundPubkeys            map[string]struct{}
 }
 
 func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
@@ -488,7 +488,7 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 			if spendCondition.Data.Tags.Sigflag == SigAll {
 				sigflagValidation.sigFlag = SigAll
 				if spendCondition.Data.Tags.NSigs > 1 {
-					sigflagValidation.signaturesRequired = uint(spendCondition.Data.Tags.NSigs)
+					sigflagValidation.signaturesRequired = spendCondition.Data.Tags.NSigs
 				}
 				pubkeys, err := proof.pubkeysForVerification(spendCondition)
 				if err != nil {
@@ -499,13 +499,9 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 				if len(spendCondition.Data.Tags.Refund) > 0 {
 					sigflagValidation.signaturesRequiredRefund = 1
 					if spendCondition.Data.Tags.NSigRefund > 1 {
-						sigflagValidation.signaturesRequiredRefund = uint(spendCondition.Data.Tags.NSigRefund)
+						sigflagValidation.signaturesRequiredRefund = spendCondition.Data.Tags.NSigRefund
 					}
-					refundPubkeys, err := proof.pubkeysForRefund(spendCondition)
-					if err != nil {
-						return SigflagValidation{}, fmt.Errorf("proof.pubkeysForRefund(spendCondition). %w", err)
-					}
-					sigflagValidation.refundPubkeys = refundPubkeys
+					sigflagValidation.refundPubkeys = proof.pubkeysForRefund(spendCondition)
 				}
 				return sigflagValidation, nil
 			}

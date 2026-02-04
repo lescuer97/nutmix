@@ -1,0 +1,33 @@
+name: golangci-lint
+on:
+  pull_request:
+    branches:
+      - master
+permissions:
+  contents: read
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.4'
+          cache: true
+      - uses: extractions/setup-just@v3
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: just install-deps
+      - name: Generate code (proto, templ)
+        run: |
+          just gen-proto
+          just gen-templ
+          just web-install
+          just web-build-prod
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9

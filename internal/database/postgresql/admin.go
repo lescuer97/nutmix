@@ -54,8 +54,8 @@ func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBal
 	var mintMeltBalance database.MintMeltBalance
 	// change the paid status of the quote
 	batch := pgx.Batch{}
-	batch.Queue("SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID') ", time)
-	batch.Queue("SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID')", time)
+	batch.Queue("SELECT quote, request, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID') ", time)
+	batch.Queue("SELECT quote, request, amount, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID')", time)
 
 	results := pql.pool.SendBatch(context.Background(), &batch)
 
@@ -207,7 +207,7 @@ func (pql Postgresql) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapSt
 func (pql Postgresql) GetMintRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MintRequestDB, error) {
 	if id != nil {
 		searchQuery := "%" + *id + "%"
-		rows, err := pql.pool.Query(ctx, "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote LIKE $1", searchQuery)
+		rows, err := pql.pool.Query(ctx, "SELECT quote, request, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE quote LIKE $1", searchQuery)
 		if err != nil {
 			return nil, fmt.Errorf("error checking for mint request by id: %w", err)
 		}
@@ -216,7 +216,7 @@ func (pql Postgresql) GetMintRequestsByTimeAndId(ctx context.Context, since time
 	}
 
 	sinceUnix := since.Unix()
-	rows, err := pql.pool.Query(ctx, "SELECT quote, request, request_paid, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE seen_at >= $1", sinceUnix)
+	rows, err := pql.pool.Query(ctx, "SELECT quote, request, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE seen_at >= $1", sinceUnix)
 	if err != nil {
 		return nil, fmt.Errorf("error checking for mint requests: %w", err)
 	}
@@ -227,7 +227,7 @@ func (pql Postgresql) GetMintRequestsByTimeAndId(ctx context.Context, since time
 func (pql Postgresql) GetMeltRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MeltRequestDB, error) {
 	if id != nil {
 		searchQuery := "%" + *id + "%"
-		rows, err := pql.pool.Query(ctx, "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE quote LIKE $1", searchQuery)
+		rows, err := pql.pool.Query(ctx, "SELECT quote, request, amount, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE quote LIKE $1", searchQuery)
 		if err != nil {
 			return nil, fmt.Errorf("error checking for melt request by id: %w", err)
 		}
@@ -235,7 +235,7 @@ func (pql Postgresql) GetMeltRequestsByTimeAndId(ctx context.Context, since time
 		return pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MeltRequestDB])
 	}
 	sinceUnix := since.Unix()
-	rows, err := pql.pool.Query(ctx, "SELECT quote, request, amount, request_paid, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE seen_at >= $1", sinceUnix)
+	rows, err := pql.pool.Query(ctx, "SELECT quote, request, amount, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE seen_at >= $1", sinceUnix)
 	if err != nil {
 		return nil, fmt.Errorf("error checking for melt requests: %w", err)
 	}

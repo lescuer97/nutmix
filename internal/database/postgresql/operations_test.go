@@ -71,14 +71,13 @@ func TestAddAndRequestMintRequestValidPubkey(t *testing.T) {
 	now := time.Now().Unix()
 
 	mintRequestDB := cashu.MintRequestDB{
-		Quote:       quoteId,
-		RequestPaid: false,
-		Expiry:      now,
-		Unit:        cashu.Sat.String(),
-		State:       cashu.UNPAID,
-		SeenAt:      now,
-		Amount:      &amount,
-		Pubkey:      cashu.WrappedPublicKey{PublicKey: pubkey},
+		Quote:  quoteId,
+		Expiry: now,
+		Unit:   cashu.Sat.String(),
+		State:  cashu.UNPAID,
+		SeenAt: now,
+		Amount: &amount,
+		Pubkey: cashu.WrappedPublicKey{PublicKey: pubkey},
 	}
 
 	log.Println("adding mint request to database")
@@ -164,14 +163,13 @@ func TestAddAndRequestMintRequestNilPubkey(t *testing.T) {
 	now := time.Now().Unix()
 
 	mintRequestDB := cashu.MintRequestDB{
-		Quote:       quoteId,
-		RequestPaid: false,
-		Expiry:      now,
-		Unit:        cashu.Sat.String(),
-		State:       cashu.UNPAID,
-		SeenAt:      now,
-		Amount:      &amount,
-		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Quote:  quoteId,
+		Expiry: now,
+		Unit:   cashu.Sat.String(),
+		State:  cashu.UNPAID,
+		SeenAt: now,
+		Amount: &amount,
+		Pubkey: cashu.WrappedPublicKey{PublicKey: nil},
 	}
 
 	log.Println("adding mint request to database")
@@ -231,28 +229,26 @@ func TestGetMintMeltBalanceByTime_OnlyPubkey(t *testing.T) {
 
 	// Mint Request 1: Old, Issued (Excluded by time)
 	mint1 := cashu.MintRequestDB{
-		Quote:       "mint1",
-		State:       cashu.ISSUED,
-		SeenAt:      entryOldTime,
-		Amount:      ptr(100),
-		Pubkey:      wrappedPubkey,
-		Request:     "req1",
-		Unit:        cashu.Sat.String(),
-		Expiry:      now + 10000,
-		RequestPaid: true,
+		Quote:   "mint1",
+		State:   cashu.ISSUED,
+		SeenAt:  entryOldTime,
+		Amount:  ptr(100),
+		Pubkey:  wrappedPubkey,
+		Request: "req1",
+		Unit:    cashu.Sat.String(),
+		Expiry:  now + 10000,
 	}
 
 	// Mint Request 2: New, Issued (Included)
 	mint2 := cashu.MintRequestDB{
-		Quote:       "mint2",
-		State:       cashu.ISSUED,
-		SeenAt:      entryNewTime,
-		Amount:      ptr(200),
-		Pubkey:      wrappedPubkey,
-		Request:     "req2",
-		Unit:        cashu.Sat.String(),
-		Expiry:      now + 10000,
-		RequestPaid: true,
+		Quote:   "mint2",
+		State:   cashu.ISSUED,
+		SeenAt:  entryNewTime,
+		Amount:  ptr(200),
+		Pubkey:  wrappedPubkey,
+		Request: "req2",
+		Unit:    cashu.Sat.String(),
+		Expiry:  now + 10000,
 	}
 
 	tx, err := db.GetTx(ctx)
@@ -272,26 +268,24 @@ func TestGetMintMeltBalanceByTime_OnlyPubkey(t *testing.T) {
 	// Melt Requests
 	// Melt Request 1: Old, Issued (Excluded by time)
 	melt1 := cashu.MeltRequestDB{
-		Quote:       "melt1",
-		State:       cashu.ISSUED,
-		SeenAt:      entryOldTime,
-		Amount:      100,
-		Request:     "reqMelt1",
-		Unit:        cashu.Sat.String(),
-		Expiry:      now + 10000,
-		RequestPaid: true,
+		Quote:   "melt1",
+		State:   cashu.ISSUED,
+		SeenAt:  entryOldTime,
+		Amount:  100,
+		Request: "reqMelt1",
+		Unit:    cashu.Sat.String(),
+		Expiry:  now + 10000,
 	}
 
 	// Melt Request 2: New, Paid (Included)
 	melt2 := cashu.MeltRequestDB{
-		Quote:       "melt2",
-		State:       cashu.PAID,
-		SeenAt:      entryNewTime,
-		Amount:      200,
-		Request:     "reqMelt2",
-		Unit:        cashu.Sat.String(),
-		Expiry:      now + 10000,
-		RequestPaid: true,
+		Quote:   "melt2",
+		State:   cashu.PAID,
+		SeenAt:  entryNewTime,
+		Amount:  200,
+		Request: "reqMelt2",
+		Unit:    cashu.Sat.String(),
+		Expiry:  now + 10000,
 	}
 
 	tx, err = db.GetTx(ctx)
@@ -356,28 +350,26 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 
 	// Mint Request with Pubkey
 	mint1 := cashu.MintRequestDB{
-		Quote:       "mintWithKey",
-		State:       cashu.ISSUED,
-		SeenAt:      entryNewTime,
-		Amount:      ptr(200),
-		Pubkey:      wrappedPubkey,
-		Request:     "reqWithKey",
-		Unit:        cashu.Sat.String(),
-		Expiry:      now + 10000,
-		RequestPaid: true,
+		Quote:   "mintWithKey",
+		State:   cashu.ISSUED,
+		SeenAt:  entryNewTime,
+		Amount:  ptr(200),
+		Pubkey:  wrappedPubkey,
+		Request: "reqWithKey",
+		Unit:    cashu.Sat.String(),
+		Expiry:  now + 10000,
 	}
 
 	// Mint Request without Pubkey
 	mint2 := cashu.MintRequestDB{
-		Quote:       "mintNoKey",
-		State:       cashu.ISSUED,
-		SeenAt:      entryNewTime,
-		Amount:      ptr(400),
-		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
-		Request:     "reqNokey",
-		Unit:        cashu.Sat.String(),
-		Expiry:      now + 10000,
-		RequestPaid: true,
+		Quote:   "mintNoKey",
+		State:   cashu.ISSUED,
+		SeenAt:  entryNewTime,
+		Amount:  ptr(400),
+		Pubkey:  cashu.WrappedPublicKey{PublicKey: nil},
+		Request: "reqNokey",
+		Unit:    cashu.Sat.String(),
+		Expiry:  now + 10000,
 	}
 
 	tx, err := db.GetTx(ctx)
@@ -396,14 +388,13 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 
 	// Melt Requests
 	melt1 := cashu.MeltRequestDB{
-		Quote:       "melt1",
-		State:       cashu.ISSUED,
-		SeenAt:      entryNewTime,
-		Amount:      100,
-		Request:     "reqMelt1",
-		Unit:        cashu.Sat.String(),
-		Expiry:      now + 10000,
-		RequestPaid: true,
+		Quote:   "melt1",
+		State:   cashu.ISSUED,
+		SeenAt:  entryNewTime,
+		Amount:  100,
+		Request: "reqMelt1",
+		Unit:    cashu.Sat.String(),
+		Expiry:  now + 10000,
 	}
 
 	tx, err = db.GetTx(ctx)

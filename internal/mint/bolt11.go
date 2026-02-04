@@ -17,12 +17,11 @@ func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB, invoice *zpay32.Inv
 
 	status, _, err := mint.LightningBackend.CheckReceived(quote, invoice)
 	if err != nil {
-		return quote, fmt.Errorf("mint.VerifyLightingPaymentHappened(pool, quote.RequestPaid. %w", err)
+		return quote, fmt.Errorf("mint.VerifyLightingPaymentHappened(pool). %w", err)
 	}
 	switch status {
 	case lightning.SETTLED:
 		quote.State = cashu.PAID
-		quote.RequestPaid = true
 	// case lightning.PENDING:
 	// 	quote.State = cashu.PENDING
 	case lightning.FAILED:
@@ -75,7 +74,6 @@ func CheckMeltRequest(mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Resp
 		quote.PaymentPreimage = preimage
 		quote.State = cashu.PAID
 		quote.FeePaid = fees
-		quote.RequestPaid = true
 
 	case lightning.PENDING:
 		quote.State = cashu.PENDING

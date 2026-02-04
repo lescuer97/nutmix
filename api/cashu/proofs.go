@@ -49,15 +49,15 @@ func (p *Proofs) SetQuoteReference(quote string) {
 }
 
 type Proof struct {
-	Amount  uint64           `json:"amount"`
-	Id      string           `json:"id"`
-	Secret  string           `json:"secret"`
 	C       WrappedPublicKey `json:"C" db:"c"`
 	Y       WrappedPublicKey `json:"Y" db:"y"`
-	Witness string           `json:"witness" db:"witness"`
-	SeenAt  int64            `json:"seen_at"`
-	State   ProofState       `json:"state"`
 	Quote   *string          `json:"quote" db:"quote"`
+	Id      string           `json:"id"`
+	Secret  string           `json:"secret"`
+	Witness string           `json:"witness" db:"witness"`
+	State   ProofState       `json:"state"`
+	Amount  uint64           `json:"amount"`
+	SeenAt  int64            `json:"seen_at"`
 }
 
 func (p Proof) verifyP2PKSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {
@@ -200,10 +200,7 @@ func (p Proof) timelockPassed(spendCondition *SpendCondition) bool {
 }
 
 func (p Proof) verifyTimelockPassedSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {
-	pubkeys, err := p.pubkeysForRefund(spendCondition)
-	if err != nil {
-		return false, fmt.Errorf("p.pubkeysForRefund(spendCondition). %w", err)
-	}
+	pubkeys := p.pubkeysForRefund(spendCondition)
 
 	nsigToCheck := uint(0)
 	if len(spendCondition.Data.Tags.Refund) > 0 {
@@ -277,14 +274,14 @@ func (p Proof) pubkeysForVerification(spendCondition *SpendCondition) (map[strin
 	return pubkeysMap, nil
 }
 
-func (p Proof) pubkeysForRefund(spendCondition *SpendCondition) (map[string]struct{}, error) {
+func (p Proof) pubkeysForRefund(spendCondition *SpendCondition) map[string]struct{} {
 	pubkeysMap := make(map[string]struct{}, 0)
 	for i := range spendCondition.Data.Tags.Refund {
 		if spendCondition.Data.Tags.Refund[i] != nil {
 			pubkeysMap[string(spendCondition.Data.Tags.Refund[i].SerializeCompressed())] = struct{}{}
 		}
 	}
-	return pubkeysMap, nil
+	return pubkeysMap
 }
 
 func (p Proof) parseSpendCondition() (*SpendCondition, error) {
@@ -406,8 +403,8 @@ func (p *Proof) UnmarshalJSON(data []byte) error {
 	// Define an alias to avoid infinite recursion
 	type Alias Proof
 	aux := &struct {
-		C string `json:"C"` // Temporarily hold C as a string
 		*Alias
+		C string `json:"C"`
 	}{
 		Alias: (*Alias)(p),
 	}

@@ -20,6 +20,7 @@ var ErrDB = errors.New("ERROR DATABASE")
 var DATABASE_URL_ENV = "DATABASE_URL"
 
 type MockDB struct {
+	ErrorToReturn error
 	Proofs        []cashu.Proof
 	MeltRequest   []cashu.MeltRequestDB
 	MintRequest   []cashu.MintRequestDB
@@ -30,7 +31,6 @@ type MockDB struct {
 	Seeds         []cashu.Seed
 	AuthUser      []database.AuthUser
 	Config        utils.Config
-	ErrorToReturn error
 }
 
 func databaseError(err error) error {
@@ -54,7 +54,7 @@ func (m *MockDB) Rollback(ctx context.Context, tx pgx.Tx) error {
 }
 
 func (m *MockDB) GetSeedsByUnit(tx pgx.Tx, unit cashu.Unit) ([]cashu.Seed, error) {
-	var seeds []cashu.Seed
+	seeds := []cashu.Seed{}
 	for i := 0; i < len(m.Seeds); i++ {
 
 		if m.Seeds[i].Unit == unit.String() {
@@ -95,7 +95,7 @@ func (m *MockDB) SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error {
 	return nil
 }
 
-func (m *MockDB) ChangeMintRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, minted bool) error {
+func (m *MockDB) ChangeMintRequestState(tx pgx.Tx, quote string, state cashu.ACTION_STATE, minted bool) error {
 	for i := 0; i < len(m.MintRequest); i++ {
 		if m.MintRequest[i].Quote == quote {
 			m.MintRequest[i].State = state
@@ -185,10 +185,9 @@ func (m *MockDB) AddPreimageMeltRequest(tx pgx.Tx, preimage string, quote string
 	return nil
 
 }
-func (m *MockDB) ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, melted bool, paid_fee uint64) error {
+func (m *MockDB) ChangeMeltRequestState(tx pgx.Tx, quote string, state cashu.ACTION_STATE, melted bool, paid_fee uint64) error {
 	for i := 0; i < len(m.MeltRequest); i++ {
 		if m.MeltRequest[i].Quote == quote {
-			m.MeltRequest[i].RequestPaid = paid
 			m.MeltRequest[i].State = state
 			m.MeltRequest[i].Melted = melted
 			m.MeltRequest[i].FeePaid = paid_fee

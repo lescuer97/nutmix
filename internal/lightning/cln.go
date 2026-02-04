@@ -18,13 +18,15 @@ import (
 )
 
 type CLNGRPCWallet struct {
-	Network    chaincfg.Params
 	grpcClient *grpc.ClientConn
 	macaroon   string
+	Network    chaincfg.Params
 }
 
 func getTlsConfig(clientCert string, clientKey string, caCert string) (*tls.Config, error) {
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
 	if clientCert != "" && clientKey != "" {
 		cert, err := tls.X509KeyPair([]byte(clientCert), []byte(clientKey))
 		if err != nil {

@@ -45,12 +45,11 @@ func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB) (c
 	meltQuote.Melted = true
 
 	mintRequest.State = cashu.PAID
-	mintRequest.RequestPaid = true
 
 	slog.Info(fmt.Sprintf("Settling bolt11 payment internally: %v. mintRequest: %v, %v, %v", meltQuote.Quote, mintRequest.Quote, meltQuote.Amount, meltQuote.Unit))
-	err = m.MintDB.ChangeMeltRequestState(tx, meltQuote.Quote, meltQuote.RequestPaid, meltQuote.State, meltQuote.Melted, meltQuote.FeePaid)
+	err = m.MintDB.ChangeMeltRequestState(tx, meltQuote.Quote, meltQuote.State, meltQuote.Melted, meltQuote.FeePaid)
 	if err != nil {
-		return meltQuote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(tx, meltQuote.Quote, meltQuote.RequestPaid, meltQuote.State, meltQuote.Melted, meltQuote.FeePaid) %w", err)
+		return meltQuote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(tx, meltQuote.Quote, meltQuote.State, meltQuote.Melted, meltQuote.FeePaid) %w", err)
 	}
 
 	return meltQuote, nil
@@ -171,9 +170,9 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				return quote, fmt.Errorf("m.MintDB.SetProofsState(pending_proofs, cashu.PROOF_SPENT) %w", err)
 			}
 
-			err = m.MintDB.ChangeMeltRequestState(settleTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
+			err = m.MintDB.ChangeMeltRequestState(settleTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.PaidFee) %w", err)
+				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(quote.Quote, quote.State, quote.Melted, quote.PaidFee) %w", err)
 			}
 
 			err = m.MintDB.AddPreimageMeltRequest(settleTx, quote.Quote, quote.PaymentPreimage)
@@ -200,9 +199,9 @@ func (m *Mint) CheckMeltQuoteState(quoteId string) (cashu.MeltRequestDB, error) 
 				}
 			}()
 
-			err = m.MintDB.ChangeMeltRequestState(failedLnTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
+			err = m.MintDB.ChangeMeltRequestState(failedLnTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid)
 			if err != nil {
-				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(failedLnTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid) %w", err)
+				return quote, fmt.Errorf("m.MintDB.ChangeMeltRequestState(failedLnTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid) %w", err)
 			}
 
 			err = m.MintDB.DeleteChangeByQuote(failedLnTx, quote.Quote)
@@ -378,9 +377,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.SaveProof(preparationTx, meltRequest.Inputs) %w", err)
 	}
-	err = m.MintDB.ChangeMeltRequestState(preparationTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
+	err = m.MintDB.ChangeMeltRequestState(preparationTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.ChangeMeltRequestState(preparationTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid) %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.ChangeMeltRequestState(preparationTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid) %w", err)
 	}
 
 	err = m.MintDB.SaveMeltChange(preparationTx, meltRequest.Outputs, quote.Quote)
@@ -411,7 +410,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 		Amount: quote.Amount,
 	}
 
-	if !quote.RequestPaid {
+	if quote.State != cashu.PAID {
 
 		payment, err := m.LightningBackend.PayInvoice(quote, invoice, quote.FeeReserve, quote.Mpp, amount)
 		// Hardened error handling
@@ -450,7 +449,7 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote) %w", err)
 			}
 
-			slog.Info("after check payed verification")
+			slog.Info("after check paid verification")
 			quote.FeePaid = fee_paid
 
 			lnStatusTx, err := m.MintDB.GetTx(ctx)
@@ -470,17 +469,17 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 			case lightning.PENDING, lightning.SETTLED:
 				quote.State = cashu.PENDING
 				// change melt request state
-				err = m.MintDB.ChangeMeltRequestState(lnStatusTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
+				err = m.MintDB.ChangeMeltRequestState(lnStatusTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid)
 				if err != nil {
-					slog.Error(fmt.Errorf("m.MintDB.ChangeMeltRequestState(lnStatusTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid): %w", err).Error())
+					slog.Error(fmt.Errorf("m.MintDB.ChangeMeltRequestState(lnStatusTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid): %w", err).Error())
 				}
 
 			// finish failure and release the proofs
 			case lightning.FAILED, lightning.UNKNOWN:
 				quote.State = cashu.UNPAID
-				errDb := m.MintDB.ChangeMeltRequestState(lnStatusTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
+				errDb := m.MintDB.ChangeMeltRequestState(lnStatusTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid)
 				if errDb != nil {
-					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.ChangeMeltRequestState(lnStatusTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid) %w", err)
+					return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.ChangeMeltRequestState(lnStatusTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid) %w", err)
 				}
 				errDb = m.MintDB.DeleteProofs(lnStatusTx, meltRequest.Inputs)
 				if errDb != nil {
@@ -501,7 +500,6 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 		quote.PaymentPreimage = payment.Preimage
 		paidLightningFeeSat = uint64(payment.PaidFeeSat)
 		quote.FeePaid = paidLightningFeeSat
-		quote.RequestPaid = true
 		quote.State = cashu.PAID
 		quote.Melted = true
 	}
@@ -549,9 +547,9 @@ func (m *Mint) Melt(meltRequest cashu.PostMeltBolt11Request) (cashu.PostMeltQuot
 		response.Change = blindSignatures
 	}
 
-	err = m.MintDB.ChangeMeltRequestState(paidLnxTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid)
+	err = m.MintDB.ChangeMeltRequestState(paidLnxTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid)
 	if err != nil {
-		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.ChangeMeltRequestState(paidLnxTx, quote.Quote, quote.RequestPaid, quote.State, quote.Melted, quote.FeePaid) %w", err)
+		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("m.MintDB.ChangeMeltRequestState(paidLnxTx, quote.Quote, quote.State, quote.Melted, quote.FeePaid) %w", err)
 	}
 
 	err = m.MintDB.AddPreimageMeltRequest(paidLnxTx, quote.Quote, quote.PaymentPreimage)

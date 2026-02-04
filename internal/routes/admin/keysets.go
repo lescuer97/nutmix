@@ -137,7 +137,7 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 		} else {
 
 			c.Header("HX-Trigger", "recharge-keyset")
-			err := RenderSuccess(c, "Key succesfully rotated")
+			err := RenderSuccess(c, "Key successfully rotated")
 			if err != nil {
 				slog.Error("RenderSuccess", slog.Any("error", err))
 			}

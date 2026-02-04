@@ -31,9 +31,9 @@ type PostAuthBlindMintRequest struct {
 }
 
 type AuthProof struct {
+	C      WrappedPublicKey `json:"C" db:"c"`
 	Id     string           `json:"id"`
 	Secret string           `json:"secret"`
-	C      WrappedPublicKey `json:"C" db:"c"`
 	Amount uint64           `json:"amount" db:"amount"`
 }
 
@@ -66,17 +66,17 @@ func (a AuthProof) Proof(y WrappedPublicKey, state ProofState) Proof {
 }
 
 type AuthClams struct {
+	Aud      *[]string `json:"aud"`
 	Sub      string    `json:"sub"`
 	ClientId string    `json:"client_id"`
-	Aud      *[]string `json:"aud"`
 }
 
 type PostAuthBlindMintResponse struct {
 	Signatures []BlindSignature `json:"signatures"`
 }
 type Nut22Info struct {
-	BatMaxMint      uint64           `json:"bat_max_mint"`
 	ProtectedRoutes []ProtectedRoute `json:"protected_endpoints"`
+	BatMaxMint      uint64           `json:"bat_max_mint"`
 }
 
 func ConvertRouteListToProtectedRouteList(list []string) []ProtectedRoute {

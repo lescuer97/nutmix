@@ -15,21 +15,19 @@ const (
 )
 
 type MeltRequestDB struct {
-	Quote      string `json:"quote"`
-	Unit       string `json:"unit"`
-	Expiry     int64  `json:"expiry"`
-	Amount     uint64 `json:"amount"`
-	FeeReserve uint64 `json:"fee_reserve" db:"fee_reserve"`
-	FeePaid    uint64 `json:"paid_fee" db:"fee_paid"`
-	// Deprecated: Should be removed after all main wallets change to the new State format
-	RequestPaid     bool         `json:"paid" db:"request_paid"`
-	Request         string       `json:"request"`
-	Melted          bool         `json:"melted"`
-	State           ACTION_STATE `json:"state"`
 	PaymentPreimage string       `json:"payment_preimage"`
-	SeenAt          int64        `json:"seen_at"`
-	Mpp             bool         `json:"mpp"`
+	Unit            string       `json:"unit"`
+	Request         string       `json:"request"`
+	State           ACTION_STATE `json:"state"`
+	Quote           string       `json:"quote"`
 	CheckingId      string       `json:"checking_id"`
+	Expiry          int64        `json:"expiry"`
+	Amount          uint64       `json:"amount"`
+	FeeReserve      uint64       `json:"fee_reserve" db:"fee_reserve"`
+	FeePaid         uint64       `json:"paid_fee" db:"fee_paid"`
+	SeenAt          int64        `json:"seen_at"`
+	Melted          bool         `json:"melted"`
+	Mpp             bool         `json:"mpp"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
@@ -37,7 +35,6 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		Quote:           meltRequest.Quote,
 		Amount:          meltRequest.Amount,
 		FeeReserve:      meltRequest.FeeReserve,
-		Paid:            meltRequest.RequestPaid,
 		Expiry:          meltRequest.Expiry,
 		State:           meltRequest.State,
 		PaymentPreimage: meltRequest.PaymentPreimage,
@@ -52,9 +49,9 @@ type PostMeltQuoteBolt11Options struct {
 }
 
 type PostMeltQuoteBolt11Request struct {
+	Options PostMeltQuoteBolt11Options `json:"options"`
 	Request string                     `json:"request"`
 	Unit    string                     `json:"unit"`
-	Options PostMeltQuoteBolt11Options `json:"options"`
 }
 
 func (p PostMeltQuoteBolt11Request) IsMpp() uint64 {
@@ -65,17 +62,15 @@ func (p PostMeltQuoteBolt11Request) IsMpp() uint64 {
 }
 
 type PostMeltQuoteBolt11Response struct {
-	Quote      string `json:"quote"`
-	Amount     uint64 `json:"amount"`
-	FeeReserve uint64 `json:"fee_reserve"`
-	// Deprecated: Should be removed after all main wallets change to the new State format
-	Paid            bool             `json:"paid"`
-	Expiry          int64            `json:"expiry"`
+	Quote           string           `json:"quote"`
 	State           ACTION_STATE     `json:"state"`
-	Change          []BlindSignature `json:"change"`
 	Unit            string           `json:"unit"`
 	Request         string           `json:"request"`
 	PaymentPreimage string           `json:"payment_preimage"`
+	Change          []BlindSignature `json:"change"`
+	Amount          uint64           `json:"amount"`
+	FeeReserve      uint64           `json:"fee_reserve"`
+	Expiry          int64            `json:"expiry"`
 }
 
 type PostMeltBolt11Request struct {
@@ -157,7 +152,7 @@ func (p *PostMeltBolt11Request) verifyConditions() error {
 			return fmt.Errorf("not same data field %w", ErrInvalidSpendCondition)
 		}
 
-		if string(spendCondition.Data.Tags.originalTag) != string(firstSpendCondition.Data.Tags.originalTag) {
+		if spendCondition.Data.Tags.originalTag != firstSpendCondition.Data.Tags.originalTag {
 			return fmt.Errorf("not same tags %w", ErrInvalidSpendCondition)
 		}
 

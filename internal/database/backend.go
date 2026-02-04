@@ -21,8 +21,8 @@ type NostrLoginAuth struct {
 }
 
 type AuthUser struct {
-	Sub          string  `db:"sub"`
 	Aud          *string `db:"aud"`
+	Sub          string  `db:"sub"`
 	LastLoggedIn uint64  `db:"last_logged_in"`
 }
 
@@ -71,13 +71,13 @@ type MintDB interface {
 	UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) error
 
 	SaveMintRequest(tx pgx.Tx, request cashu.MintRequestDB) error
-	ChangeMintRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, minted bool) error
+	ChangeMintRequestState(tx pgx.Tx, quote string, state cashu.ACTION_STATE, minted bool) error
 	GetMintRequestById(tx pgx.Tx, quote string) (cashu.MintRequestDB, error)
 	GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error)
 
 	GetMeltRequestById(tx pgx.Tx, quote string) (cashu.MeltRequestDB, error)
 	SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error
-	ChangeMeltRequestState(tx pgx.Tx, quote string, paid bool, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
+	ChangeMeltRequestState(tx pgx.Tx, quote string, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
 	AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage string) error
 	ChangeCheckingId(tx pgx.Tx, quote string, checking_id string) error
 

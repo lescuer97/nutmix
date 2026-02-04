@@ -62,10 +62,6 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 	wrongPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x05})
 
-	if err != nil {
-		t.Fatalf("could not parse locking pubkey: %v", err)
-	}
-
 	// MINTING TESTING STARTS
 	// request mint quote of 1000 sats
 	w := httptest.NewRecorder()
@@ -354,10 +350,6 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	lockingPrivKeyTwo := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x05})
 
 	wrongPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x08})
-
-	if err != nil {
-		t.Fatalf("could not parse locking pubkey: %v", err)
-	}
 
 	// MINTING TESTING STARTS
 	// request mint quote of 1000 sats

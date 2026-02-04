@@ -1,0 +1,117 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    # Security-focused linters
+    - gosec           # Security vulnerability scanner
+    - bidichk         # Checks for dangerous unicode character sequences
+    - bodyclose       # Checks HTTP response body is closed
+    # - contextcheck    # Check for non-inherited context
+    
+    # Bug detection
+    - staticcheck     # Comprehensive static analysis
+    - govet           # Reports suspicious constructs
+    - errcheck        # Unchecked errors
+    - ineffassign     # Detects unused assignments
+    
+    # Code quality
+    # - revive          # Fast, extensible linter
+    # - gocyclo         # Cyclomatic complexity
+    - unconvert       # Unnecessary type conversions
+    - unparam         # Unused function parameters
+    - misspell        # Commonly misspelled words
+
+  settings:
+    gosec:
+      # Enable all security rules - these check for common vulnerabilities
+      includes:
+        - G101  # Look for hardcoded credentials
+        - G102  # Bind to all interfaces
+        - G103  # Audit the use of unsafe block
+        - G104  # Audit errors not checked
+        - G106  # Audit the use of ssh.InsecureIgnoreHostKey function
+        - G107  # URL provided to HTTP request as taint input
+        - G108  # Profiling endpoint is automatically exposed
+        - G109  # Converting strconv.Atoi result to int32/int16
+        - G110  # Detect io.Copy instead of io.CopyN when decompression
+        - G111  # Detect http.Dir('/') as a potential risk
+        - G112  # Detect ReadHeaderTimeout not configured
+        - G114  # Use of net/http serve function without timeouts
+        - G116  # Detect Trojan Source attacks using bidirectional Unicode
+        - G201  # SQL query construction using format string
+        - G202  # SQL query construction using string concatenation
+        - G203  # Use of unescaped data in HTML templates
+        - G204  # Audit use of command execution
+        - G301  # Poor file permissions used when creating a directory
+        - G302  # Poor file permissions used with chmod
+        - G303  # Creating tempfile using a predictable path
+        - G304  # File path provided as taint input
+        - G305  # File traversal when extracting zip/tar archive
+        - G306  # Poor file permissions used when writing to a new file
+        - G307  # Poor file permissions used with os.Create
+        - G401  # Detect the usage of MD5 or SHA1
+        - G402  # Look for bad TLS connection settings
+        - G403  # Ensure minimum RSA key length of 2048 bits
+        - G404  # Insecure random number source (rand instead of crypto/rand)
+        - G501  # Import blocklist: crypto/md5
+        - G502  # Import blocklist: crypto/des
+        - G503  # Import blocklist: crypto/rc4
+        - G504  # Import blocklist: net/http/cgi
+        - G505  # Import blocklist: crypto/sha1
+        - G601  # Implicit memory aliasing in for loop (Go < 1.22)
+        - G602  # Slice access out of bounds
+      
+      # Configure specific rules
+      config:
+        G101:
+          pattern: "(?i)passwd|pass|password|pwd|secret|private_key|token|api_key|apikey|access_key|auth"
+          ignore_entropy: false
+          entropy_threshold: "80.0"
+          per_char_threshold: "3.0"
+          truncate: "32"
+        G306:
+          "0600"
+
+    errcheck:
+      check-type-assertions: true
+    #   check-blank: true
+
+    govet:
+      enable-all: true
+      disable:
+        - shadow
+
+    gocyclo:
+      min-complexity: 15
+
+    bidichk:
+      # Check for all dangerous bidirectional unicode characters
+      left-to-right-embedding: true
+      right-to-left-embedding: true
+      pop-directional-formatting: true
+      left-to-right-override: true
+      right-to-left-override: true
+      left-to-right-isolate: true
+      right-to-left-isolate: true
+      first-strong-isolate: true
+      pop-directional-isolate: true
+
+  exclusions:
+    presets:
+      - common-false-positives
+    rules:
+      # Relax some checks in test files, but keep security checks active
+      - path: '(.+)_test\.go'
+        linters:
+          - gocyclo
+          - dupl
+          - funlen
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

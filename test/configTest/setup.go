@@ -47,7 +47,7 @@ func WriteConfigFile(file []byte) error {
 	var pathToProjectDir = dir + "/" + mint.ConfigDirName
 	var pathToProjectConfigFile = pathToProjectDir + "/" + mint.ConfigFileName
 
-	err = os.WriteFile(pathToProjectConfigFile, file, 0764)
+	err = os.WriteFile(pathToProjectConfigFile, file, 0600)
 	if err != nil {
 		return fmt.Errorf("os.WriteFile(pathToProjectConfigFile, file, 0764), %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -109,7 +110,6 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		return nil, nil, nil, nil, fmt.Errorf("could not execute newaddress command: %w", err)
 	}
 
-	reader := io.Reader(addressReader)
 	buf := make([]byte, 1024)
 
 	type LndAddress struct {
@@ -118,7 +118,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	var address LndAddress
 	for {
-		n, err := reader.Read(buf)
+		n, err := addressReader.Read(buf)
 		if n > 0 {
 			index := strings.Index(string(buf[:n]), "{")
 			err := json.Unmarshal(buf[index:n], &address)
@@ -183,7 +183,6 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		return nil, nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
 	}
 
-	reader = io.Reader(getInfoBobReader)
 	buf = make([]byte, 3024)
 
 	type NodeInfo struct {
@@ -196,7 +195,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	var bobInfo NodeInfo
 	for {
-		n, err := reader.Read(buf)
+		n, err := getInfoBobReader.Read(buf)
 		if n > 0 {
 			index := strings.Index(string(buf[:n]), "{")
 			err := json.Unmarshal(buf[index:n], &bobInfo)
@@ -236,11 +235,10 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		return nil, nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
 	}
 
-	reader = io.Reader(getInfoBobReaderTwo)
 	buf = make([]byte, 3024)
 	var bobInfoTwo NodeInfo
 	for {
-		n, err := reader.Read(buf)
+		n, err := getInfoBobReaderTwo.Read(buf)
 		if n > 0 {
 			index := strings.Index(string(buf[:n]), "{")
 			err := json.Unmarshal(buf[index:n], &bobInfoTwo)
@@ -383,6 +381,12 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
 	}
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			slog.Error("could not close body from call.", slog.Any("error", err))
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 
@@ -417,6 +421,12 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
 	}
+	defer func() {
+		// err := walletsRequest.Body.Close()
+		// if err != nil {
+		// 	slog.Error("could not close body from call.", slog.Any("error", err))
+		// }
+	}()
 
 	walletsRequest.Header.Add("Authorization", "Bearer "+response.AccessToken)
 	walletsRequest.Header.Add("cookie_access_token", response.AccessToken)
@@ -425,6 +435,12 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not make response %w", err)
 	}
+	defer func() {
+		err := respWallet.Body.Close()
+		if err != nil {
+			slog.Error("could not close body from call.", slog.Any("error", err))
+		}
+	}()
 
 	body, err = io.ReadAll(respWallet.Body)
 

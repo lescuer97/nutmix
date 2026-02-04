@@ -60,10 +60,9 @@ func (m *MockDB) AddLiquiditySwap(tx pgx.Tx, swap utils.LiquiditySwap) error {
 
 }
 func (m *MockDB) ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.SwapState) error {
-	var liquiditySwaps []utils.LiquiditySwap
 	for i := 0; i < len(m.LiquiditySwap); i++ {
 		if m.LiquiditySwap[i].Id == id {
-			liquiditySwaps[i].State = state
+			m.LiquiditySwap[i].State = state
 		}
 
 	}
@@ -109,7 +108,6 @@ func (m *MockDB) GetMintRequestsByTimeAndId(ctx context.Context, since time.Time
 			if m.MintRequest[i].Quote == *id {
 				return []cashu.MintRequestDB{m.MintRequest[i]}, nil
 			}
-			return []cashu.MintRequestDB{}, nil
 		}
 	}
 	mintRequests := make([]cashu.MintRequestDB, 0)

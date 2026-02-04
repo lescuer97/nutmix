@@ -46,15 +46,15 @@ const UNKNOWN PaymentStatus = iota + 999
 type PaymentResponse struct {
 	Preimage       string
 	PaymentRequest string
-	PaymentState   PaymentStatus
 	Rhash          string
-	PaidFeeSat     int64
 	CheckingId     string
+	PaymentState   PaymentStatus
+	PaidFeeSat     int64
 }
 type FeesResponse struct {
+	CheckingId   string
 	Fees         cashu.Amount
 	AmountToSend cashu.Amount
-	CheckingId   string
 }
 
 type InvoiceResponse struct {

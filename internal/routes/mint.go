@@ -117,8 +117,12 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 					Disabled: &b,
 				}
 				if entry, ok := nuts[nut]; ok {
-
-					mintInfo := entry.(cashu.SwapMintInfo)
+					mintInfo, ok := entry.(cashu.SwapMintInfo)
+					if !ok {
+						slog.Error("nuts entry type mismatch", slog.String("nut", nut), slog.Any("value", entry))
+						c.JSON(500, "Server side error")
+						return
+					}
 					// Then we modify the copy
 					mintInfo.Disabled = &mint.Config.PEG_OUT_ONLY
 

@@ -70,7 +70,12 @@ func isNostrKeyValid(nostrKey string) (bool, error) {
 
 	}
 
-	return nostr.IsValid32ByteHex(key.(string)), nil
+	keyStr, ok := key.(string)
+	if !ok {
+		return false, fmt.Errorf("nip19.Decode(nostrKey) returned %T", key)
+	}
+
+	return nostr.IsValid32ByteHex(keyStr), nil
 
 }
 
@@ -243,7 +248,6 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 			slog.Error("failed to render success", slog.Any("error", err))
 			return
 		}
-		return
 	}
 }
 
@@ -338,7 +342,6 @@ func MintSettingsAuth(mint *m.Mint) gin.HandlerFunc {
 			slog.Error("failed to render success", slog.Any("error", err))
 			return
 		}
-		return
 	}
 }
 

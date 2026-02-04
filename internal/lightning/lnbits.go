@@ -17,9 +17,9 @@ import (
 )
 
 type LnbitsWallet struct {
-	Network  chaincfg.Params
 	Endpoint string
 	Key      string
+	Network  chaincfg.Params
 }
 
 type LNBitsDetailErrorData struct {
@@ -27,26 +27,26 @@ type LNBitsDetailErrorData struct {
 	Status string
 }
 type lnbitsInvoiceRequest struct {
-	Amount     uint64 `json:"amount"`
 	Unit       string `json:"unit,omitempty"`
 	CheckingId string `json:"checking_id,omitempty"`
 	Memo       string `json:"memo"`
-	Out        bool   `json:"out"`
-	Expiry     int64  `json:"expiry"`
 	Bolt11     string `json:"bolt11"`
+	Amount     uint64 `json:"amount"`
+	Expiry     int64  `json:"expiry"`
+	Out        bool   `json:"out"`
 }
 
 type LNBitsPaymentStatusDetail struct {
 	Memo    string
+	Status  string
 	Fee     int64
 	Pending bool
-	Status  string
 }
 type LNBitsPaymentStatus struct {
-	Paid     bool   `json:"paid"`
-	Pending  bool   `json:"pending"`
 	Preimage string `json:"preimage"`
 	Details  LNBitsPaymentStatusDetail
+	Paid     bool `json:"paid"`
+	Pending  bool `json:"pending"`
 }
 type lnbitsFeeResponse struct {
 	FeeReserve uint64 `json:"fee_reserve"`

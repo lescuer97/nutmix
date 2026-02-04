@@ -12,10 +12,10 @@ const Bolt11MintQuote SubscriptionKind = "bolt11_mint_quote"
 const ProofStateWs SubscriptionKind = "proof_state"
 
 type WebRequestParams struct {
+	Payload any              `json:"payload,omitempty"`
 	Kind    SubscriptionKind `json:"kind,omitempty"`
 	SubId   string           `json:"subId"`
 	Filters []string         `json:"filters,omitempty"`
-	Payload any              `json:"payload,omitempty"`
 }
 
 type WsRequest struct {
@@ -44,8 +44,8 @@ type WsNotification struct {
 }
 
 type ErrorMsg struct {
-	Code    uint64 `json:"code"`
 	Message string `json:"message"`
+	Code    uint64 `json:"code"`
 }
 type WsError struct {
 	JsonRpc string   `json:"jsonrpc"`

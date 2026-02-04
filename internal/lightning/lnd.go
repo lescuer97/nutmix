@@ -20,9 +20,9 @@ import (
 )
 
 type LndGrpcWallet struct {
-	Network    chaincfg.Params
 	grpcClient *grpc.ClientConn
 	macaroon   string
+	Network    chaincfg.Params
 }
 
 func (l *LndGrpcWallet) SetupGrpc(host string, macaroon string, tlsCrt string) error {
@@ -217,9 +217,9 @@ func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 }
 
 type LndPayStatus struct {
+	Preimage string
 	Fee      uint64
 	Status   PaymentStatus
-	Preimage string
 }
 
 func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, error) {

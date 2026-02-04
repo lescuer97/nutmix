@@ -426,7 +426,7 @@ func calculateLnChartSummary(data []templates.MintMeltTimeSeriesPoint) templates
 
 // buildMintMeltTimeSeries processes raw mint/melt data and aggregates into time buckets
 // using zpay32 to decode invoice amounts
-func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *chaincfg.Params, startTime time.Time, bucketMinutes int) []templates.MintMeltTimeSeriesPoint {
+func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *chaincfg.Params, bucketMinutes int) []templates.MintMeltTimeSeriesPoint {
 	bucketSeconds := int64(bucketMinutes * 60)
 
 	// Maps to aggregate data by bucket
@@ -536,7 +536,7 @@ func LnChartCard(mint *mint.Mint) gin.HandlerFunc {
 		}
 
 		// Process and aggregate into time series using zpay32 for invoice decoding
-		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime, bucketMinutes)
+		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), bucketMinutes)
 
 		summary := calculateLnChartSummary(data)
 
@@ -567,7 +567,7 @@ func LnChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		}
 
 		// Process and aggregate into time series using zpay32 for invoice decoding
-		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), startTime, bucketMinutes)
+		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), bucketMinutes)
 
 		// Return HTML fragment for HTMX
 		err = templates.LnChartContent(data).Render(ctx, c.Writer)

@@ -14,7 +14,7 @@ func TestCheckIntegerFromStringSuccess(t *testing.T) {
 
 	success := 2
 	if *int != success {
-		t.Error("Convertion should have occured")
+		t.Error("Conversion should have occurred")
 	}
 }
 

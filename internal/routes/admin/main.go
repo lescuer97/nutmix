@@ -116,7 +116,13 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 			panic("invalid  ADMIN_NOSTR_NPUB ")
 		}
 
-		decodedKey, err := hex.DecodeString(value.(string))
+		keyStr, ok := value.(string)
+		if !ok {
+			slog.Info("nip19.Decode(adminNpubStr) returned non-string", slog.Any("value", value))
+			panic("invalid ADMIN_NOSTR_NPUB type")
+		}
+
+		decodedKey, err := hex.DecodeString(keyStr)
 		if err != nil {
 			slog.Info("hex.DecodeString(value.(string))", slog.Any("error", err))
 			panic("decoded ADMIN_NOSTR_NPUB is not correct")
