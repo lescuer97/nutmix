@@ -204,11 +204,13 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 		return fmt.Errorf(" bip32.NewMasterKey(mintPrivateKey.Serialize()). %w", err)
 	}
 
-	now := time.Now()
-	now = now.Add(time.Duration(expiry_limit_hours) * time.Hour)
-
+	var now *time.Time
+	if expiry_limit_hours > 0 {
+		nowTime := time.Now().Add(time.Duration(expiry_limit_hours) * time.Hour)
+		now = &nowTime
+	}
 	// Create New seed with one higher version
-	newSeed, err := l.createNewSeed(signerMasterKey, unit, highestSeed.Version+1, fee, &now)
+	newSeed, err := l.createNewSeed(signerMasterKey, unit, highestSeed.Version+1, fee, now)
 
 	if err != nil {
 		return fmt.Errorf(`l.createNewSeed(signerMasterKey, unit, highestSeed.Version+1, fee) %w`, err)
