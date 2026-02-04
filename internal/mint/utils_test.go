@@ -157,7 +157,7 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error parsing B_2: %+v", err)
 	}
-	outputs := []cashu.BlindedMessage{{Id: "00bfa73302d12ffd", B_: cashu.WrappedPublicKey{PublicKey: B_1}}, {Id: "00bfa73302d12ffd", B_: cashu.WrappedPublicKey{PublicKey: B_2}}, {Id: "00bfa73302d12ffd", B_: cashu.WrappedPublicKey{PublicKey: B_2}}}
+	outputs := []cashu.BlindedMessage{{Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", B_: cashu.WrappedPublicKey{PublicKey: B_1}}, {Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", B_: cashu.WrappedPublicKey{PublicKey: B_2}}, {Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", B_: cashu.WrappedPublicKey{PublicKey: B_2}}}
 
 	tx, err := mint.MintDB.GetTx(context.Background())
 	if err != nil {
