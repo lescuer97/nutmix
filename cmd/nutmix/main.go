@@ -122,6 +122,9 @@ func main() {
 
 	r.Use(middleware.CacheMiddleware(store))
 
+	// Add per-request timeout middleware (sets context deadline for handlers)
+	r.Use(middleware.TimeoutMiddleware(90 * time.Second))
+
 	err = mint.CheckPendingQuoteAndProofs()
 	if err != nil {
 		slog.Error("SetUpMint", slog.Any("error", err))
@@ -150,7 +153,7 @@ func main() {
 		Handler:      r,
 		ReadTimeout:  3 * time.Second,
 		WriteTimeout: 4 * time.Second,
-		IdleTimeout:  2 * time.Minute,
+		IdleTimeout:  3 * time.Minute,
 	}
 	// Start the server
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
