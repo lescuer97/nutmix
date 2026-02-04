@@ -12,6 +12,7 @@ import (
 	"github.com/tyler-smith/go-bip32"
 )
 
+// Deprecated: Use DeriveKeysetIdV2 instead. This function generates V1 keyset IDs which are less unique.
 func DeriveKeysetId(keysets []*secp256k1.PublicKey) (string, error) {
 	concatBinaryArray := []byte{}
 	for _, pubkey := range keysets {

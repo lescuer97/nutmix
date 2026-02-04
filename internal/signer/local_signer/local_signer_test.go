@@ -87,8 +87,12 @@ func TestCreateNewSeed(t *testing.T) {
 		t.Fatalf("localsigner.GetActiveKeys() %+v", err)
 	}
 
-	if keys.Keysets[0].Id != "00bfa73302d12ffd" {
-		t.Errorf("seed id incorrect. %v", keys.Keysets[1].Id)
+	// V2 keyset ID should start with "01" and be 66 characters long
+	if len(keys.Keysets[0].Id) != 66 {
+		t.Errorf("V2 keyset ID should be 66 characters long, got %d", len(keys.Keysets[0].Id))
+	}
+	if keys.Keysets[0].Id[:2] != "01" {
+		t.Errorf("V2 keyset ID should start with '01', got %s", keys.Keysets[0].Id[:2])
 	}
 }
 func TestRotateAuthSeedUnit(t *testing.T) {
@@ -129,4 +133,132 @@ func TestRotateAuthSeedUnit(t *testing.T) {
 	// if keys.Keysets[1].Keys[] == 1 {
 	//     t.Errorf("Should be Auth key %v",keys.Keysets[1].Unit)
 	// }
+}
+
+func TestBackwardCompatibilityV1Keysets(t *testing.T) {
+	// Pre-populate MockDB with a V1 keyset seed (simulating existing database with old keyset)
+	v1Seed := cashu.Seed{
+		Id:          "00bfa73302d12ffd", // Old V1 keyset ID
+		Unit:        cashu.Sat.String(),
+		Version:     1,
+		InputFeePpk: 0,
+		Active:      true,
+	}
+	db := mockdb.MockDB{
+		Seeds: []cashu.Seed{v1Seed},
+	}
+
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+
+	// Verify V1 keyset is loaded correctly
+	keys, err := localsigner.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("localsigner.GetActiveKeys() %+v", err)
+	}
+
+	if len(keys.Keysets) != 1 {
+		t.Errorf("Expected 1 keyset, got %d", len(keys.Keysets))
+	}
+
+	// Verify the V1 keyset ID is preserved
+	if keys.Keysets[0].Id != "00bfa73302d12ffd" {
+		t.Errorf("V1 keyset ID should be preserved, got %s", keys.Keysets[0].Id)
+	}
+
+	// Verify V1 keyset has correct format (starts with "00", 16 chars)
+	if len(keys.Keysets[0].Id) != 16 {
+		t.Errorf("V1 keyset ID should be 16 characters long, got %d", len(keys.Keysets[0].Id))
+	}
+	if keys.Keysets[0].Id[:2] != "00" {
+		t.Errorf("V1 keyset ID should start with '00', got %s", keys.Keysets[0].Id[:2])
+	}
+}
+
+func TestMixedV1AndV2Keysets(t *testing.T) {
+	// Pre-populate MockDB with V1 seed (simulating existing keyset)
+	v1Seed := cashu.Seed{
+		Id:          "00bfa73302d12ffd",
+		Unit:        cashu.Sat.String(),
+		Version:     1,
+		InputFeePpk: 0,
+		Active:      true,
+	}
+	db := mockdb.MockDB{
+		Seeds: []cashu.Seed{v1Seed},
+	}
+
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+
+	// Rotate the keyset - new one should use V2
+	err = localsigner.RotateKeyset(cashu.Sat, uint(50), 240)
+	if err != nil {
+		t.Fatalf("localsigner.RotateKeyset(cashu.Sat, uint(50), 240) %+v", err)
+	}
+
+	// Get all keysets
+	allKeysets, err := localsigner.GetKeysets()
+	if err != nil {
+		t.Fatalf("localsigner.GetKeysets() %+v", err)
+	}
+
+	if len(allKeysets.Keysets) != 2 {
+		t.Errorf("Expected 2 keysets, got %d", len(allKeysets.Keysets))
+	}
+
+	// Find V1 and V2 keysets
+	var v1Keyset, v2Keyset *cashu.BasicKeysetResponse
+	for i := range allKeysets.Keysets {
+		switch allKeysets.Keysets[i].Id[:2] {
+		case "00":
+			v1Keyset = &allKeysets.Keysets[i]
+		case "01":
+			v2Keyset = &allKeysets.Keysets[i]
+		}
+	}
+
+	// Verify V1 keyset exists and is inactive
+	if v1Keyset == nil {
+		t.Error("V1 keyset should exist")
+	} else {
+		if v1Keyset.Active {
+			t.Error("V1 keyset should be inactive after rotation")
+		}
+		if v1Keyset.Id != "00bfa73302d12ffd" {
+			t.Errorf("V1 keyset ID should be preserved, got %s", v1Keyset.Id)
+		}
+	}
+
+	// Verify V2 keyset exists and is active
+	if v2Keyset == nil {
+		t.Error("V2 keyset should exist after rotation")
+	} else {
+		if !v2Keyset.Active {
+			t.Error("V2 keyset should be active after rotation")
+		}
+		if len(v2Keyset.Id) != 66 {
+			t.Errorf("V2 keyset ID should be 66 characters long, got %d", len(v2Keyset.Id))
+		}
+	}
+
+	// Verify active keys returns V2
+	activeKeys, err := localsigner.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("localsigner.GetActiveKeys() %+v", err)
+	}
+
+	if len(activeKeys.Keysets) != 1 {
+		t.Errorf("Expected 1 active keyset, got %d", len(activeKeys.Keysets))
+	}
+
+	if activeKeys.Keysets[0].Id[:2] != "01" {
+		t.Errorf("Active keyset should be V2 (starts with '01'), got %s", activeKeys.Keysets[0].Id[:2])
+	}
 }
