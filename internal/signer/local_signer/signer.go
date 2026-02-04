@@ -148,16 +148,11 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 	if err != nil {
 		return newSeed, fmt.Errorf("DeriveKeyset(mintPrivateKey, newSeed) %w", err)
 	}
-	justPubkeys := []*secp256k1.PublicKey{}
-
+	pubkeysWithValues := make(map[uint64]*secp256k1.PublicKey, len(keysets))
 	for i := range keysets {
-		justPubkeys = append(justPubkeys, keysets[i].GetPubKey())
+		pubkeysWithValues[keysets[i].Amount] = keysets[i].GetPubKey()
 	}
-	newSeedId, err := cashu.DeriveKeysetId(justPubkeys)
-	if err != nil {
-		return newSeed, fmt.Errorf("cashu.DeriveKeysetId(justPubkeys) %w", err)
-	}
-	newSeed.Id = newSeedId
+	newSeed.Id = cashu.DeriveKeysetIdV2(pubkeysWithValues, unit.String(), fee, final_expiry)
 	if final_expiry != nil {
 		timestamp := uint64(final_expiry.Unix())
 		newSeed.FinalExpiry = &timestamp
@@ -209,11 +204,13 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 		return fmt.Errorf(" bip32.NewMasterKey(mintPrivateKey.Serialize()). %w", err)
 	}
 
-	now := time.Now()
-	now = now.Add(time.Duration(expiry_limit_hours) * time.Hour)
-
+	var now *time.Time
+	if expiry_limit_hours > 0 {
+		nowTime := time.Now().Add(time.Duration(expiry_limit_hours) * time.Hour)
+		now = &nowTime
+	}
 	// Create New seed with one higher version
-	newSeed, err := l.createNewSeed(signerMasterKey, unit, highestSeed.Version+1, fee, &now)
+	newSeed, err := l.createNewSeed(signerMasterKey, unit, highestSeed.Version+1, fee, now)
 
 	if err != nil {
 		return fmt.Errorf(`l.createNewSeed(signerMasterKey, unit, highestSeed.Version+1, fee) %w`, err)

@@ -275,3 +275,63 @@
   color: var(--accent-red);
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
+
+.card-header-active{
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+}
+/* ============================================
+   WARNING ICON COMPONENT
+   ============================================ */
+
+.warning-icon-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.warning-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.warning-yellow {
+  color: var(--accent-yellow);
+  transition: all 0.2s ease;
+}
+
+.warning-yellow:hover {
+  color: #fbbf24;
+  filter: brightness(1.3);
+  transform: scale(1.1);
+}
+
+.warning-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  width: 200px;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  display: none;
+  z-index: 100;
+  margin-bottom: var(--space-2);
+  box-shadow: var(--shadow-md);
+}
+
+.warning-icon-container:hover .warning-tooltip,
+.warning-icon-container:focus .warning-tooltip {
+  display: block;
+}
