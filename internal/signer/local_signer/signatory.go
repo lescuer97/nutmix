@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -15,7 +14,7 @@ const PeanutUTF8 = uint32(129372)
 
 func keyDerivation(version uint, unit cashu.Unit) string {
 	unitInteger := parseUnitToIntegerReference(unit.String())
-	return fmt.Sprintf("%v'/%v'/%v'", PeanutUTF8, uint32(unitInteger), version)
+	return fmt.Sprintf("%v'/%v'/%v'", PeanutUTF8, unitInteger, version)
 }
 
 func parseUnitToIntegerReference(unit string) uint32 {
@@ -33,19 +32,4 @@ func unitNormalization(unit string) string {
 	//  Convert the normalized string to uppercase using Unicode-aware semantics
 	return strings.ToUpper(unitStr)
 
-}
-
-type keysetAmounts = map[uint64]int
-
-func orderAndTransformAmounts(amounts []uint64) keysetAmounts {
-	// Sort the amounts
-	sort.Slice(amounts, func(i, j int) bool { return amounts[i] < amounts[j] })
-
-	// Transform to KeysetAmounts
-	keysetAmounts := make(keysetAmounts, len(amounts))
-	for index, amount := range amounts {
-		keysetAmounts[amount] = index
-	}
-
-	return keysetAmounts
 }
