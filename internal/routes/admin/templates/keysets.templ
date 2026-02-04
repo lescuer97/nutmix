@@ -13,6 +13,10 @@ type KeysetData struct {
 	ExpireLimit *time.Time
 }
 
+func isLegacyKeyset(id string) bool {
+	return len(id) == 16 && id[:2] == "00"
+}
+
 templ KeysetsPage() {
 	@Layout("keysets") {
 		<main class="main-content">
@@ -81,15 +85,20 @@ templ keysetCard(keyset KeysetData) {
 	<div class="card card-hover transition-all w-full max-w-sm">
 		<div class="card-header">
 			<span class="font-mono text-sm text-secondary truncate" title={ keyset.Id }>Id: { keyset.Id }</span>
-			if keyset.Active {
-				<span
-					class="text-xs font-bold text-success bg-opacity-10 bg-green-500 px-2 py-1 rounded-full uppercase"
-				>Active</span>
-			} else {
-				<span
-					class="text-xs font-bold text-secondary bg-opacity-10 bg-gray-500 px-2 py-1 rounded-full uppercase"
-				>Inactive</span>
-			}
+			<div class="card-header-active"> 
+				if keyset.Active {
+					<span
+						class="text-xs font-bold text-success bg-opacity-10 bg-green-500 px-2 py-1 rounded-full uppercase"
+					>Active</span>
+					if isLegacyKeyset(keyset.Id) {
+						@WarningIcon("This is a legacy V1 keyset. Consider rotating for improved security.", "warning-yellow")
+					}
+				} else {
+					<span
+						class="text-xs font-bold text-secondary bg-opacity-10 bg-gray-500 px-2 py-1 rounded-full uppercase"
+					>Inactive</span>
+				}
+			</div>
 		</div>
 		<div class="card-body">
 			<div class="grid grid-cols-2 gap-4 text-sm">

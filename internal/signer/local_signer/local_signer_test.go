@@ -216,9 +216,10 @@ func TestMixedV1AndV2Keysets(t *testing.T) {
 	// Find V1 and V2 keysets
 	var v1Keyset, v2Keyset *cashu.BasicKeysetResponse
 	for i := range allKeysets.Keysets {
-		if allKeysets.Keysets[i].Id[:2] == "00" {
+		switch allKeysets.Keysets[i].Id[:2] {
+		case "00":
 			v1Keyset = &allKeysets.Keysets[i]
-		} else if allKeysets.Keysets[i].Id[:2] == "01" {
+		case "01":
 			v2Keyset = &allKeysets.Keysets[i]
 		}
 	}
