@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -143,7 +144,16 @@ func main() {
 
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
-	if err := r.Run(PORT); err != nil {
+	// Define a custom http.Server
+	srv := &http.Server{
+		Addr:         PORT,
+		Handler:      r,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 4 * time.Second,
+		IdleTimeout:  2 * time.Minute,
+	}
+	// Start the server
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server failed", slog.Any("error", err))
 		os.Exit(1)
 	}
