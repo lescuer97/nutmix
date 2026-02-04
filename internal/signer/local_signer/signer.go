@@ -153,11 +153,7 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 	for i := range keysets {
 		justPubkeys = append(justPubkeys, keysets[i].GetPubKey())
 	}
-	newSeedId, err := cashu.DeriveKeysetId(justPubkeys)
-	if err != nil {
-		return newSeed, fmt.Errorf("cashu.DeriveKeysetId(justPubkeys) %w", err)
-	}
-	newSeed.Id = newSeedId
+	newSeed.Id = cashu.DeriveKeysetIdV2(justPubkeys, unit, final_expiry)
 	if final_expiry != nil {
 		timestamp := uint64(final_expiry.Unix())
 		newSeed.FinalExpiry = &timestamp
