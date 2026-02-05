@@ -16,7 +16,7 @@ func TestUseMinimumFeeOnInvoice(t *testing.T) {
 	}
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
-	invoiceString, err := CreateMockInvoice(10000, "test", chainParam, expireTime)
+	invoiceString, err := CreateMockInvoice(cashu.NewAmount(cashu.Sat, 10000), "test", chainParam, expireTime)
 	if err != nil {
 		t.Fatalf(`CreateMockInvoice(10000, "test", chaincfg.MainNetParams,expireTime). %v`, err)
 	}
@@ -29,7 +29,7 @@ func TestUseMinimumFeeOnInvoice(t *testing.T) {
 
 	sat_amount := uint64(invoice.MilliSat.ToSatoshis())
 
-	feeRes, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
+	feeRes, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.NewAmount(cashu.Sat, sat_amount))
 	if err != nil {
 		t.Fatalf(`fakeWallet.QueryFees(). %v`, err)
 	}
@@ -48,7 +48,7 @@ func TestUseFeeInvoice(t *testing.T) {
 	}
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
-	invoiceString, err := CreateMockInvoice(10000, "test", chainParam, expireTime)
+	invoiceString, err := CreateMockInvoice(cashu.NewAmount(cashu.Sat, 10000), "test", chainParam, expireTime)
 	if err != nil {
 		t.Fatalf(`CreateMockInvoice(10000, "test", chaincfg.MainNetParams,expireTime). %v`, err)
 	}
@@ -61,7 +61,7 @@ func TestUseFeeInvoice(t *testing.T) {
 
 	sat_amount := uint64(invoice.MilliSat.ToSatoshis())
 
-	feeRes, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.Amount{Amount: sat_amount, Unit: cashu.Sat})
+	feeRes, err := fakeWallet.QueryFees(invoiceString, invoice, false, cashu.NewAmount(cashu.Sat, sat_amount))
 	if err != nil {
 		t.Fatalf(`fakeWallet.QueryFees(). %v`, err)
 	}

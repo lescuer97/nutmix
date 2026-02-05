@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 
 	"github.com/jackc/pgconn"
@@ -100,14 +99,23 @@ func (m *Mint) CheckMeltQuoteState(ctx context.Context, quoteId string) (cashu.M
 			return quote, fmt.Errorf("zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork()). %w", err)
 		}
 
-		status, preimage, fee, err := m.LightningBackend.CheckPayed(quote.Quote, invoice, quote.CheckingId)
+		status, preimage, feeAmount, err := m.LightningBackend.CheckPayed(quote.Quote, invoice, quote.CheckingId)
 		if err != nil {
 			return quote, fmt.Errorf("m.LightningBackend.CheckPayed(quote.Quote). %w", err)
 		}
 
 		if status == lightning.SETTLED {
 			quote.State = cashu.PAID
-			quote.FeePaid = fee
+			// Convert fee to quote's unit for storage
+			quoteUnit, err := cashu.UnitFromString(quote.Unit)
+			if err != nil {
+				return quote, fmt.Errorf("cashu.UnitFromString(quote.Unit). %w", err)
+			}
+			convertErr := feeAmount.To(quoteUnit)
+			if convertErr != nil {
+				return quote, fmt.Errorf("feeAmount.To(quoteUnit). %w", convertErr)
+			}
+			quote.FeePaid = feeAmount.Amount
 			quote.PaymentPreimage = preimage
 
 			keysets, err := m.Signer.GetKeysets()
@@ -285,8 +293,6 @@ func (m *Mint) Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11Request
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("%w", cashu.ErrNotEnoughtProofs)
 	}
 
-	log.Printf("\n meltRequest.Inputs: %+v", meltRequest.Inputs)
-
 	// Verify spending conditions
 	hasSigAll, err := cashu.ProofsHaveSigAll(meltRequest.Inputs)
 	if err != nil {
@@ -403,14 +409,13 @@ func (m *Mint) Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11Request
 	}
 
 	var paidLightningFeeSat uint64
-	amount := cashu.Amount{
-		Unit:   unit,
-		Amount: quote.Amount,
-	}
+	amount := cashu.NewAmount(unit, quote.Amount)
 
 	if quote.State != cashu.PAID {
 
-		payment, err := m.LightningBackend.PayInvoice(quote, invoice, quote.FeeReserve, quote.Mpp, amount)
+		// Convert feeReserve to Amount for the lightning backend
+		feeReserveAmount := cashu.NewAmount(unit, quote.FeeReserve)
+		payment, err := m.LightningBackend.PayInvoice(quote, invoice, feeReserveAmount, quote.Mpp, amount)
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {
 			lnTx, err := m.MintDB.GetTx(ctx)
@@ -448,7 +453,16 @@ func (m *Mint) Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11Request
 			}
 
 			slog.Info("after check paid verification")
-			quote.FeePaid = fee_paid
+			// Convert fee Amount to quote's unit for storage
+			quoteUnit, err := cashu.UnitFromString(quote.Unit)
+			if err != nil {
+				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("cashu.UnitFromString(quote.Unit). %w", err)
+			}
+			convertErr := fee_paid.To(quoteUnit)
+			if convertErr != nil {
+				return quote.GetPostMeltQuoteResponse(), fmt.Errorf("fee_paid.To(quoteUnit). %w", convertErr)
+			}
+			quote.FeePaid = fee_paid.Amount
 
 			lnStatusTx, err := m.MintDB.GetTx(ctx)
 			if err != nil {
@@ -496,8 +510,16 @@ func (m *Mint) Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11Request
 			return quote.GetPostMeltQuoteResponse(), nil
 		}
 		quote.PaymentPreimage = payment.Preimage
-		paidLightningFeeSat = uint64(payment.PaidFeeSat)
-		quote.FeePaid = paidLightningFeeSat
+		// Convert fee Amount to quote's unit for storage
+		quoteUnit, err := cashu.UnitFromString(quote.Unit)
+		if err != nil {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("cashu.UnitFromString(quote.Unit). %w", err)
+		}
+		convertErr := payment.PaidFee.To(quoteUnit)
+		if convertErr != nil {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("payment.PaidFee.To(quoteUnit). %w", convertErr)
+		}
+		quote.FeePaid = payment.PaidFee.Amount
 		quote.State = cashu.PAID
 		quote.Melted = true
 	}

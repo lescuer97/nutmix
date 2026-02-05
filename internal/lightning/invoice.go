@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/invoicesrpc"
 	"github.com/lightningnetwork/lnd/lntypes"
@@ -55,8 +56,13 @@ func mockMppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Prei
 	return paymentPreimage, paymentHash, nil
 }
 
-func CreateMockInvoice(amountSats uint64, description string, network chaincfg.Params, expiry int64) (string, error) {
-	milsats, err := lnrpc.UnmarshallAmt(int64(amountSats), 0)
+func CreateMockInvoice(amountSats cashu.Amount, description string, network chaincfg.Params, expiry int64) (string, error) {
+	err := amountSats.To(cashu.Msat)
+	if err != nil {
+		return "", fmt.Errorf("amountSats.To(cashu.Msat): %w", err)
+
+	}
+	milsats, err := lnrpc.UnmarshallAmt(0, int64(amountSats.Amount))
 	if err != nil {
 		return "", fmt.Errorf("UnmarshallAmt: %w", err)
 	}

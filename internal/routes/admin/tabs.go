@@ -510,7 +510,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		testQuote := "verification-test-" + strconv.FormatInt(time.Now().Unix(), 10)
 		invoiceResp, err := newBackend.RequestInvoice(
 			cashu.MintRequestDB{Quote: testQuote},
-			cashu.Amount{Unit: cashu.Sat, Amount: 100},
+			cashu.NewAmount(cashu.Sat, 100),
 		)
 		if err != nil {
 			slog.Warn("newBackend.RequestInvoice failed during verification", slog.String("err", err.Error()))
