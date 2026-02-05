@@ -28,13 +28,13 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 	}
 	defer func() {
 		if p := recover(); p != nil {
-			slog.Error("Rolling back because of failure", slog.Any("error", err))
+			slog.Warn("Rolling back because of failure", slog.Any("error", err))
 			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
 				slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 			}
 
 		} else if err != nil {
-			slog.Error("Rolling back because of failure", slog.Any("error", err))
+			slog.Warn("Rolling back because of failure", slog.Any("error", err))
 			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
 				slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 			}
@@ -80,13 +80,13 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 					}
 					defer func() {
 						if p := recover(); p != nil {
-							slog.Error("Rolling back because of failure", slog.Any("error", err))
+							slog.Warn("Rolling back because of failure", slog.Any("error", err))
 							if rollbackErr := mint.MintDB.Rollback(ctx, swapTx); rollbackErr != nil {
 								slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 							}
 
 						} else if err != nil {
-							slog.Error("Rolling back because of failure", slog.Any("error", err))
+							slog.Warn("Rolling back because of failure", slog.Any("error", err))
 							if rollbackErr := mint.MintDB.Rollback(ctx, swapTx); rollbackErr != nil {
 								slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 							}
@@ -173,7 +173,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 					}
 					defer func() {
 						if p := recover(); p != nil {
-							slog.Error("Rolling back because of failure", slog.Any("error", err))
+							slog.Warn("Rolling back because of failure", slog.Any("error", err))
 							if rollbackErr := mint.MintDB.Rollback(ctx, afterCheckTx); rollbackErr != nil {
 								slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 							}
