@@ -70,7 +70,7 @@ func (l *LndGrpcWallet) lndGrpcPayInvoice(routerrpcClient routerrpc.RouterClient
 	if decodedInvoice.MilliSat == nil {
 		return fmt.Errorf("amount is not available for the invoice")
 	}
-	sendRequest := routerrpc.SendPaymentRequest{PaymentRequest: invoiceString, AllowSelfPayment: true}
+	sendRequest := routerrpc.SendPaymentRequest{PaymentRequest: invoiceString, FeeLimitSat: int64(feeReserve), AllowSelfPayment: true}
 	res, err := routerrpcClient.SendPaymentV2(ctx, &sendRequest)
 	if err != nil {
 		lightningResponse.PaymentState = FAILED
