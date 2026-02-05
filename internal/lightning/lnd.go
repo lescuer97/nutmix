@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"time"
 
 	"crypto/x509"
 
@@ -77,11 +78,12 @@ func (l *LndGrpcWallet) lndGrpcPayInvoice(routerrpcClient routerrpc.RouterClient
 		return err
 	}
 
-	payment, err := res.Recv()
-	if err != nil {
-		return fmt.Errorf("res.Recv(). %w", err)
-	}
 	for {
+		time.Sleep(50 * time.Millisecond)
+		payment, err := res.Recv()
+		if err != nil {
+			return fmt.Errorf("res.Recv(). %w", err)
+		}
 		switch payment.Status {
 		case lnrpc.Payment_IN_FLIGHT:
 			lightningResponse.PaymentState = PENDING
@@ -102,7 +104,6 @@ func (l *LndGrpcWallet) lndGrpcPayInvoice(routerrpcClient routerrpc.RouterClient
 			return nil
 		default:
 			continue
-
 		}
 	}
 }
@@ -218,7 +219,7 @@ func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 	} else {
 		err := l.lndGrpcPayInvoice(routerClient, melt_quote.Request, zpayInvoice, feeReserve, &invoiceRes)
 		if err != nil {
-			return invoiceRes, fmt.Errorf(`l.LnbitsInvoiceRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice) %w`, err)
+			return invoiceRes, fmt.Errorf(`l.lndGrpcPayInvoice(routerClient, melt_quote.Request, zpayInvoice, feeReserve, &invoiceRes) %w`, err)
 		}
 	}
 	invoiceRes.CheckingId = melt_quote.CheckingId
