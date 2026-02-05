@@ -33,7 +33,8 @@ func TestSetupLightingCommsLND(t *testing.T) {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
 	}
 
-	invoice, err := lndWallet.RequestInvoice(cashu.MintRequestDB{}, cashu.Amount{Amount: 1000, Unit: cashu.Sat}) //nolint:exhaustruct
+	//nolint:exhaustruct
+	invoice, err := lndWallet.RequestInvoice(cashu.MintRequestDB{}, cashu.Amount{Amount: 1000, Unit: cashu.Sat})
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)
 	}
@@ -62,7 +63,8 @@ func TestSetupLightingCommsLnBits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setUpLightingNetworkEnviroment %+v", err)
 	}
-	invoice, err := lnbitsWallet.RequestInvoice(cashu.MintRequestDB{}, cashu.Amount{Amount: 1000, Unit: cashu.Sat}) //nolint:exhaustruct
+	//nolint:exhaustruct
+	invoice, err := lnbitsWallet.RequestInvoice(cashu.MintRequestDB{}, cashu.Amount{Amount: 1000, Unit: cashu.Sat})
 	if err != nil {
 		t.Fatalf("could not setup lighting comms %+v", err)
 	}

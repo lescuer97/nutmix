@@ -33,7 +33,7 @@ type FakeWallet struct {
 
 const mock_preimage = "fakewalletpreimage"
 
-func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	switch {
 	case slices.Contains(f.UnpurposeErrors, FailPaymentUnknown):
 		return PaymentResponse{
@@ -41,7 +41,7 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 			PaymentRequest: "",
 			PaymentState:   UNKNOWN,
 			Rhash:          "",
-			PaidFeeSat:     0,
+			PaidFee:        cashu.Amount{Unit: amount.Unit, Amount: 0},
 			CheckingId:     "",
 		}, nil
 
@@ -51,7 +51,7 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 			PaymentRequest: "",
 			PaymentState:   FAILED,
 			Rhash:          "",
-			PaidFeeSat:     0,
+			PaidFee:        cashu.Amount{Unit: amount.Unit, Amount: 0},
 			CheckingId:     "",
 		}, nil
 	case slices.Contains(f.UnpurposeErrors, FailPaymentPending):
@@ -60,7 +60,7 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 			PaymentRequest: "",
 			PaymentState:   PENDING,
 			Rhash:          "",
-			PaidFeeSat:     0,
+			PaidFee:        cashu.Amount{Unit: amount.Unit, Amount: 0},
 			CheckingId:     "",
 		}, nil
 	}
@@ -70,23 +70,23 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 		PaymentRequest: melt_quote.Request,
 		PaymentState:   SETTLED,
 		Rhash:          "",
-		PaidFeeSat:     0,
+		PaidFee:        cashu.Amount{Unit: amount.Unit, Amount: 0},
 		CheckingId:     melt_quote.CheckingId,
 	}, nil
 }
 
-func (f FakeWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
+func (f FakeWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
 	switch {
 	case slices.Contains(f.UnpurposeErrors, FailQueryUnknown):
-		return UNKNOWN, "", 0, nil
+		return UNKNOWN, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, nil
 	case slices.Contains(f.UnpurposeErrors, FailQueryFailed):
-		return FAILED, "", 0, nil
+		return FAILED, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, nil
 	case slices.Contains(f.UnpurposeErrors, FailQueryPending):
-		return PENDING, "", 0, nil
+		return PENDING, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, nil
 
 	}
 
-	return SETTLED, mock_preimage, uint64(10), nil
+	return SETTLED, mock_preimage, cashu.Amount{Unit: cashu.Sat, Amount: 10}, nil
 }
 
 func (f FakeWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
@@ -107,8 +107,8 @@ func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp b
 	fee := GetFeeReserve(amount.Amount, f.InvoiceFee)
 	hash := zpayInvoice.PaymentHash[:]
 	feesResponse := FeesResponse{
-		Fees:         cashu.Amount{Amount: fee, Unit: cashu.Sat},
-		AmountToSend: cashu.Amount{Amount: amount.Amount, Unit: cashu.Sat},
+		Fees:         cashu.Amount{Unit: amount.Unit, Amount: fee},
+		AmountToSend: amount,
 		CheckingId:   hex.EncodeToString(hash),
 	}
 
@@ -128,7 +128,7 @@ func (f FakeWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amoun
 	if quote.Description != nil {
 		description = *quote.Description
 	}
-	payReq, err := CreateMockInvoice(amount.Amount, description, f.Network, expireTime)
+	payReq, err := CreateMockInvoice(amount, description, f.Network, expireTime)
 	if err != nil {
 		return response, fmt.Errorf(`CreateMockInvoice(amount, "mock invoice", f.Network, expireTime). %w`, err)
 	}
@@ -146,8 +146,8 @@ func (f FakeWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amoun
 	}, nil
 }
 
-func (f FakeWallet) WalletBalance() (uint64, error) {
-	return 0, nil
+func (f FakeWallet) WalletBalance() (cashu.Amount, error) {
+	return cashu.Amount{Unit: cashu.Sat, Amount: 0}, nil
 }
 
 func (f FakeWallet) LightningType() Backend {

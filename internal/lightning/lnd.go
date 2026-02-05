@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"log/slog"
 	"time"
 
 	"crypto/x509"
@@ -65,13 +66,17 @@ func (l *LndGrpcWallet) SetupGrpc(host string, macaroon string, tlsCrt string) e
 	return nil
 }
 
-func (l *LndGrpcWallet) lndGrpcPayInvoice(routerrpcClient routerrpc.RouterClient, invoiceString string, decodedInvoice *zpay32.Invoice, feeReserve uint64, lightningResponse *PaymentResponse) error {
+func (l *LndGrpcWallet) lndGrpcPayInvoice(routerrpcClient routerrpc.RouterClient, invoiceString string, decodedInvoice *zpay32.Invoice, feeReserve cashu.Amount, lightningResponse *PaymentResponse) error {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	if decodedInvoice.MilliSat == nil {
 		return fmt.Errorf("amount is not available for the invoice")
 	}
-	sendRequest := routerrpc.SendPaymentRequest{PaymentRequest: invoiceString, FeeLimitSat: int64(feeReserve), AllowSelfPayment: true} //nolint:exhaustruct
+	err := feeReserve.To(cashu.Msat)
+	if err != nil {
+		return fmt.Errorf(`feeReserve.To(cashu.Sat) %w`, err)
+	}
+	sendRequest := routerrpc.SendPaymentRequest{PaymentRequest: invoiceString, FeeLimitMsat: int64(feeReserve.Amount), AllowSelfPayment: true} //nolint:exhaustruct
 	res, err := routerrpcClient.SendPaymentV2(ctx, &sendRequest)
 	if err != nil {
 		lightningResponse.PaymentState = FAILED
@@ -99,7 +104,8 @@ func (l *LndGrpcWallet) lndGrpcPayInvoice(routerrpcClient routerrpc.RouterClient
 			lightningResponse.PaymentRequest = invoiceString
 			lightningResponse.PaymentState = SETTLED
 			lightningResponse.Preimage = payment.GetPaymentPreimage()
-			lightningResponse.PaidFeeSat = payment.FeeSat
+
+			lightningResponse.PaidFee = cashu.Amount{Unit: cashu.Msat, Amount: uint64(payment.FeeMsat)}
 			lightningResponse.PaymentState = SETTLED
 			return nil
 		default:
@@ -114,15 +120,28 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 	routerrpcClient routerrpc.RouterClient,
 	invoice string,
 	zpayInvoice *zpay32.Invoice,
-	feeReserve uint64,
-	amount_sat uint64,
+	feeReserve cashu.Amount,
+	amount cashu.Amount,
 	lightningResponse *PaymentResponse) error {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
+	// Convert amounts to Sat for LND
+	feeSat := cashu.Amount{Unit: feeReserve.Unit, Amount: feeReserve.Amount}
+	err := feeSat.To(cashu.Sat)
+	if err != nil {
+		return fmt.Errorf(`feeReserve.To(cashu.Sat) %w`, err)
+	}
+
+	amountMilisat := cashu.Amount{Unit: amount.Unit, Amount: amount.Amount}
+	err = amountMilisat.To(cashu.Sat)
+	if err != nil {
+		return fmt.Errorf(`amount.To(cashu.Sat) %w`, err)
+	}
+
 	fixedLimit := lnrpc.FeeLimit_Fixed{
-		Fixed: int64(feeReserve),
+		Fixed: int64(feeSat.Amount),
 	}
 
 	feeLimit := lnrpc.FeeLimit{
@@ -136,7 +155,7 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 		queryRoutes := lnrpc.QueryRoutesRequest{
 			PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
 			UseMissionControl: true,
-			Amt:               int64(amount_sat),
+			AmtMsat:           int64(amountMilisat.Amount),
 			FeeLimit:          &feeLimit,
 		}
 
@@ -184,9 +203,7 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 					failedSource := routes[0].Hops[failureIndex-1].PubKey
 					failedDestination := routes[0].Hops[failureIndex].PubKey
 
-					// TODO: change to use slog when refactor for slog
-					log.Printf("partial payment attempt failed from %s to %s", failedSource, failedDestination)
-
+					slog.Info("partial payment attempt failed", slog.Any("failedSource", failedSource), slog.Any("failedDestination", failedDestination))
 					continue
 				}
 				lightningResponse.PaymentState = FAILED
@@ -195,8 +212,12 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 				lightningResponse.PaymentRequest = invoice
 				lightningResponse.PaymentState = SETTLED
 				lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
-				lightningResponse.PaidFeeSat = res.Route.TotalFeesMsat / 1000
-				lightningResponse.PaymentState = SETTLED
+				// LND returns fee in msat, convert to Amount
+				lightningResponse.PaidFee = cashu.Amount{Unit: cashu.Msat, Amount: uint64(res.Route.TotalFeesMsat)}
+				err := lightningResponse.PaidFee.To(feeReserve.Unit)
+				if err != nil {
+					return fmt.Errorf(`feePaidMsat.To(feeReserve.Unit) %w`, err)
+				}
 				return nil
 			default:
 				continue
@@ -208,12 +229,12 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 
 }
 
-func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 
 	routerClient := routerrpc.NewRouterClient(l.grpcClient)
 	if mpp {
-		err := l.lndGrpcPayPartialInvoice(routerClient, melt_quote.Request, zpayInvoice, feeReserve, amount.Amount, &invoiceRes)
+		err := l.lndGrpcPayPartialInvoice(routerClient, melt_quote.Request, zpayInvoice, feeReserve, feeReserve, &invoiceRes)
 		if err != nil {
 			return invoiceRes, fmt.Errorf(`l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes) %w`, err)
 		}
@@ -230,7 +251,7 @@ func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 
 type LndPayStatus struct {
 	Preimage string
-	Fee      uint64
+	Fee      cashu.Amount
 	Status   PaymentStatus
 }
 
@@ -255,7 +276,8 @@ func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, 
 		if err != nil {
 			return payStatus, err
 		}
-		payStatus.Fee = uint64(payment.FeeSat)
+		// LND returns fee in satoshis
+		payStatus.Fee = cashu.Amount{Unit: cashu.Sat, Amount: uint64(payment.FeeSat)}
 		switch payment.Status {
 		case lnrpc.Payment_IN_FLIGHT:
 			payStatus.Status = PENDING
@@ -277,10 +299,10 @@ func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, 
 	}
 }
 
-func (l LndGrpcWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
+func (l LndGrpcWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
 	payStatus, err := l.getPaymentStatus(invoice)
 	if err != nil {
-		return FAILED, "", 0, fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
+		return FAILED, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
 	}
 
 	return payStatus.Status, payStatus.Preimage, payStatus.Fee, nil
@@ -369,13 +391,19 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 	featureBits := getFeatureBits(zpayInvoice.Features)
 
+	queryAmount := amount
+	err := queryAmount.To(cashu.Msat)
+	if err != nil {
+		return FeesResponse{}, fmt.Errorf("amount.To(cashu.Msat). %w", err)
+	}
+
 	//nolint:exhaustruct
 	queryRoutes := lnrpc.QueryRoutesRequest{
 		PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
 		RouteHints:        routeHints,
 		DestFeatures:      featureBits,
 		UseMissionControl: true,
-		Amt:               int64(amount.Amount),
+		AmtMsat:           int64(queryAmount.Amount),
 	}
 
 	res, err := client.QueryRoutes(ctx, &queryRoutes)
@@ -387,21 +415,23 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 		return FeesResponse{}, fmt.Errorf("no routes found")
 	}
 
-	fee := GetAverageRouteFee(res.Routes) / 1000
-
-	fee = GetFeeReserve(amount.Amount, fee)
-
-	feesResponse := FeesResponse{
-		Fees:         cashu.Amount{Unit: cashu.Sat, Amount: fee},
-		AmountToSend: cashu.Amount{Unit: cashu.Sat, Amount: amount.Amount},
-		CheckingId:   "",
+	// LND returns route fees in msats
+	feeMsat := GetAverageRouteFee(res.Routes)
+	feeAmount := cashu.Amount{Unit: cashu.Msat, Amount: feeMsat}
+	convertErr := feeAmount.To(amount.Unit)
+	if convertErr != nil {
+		return FeesResponse{}, fmt.Errorf("feeAmount.To(amount.Unit): %w", convertErr)
 	}
+
+	feeAmount.Amount = GetFeeReserve(amount.Amount, feeAmount.Amount)
 
 	hash := zpayInvoice.PaymentHash[:]
 
-	feesResponse.Fees.Amount = fee
-	feesResponse.AmountToSend.Amount = amount.Amount
-	feesResponse.CheckingId = hex.EncodeToString(hash)
+	feesResponse := FeesResponse{
+		Fees:         feeAmount,
+		AmountToSend: amount,
+		CheckingId:   hex.EncodeToString(hash),
+	}
 	return feesResponse, nil
 }
 
@@ -416,12 +446,12 @@ func (l LndGrpcWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
-	err := amount.To(cashu.Sat)
+	err := amount.To(cashu.Msat)
 	if err != nil {
 		return response, fmt.Errorf(`amount.To(cashu.Sat) %w`, err)
 	}
 
-	Lndinvoice := lnrpc.Invoice{Value: int64(amount.Amount), Expiry: 900} //nolint:exhaustruct
+	Lndinvoice := lnrpc.Invoice{ValueMsat: int64(amount.Amount), Expiry: 900} //nolint:exhaustruct
 	if quote.Description != nil {
 		Lndinvoice.Memo = *quote.Description
 	}
@@ -440,7 +470,7 @@ func (l LndGrpcWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 	return response, nil
 }
 
-func (l LndGrpcWallet) WalletBalance() (uint64, error) {
+func (l LndGrpcWallet) WalletBalance() (cashu.Amount, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
@@ -450,9 +480,9 @@ func (l LndGrpcWallet) WalletBalance() (uint64, error) {
 	balance, err := client.ChannelBalance(ctx, &channelRequest)
 
 	if err != nil {
-		return 0, err
+		return cashu.Amount{}, err
 	}
-	return balance.LocalBalance.GetMsat(), nil
+	return cashu.Amount{Unit: cashu.Msat, Amount: balance.LocalBalance.GetMsat()}, nil
 }
 
 func (f LndGrpcWallet) LightningType() Backend {
@@ -466,9 +496,10 @@ func (f LndGrpcWallet) ActiveMPP() bool {
 	return true
 }
 func (f LndGrpcWallet) VerifyUnitSupport(unit cashu.Unit) bool {
-	if unit == cashu.Sat {
+	switch unit {
+	case cashu.Sat, cashu.Msat:
 		return true
-	} else {
+	default:
 		return false
 	}
 }

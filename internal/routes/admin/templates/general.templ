@@ -1,8 +1,9 @@
 package templates 
 
 templ ObbNotification(children templ.Component) {
-	<div id="notifications" hx-ext="remove-me" hx-swap-oob="true">@children
-</div>
+	<div id="notifications" hx-ext="remove-me" hx-swap-oob="true">
+		@children
+	</div>
 }
 
 templ ErrorNotif(message string) {
