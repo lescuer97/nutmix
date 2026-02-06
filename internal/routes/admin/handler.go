@@ -97,11 +97,16 @@ func (a *adminHandler) rotateKeyset(unit cashu.Unit, fee uint, expiry_hours uint
 }
 
 func (a *adminHandler) lnSatsBalance() (uint64, error) {
-	milillisatBalance, err := a.mint.LightningBackend.WalletBalance()
+	balanceAmount, err := a.mint.LightningBackend.WalletBalance()
 	if err != nil {
 		return 0, fmt.Errorf("a.mint.LightningBackend.WalletBalance(). %w", err)
 	}
-	return milillisatBalance / 1000, nil
+	// Convert to Sat for display
+	convertErr := balanceAmount.To(cashu.Sat)
+	if convertErr != nil {
+		return 0, fmt.Errorf("balanceAmount.To(cashu.Sat). %w", convertErr)
+	}
+	return balanceAmount.Amount, nil
 }
 
 func (a *adminHandler) EcashBalance(since time.Time) (templates.Balance, error) {

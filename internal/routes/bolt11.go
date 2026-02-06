@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"strings"
 	"time"
@@ -14,7 +13,6 @@ import (
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/invoices"
-	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
@@ -68,7 +66,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			slog.Uint64("amount", mintRequest.Amount),
 			slog.Any("backend", mint.LightningBackend.LightningType()))
 
-		log.Printf("\n MINT REQUEST: %+v", mintRequest)
 		unit, err := cashu.UnitFromString(mintRequest.Unit)
 
 		if err != nil {
@@ -96,7 +93,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			Description: mintRequest.Description,
 		}
 
-		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: mintRequest.Amount})
+		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.NewAmount(unit, mintRequest.Amount))
 		if err != nil {
 			slog.Info("Payment request", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
@@ -311,6 +308,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			amountBlindMessages += blindMessage.Amount
 			// check all blind messages have the same unit
 		}
+
 		invoice, err := zpay32.Decode(mintRequestDB.Request, mint.LightningBackend.GetNetwork())
 		if err != nil {
 			slog.Warn("Mint decoding zpay32.Decode", slog.Any("error", err))
@@ -318,16 +316,22 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		amountMilsats, err := lnrpc.UnmarshallAmt(int64(amountBlindMessages), 0)
+		cashuUnit, err := cashu.UnitFromString(mintRequestDB.Unit)
 		if err != nil {
-			slog.Info("UnmarshallAmt", slog.Any("error", err))
+			slog.Warn("cashu.UnitFromString(mintRequestDB.Unit)", slog.Any("error", err))
 			c.JSON(500, "Opps!, something went wrong")
+			return
+		}
+		cashuBlindMessage := cashu.NewAmount(cashuUnit, amountBlindMessages)
+		err = cashuBlindMessage.To(cashu.Msat)
+		if err != nil {
+			_ = c.Error(fmt.Errorf("cashuBlindMessage.To(cashu.Msat). %w", err))
 			return
 		}
 
 		// check the amount in outputs are the same as the quote
-		if int32(*invoice.MilliSat) < int32(amountMilsats) {
-			slog.Info("wrong amount of milisats", slog.Int("invoice_milisats", int(*invoice.MilliSat)), slog.Int("needed_milisats", int(amountMilsats)))
+		if uint64(*invoice.MilliSat) < cashuBlindMessage.Amount {
+			slog.Info("wrong amount of milisats", slog.Int("invoice_milisats", int(*invoice.MilliSat)), slog.Int("needed_milisats", int(cashuBlindMessage.Amount)))
 			c.JSON(403, "Amounts in outputs are not the same")
 			return
 		}
@@ -490,25 +494,29 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		amount := invoice.MilliSat.ToSatoshis()
-		cashuAmount := cashu.Amount{Unit: unit, Amount: uint64(amount)}
+		invoiceAmountMilisats := uint64(*invoice.MilliSat)
+		cashuAmount := cashu.NewAmount(cashu.Msat, invoiceAmountMilisats)
+		err = cashuAmount.To(unit)
+		if err != nil {
+			slog.Error("cashuAmount.To(unit)", slog.Any("error", err), slog.Any("err", cashu.ErrUnitNotSupported))
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
 
 		isMpp := false
-		mppAmount := cashu.Amount{Unit: cashu.Msat, Amount: meltRequest.IsMpp()}
+		mppAmount := cashu.NewAmount(unit, meltRequest.IsMpp())
 
 		// if mpp is valid than change amount to mpp amount
 		if mppAmount.Amount != 0 {
-			isMpp = true
-			if unit == cashu.Sat {
-				err = mppAmount.To(cashu.Sat)
-				if err != nil {
-					slog.Warn("mppAmount.To(cashu.Sat)", slog.Any("error", err), slog.Any("err", cashu.ErrUnitNotSupported))
-					errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-					c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
-					return
-				}
+			if mppAmount.Amount > cashuAmount.Amount {
+				slog.Warn("User tried to pay mpp amount bigger than the given invoice", slog.Any("invoiceAmount", cashuAmount.Amount), slog.Any("mppAmount", mppAmount.Amount))
+				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+				return
 
 			}
+			isMpp = true
 			cashuAmount = mppAmount
 		}
 

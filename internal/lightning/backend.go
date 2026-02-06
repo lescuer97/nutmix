@@ -21,14 +21,14 @@ const FAKEWALLET Backend = iota + 4
 const STRIKE Backend = iota + 5
 
 type LightningBackend interface {
-	PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error)
-	CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error)
+	PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error)
+	CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error)
 	CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error)
 	RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error)
 	// returns the amount in sats and the checking_id
 	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error)
 	// returns milisats balance
-	WalletBalance() (uint64, error)
+	WalletBalance() (cashu.Amount, error)
 	LightningType() Backend
 	GetNetwork() *chaincfg.Params
 	ActiveMPP() bool
@@ -49,7 +49,7 @@ type PaymentResponse struct {
 	Rhash          string
 	CheckingId     string
 	PaymentState   PaymentStatus
-	PaidFeeSat     int64
+	PaidFee        cashu.Amount
 }
 type FeesResponse struct {
 	CheckingId   string

@@ -51,7 +51,12 @@ func LnSendPage(mint *m.Mint) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 			balance = "Unavailable"
 		} else {
-			balance = strconv.FormatUint(milillisatBalance/1000, 10)
+			err = milillisatBalance.To(cashu.Sat)
+			if err != nil {
+				_ = c.Error(fmt.Errorf("milillisatBalance.To(cashu.Sat). %w", err))
+				return
+			}
+			balance = strconv.FormatUint(milillisatBalance.Amount, 10)
 		}
 
 		component := templates.LnSendPage(balance)
@@ -94,7 +99,12 @@ func SwapOutForm(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		balance := strconv.FormatUint(milillisatBalance/1000, 10)
+		err = milillisatBalance.To(cashu.Sat)
+		if err != nil {
+			_ = c.Error(fmt.Errorf("milillisatBalance.To(cashu.Sat). %w", err))
+			return
+		}
+		balance := strconv.FormatUint(milillisatBalance.Amount, 10)
 		component := templates.SwapOutPostForm(balance)
 
 		err = component.Render(ctx, c.Writer)
@@ -153,16 +163,33 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
+		err = currentBalance.To(cashu.Msat)
+		if err != nil {
+			_ = c.Error(fmt.Errorf("currentBalance.To(cashu.Msat). %w", err))
+			return
+		}
 		invoiceAmountMsats := uint64(*decodedInvoice.MilliSat)
-		if currentBalance < invoiceAmountMsats {
-			if err := RenderError(c, fmt.Sprintf("Insufficient funds: Have %d sats, need %d sats", currentBalance/1000, invoiceAmountMsats/1000)); err != nil {
+		if currentBalance.Amount < invoiceAmountMsats {
+			err = currentBalance.To(cashu.Sat)
+			if err != nil {
+				_ = c.Error(fmt.Errorf("currentBalance.To(cashu.Sat). %w", err))
+				return
+			}
+			// Convert invoice amount from msats to sats for display
+			invoiceAmountSat := cashu.NewAmount(cashu.Msat, invoiceAmountMsats)
+			convertErr := invoiceAmountSat.To(cashu.Sat)
+			if convertErr != nil {
+				_ = c.Error(fmt.Errorf("invoiceAmountSat.To(cashu.Sat). %w", convertErr))
+				return
+			}
+			if err := RenderError(c, fmt.Sprintf("Insufficient funds: Have %d sats, need %d sats", currentBalance.Amount, invoiceAmountSat.Amount)); err != nil {
 				slog.Warn("failed to render error", slog.Any("error", err))
 			}
 			return
 		}
 
 		amount := decodedInvoice.MilliSat.ToSatoshis()
-		feesResponse, err := mint.LightningBackend.QueryFees(invoice, decodedInvoice, false, cashu.Amount{Unit: cashu.Sat, Amount: uint64(amount)})
+		feesResponse, err := mint.LightningBackend.QueryFees(invoice, decodedInvoice, false, cashu.NewAmount(cashu.Sat, uint64(amount)))
 		if err != nil {
 			slog.Info("mint.LightningComs.PayInvoice", slog.Any("error", err))
 			if err := RenderError(c, "Could not calculate fees or route not found"); err != nil {
@@ -257,7 +284,7 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 
 		uuid := uuid.New().String()
 
-		resp, err := mint.LightningBackend.RequestInvoice(cashu.MintRequestDB{Quote: uuid}, cashu.Amount{Amount: amount, Unit: cashu.Sat})
+		resp, err := mint.LightningBackend.RequestInvoice(cashu.MintRequestDB{Quote: uuid}, cashu.NewAmount(cashu.Sat, amount))
 		if err != nil {
 			slog.Warn("mint.LightningBackend.RequestInvoice", slog.Any("error", err))
 			if err := RenderError(c, "Could not generate invoice"); err != nil {
@@ -464,11 +491,11 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 			return
 		}
 
-		fee := uint64(float64(swapRequest.Amount) * 0.10)
+		fee := cashu.NewAmount(cashu.Sat, uint64(float64(swapRequest.Amount)*0.10))
 
 		slog.Info("making payment to invoice", slog.String("invoice", swapRequest.LightningInvoice))
 
-		payment, err := mint.LightningBackend.PayInvoice(cashu.MeltRequestDB{Request: swapRequest.LightningInvoice}, decodedInvoice, fee, false, cashu.Amount{Unit: cashu.Sat, Amount: swapRequest.Amount})
+		payment, err := mint.LightningBackend.PayInvoice(cashu.MeltRequestDB{Request: swapRequest.LightningInvoice}, decodedInvoice, fee, false, cashu.NewAmount(cashu.Sat, swapRequest.Amount))
 
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {

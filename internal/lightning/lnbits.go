@@ -120,7 +120,7 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 	return nil
 }
 
-func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
 
 	var lnbitsInvoice struct {
@@ -154,34 +154,38 @@ func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zp
 	invoiceRes.PaymentState = SETTLED
 	invoiceRes.Rhash = lnbitsInvoice.PaymentHash
 	invoiceRes.Preimage = paymentStatus.Preimage
-	invoiceRes.PaidFeeSat = int64(math.Abs(float64(paymentStatus.Details.Fee)))
+	// LNBits returns fee as int64, convert to Amount
+	invoiceRes.PaidFee = cashu.NewAmount(amount.Unit, uint64(math.Abs(float64(paymentStatus.Details.Fee))))
 	invoiceRes.CheckingId = melt_quote.CheckingId
 
 	return invoiceRes, nil
 }
 
-func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
+func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
 	var paymentStatus LNBitsPaymentStatus
+	zeroFee := cashu.NewAmount(cashu.Sat, 0)
 
 	hash := invoice.PaymentHash[:]
 	err := l.LnbitsRequest("GET", "/api/v1/payments/"+hex.EncodeToString(hash), nil, &paymentStatus)
 	if err != nil {
-		return FAILED, "", uint64(paymentStatus.Details.Fee), fmt.Errorf("json.Marshal: %w", err)
+		return FAILED, "", zeroFee, fmt.Errorf("json.Marshal: %w", err)
 	}
+
+	fee := cashu.NewAmount(cashu.Sat, uint64(paymentStatus.Details.Fee))
 
 	switch {
 	case paymentStatus.Paid:
-		return SETTLED, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+		return SETTLED, paymentStatus.Preimage, fee, nil
 	case paymentStatus.Details.Status == "pending":
-		return PENDING, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+		return PENDING, paymentStatus.Preimage, fee, nil
 	case paymentStatus.Details.Pending:
-		return PENDING, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+		return PENDING, paymentStatus.Preimage, fee, nil
 	case !paymentStatus.Paid && paymentStatus.Details.Status == "failed":
-		return FAILED, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+		return FAILED, paymentStatus.Preimage, fee, nil
 	case !paymentStatus.Paid && !paymentStatus.Details.Pending:
-		return FAILED, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+		return FAILED, paymentStatus.Preimage, fee, nil
 	default:
-		return FAILED, paymentStatus.Preimage, uint64(paymentStatus.Details.Fee), nil
+		return FAILED, paymentStatus.Preimage, fee, nil
 	}
 }
 
@@ -212,26 +216,39 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 	invoiceString := "/api/v1/payments/fee-reserve" + "?" + `invoice=` + invoice
 
 	err := l.LnbitsRequest("GET", invoiceString, nil, &queryResponse)
-	queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
 
 	feesResponse := FeesResponse{}
 	if err != nil {
 		return feesResponse, fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	fee := GetFeeReserve(amount.Amount, queryResponse.FeeReserve)
+	// LNBits returns fee in msats, convert to Amount
+	feeMsat := cashu.NewAmount(cashu.Msat, queryResponse.FeeReserve)
+	convertErr := feeMsat.To(amount.Unit)
+	if convertErr != nil {
+		return feesResponse, fmt.Errorf("feeMsat.To(amount.Unit): %w", convertErr)
+	}
+
+	fee := GetFeeReserve(amount.Amount, feeMsat.Amount)
 	hash := zpayInvoice.PaymentHash[:]
 
-	feesResponse.Fees.Amount = fee
-	feesResponse.AmountToSend.Amount = amount.Amount
+	feesResponse.Fees = cashu.NewAmount(amount.Unit, fee)
+	feesResponse.AmountToSend = amount
 	feesResponse.CheckingId = hex.EncodeToString(hash)
 
 	return feesResponse, nil
 }
 
 func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
+	// Convert amount to Sat for LNBits
+	amountSat := cashu.NewAmount(amount.Unit, amount.Amount)
+	err := amountSat.To(cashu.Sat)
+	if err != nil {
+		return InvoiceResponse{}, fmt.Errorf(`amount.To(cashu.Sat) %w`, err)
+	}
+
 	reqInvoice := lnbitsInvoiceRequest{
-		Amount: amount.Amount,
+		Amount: amountSat.Amount,
 		Unit:   cashu.Sat.String(),
 		Memo:   "",
 		Out:    false,
@@ -254,7 +271,7 @@ func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amo
 		PaymentRequest string `json:"payment_request"`
 		Bolt11         string `json:"bolt11"`
 	}
-	err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
+	err = l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
 	if err != nil {
 		return response, fmt.Errorf("json.Marshal: %w", err)
 	}
@@ -273,7 +290,7 @@ func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amo
 
 }
 
-func (l LnbitsWallet) WalletBalance() (uint64, error) {
+func (l LnbitsWallet) WalletBalance() (cashu.Amount, error) {
 	var channelBalance struct {
 		Id      string `json:"id"`
 		Name    string `json:"name"`
@@ -281,10 +298,11 @@ func (l LnbitsWallet) WalletBalance() (uint64, error) {
 	}
 	err := l.LnbitsRequest("GET", "/api/v1/wallet", nil, &channelBalance)
 	if err != nil {
-		return 0, fmt.Errorf("l.LnbitsInvoiceRequest: %w", err)
+		return cashu.Amount{}, fmt.Errorf("l.LnbitsInvoiceRequest: %w", err)
 	}
 
-	return uint64(channelBalance.Balance), nil
+	// LNBits returns balance in sats
+	return cashu.NewAmount(cashu.Sat, uint64(channelBalance.Balance)), nil
 }
 
 func (f LnbitsWallet) LightningType() Backend {
@@ -298,9 +316,10 @@ func (f LnbitsWallet) ActiveMPP() bool {
 	return false
 }
 func (f LnbitsWallet) VerifyUnitSupport(unit cashu.Unit) bool {
-	if unit == cashu.Sat {
+	switch unit {
+	case cashu.Sat:
 		return true
-	} else {
+	default:
 		return false
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +21,14 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		err := templates.KeysetsPage().Render(ctx, c.Writer)
+		availableUnits := []cashu.Unit{cashu.Sat, cashu.Msat, cashu.USD, cashu.EUR}
+
+		availableUnits = slices.DeleteFunc(availableUnits, func(val cashu.Unit) bool {
+			return !mint.LightningBackend.VerifyUnitSupport(val)
+		})
+
+		availableUnits = append(availableUnits, cashu.AUTH)
+		err := templates.KeysetsPage(availableUnits).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(fmt.Errorf("templates.KeysetsPage().Render(ctx, c.Writer). %w", err))

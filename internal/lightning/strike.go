@@ -224,7 +224,7 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 }
 
 func (l Strike) convertStrikeAmountToUInt(amount strikeAmount) (cashu.Amount, error) {
-	cashuAmount := cashu.Amount{}
+	cashuAmount := cashu.NewAmount(0, 0)
 	val, err := strconv.ParseFloat(amount.Amount, 64)
 	if err != nil {
 		return cashuAmount, fmt.Errorf("strconv.ParseUint(fee_str, 10, 64): %w", err)
@@ -246,7 +246,7 @@ func (l Strike) convertStrikeAmountToUInt(amount strikeAmount) (cashu.Amount, er
 	return cashuAmount, nil
 }
 
-func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve uint64, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
+func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var strikePayment strikePaymentStatus
 	var invoiceRes PaymentResponse
 
@@ -265,7 +265,7 @@ func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.I
 		return invoiceRes, fmt.Errorf(`strikeStateToCashuState(strikePayment.State) %w`, err)
 	}
 	payHash := *zpayInvoice.PaymentHash
-	invoiceRes.PaidFeeSat = int64(fee.Amount)
+	invoiceRes.PaidFee = fee
 	invoiceRes.PaymentState = state
 	invoiceRes.PaymentRequest = melt_quote.Request
 	invoiceRes.Rhash = hex.EncodeToString(payHash[:])
@@ -274,24 +274,24 @@ func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.I
 	return invoiceRes, nil
 }
 
-func (l Strike) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, uint64, error) {
+func (l Strike) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
 	var paymentStatus strikePaymentStatus
 
 	err := l.StrikeRequest("GET", "/v1/payments/"+checkingId, nil, &paymentStatus)
 	if err != nil {
-		return FAILED, "", uint64(0), fmt.Errorf(`l.StrikeRequest("GET", "/v1/payments/"+checkingId: %w`, err)
+		return FAILED, "", cashu.NewAmount(cashu.Sat, 0), fmt.Errorf(`l.StrikeRequest("GET", "/v1/payments/"+checkingId: %w`, err)
 	}
 
 	lnFee, err := l.convertStrikeAmountToUInt(paymentStatus.LightningNetworkFee)
 	if err != nil {
-		return FAILED, "", uint64(0), fmt.Errorf(`strconv.ParseUint(paymentStatus.LightningNetworkFee, 10, 64): %w`, err)
+		return FAILED, "", cashu.NewAmount(cashu.Sat, 0), fmt.Errorf(`strconv.ParseUint(paymentStatus.LightningNetworkFee, 10, 64): %w`, err)
 	}
 
 	state, err := strikePaymentStateToCashuState(paymentStatus.State)
 	if err != nil {
-		return PENDING, "", lnFee.Amount, fmt.Errorf("strikePaymentStateToCashuState(strikePayment.State): %w", err)
+		return PENDING, "", lnFee, fmt.Errorf("strikePaymentStateToCashuState(strikePayment.State): %w", err)
 	}
-	return state, "", lnFee.Amount, nil
+	return state, "", lnFee, nil
 }
 func (l Strike) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
 	var paymentStatus strikeInvoiceResponse
@@ -389,11 +389,11 @@ func (l Strike) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (
 	return response, nil
 }
 
-func (l Strike) WalletBalance() (uint64, error) {
+func (l Strike) WalletBalance() (cashu.Amount, error) {
 	var balance []strikeAccountBalanceResponse
 	err := l.StrikeRequest("GET", "/v1/balances", nil, &balance)
 	if err != nil {
-		return 0, fmt.Errorf(`l.StrikeRequest("GET", "/v1/balances": %w`, err)
+		return cashu.NewAmount(0, 0), fmt.Errorf(`l.StrikeRequest("GET", "/v1/balances": %w`, err)
 	}
 
 	balanceTotal := uint64(0)
@@ -402,14 +402,14 @@ func (l Strike) WalletBalance() (uint64, error) {
 		if bal.Currency == BTC {
 			currentBalance, err := l.convertStrikeAmountToUInt(strikeAmount{Amount: bal.Current, Currency: BTC})
 			if err != nil {
-				return 0, fmt.Errorf(`l.convertToSatAmount(strikeAmount{Amount: bal.Current, Currency: BTC}). %w`, err)
+				return cashu.NewAmount(0, 0), fmt.Errorf(`l.convertToSatAmount(strikeAmount{Amount: bal.Current, Currency: BTC}). %w`, err)
 			}
 			balanceTotal += currentBalance.Amount
 		}
 
 	}
 
-	return balanceTotal * 1000, nil
+	return cashu.NewAmount(cashu.Msat, balanceTotal*1000), nil
 }
 
 func (f Strike) LightningType() Backend {

@@ -61,7 +61,7 @@ func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.Po
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork()). %w", err)
 	}
 
-	status, preimage, fees, err := mint.LightningBackend.CheckPayed(quote.Quote, invoice, quote.CheckingId)
+	status, preimage, feesAmount, err := mint.LightningBackend.CheckPayed(quote.Quote, invoice, quote.CheckingId)
 	if err != nil {
 		if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 			return quote.GetPostMeltQuoteResponse(), nil
@@ -73,7 +73,16 @@ func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.Po
 	case lightning.SETTLED:
 		quote.PaymentPreimage = preimage
 		quote.State = cashu.PAID
-		quote.FeePaid = fees
+		// Convert fee Amount to quote's unit for storage
+		quoteUnit, err := cashu.UnitFromString(quote.Unit)
+		if err != nil {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("cashu.UnitFromString(quote.Unit). %w", err)
+		}
+		convertErr := feesAmount.To(quoteUnit)
+		if convertErr != nil {
+			return quote.GetPostMeltQuoteResponse(), fmt.Errorf("feesAmount.To(quoteUnit). %w", convertErr)
+		}
+		quote.FeePaid = feesAmount.Amount
 
 	case lightning.PENDING:
 		quote.State = cashu.PENDING

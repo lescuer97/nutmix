@@ -17,6 +17,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/go-playground/validator/v10"
 	"github.com/lescuer97/nutmix/pkg/crypto"
 )
 
@@ -48,6 +49,12 @@ var (
 	ErrMintQuoteNoPublicKey      = errors.New("no valid pubkey for mint quote")
 	ErrMintQuoteNoValidSignature = errors.New("no valid signature for mint quote")
 )
+var validate *validator.Validate
+
+func init() {
+	validate = validator.New()
+
+}
 
 const (
 	MethodBolt11 = "bolt11"
@@ -612,11 +619,20 @@ type MeltChange struct {
 }
 
 type Amount struct {
-	Unit   Unit
-	Amount uint64
+	Unit   Unit   `validate:"required"`
+	Amount uint64 `validate:"gte=0"`
+}
+
+func NewAmount(unit Unit, amount uint64) Amount {
+	return Amount{Unit: unit, Amount: amount}
 }
 
 func (a *Amount) To(toUnit Unit) error {
+	err := validate.Struct(a)
+	if err != nil {
+		return fmt.Errorf("could not validate amount structure. %w", err)
+	}
+
 	if a.Unit == toUnit {
 		return nil
 	}
