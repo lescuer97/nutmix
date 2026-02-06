@@ -131,14 +131,14 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 			// If the fees are acceptable, continue to create the Receive Payment
 			slog.Warn("zpay32.Decode(invoice)", slog.Any("error", err))
 			if err := RenderError(c, "Invalid Lightning Invoice"); err != nil {
-				slog.Error("failed to render error", slog.Any("error", err))
+				slog.Warn("failed to render error", slog.Any("error", err))
 			}
 			return
 		}
 
 		if decodedInvoice.MilliSat == nil {
 			if err := RenderError(c, "Invoice must have an amount"); err != nil {
-				slog.Error("failed to render error", slog.Any("error", err))
+				slog.Warn("failed to render error", slog.Any("error", err))
 			}
 			return
 		}
@@ -146,9 +146,9 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		// Check for sufficient funds
 		currentBalance, err := mint.LightningBackend.WalletBalance()
 		if err != nil {
-			slog.Error("Could not fetch wallet balance", slog.Any("error", err))
+			slog.Warn("Could not fetch wallet balance", slog.Any("error", err))
 			if err := RenderError(c, "Could not check wallet balance"); err != nil {
-				slog.Error("failed to render error", slog.Any("error", err))
+				slog.Warn("failed to render error", slog.Any("error", err))
 			}
 			return
 		}
@@ -156,7 +156,7 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		invoiceAmountMsats := uint64(*decodedInvoice.MilliSat)
 		if currentBalance < invoiceAmountMsats {
 			if err := RenderError(c, fmt.Sprintf("Insufficient funds: Have %d sats, need %d sats", currentBalance/1000, invoiceAmountMsats/1000)); err != nil {
-				slog.Error("failed to render error", slog.Any("error", err))
+				slog.Warn("failed to render error", slog.Any("error", err))
 			}
 			return
 		}
@@ -166,7 +166,7 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		if err != nil {
 			slog.Info("mint.LightningComs.PayInvoice", slog.Any("error", err))
 			if err := RenderError(c, "Could not calculate fees or route not found"); err != nil {
-				slog.Error("failed to render error", slog.Any("error", err))
+				slog.Warn("failed to render error", slog.Any("error", err))
 			}
 			return
 		}
@@ -198,13 +198,13 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			}
 		}()
@@ -243,14 +243,14 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 		amount, err := strconv.ParseUint(amountStr, 10, 64)
 		if err != nil {
 			if err := RenderError(c, "Invalid amount"); err != nil {
-				slog.Error("failed to render error", slog.Any("error", err))
+				slog.Warn("failed to render error", slog.Any("error", err))
 			}
 			return
 		}
 
 		if amount <= 0 {
 			if err := RenderError(c, "Amount must be greater than 0"); err != nil {
-				slog.Error("failed to render error", slog.Any("error", err))
+				slog.Warn("failed to render error", slog.Any("error", err))
 			}
 			return
 		}
@@ -259,9 +259,9 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 
 		resp, err := mint.LightningBackend.RequestInvoice(cashu.MintRequestDB{Quote: uuid}, cashu.Amount{Amount: amount, Unit: cashu.Sat})
 		if err != nil {
-			slog.Error("mint.LightningBackend.RequestInvoice", slog.Any("error", err))
+			slog.Warn("mint.LightningBackend.RequestInvoice", slog.Any("error", err))
 			if err := RenderError(c, "Could not generate invoice"); err != nil {
-				slog.Error("failed to render error", slog.Any("error", err))
+				slog.Warn("failed to render error", slog.Any("error", err))
 			}
 			return
 		}
@@ -299,13 +299,13 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			}
 		}()
@@ -365,13 +365,13 @@ func SwapStateCheck(mint *m.Mint) gin.HandlerFunc {
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			}
 		}()
@@ -421,13 +421,13 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
-					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
+					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			}
 		}()
@@ -498,14 +498,14 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 			case lightning.PENDING, lightning.SETTLED:
 				err = mint.MintDB.ChangeLiquiditySwapState(lnStatusTx, swapRequest.Id, utils.LightningPaymentPending)
 				if err != nil {
-					slog.Error("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail)", slog.Any("error", err))
+					slog.Warn("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail)", slog.Any("error", err))
 				}
 
 			// finish failure and release the proofs
 			case lightning.FAILED, lightning.UNKNOWN:
 				err = mint.MintDB.ChangeLiquiditySwapState(lnStatusTx, swapRequest.Id, utils.LightningPaymentFail)
 				if err != nil {
-					slog.Error("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail)", slog.Any("error", err))
+					slog.Warn("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail)", slog.Any("error", err))
 				}
 			}
 			err = lnStatusTx.Commit(ctx)
@@ -534,7 +534,7 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 
 		err = mint.MintDB.ChangeLiquiditySwapState(txSwap, swapRequest.Id, swapRequest.State)
 		if err != nil {
-			slog.Error("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail)", slog.Any("error", err))
+			slog.Warn("mint.MintDB.ChangeLiquiditySwapState(swapRequest.Id, utils.LightnigPaymentFail)", slog.Any("error", err))
 		}
 
 		err = txSwap.Commit(ctx)

@@ -170,7 +170,7 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 		if iconUrl != "" {
 			if err := validateURL(iconUrl); err != nil {
 				if renderErr := RenderError(c, fmt.Sprintf("Invalid Icon URL: %s", err.Error())); renderErr != nil {
-					slog.Error("failed to render error", slog.Any("error", renderErr))
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
 				}
 				return
 			}
@@ -180,7 +180,7 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 		if tosUrl != "" {
 			if err := validateURL(tosUrl); err != nil {
 				if renderErr := RenderError(c, fmt.Sprintf("Invalid Terms of Service URL: %s", err.Error())); renderErr != nil {
-					slog.Error("failed to render error", slog.Any("error", renderErr))
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
 				}
 				return
 			}
@@ -230,7 +230,7 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 
 		err := mint.MintDB.UpdateConfig(mint.Config)
 		if err != nil {
-			slog.Error(
+			slog.Warn(
 				"mint.MintDB.UpdateConfig(mint.Config) - Mocking success despite error",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			return
@@ -238,14 +238,14 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 
 		// render the settings page
 		if err := templates.General(mint.Config).Render(c.Request.Context(), c.Writer); err != nil {
-			slog.Error("failed to render settings", slog.Any("error", err))
+			slog.Warn("failed to render settings", slog.Any("error", err))
 			return
 		}
 
 		// obb success and render the settings page
 		err = templates.ObbNotification(templates.SuccessNotif("General settings successfully set")).Render(c.Request.Context(), c.Writer)
 		if err != nil {
-			slog.Error("failed to render success", slog.Any("error", err))
+			slog.Warn("failed to render success", slog.Any("error", err))
 			return
 		}
 	}
@@ -268,7 +268,7 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 				`checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))`,
 				slog.String(utils.LogExtraInfo, err.Error()))
 			if renderErr := RenderError(c, "peg out limit has a problem"); renderErr != nil {
-				slog.Error("failed to render error", slog.Any("error", renderErr))
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
@@ -281,7 +281,7 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 				`checkLimitSat(c.Request.PostFormValue("PEG_OUT_LIMIT_SATS"))`,
 				slog.String(utils.LogExtraInfo, err.Error()))
 			if renderErr := RenderError(c, "peg out limit has a problem"); renderErr != nil {
-				slog.Error("failed to render error", slog.Any("error", renderErr))
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
@@ -289,21 +289,21 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 
 		err = mint.MintDB.UpdateConfig(mint.Config)
 		if err != nil {
-			slog.Error(
+			slog.Warn(
 				"mint.MintDB.UpdateConfig(mint.Config) - Mocking success despite error",
 				slog.String(utils.LogExtraInfo, err.Error()))
 		}
 
 		// render the settings page
 		if err := templates.Lightning(mint.Config).Render(c.Request.Context(), c.Writer); err != nil {
-			slog.Error("failed to render settings", slog.Any("error", err))
+			slog.Warn("failed to render settings", slog.Any("error", err))
 			return
 		}
 
 		// obb success and render the settings page
 		err = templates.ObbNotification(templates.SuccessNotif("General settings successfully set")).Render(c.Request.Context(), c.Writer)
 		if err != nil {
-			slog.Error("failed to render success", slog.Any("error", err))
+			slog.Warn("failed to render success", slog.Any("error", err))
 			return
 		}
 	}
@@ -322,7 +322,7 @@ func MintSettingsAuth(mint *m.Mint) gin.HandlerFunc {
 		err = mint.MintDB.UpdateConfig(mint.Config)
 
 		if err != nil {
-			slog.Error(
+			slog.Warn(
 				"mint.MintDB.UpdateConfig(mint.Config) - Mocking success despite error",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
@@ -332,14 +332,14 @@ func MintSettingsAuth(mint *m.Mint) gin.HandlerFunc {
 
 		// render the settings page
 		if err := templates.Auth(mint.Config).Render(c.Request.Context(), c.Writer); err != nil {
-			slog.Error("failed to render settings", slog.Any("error", err))
+			slog.Warn("failed to render settings", slog.Any("error", err))
 			return
 		}
 
 		// obb success and render the settings page
 		err = templates.ObbNotification(templates.SuccessNotif("Auth settings successfully set")).Render(c.Request.Context(), c.Writer)
 		if err != nil {
-			slog.Error("failed to render success", slog.Any("error", err))
+			slog.Warn("failed to render success", slog.Any("error", err))
 			return
 		}
 	}
@@ -363,12 +363,12 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 		chainparam, err := m.CheckChainParams(formNetwork)
 		if err != nil {
-			slog.Error(
+			slog.Warn(
 				"m.CheckChainParams(formNetwork)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
 			if renderErr := RenderError(c, "Could not setup network for lightning"); renderErr != nil {
-				slog.Error("failed to render error", slog.Any("error", renderErr))
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
@@ -417,12 +417,12 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 			err := lndWallet.SetupGrpc(lndHost, lndMacaroon, lndTls)
 			if err != nil {
-				slog.Error(
+				slog.Warn(
 					"lndWallet.SetupGrpc",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
 				if renderErr := RenderError(c, "Something went wrong setting up LND communications"); renderErr != nil {
-					slog.Error("failed to render error", slog.Any("error", renderErr))
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
 				}
 				return
 			}
@@ -453,7 +453,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			if err != nil {
 				_ = c.Error(fmt.Errorf("strikeWallet.Setup(strikeKey, strikeEndpoint) %w %w", err, ErrInvalidStrikeConfig))
 				if renderErr := RenderError(c, "Invalid Strike configuration"); renderErr != nil {
-					slog.Error("failed to render error", slog.Any("error", renderErr))
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
 				}
 				return
 			}
@@ -473,12 +473,12 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 			err := clnWallet.SetupGrpc(clnHost, clnCa, clnClient, clnKey, clnMacaroon)
 			if err != nil {
-				slog.Error(
+				slog.Warn(
 					"clnWallet.SetupGrpc",
 					slog.String(utils.LogExtraInfo, err.Error()))
 
 				if renderErr := RenderError(c, "Something went wrong setting up CLN communications"); renderErr != nil {
-					slog.Error("failed to render error", slog.Any("error", renderErr))
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
 				}
 				return
 			}
@@ -486,7 +486,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 		default:
 			if renderErr := RenderError(c, "Invalid backend selection"); renderErr != nil {
-				slog.Error("failed to render error", slog.Any("error", renderErr))
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
@@ -500,7 +500,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				"Could not get lightning balance",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			if renderErr := RenderError(c, "Could not check established connection with Node (WalletBalance failed)"); renderErr != nil {
-				slog.Error("failed to render error", slog.Any("error", renderErr))
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
@@ -513,9 +513,9 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			cashu.Amount{Unit: cashu.Sat, Amount: 100},
 		)
 		if err != nil {
-			slog.Error("newBackend.RequestInvoice failed during verification", slog.String("err", err.Error()))
+			slog.Warn("newBackend.RequestInvoice failed during verification", slog.String("err", err.Error()))
 			if renderErr := RenderError(c, "Could not generate a test invoice with the new backend"); renderErr != nil {
-				slog.Error("failed to render error", slog.Any("error", renderErr))
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
@@ -523,9 +523,9 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		// 3. Decode invoice and verify network
 		decodedInvoice, err := zpay32.Decode(invoiceResp.PaymentRequest, &chainparam)
 		if err != nil {
-			slog.Error("zpay32.Decode failed during verification", slog.String("err", err.Error()))
+			slog.Warn("zpay32.Decode failed during verification", slog.String("err", err.Error()))
 			if renderErr := RenderError(c, "Lightning backend network does not match selected network configuration"); renderErr != nil {
-				slog.Error("failed to render error", slog.Any("error", renderErr))
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
@@ -566,17 +566,17 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		// Save to DB
 		err = mint.MintDB.UpdateConfig(mint.Config)
 		if err != nil {
-			slog.Error(
+			slog.Warn(
 				"mint.MintDB.UpdateConfig(mint.Config)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			if renderErr := RenderError(c, "Settings applied but failed to save to database"); renderErr != nil {
-				slog.Error("failed to render error", slog.Any("error", renderErr))
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
 
 		if err := RenderSuccess(c, "Lightning node settings changed and verified successfully"); err != nil {
-			slog.Error("failed to render success", slog.Any("error", err))
+			slog.Warn("failed to render success", slog.Any("error", err))
 		}
 	}
 }

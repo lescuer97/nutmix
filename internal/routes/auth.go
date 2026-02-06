@@ -32,7 +32,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 	auth.GET("/blind/keys", func(c *gin.Context) {
 		keys, err := mint.Signer.GetAuthActiveKeys()
 		if err != nil {
-			slog.Error("mint.Signer.GetAuthActiveKeys()", slog.Any("error", err))
+			slog.Warn("mint.Signer.GetAuthActiveKeys()", slog.Any("error", err))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -46,7 +46,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		keysets, err := mint.Signer.GetAuthKeysById(id)
 
 		if err != nil {
-			slog.Error("mint.Signer.GetAuthKeysById(id)", slog.Any("error", err))
+			slog.Warn("mint.Signer.GetAuthKeysById(id)", slog.Any("error", err))
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.KEYSET_NOT_KNOW, nil))
 			return
 		}
@@ -97,7 +97,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		}
 		unit, err := mint.VerifyOutputs(tx, mintRequest.Outputs, keysets.Keysets)
 		if err != nil {
-			slog.Error("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
+			slog.Warn("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -124,7 +124,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 
 		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(mintRequest.Outputs)
 		if err != nil {
-			slog.Error("mint.Signer.SignBlindMessages(mintRequest.Outputs)", slog.Any("error", err))
+			slog.Warn("mint.Signer.SignBlindMessages(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
