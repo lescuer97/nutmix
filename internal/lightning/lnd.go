@@ -278,8 +278,6 @@ func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, 
 		if err != nil {
 			return payStatus, err
 		}
-		// LND returns fee in satoshis
-		payStatus.Fee = cashu.NewAmount(cashu.Sat, uint64(payment.FeeSat))
 		switch payment.Status {
 		case lnrpc.Payment_IN_FLIGHT:
 			payStatus.Status = PENDING
@@ -290,6 +288,7 @@ func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, 
 		case lnrpc.Payment_SUCCEEDED:
 			payStatus.Status = SETTLED
 			payStatus.Preimage = payment.PaymentPreimage
+			payStatus.Fee = cashu.NewAmount(cashu.Msat, uint64(payment.FeeMsat))
 			return payStatus, nil
 		case lnrpc.Payment_INITIATED:
 			payStatus.Status = PENDING

@@ -620,7 +620,7 @@ type MeltChange struct {
 
 type Amount struct {
 	Unit   Unit   `validate:"required"`
-	Amount uint64 `validate:"required"`
+	Amount uint64 `validate:"gte=0"`
 }
 
 func NewAmount(unit Unit, amount uint64) Amount {
