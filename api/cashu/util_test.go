@@ -17,6 +17,9 @@ func TestOrderKeysetByUnit(t *testing.T) {
 		Unit:        Sat.String(),
 		Version:     0,
 		InputFeePpk: 0,
+		FinalExpiry: nil,
+		CreatedAt:   0,
+		Active:      false,
 	}
 
 	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), seed)
@@ -44,12 +47,24 @@ func TestAmountOfFeeProofs(t *testing.T) {
 	for i := 0; i < 9; i++ {
 		// add 9 proofs
 		proof := Proof{
-			Id: id,
+			Id:      id,
+			C:       WrappedPublicKey{PublicKey: nil},
+			Y:       WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Secret:  "",
+			Witness: "",
+			State:   PROOF_UNSPENT,
+			Amount:  0,
+			SeenAt:  0,
 		}
 
 		keyset := BasicKeysetResponse{
 			Id:          id,
 			InputFeePpk: inputFee,
+			FinalExpiry: nil,
+			Unit:        "",
+			Version:     0,
+			Active:      false,
 		}
 
 		proofs = append(proofs, proof)
@@ -65,12 +80,24 @@ func TestAmountOfFeeProofs(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		// add 9 proofs
 		proof := Proof{
-			Id: id,
+			Id:      id,
+			C:       WrappedPublicKey{PublicKey: nil},
+			Y:       WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Secret:  "",
+			Witness: "",
+			State:   PROOF_UNSPENT,
+			Amount:  0,
+			SeenAt:  0,
 		}
 
 		keyset := BasicKeysetResponse{
 			Id:          id,
 			InputFeePpk: inputFee,
+			FinalExpiry: nil,
+			Unit:        "",
+			Version:     0,
+			Active:      false,
 		}
 
 		proofs = append(proofs, proof)

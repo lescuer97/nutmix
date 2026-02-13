@@ -73,7 +73,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 	// request mint quote of 1000 sats
 	w := httptest.NewRecorder()
 
-	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{Description: nil, Pubkey: cashu.WrappedPublicKey{PublicKey: nil},
 		Amount: 1000,
 		Unit:   cashu.Sat.String(),
 	}
@@ -105,7 +105,7 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
 
-	mintRequest := cashu.PostMintBolt11Request{
+	mintRequest := cashu.PostMintBolt11Request{Signature: nil,
 		Quote:   postMintQuoteResponse.Quote,
 		Outputs: htlcBlindedMessages,
 	}
@@ -357,7 +357,7 @@ func GenerateProofsHTLC(signatures []cashu.BlindSignature, preimage string, keys
 
 		C := crypto.UnblindSignature(output.C_.PublicKey, secretsKey[i], mintPublicKey)
 
-		proof := cashu.Proof{Id: output.Id, Amount: output.Amount, C: cashu.WrappedPublicKey{PublicKey: C}, Secret: secrets[i]}
+		proof := cashu.Proof{Id: output.Id, Amount: output.Amount, C: cashu.WrappedPublicKey{PublicKey: C}, Secret: secrets[i], Y: cashu.WrappedPublicKey{PublicKey: nil}, Quote: nil, Witness: "", State: cashu.PROOF_UNSPENT, SeenAt: 0}
 
 		for _, privkey := range privkeys {
 			err = proof.Sign(privkey)
@@ -426,7 +426,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 	// request mint quote of 1000 sats
 	w := httptest.NewRecorder()
 
-	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{Description: nil, Pubkey: cashu.WrappedPublicKey{PublicKey: nil},
 		Amount: 1000,
 		Unit:   cashu.Sat.String(),
 	}
@@ -458,7 +458,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
 
-	mintRequest := cashu.PostMintBolt11Request{
+	mintRequest := cashu.PostMintBolt11Request{Signature: nil,
 		Quote:   postMintQuoteResponse.Quote,
 		Outputs: htlcBlindedMessages,
 	}
@@ -673,7 +673,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{Detail: nil, Error: "", Code: 0}
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 

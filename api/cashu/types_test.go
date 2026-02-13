@@ -21,6 +21,9 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		Unit:        Sat.String(),
 		Version:     0,
 		InputFeePpk: 0,
+		FinalExpiry: nil,
+		CreatedAt:   0,
+		Active:      false,
 	}
 
 	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), seed)
@@ -54,9 +57,10 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 	}
 
 	blindMessage := BlindedMessage{
-		Amount: 1,
-		B_:     WrappedPublicKey{PublicKey: publicKeyBlindFactor},
-		Id:     keysetId,
+		Amount:  1,
+		B_:      WrappedPublicKey{PublicKey: publicKeyBlindFactor},
+		Id:      keysetId,
+		Witness: "",
 	}
 
 	// Create BlindSignature
@@ -77,10 +81,15 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 	unblindedFactor := crypto.UnblindSignature(blindSignature.C_.PublicKey, privateKeyBlindFactor, generatedKeysets[1].PrivKey.PubKey())
 
 	proof := Proof{
-		Amount: 1,
-		C:      WrappedPublicKey{PublicKey: unblindedFactor},
-		Secret: "secret",
-		Id:     keysetId,
+		Amount:  1,
+		C:       WrappedPublicKey{PublicKey: unblindedFactor},
+		Secret:  "secret",
+		Id:      keysetId,
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Witness: "",
+		State:   PROOF_UNSPENT,
+		SeenAt:  0,
 	}
 
 	proof, err = proof.HashSecretToCurve()
@@ -125,7 +134,10 @@ func TestGenerateDLEQ(t *testing.T) {
 	}
 
 	blindSignature := BlindSignature{
-		C_: WrappedPublicKey{PublicKey: C_},
+		C_:     WrappedPublicKey{PublicKey: C_},
+		Dleq:   nil,
+		Id:     "",
+		Amount: 0,
 	}
 
 	err = blindSignature.GenerateDLEQ(B_, a)

@@ -25,6 +25,7 @@ linters:
     - unconvert       # Unnecessary type conversions
     - unparam         # Unused function parameters
     - misspell        # Commonly misspelled words
+    - exhaustruct # [highly recommend to enable] checks if all structure fields are initialized
 
   settings:
     gosec:

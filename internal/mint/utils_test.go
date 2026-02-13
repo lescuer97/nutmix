@@ -26,9 +26,17 @@ func TestIsInternalTransactionSuccess(t *testing.T) {
 	}
 
 	mintRequest := cashu.MintRequestDB{
-		Quote:   "quote1",
-		Request: RegtestRequest,
-		State:   cashu.UNPAID,
+		Amount:      nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       "quote1",
+		Request:     RegtestRequest,
+		Unit:        "",
+		State:       cashu.UNPAID,
+		CheckingId:  "",
+		Expiry:      0,
+		SeenAt:      0,
+		Minted:      false,
 	}
 	err = mint.MintDB.SaveMintRequest(tx, mintRequest)
 	if err != nil {
@@ -61,9 +69,17 @@ func TestIsInternalTransactionFail(t *testing.T) {
 	}
 
 	mintRequest := cashu.MintRequestDB{
-		Quote:   "quote1",
-		Request: "wrong request",
-		State:   cashu.UNPAID,
+		Amount:      nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       "quote1",
+		Request:     "wrong request",
+		Unit:        "",
+		State:       cashu.UNPAID,
+		CheckingId:  "",
+		Expiry:      0,
+		SeenAt:      0,
+		Minted:      false,
 	}
 	err = mint.MintDB.SaveMintRequest(tx, mintRequest)
 	if err != nil {
@@ -97,7 +113,41 @@ func TestVerifyUnitOfProofFail(t *testing.T) {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}
 	log.Printf("\n keysets: %+v\n ", keysets)
-	proofs := cashu.Proofs{cashu.Proof{Id: "0199c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239"}, cashu.Proof{Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239"}, cashu.Proof{Id: "01f36438a5cd4b6a6fa3c1091161c03ddff5deb8f15722c25171eb2c5156610668"}}
+	proofs := cashu.Proofs{
+		cashu.Proof{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "0199c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
+		cashu.Proof{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
+		cashu.Proof{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "01f36438a5cd4b6a6fa3c1091161c03ddff5deb8f15722c25171eb2c5156610668",
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
+	}
 
 	_, err = mint.CheckProofsAreSameUnit(proofs, keysets.Keysets)
 	if err == nil {
@@ -119,7 +169,41 @@ func TestVerifyUnitOfProofPass(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
 	}
-	proofs := cashu.Proofs{cashu.Proof{Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239"}, cashu.Proof{Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239"}, cashu.Proof{Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239"}}
+	proofs := cashu.Proofs{
+		cashu.Proof{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
+		cashu.Proof{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
+		cashu.Proof{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
+	}
 
 	unit, err := mint.CheckProofsAreSameUnit(proofs, keysets.Keysets)
 	if err != nil {
@@ -159,7 +243,11 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error parsing B_2: %+v", err)
 	}
-	outputs := []cashu.BlindedMessage{{Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", B_: cashu.WrappedPublicKey{PublicKey: B_1}}, {Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", B_: cashu.WrappedPublicKey{PublicKey: B_2}}, {Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", B_: cashu.WrappedPublicKey{PublicKey: B_2}}}
+	outputs := []cashu.BlindedMessage{
+		{B_: cashu.WrappedPublicKey{PublicKey: B_1}, Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", Witness: "", Amount: 0},
+		{B_: cashu.WrappedPublicKey{PublicKey: B_2}, Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", Witness: "", Amount: 0},
+		{B_: cashu.WrappedPublicKey{PublicKey: B_2}, Id: "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239", Witness: "", Amount: 0},
+	}
 
 	tx, err := mint.MintDB.GetTx(context.Background())
 	if err != nil {

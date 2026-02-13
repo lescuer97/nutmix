@@ -13,7 +13,15 @@ func TestGeneratingAuthKeyset(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not setup master key %+v", err)
 	}
-	Seed := cashu.Seed{Version: 1, Unit: cashu.AUTH.String()}
+	Seed := cashu.Seed{
+		FinalExpiry: nil,
+		Unit:        cashu.AUTH.String(),
+		Id:          "",
+		CreatedAt:   0,
+		InputFeePpk: 0,
+		Version:     1,
+		Active:      false,
+	}
 
 	generatedKeysets, err := DeriveKeyset(key, Seed)
 	if err != nil {

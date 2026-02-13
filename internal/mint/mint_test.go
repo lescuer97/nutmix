@@ -87,16 +87,19 @@ func SetupDataOnDB(mint *Mint) error {
 	now := time.Now().Unix()
 
 	melt_quote := cashu.MeltRequestDB{
-		Quote:      quoteId,
-		Unit:       cashu.Sat.String(),
-		Expiry:     now,
-		Amount:     2,
-		FeeReserve: 2,
-		Request:    "lnbcrt2u1pna2hrlpp5gv4edjsvjzflaxex5y4jcm87yhhm7s6clt6hjar50yhswan83fesdqqcqzzsxqzuysp5u3kq8etcat22w2hraktrgppltaegt3prrf5qz9z4cplreje2kzrq9qxpqysgq2ujupalzlwz9nhn55pl6nuwtv4qqkdlkn02rf835l3janjwy7w3n0tl0whh6v3frpvfcsyzud3g6dsx6gqgmw04xj2c0alz4px5hjecq0pnclr",
-		State:      cashu.PENDING,
-		Melted:     false,
-		SeenAt:     time.Now().Unix(),
-		Mpp:        false,
+		PaymentPreimage: "",
+		Unit:            cashu.Sat.String(),
+		Request:         "lnbcrt2u1pna2hrlpp5gv4edjsvjzflaxex5y4jcm87yhhm7s6clt6hjar50yhswan83fesdqqcqzzsxqzuysp5u3kq8etcat22w2hraktrgppltaegt3prrf5qz9z4cplreje2kzrq9qxpqysgq2ujupalzlwz9nhn55pl6nuwtv4qqkdlkn02rf835l3janjwy7w3n0tl0whh6v3frpvfcsyzud3g6dsx6gqgmw04xj2c0alz4px5hjecq0pnclr",
+		State:           cashu.PENDING,
+		Quote:           quoteId,
+		CheckingId:      "",
+		Expiry:          now,
+		Amount:          2,
+		FeeReserve:      2,
+		FeePaid:         0,
+		SeenAt:          time.Now().Unix(),
+		Melted:          false,
+		Mpp:             false,
 	}
 
 	c1Priv, err := secp256k1.GeneratePrivateKey()
@@ -112,22 +115,26 @@ func SetupDataOnDB(mint *Mint) error {
 	c2 := c2Priv.PubKey()
 	proofs := cashu.Proofs{
 		cashu.Proof{
-			Amount: 2,
-			Id:     "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
-			Secret: "secret1",
-			C:      cashu.WrappedPublicKey{PublicKey: c1},
-			SeenAt: now,
-			State:  cashu.PROOF_PENDING,
-			Quote:  &melt_quote.Quote,
+			C:       cashu.WrappedPublicKey{PublicKey: c1},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   &melt_quote.Quote,
+			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Secret:  "secret1",
+			Witness: "",
+			State:   cashu.PROOF_PENDING,
+			Amount:  2,
+			SeenAt:  now,
 		},
 		cashu.Proof{
-			Amount: 2,
-			Id:     "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
-			Secret: "secret2",
-			C:      cashu.WrappedPublicKey{PublicKey: c2},
-			SeenAt: now,
-			State:  cashu.PROOF_PENDING,
-			Quote:  &melt_quote.Quote,
+			C:       cashu.WrappedPublicKey{PublicKey: c2},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   &melt_quote.Quote,
+			Id:      "0198c6516691814bf519f1736b124b28406dc954d1406c4ace4610c42865b55239",
+			Secret:  "secret2",
+			Witness: "",
+			State:   cashu.PROOF_PENDING,
+			Amount:  2,
+			SeenAt:  now,
 		},
 	}
 
@@ -242,13 +249,15 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 
-	lightning := lightning.FakeWallet{
-		Network: *mint.LightningBackend.GetNetwork(),
-		UnpurposeErrors: []lightning.FakeWalletError{
-			lightning.FailQueryFailed,
-		},
+	ln := lightning.FakeWallet{
+		UnpurposeErrors: nil,
+		Network:         *mint.LightningBackend.GetNetwork(),
+		InvoiceFee:      0,
 	}
-	mint.LightningBackend = lightning
+	ln.UnpurposeErrors = []lightning.FakeWalletError{
+		lightning.FailQueryFailed,
+	}
+	mint.LightningBackend = ln
 
 	err := SetupDataOnDB(mint)
 	if err != nil {
@@ -313,13 +322,15 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 func TestPendingQuotesAndProofsWithPostgresAndMockLNPending(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 
-	lightning := lightning.FakeWallet{
-		Network: *mint.LightningBackend.GetNetwork(),
-		UnpurposeErrors: []lightning.FakeWalletError{
-			lightning.FailQueryPending,
-		},
+	ln := lightning.FakeWallet{
+		UnpurposeErrors: nil,
+		Network:         *mint.LightningBackend.GetNetwork(),
+		InvoiceFee:      0,
 	}
-	mint.LightningBackend = lightning
+	ln.UnpurposeErrors = []lightning.FakeWalletError{
+		lightning.FailQueryPending,
+	}
+	mint.LightningBackend = ln
 
 	err := SetupDataOnDB(mint)
 	if err != nil {

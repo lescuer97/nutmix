@@ -29,8 +29,10 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 10000,
-		Unit:   cashu.Sat.String(),
+		Description: nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Amount:      10000,
+		Unit:        cashu.Sat.String(),
 	}
 	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
 
@@ -61,8 +63,9 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	}
 
 	mintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: blindedMessages,
+		Signature: nil,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   blindedMessages,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
@@ -87,6 +90,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 
 	/// start doing melt quote
 	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
+		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 		Unit:    cashu.Sat.String(),
 		Request: RegtestRequest,
 	}
@@ -110,7 +114,8 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	w.Flush()
 	// errors to lightning to force payment checking
 	fakeWallet := lightning.FakeWallet{
-		Network: *mint.LightningBackend.GetNetwork(),
+		Network:    *mint.LightningBackend.GetNetwork(),
+		InvoiceFee: 0,
 		UnpurposeErrors: []lightning.FakeWalletError{
 			lightning.FailPaymentFailed, lightning.FailQueryPending,
 		},
@@ -125,8 +130,9 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
-		Quote:  postMeltQuoteResponse.Quote,
-		Inputs: meltProofs,
+		Quote:   postMeltQuoteResponse.Quote,
+		Inputs:  meltProofs,
+		Outputs: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(meltRequest)
@@ -136,6 +142,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var postMeltResponse cashu.PostMeltQuoteBolt11Response
+
 	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
@@ -164,7 +171,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	var errorResponse cashu.ErrorResponse
+	var errorResponse cashu.ErrorResponse //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -231,8 +238,10 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 10000,
-		Unit:   cashu.Sat.String(),
+		Description: nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Amount:      10000,
+		Unit:        cashu.Sat.String(),
 	}
 	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
 
@@ -263,8 +272,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	}
 
 	mintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: blindedMessages,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   blindedMessages,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
@@ -291,6 +301,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
 		Unit:    cashu.Sat.String(),
 		Request: RegtestRequest,
+		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 	}
 
 	jsonRequestBody, _ = json.Marshal(meltQuoteRequest)
@@ -316,6 +327,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		UnpurposeErrors: []lightning.FakeWalletError{
 			lightning.FailPaymentFailed, lightning.FailQueryPending,
 		},
+		InvoiceFee: 0,
 	}
 
 	mint.LightningBackend = &fakeWallet
@@ -327,8 +339,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
-		Quote:  postMeltQuoteResponse.Quote,
-		Inputs: meltProofs,
+		Quote:   postMeltQuoteResponse.Quote,
+		Inputs:  meltProofs,
+		Outputs: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(meltRequest)
@@ -370,7 +383,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	var errorResponse cashu.ErrorResponse
+	var errorResponse cashu.ErrorResponse //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -422,8 +435,10 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 10000,
-		Unit:   cashu.Sat.String(),
+		Description: nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Amount:      10000,
+		Unit:        cashu.Sat.String(),
 	}
 	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
 
@@ -454,8 +469,9 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	}
 
 	mintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: blindedMessages,
+		Signature: nil,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   blindedMessages,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
@@ -480,6 +496,7 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 
 	/// start doing melt quote
 	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
+		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 		Unit:    cashu.Sat.String(),
 		Request: RegtestRequest,
 	}
@@ -503,7 +520,8 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	w.Flush()
 	// errors to lightning to force payment checking
 	fakeWallet := lightning.FakeWallet{
-		Network: *mint.LightningBackend.GetNetwork(),
+		Network:    *mint.LightningBackend.GetNetwork(),
+		InvoiceFee: 0,
 		UnpurposeErrors: []lightning.FakeWalletError{
 			lightning.FailPaymentFailed, lightning.FailQueryPending,
 		},
@@ -518,8 +536,9 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
-		Quote:  postMeltQuoteResponse.Quote,
-		Inputs: meltProofs,
+		Quote:   postMeltQuoteResponse.Quote,
+		Inputs:  meltProofs,
+		Outputs: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(meltRequest)

@@ -96,8 +96,10 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 10000,
-		Unit:   cashu.Sat.String(),
+		Amount:      10000,
+		Unit:        cashu.Sat.String(),
+		Description: nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
 	}
 	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
 
@@ -164,8 +166,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	}
 
 	mintRequestTooManyBlindMessages := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: blindedMessages,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   blindedMessages,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequestTooManyBlindMessages)
@@ -191,8 +194,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	}
 
 	mintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: blindedMessages,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   blindedMessages,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
@@ -235,7 +239,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.MintRequestDB{}
+	postMintQuoteResponseTwo = cashu.MintRequestDB{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -254,8 +258,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	}
 
 	reMintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: reMintBlindedMessages,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   reMintBlindedMessages,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(reMintRequest)
@@ -284,8 +289,10 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	// Minting with invalid signatures
 	w = httptest.NewRecorder()
 	mintExcessQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 10000000,
-		Unit:   cashu.Sat.String(),
+		Amount:      10000000,
+		Unit:        cashu.Sat.String(),
+		Description: nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
 	}
 	jsonRequestBody, _ = json.Marshal(mintExcessQuoteRequest)
 
@@ -305,8 +312,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	}
 
 	excessMintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: excesMintingBlindMessage,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   excesMintingBlindMessage,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(excessMintRequest)
@@ -324,7 +332,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {
@@ -369,7 +377,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -466,7 +474,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -508,7 +516,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -535,6 +543,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
 		Unit:    cashu.Sat.String(),
 		Request: RegtestRequest,
+		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 	}
 
 	jsonRequestBody, _ = json.Marshal(meltQuoteRequest)
@@ -589,8 +598,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	// test melt with invalid proofs
 	InvalidProofsMeltRequest := cashu.PostMeltBolt11Request{
-		Quote:  postMeltQuoteResponse.Quote,
-		Inputs: meltProofs,
+		Quote:   postMeltQuoteResponse.Quote,
+		Inputs:  meltProofs,
+		Outputs: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(InvalidProofsMeltRequest)
@@ -605,7 +615,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
 	if err != nil {
@@ -625,8 +635,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
-		Quote:  postMeltQuoteResponse.Quote,
-		Inputs: meltProofs,
+		Quote:   postMeltQuoteResponse.Quote,
+		Inputs:  meltProofs,
+		Outputs: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(meltRequest)
@@ -656,7 +667,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -722,7 +733,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 	return r, mint
 }
 func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
-	db := mockdb.MockDB{}
+	db := mockdb.MockDB{} //nolint:exhaustruct
 
 	signer, err := localsigner.SetupLocalSigner(&db)
 	if err != nil {
@@ -765,7 +776,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 }
 
 func newBlindedMessage(id string, amount uint64, B_ *secp256k1.PublicKey) cashu.BlindedMessage {
-	return cashu.BlindedMessage{Amount: amount, B_: cashu.WrappedPublicKey{PublicKey: B_}, Id: id}
+	return cashu.BlindedMessage{Amount: amount, B_: cashu.WrappedPublicKey{PublicKey: B_}, Id: id, Witness: ""}
 }
 
 // returns Blinded messages, secrets - [][]byte, and list of r
@@ -962,7 +973,6 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	}
 
 	LightningBolt11Test(t, ctx, bobLnd)
-
 }
 
 func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResponse, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
@@ -984,7 +994,17 @@ func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResp
 
 		C := crypto.UnblindSignature(output.C_.PublicKey, secretsKey[i], mintPublicKey)
 
-		proofs = append(proofs, cashu.Proof{Id: output.Id, Amount: output.Amount, C: cashu.WrappedPublicKey{PublicKey: C}, Secret: secrets[i]})
+		proofs = append(proofs, cashu.Proof{
+			Id:      output.Id,
+			Amount:  output.Amount,
+			C:       cashu.WrappedPublicKey{PublicKey: C},
+			Secret:  secrets[i],
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Witness: "",
+			State:   "",
+			SeenAt:  0,
+		})
 	}
 
 	return proofs, nil
@@ -999,8 +1019,10 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w := httptest.NewRecorder()
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 1000,
-		Unit:   cashu.Sat.String(),
+		Amount:      1000,
+		Unit:        cashu.Sat.String(),
+		Description: nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
 	}
 	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
 
@@ -1065,8 +1087,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	mintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: beforeMintBlindedMessages,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   beforeMintBlindedMessages,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
@@ -1113,8 +1136,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	excessMintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: excesMintingBlindMessage,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   excesMintingBlindMessage,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(excessMintRequest)
@@ -1131,7 +1155,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {
@@ -1149,8 +1173,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	mintRequestTooManyBlindMessages := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: blindedMessages,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   blindedMessages,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequestTooManyBlindMessages)
@@ -1176,8 +1201,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	mintRequest = cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: blindedMessages,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   blindedMessages,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
@@ -1220,7 +1246,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.MintRequestDB{}
+	postMintQuoteResponseTwo = cashu.MintRequestDB{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -1239,8 +1265,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	reMintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: reMintBlindedMessages,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   reMintBlindedMessages,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(reMintRequest)
@@ -1249,7 +1276,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1294,7 +1321,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1391,7 +1418,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1433,7 +1460,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1486,6 +1513,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
 		Unit:    cashu.Sat.String(),
 		Request: invoice.PaymentRequest,
+		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 	}
 
 	jsonRequestBody, _ = json.Marshal(meltQuoteRequest)
@@ -1540,8 +1568,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	InvalidProofsMeltRequest := cashu.PostMeltBolt11Request{
-		Quote:  postMeltQuoteResponse.Quote,
-		Inputs: meltProofs,
+		Quote:   postMeltQuoteResponse.Quote,
+		Inputs:  meltProofs,
+		Outputs: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(InvalidProofsMeltRequest)
@@ -1576,8 +1605,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	// test melt tokens
 	meltRequest := cashu.PostMeltBolt11Request{
-		Quote:  postMeltQuoteResponse.Quote,
-		Inputs: meltProofs,
+		Quote:   postMeltQuoteResponse.Quote,
+		Inputs:  meltProofs,
+		Outputs: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(meltRequest)
@@ -1604,7 +1634,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1664,8 +1694,10 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 10000,
-		Unit:   "Milsat",
+		Amount:      10000,
+		Unit:        cashu.Sat.String(),
+		Description: nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
 	}
 	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
 
@@ -1673,7 +1705,7 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse := cashu.ErrorResponse{}
+	errorResponse := cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1695,13 +1727,14 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
 		Request: "dummyrequest",
 		Unit:    "Milsat",
+		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 	}
 	jsonRequestBody, _ = json.Marshal(meltQuoteRequest)
 
 	req = httptest.NewRequest("POST", "/v1/melt/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
 
 	router.ServeHTTP(w, req)
-	errorResponse = cashu.ErrorResponse{}
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1762,8 +1795,10 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 1000,
-		Unit:   cashu.Sat.String(),
+		Amount:      1000,
+		Unit:        cashu.Sat.String(),
+		Description: nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
 	}
 	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
 
@@ -1792,7 +1827,7 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-	errorResponse := cashu.ErrorResponse{}
+	errorResponse := cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {
@@ -1847,8 +1882,10 @@ func TestFeeReturnAmount(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
-		Amount: 10000,
-		Unit:   cashu.Sat.String(),
+		Amount:      10000,
+		Unit:        cashu.Sat.String(),
+		Description: nil,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
 	}
 	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
 
@@ -1879,8 +1916,9 @@ func TestFeeReturnAmount(t *testing.T) {
 	}
 
 	mintRequest := cashu.PostMintBolt11Request{
-		Quote:   postMintQuoteResponse.Quote,
-		Outputs: blindedMessages,
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   blindedMessages,
+		Signature: nil,
 	}
 
 	jsonRequestBody, _ = json.Marshal(mintRequest)
@@ -1907,6 +1945,7 @@ func TestFeeReturnAmount(t *testing.T) {
 	meltQuoteRequest := cashu.PostMeltQuoteBolt11Request{
 		Unit:    cashu.Sat.String(),
 		Request: RegtestRequest,
+		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 	}
 
 	jsonRequestBody, _ = json.Marshal(meltQuoteRequest)

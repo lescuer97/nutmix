@@ -7,8 +7,7 @@ import (
 )
 
 func TestDeleteSubIdKeepOther(t *testing.T) {
-	observer := Observer{}
-	observer.Proofs = make(map[string][]ProofWatchChannel)
+	observer := Observer{} //nolint:exhaustruct
 
 	proofChan1 := make(chan cashu.Proof)
 	proofChan2 := make(chan cashu.Proof)

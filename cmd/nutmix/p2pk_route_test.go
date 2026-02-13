@@ -66,7 +66,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	// request mint quote of 1000 sats
 	w := httptest.NewRecorder()
 
-	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{Description: nil, Pubkey: cashu.WrappedPublicKey{PublicKey: nil},
 		Amount: 1000,
 		Unit:   cashu.Sat.String(),
 	}
@@ -98,7 +98,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
 
-	mintRequest := cashu.PostMintBolt11Request{
+	mintRequest := cashu.PostMintBolt11Request{Signature: nil,
 		Quote:   postMintQuoteResponse.Quote,
 		Outputs: p2pkBlindedMessages,
 	}
@@ -187,7 +187,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse := cashu.ErrorResponse{}
+	errorResponse := cashu.ErrorResponse{Detail: nil, Error: "", Code: 0}
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -290,7 +290,7 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keyset signer.GetKeys
 
 		C := crypto.UnblindSignature(output.C_.PublicKey, secretsKey[i], mintPublicKey)
 
-		proof := cashu.Proof{Id: output.Id, Amount: output.Amount, C: cashu.WrappedPublicKey{PublicKey: C}, Secret: secrets[i]}
+		proof := cashu.Proof{Id: output.Id, Amount: output.Amount, C: cashu.WrappedPublicKey{PublicKey: C}, Secret: secrets[i], Y: cashu.WrappedPublicKey{PublicKey: nil}, Quote: nil, Witness: "", State: cashu.PROOF_UNSPENT, SeenAt: 0}
 
 		for _, privkey := range privkeys {
 			err = proof.Sign(privkey)
@@ -355,7 +355,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	// request mint quote of 1000 sats
 	w := httptest.NewRecorder()
 
-	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
+	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{Description: nil, Pubkey: cashu.WrappedPublicKey{PublicKey: nil},
 		Amount: 1000,
 		Unit:   cashu.Sat.String(),
 	}
@@ -388,7 +388,7 @@ func TestP2PKMultisigSigning(t *testing.T) {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
 
-	mintRequest := cashu.PostMintBolt11Request{
+	mintRequest := cashu.PostMintBolt11Request{Signature: nil,
 		Quote:   postMintQuoteResponse.Quote,
 		Outputs: p2pkBlindedMessages,
 	}

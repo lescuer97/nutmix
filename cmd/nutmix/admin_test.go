@@ -119,7 +119,7 @@ func TestSetupMintAdminLoginSuccess(t *testing.T) {
 	}
 
 	// sign nonce with admin nostr privkey
-	eventToSign := nostr.Event{
+	eventToSign := nostr.Event{ //nolint:exhaustruct
 		Kind:      27235,
 		Content:   nonces,
 		CreatedAt: nostr.Timestamp(time.Now().Unix()),
@@ -212,7 +212,7 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 	}
 
 	// sign nonce with admin nostr privkey
-	eventToSign := nostr.Event{
+	eventToSign := nostr.Event{ //nolint:exhaustruct
 		Kind:      27235,
 		Content:   nonces,
 		CreatedAt: nostr.Timestamp(time.Now().Unix()),
@@ -313,7 +313,7 @@ func TestRotateKeyUpCall(t *testing.T) {
 	}
 
 	// sign nonce with admin nostr privkey
-	eventToSign := nostr.Event{
+	eventToSign := nostr.Event{ //nolint:exhaustruct
 		Kind:      27235,
 		Content:   nonces,
 		CreatedAt: nostr.Timestamp(time.Now().Unix()),
@@ -361,8 +361,9 @@ func TestRotateKeyUpCall(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	rotatingFeeRequest := admin.RotateRequest{
-		Fee:  100,
-		Unit: cashu.Sat,
+		Fee:              100,
+		Unit:             cashu.Sat,
+		ExpireLimitHours: 24,
 	}
 
 	jsonRequestBody, err = json.Marshal(rotatingFeeRequest)
