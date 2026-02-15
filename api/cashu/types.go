@@ -112,6 +112,7 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 		Amount: b.Amount,
 		Id:     b.Id,
 		C_:     WrappedPublicKey{PublicKey: C_},
+		Dleq:   nil,
 	}
 
 	err := blindSig.GenerateDLEQ(b.B_.PublicKey, k)
@@ -295,6 +296,7 @@ func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Respons
 		Minted:  m.Minted,
 		State:   m.State,
 		Pubkey:  m.Pubkey,
+		Amount:  m.Amount,
 	}
 
 	if m.Amount != nil {
@@ -424,9 +426,10 @@ func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
 }
 func (r RecoverSigDB) GetBlindedMessage() BlindedMessage {
 	return BlindedMessage{
-		Amount: r.Amount,
-		Id:     r.Id,
-		B_:     r.B_,
+		B_:      r.B_,
+		Id:      r.Id,
+		Witness: "",
+		Amount:  r.Amount,
 	}
 }
 

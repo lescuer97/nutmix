@@ -163,7 +163,7 @@ func (pql Postgresql) SaveNewSeeds(seeds []cashu.Seed) error {
 
 func (pql Postgresql) UpdateSeedsActiveStatus(tx pgx.Tx, seeds []cashu.Seed) error {
 	// change the paid status of the quote
-	batch := pgx.Batch{}
+	batch := pgx.Batch{} //nolint:exhaustruct
 	for _, seed := range seeds {
 
 		batch.Queue("UPDATE seeds SET active = $1 WHERE id = $2", seed.Active, seed.Id)
@@ -414,7 +414,7 @@ func (pql Postgresql) GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs,
 }
 func (pql Postgresql) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error {
 	// change the paid status of the quote
-	batch := pgx.Batch{}
+	batch := pgx.Batch{} //nolint:exhaustruct
 	for _, proof := range proofs {
 		batch.Queue(`UPDATE proofs SET state = $1  WHERE y = $2`, state, proof.Y)
 	}
@@ -437,7 +437,7 @@ func (pql Postgresql) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu
 
 func (pql Postgresql) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
 	// change the paid status of the quote
-	batch := pgx.Batch{}
+	batch := pgx.Batch{} //nolint:exhaustruct
 	for _, proof := range proofs {
 		batch.Queue(`DELETE FROM proofs WHERE y = $1`, proof.Y)
 	}

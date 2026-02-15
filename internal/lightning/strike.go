@@ -159,7 +159,7 @@ func (l *Strike) Setup(key string, endpoint string) error {
 }
 
 func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, responseType any) error {
-	client := &http.Client{}
+	client := &http.Client{} //nolint:exhaustruct
 	marshalledBody := bytes.NewBuffer(nil)
 	if reqBody != nil {
 		jsonBytes, err := json.Marshal(reqBody)
@@ -204,7 +204,14 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 		return nil
 
 	default:
-		errorBody := strikeErrorStatus{}
+		errorBody := strikeErrorStatus{
+			TraceId: nil,
+			Data: struct {
+				Code    string `json:"string"`
+				Message string `json:"message"`
+				Status  uint   `json:"status"`
+			}{"", "", 0},
+		}
 		err = json.Unmarshal(body, &errorBody)
 		if err != nil {
 			return fmt.Errorf("json.Unmarshal(errorBody): %w", err)
@@ -224,7 +231,10 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 }
 
 func (l Strike) convertStrikeAmountToUInt(amount strikeAmount) (cashu.Amount, error) {
-	cashuAmount := cashu.Amount{}
+	cashuAmount := cashu.Amount{
+		Unit:   cashu.Sat,
+		Amount: 0,
+	}
 	val, err := strconv.ParseFloat(amount.Amount, 64)
 	if err != nil {
 		return cashuAmount, fmt.Errorf("strconv.ParseUint(fee_str, 10, 64): %w", err)

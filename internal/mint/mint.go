@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"sync"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -88,9 +89,13 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 
 func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig signer.Signer) (*Mint, error) {
 	mint := Mint{
-		Config: config,
-		MintDB: db,
-		Signer: sig,
+		Config:           config,
+		MintDB:           db,
+		Signer:           sig,
+		MintPubkey:       "",
+		LightningBackend: nil,
+		OICDClient:       nil,
+		Observer:         nil,
 	}
 
 	chainparam, err := CheckChainParams(config.NETWORK)
@@ -102,7 +107,9 @@ func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig
 
 	case utils.FAKE_WALLET:
 		fake_wallet := lightning.FakeWallet{
-			Network: chainparam,
+			Network:         chainparam,
+			UnpurposeErrors: []lightning.FakeWalletError{},
+			InvoiceFee:      0,
 		}
 
 		mint.LightningBackend = fake_wallet
@@ -156,12 +163,13 @@ func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig
 	}
 	mint.MintPubkey = pubkey
 
-	observer := Observer{}
+	observer := Observer{
+		Proofs:    make(map[string][]ProofWatchChannel),
+		MintQuote: make(map[string][]MintQuoteChannel),
+		MeltQuote: make(map[string][]MeltQuoteChannel),
+		Mutex:     sync.Mutex{},
+	}
 	mint.Observer = &observer
-
-	observer.Proofs = make(map[string][]ProofWatchChannel)
-	observer.MeltQuote = make(map[string][]MeltQuoteChannel)
-	observer.MintQuote = make(map[string][]MintQuoteChannel)
 
 	if config.MINT_REQUIRE_AUTH {
 		if config.MINT_AUTH_OICD_URL == "" {

@@ -356,7 +356,10 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 
 	var witness Witness
 	if p.Witness == "" {
-		witness = Witness{}
+		witness = Witness{
+			Preimage:   "",
+			Signatures: []*schnorr.Signature{},
+		}
 	} else {
 		err = json.Unmarshal([]byte(p.Witness), &witness)
 		if err != nil {
@@ -379,7 +382,10 @@ func (p *Proof) AddPreimage(preimage string) error {
 
 	var witness Witness
 	if p.Witness == "" {
-		witness = Witness{}
+		witness = Witness{
+			Preimage:   "",
+			Signatures: []*schnorr.Signature{},
+		}
 	} else {
 		err := json.Unmarshal([]byte(p.Witness), &witness)
 		if err != nil {
@@ -407,6 +413,7 @@ func (p *Proof) UnmarshalJSON(data []byte) error {
 		C string `json:"C"`
 	}{
 		Alias: (*Alias)(p),
+		C:     "",
 	}
 
 	// Unmarshal into the auxiliary struct

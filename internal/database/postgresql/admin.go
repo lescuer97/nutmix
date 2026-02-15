@@ -53,7 +53,7 @@ func (pql Postgresql) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLogin
 func (pql Postgresql) GetMintMeltBalanceByTime(time int64) (database.MintMeltBalance, error) {
 	var mintMeltBalance database.MintMeltBalance
 	// change the paid status of the quote
-	batch := pgx.Batch{}
+	batch := pgx.Batch{} //nolint:exhaustruct
 	batch.Queue("SELECT quote, request, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description FROM mint_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID') ", time)
 	batch.Queue("SELECT quote, request, amount, expiry, unit, melted, fee_reserve, state, payment_preimage, seen_at, mpp, fee_paid, checking_id FROM melt_request WHERE seen_at >= $1 AND (state = 'ISSUED' OR state = 'PAID')", time)
 

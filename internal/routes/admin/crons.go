@@ -120,6 +120,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 					switch swap.Type {
 					case utils.LiquidityIn:
 						slog.Debug("Checking in swap", slog.String("swap_id", swap.Id))
+						//nolint:exhaustruct
 						status, _, err := mint.LightningBackend.CheckReceived(cashu.MintRequestDB{Quote: payHash}, decodedInvoice)
 						if err != nil {
 							slog.Warn(

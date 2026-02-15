@@ -15,6 +15,7 @@ type TokenBlacklist struct {
 func NewTokenBlacklist() *TokenBlacklist {
 	return &TokenBlacklist{
 		tokens: make(map[string]time.Time),
+		mutex:  sync.RWMutex{},
 	}
 }
 

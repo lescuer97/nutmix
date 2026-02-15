@@ -61,7 +61,7 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 }
 
 func (m *Mint) VerifyAuthClearToken(token string) error {
-	verifier := m.OICDClient.Verifier(&oidc.Config{ClientID: m.Config.MINT_AUTH_OICD_CLIENT_ID, Now: time.Now, SkipClientIDCheck: false})
+	verifier := m.OICDClient.Verifier(&oidc.Config{ClientID: m.Config.MINT_AUTH_OICD_CLIENT_ID, Now: time.Now, SkipClientIDCheck: false}) //nolint:exhaustruct
 
 	ctx := context.Background()
 	idToken, err := verifier.Verify(ctx, token)
@@ -72,7 +72,11 @@ func (m *Mint) VerifyAuthClearToken(token string) error {
 	if now.Unix() >= idToken.Expiry.Unix() {
 		return cashu.ErrClearTokenExpired
 	}
-	clams := cashu.AuthClams{}
+	clams := cashu.AuthClams{
+		Aud:      nil,
+		Sub:      "",
+		ClientId: "",
+	}
 	err = idToken.Claims(&clams)
 	if err != nil {
 		return fmt.Errorf("idToken.Claims(&clams). %w", err)

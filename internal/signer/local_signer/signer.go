@@ -27,7 +27,9 @@ type LocalSigner struct {
 
 func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
 	localsigner := LocalSigner{
-		db: db,
+		db:            db,
+		activeKeysets: make(map[string]cashu.MintKeysMap),
+		keysets:       make(map[string]cashu.MintKeysMap),
 	}
 
 	privateKey, err := localsigner.getSignerPrivateKey()
@@ -142,6 +144,8 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *bip32.Key, unit cashu.Unit, 
 		Version:     version,
 		Unit:        unit.String(),
 		InputFeePpk: fee,
+		FinalExpiry: nil,
+		Id:          "",
 	}
 
 	keysets, err := signer.DeriveKeyset(mintPrivateKey, newSeed)
@@ -176,6 +180,7 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 	}()
 
 	// get current highest seed version
+	//nolint:govet,exhaustruct
 	var highestSeed = cashu.Seed{Version: 0}
 	seeds, err := l.db.GetSeedsByUnit(tx, unit)
 	if err != nil {
@@ -270,6 +275,7 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 			B_:        output.B_,
 			Dleq:      blindSignature.Dleq,
 			CreatedAt: time.Now().Unix(),
+			MeltQuote: "",
 		}
 
 		if err != nil {

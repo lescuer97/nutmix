@@ -99,6 +99,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 					Method:    cashu.MethodBolt11,
 					Unit:      cashu.Sat.String(),
 					MinAmount: 0,
+					MaxAmount: 0,
+					Options:   nil,
+					Commands:  nil,
 				}
 
 				if mint.Config.PEG_IN_LIMIT_SATS != nil {
@@ -114,7 +117,8 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 					Methods: &[]cashu.SwapMintMethod{
 						bolt11Method,
 					},
-					Disabled: &b,
+					Disabled:  &b,
+					Supported: nil,
 				}
 				if entry, ok := nuts[nut]; ok {
 					mintInfo, ok := entry.(cashu.SwapMintInfo)
@@ -135,6 +139,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 					Method:    cashu.MethodBolt11,
 					Unit:      cashu.Sat.String(),
 					MinAmount: 0,
+					MaxAmount: 0,
+					Options:   nil,
+					Commands:  nil,
 				}
 
 				if mint.Config.PEG_OUT_LIMIT_SATS != nil {
@@ -145,12 +152,15 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 					Methods: &[]cashu.SwapMintMethod{
 						bolt11Method,
 					},
-					Disabled: &b,
+					Disabled:  &b,
+					Supported: nil,
 				}
 
 			default:
 				nuts[nut] = cashu.SwapMintInfo{
-					Disabled: &b,
+					Disabled:  &b,
+					Methods:   nil,
+					Supported: nil,
 				}
 
 			}
@@ -161,22 +171,31 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			switch nut {
 			case "15":
 				bolt11Method := cashu.SwapMintMethod{
-					Method: cashu.MethodBolt11,
-					Unit:   cashu.Sat.String(),
+					Method:    cashu.MethodBolt11,
+					Unit:      cashu.Sat.String(),
+					MinAmount: 0,
+					MaxAmount: 0,
+					Options:   nil,
+					Commands:  nil,
 				}
 
 				nuts[nut] = cashu.SwapMintInfo{
 					Methods: &[]cashu.SwapMintMethod{
 						bolt11Method,
 					},
+					Disabled:  nil,
+					Supported: nil,
 				}
 			case "17":
 
 				wsMethod := make(map[string][]cashu.SwapMintMethod)
 
 				bolt11Method := cashu.SwapMintMethod{
-					Method: cashu.MethodBolt11,
-					Unit:   cashu.Sat.String(),
+					Method:    cashu.MethodBolt11,
+					Unit:      cashu.Sat.String(),
+					MinAmount: 0,
+					MaxAmount: 0,
+					Options:   nil,
 					Commands: []cashu.SubscriptionKind{
 						cashu.Bolt11MeltQuote,
 						cashu.Bolt11MintQuote,
@@ -214,6 +233,8 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			default:
 				nuts[nut] = cashu.SwapMintInfo{
 					Supported: &b,
+					Methods:   nil,
+					Disabled:  nil,
 				}
 
 			}

@@ -40,6 +40,7 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		PaymentPreimage: meltRequest.PaymentPreimage,
 		Request:         meltRequest.Request,
 		Unit:            meltRequest.Unit,
+		Change:          []BlindSignature{},
 	}
 
 }

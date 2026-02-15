@@ -103,6 +103,7 @@ func GenerateKeysets(versionKey *bip32.Key, values []uint64, seed Seed) ([]MintK
 			PrivKey:     privKey,
 			CreatedAt:   formattedTime,
 			InputFeePpk: seed.InputFeePpk,
+			FinalExpiry: seed.FinalExpiry,
 		}
 
 		keysets = append(keysets, keyset)
