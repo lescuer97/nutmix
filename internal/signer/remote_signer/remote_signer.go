@@ -34,7 +34,12 @@ type RemoteSigner struct {
 const abstractSocket = "unix:@signer_socket"
 
 func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (RemoteSigner, error) {
-	socketSigner := RemoteSigner{}
+	socketSigner := RemoteSigner{
+		grpcClient:    nil,
+		activeKeysets: make(map[string]MintPublicKeyset),
+		keysets:       make(map[string]MintPublicKeyset),
+		pubkey:        nil,
+	}
 
 	certs, err := GetTlsSecurityCredential()
 	if err != nil {
@@ -56,8 +61,6 @@ func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (RemoteSign
 	client := sig.NewSignatoryClient(conn)
 
 	socketSigner.grpcClient = client
-	socketSigner.keysets = make(map[string]MintPublicKeyset)
-	socketSigner.activeKeysets = make(map[string]MintPublicKeyset)
 
 	err = socketSigner.setupSignerPubkeys()
 	if err != nil {
@@ -103,6 +106,12 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 		if err != nil {
 			return fmt.Errorf("ConvertSigUnitToCashuUnit(key.Unit). %w", err)
 		}
+		stringKeys := make(map[uint64]string)
+
+		for key, val := range key.GetKeys().GetKeys() {
+			stringKeys[key] = hex.EncodeToString(val)
+		}
+
 		mintKeyset := MintPublicKeyset{
 			Id:          key.Id,
 			Unit:        unit.String(),
@@ -110,14 +119,8 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 			InputFeePpk: uint(key.InputFeePpk),
 			Version:     key.Version,
 			FinalExpiry: key.FinalExpiry,
+			Keys:        stringKeys,
 		}
-
-		stringKeys := make(map[uint64]string)
-
-		for key, val := range key.GetKeys().GetKeys() {
-			stringKeys[key] = hex.EncodeToString(val)
-		}
-		mintKeyset.Keys = stringKeys
 
 		if mintKeyset.Active {
 			s.activeKeysets[hex.EncodeToString(mintKeyset.Id)] = mintKeyset
@@ -152,7 +155,14 @@ func (s *RemoteSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 	var response signer.GetKeysetsResponse
 	for _, seed := range s.keysets {
 		if seed.Unit != cashu.AUTH.String() {
-			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(seed.Id), Unit: seed.Unit, Active: seed.Active, InputFeePpk: seed.InputFeePpk, Version: seed.Version})
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{
+				Id:          hex.EncodeToString(seed.Id),
+				Unit:        seed.Unit,
+				Active:      seed.Active,
+				InputFeePpk: seed.InputFeePpk,
+				Version:     seed.Version,
+				FinalExpiry: seed.FinalExpiry,
+			})
 		}
 	}
 	return response, nil
@@ -202,7 +212,7 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hour
 func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
 
 	ctx := context.Background()
-	blindedMessageRequest := sig.BlindedMessages{}
+	blindedMessageRequest := sig.BlindedMessages{} //nolint:exhaustruct
 
 	blindedMessageRequest.BlindedMessages = []*sig.BlindedMessage{}
 	for _, val := range messages {
@@ -250,6 +260,7 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 			B_:        messages[i].B_,
 			CreatedAt: now,
 			Dleq:      val.Dleq,
+			MeltQuote: "",
 		})
 
 	}
@@ -261,8 +272,9 @@ func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {
 
 	ctx := context.Background()
 	// INFO: we verify locally if the proofs are locked and valid before sending to the crypto signer
-	proofsVericationRequest := sig.Proofs{}
-	proofsVericationRequest.Proof = make([]*sig.Proof, len(proofs))
+	proofsVericationRequest := sig.Proofs{ //nolint:exhaustruct
+		Proof: make([]*sig.Proof, len(proofs)),
+	}
 	for i, val := range proofs {
 
 		C := val.C.SerializeCompressed()
@@ -333,7 +345,14 @@ func (l *RemoteSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	var response signer.GetKeysetsResponse
 	for _, key := range l.keysets {
 		if key.Unit == cashu.AUTH.String() {
-			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{Id: hex.EncodeToString(key.Id), Unit: key.Unit, Active: key.Active, InputFeePpk: key.InputFeePpk, Version: key.Version})
+			response.Keysets = append(response.Keysets, cashu.BasicKeysetResponse{
+				Id:          hex.EncodeToString(key.Id),
+				Unit:        key.Unit,
+				Active:      key.Active,
+				InputFeePpk: key.InputFeePpk,
+				Version:     key.Version,
+				FinalExpiry: key.FinalExpiry,
+			})
 		}
 	}
 	return response, nil

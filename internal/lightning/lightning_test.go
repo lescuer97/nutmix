@@ -11,8 +11,9 @@ import (
 func TestUseMinimumFeeOnInvoice(t *testing.T) {
 	chainParam := chaincfg.MainNetParams
 	fakeWallet := FakeWallet{
-		Network:    chainParam,
-		InvoiceFee: 2,
+		UnpurposeErrors: nil,
+		Network:         chainParam,
+		InvoiceFee:      2,
 	}
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
@@ -43,8 +44,9 @@ func TestUseMinimumFeeOnInvoice(t *testing.T) {
 func TestUseFeeInvoice(t *testing.T) {
 	chainParam := chaincfg.MainNetParams
 	fakeWallet := FakeWallet{
-		Network:    chainParam,
-		InvoiceFee: 150,
+		UnpurposeErrors: nil,
+		Network:         chainParam,
+		InvoiceFee:      150,
 	}
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)

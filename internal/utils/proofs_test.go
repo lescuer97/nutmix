@@ -10,8 +10,10 @@ func setListofEmptyBlindMessages(amounts int) []cashu.BlindedMessage {
 	var messages []cashu.BlindedMessage
 	for i := 0; i < amounts; i++ {
 		message := cashu.BlindedMessage{
-			Id:     "mockid",
-			Amount: 0,
+			B_:      cashu.WrappedPublicKey{PublicKey: nil},
+			Id:      "mockid",
+			Witness: "",
+			Amount:  0,
 		}
 		messages = append(messages, message)
 
@@ -66,8 +68,15 @@ func MakeListofMockProofs(amounts int) []cashu.Proof {
 	var proofs []cashu.Proof
 	for i := 0; i < amounts; i++ {
 		proof := cashu.Proof{
-			Id:     "mockid",
-			Amount: 0,
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "mockid",
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
 		}
 		proofs = append(proofs, proof)
 
@@ -80,14 +89,26 @@ func TestGetValuesFromProofs(t *testing.T) {
 
 	listOfProofs := cashu.Proofs{
 		{
-			Id:     "mockid",
-			Amount: 2,
-			Secret: "mockSecret",
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "mockid",
+			Secret:  "mockSecret",
+			Witness: "",
+			State:   "",
+			Amount:  2,
+			SeenAt:  0,
 		},
 		{
-			Id:     "mockid",
-			Amount: 6,
-			Secret: "mockSecret2",
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "mockid",
+			Secret:  "mockSecret2",
+			Witness: "",
+			State:   "",
+			Amount:  6,
+			SeenAt:  0,
 		},
 	}
 

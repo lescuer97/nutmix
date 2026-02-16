@@ -42,6 +42,7 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 			PaymentState:   UNKNOWN,
 			Rhash:          "",
 			PaidFeeSat:     0,
+			CheckingId:     "",
 		}, nil
 
 	case slices.Contains(f.UnpurposeErrors, FailPaymentFailed):
@@ -51,6 +52,7 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 			PaymentState:   FAILED,
 			Rhash:          "",
 			PaidFeeSat:     0,
+			CheckingId:     "",
 		}, nil
 	case slices.Contains(f.UnpurposeErrors, FailPaymentPending):
 		return PaymentResponse{
@@ -59,6 +61,7 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 			PaymentState:   PENDING,
 			Rhash:          "",
 			PaidFeeSat:     0,
+			CheckingId:     "",
 		}, nil
 	}
 
@@ -103,10 +106,11 @@ func (f FakeWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Inv
 func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {
 	fee := GetFeeReserve(amount.Amount, f.InvoiceFee)
 	hash := zpayInvoice.PaymentHash[:]
-	feesResponse := FeesResponse{}
-	feesResponse.Fees.Amount = fee
-	feesResponse.AmountToSend.Amount = amount.Amount
-	feesResponse.CheckingId = hex.EncodeToString(hash)
+	feesResponse := FeesResponse{
+		Fees:         cashu.Amount{Amount: fee, Unit: cashu.Sat},
+		AmountToSend: cashu.Amount{Amount: amount.Amount, Unit: cashu.Sat},
+		CheckingId:   hex.EncodeToString(hash),
+	}
 
 	return feesResponse, nil
 }

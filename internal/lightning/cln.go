@@ -24,6 +24,7 @@ type CLNGRPCWallet struct {
 }
 
 func getTlsConfig(clientCert string, clientKey string, caCert string) (*tls.Config, error) {
+	//nolint:exhaustruct
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
@@ -94,7 +95,7 @@ func (l *CLNGRPCWallet) clnGrpcPayInvoice(invoice string, feeReserve uint64, lig
 		Msat: feeReserve * 1000,
 	}
 
-	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee}
+	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee} //nolint:exhaustruct
 
 	res, err := client.Pay(ctx, &sendRequest)
 
@@ -146,7 +147,7 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 	partialSats := cln_grpc.Amount{
 		Msat: amount.Amount,
 	}
-	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee, PartialMsat: &partialSats}
+	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee, PartialMsat: &partialSats} //nolint:exhaustruct
 
 	res, err := client.Pay(ctx, &sendRequest)
 
@@ -209,6 +210,7 @@ func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkin
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 	fee := uint64(0)
 
+	//nolint:exhaustruct
 	rhash := cln_grpc.ListpaysRequest{
 		PaymentHash: invoice.PaymentHash[:],
 	}
@@ -239,6 +241,7 @@ func (l CLNGRPCWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
+	//nolint:exhaustruct
 	invoiceReq := cln_grpc.ListinvoicesRequest{
 		PaymentHash: invoice.PaymentHash[:],
 	}
@@ -266,7 +269,11 @@ func (l CLNGRPCWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
-	feesResponse := FeesResponse{}
+	feesResponse := FeesResponse{
+		Fees:         cashu.Amount{Unit: cashu.Sat, Amount: 0},
+		AmountToSend: cashu.Amount{Unit: cashu.Sat, Amount: 0},
+		CheckingId:   "",
+	}
 	_, _, _, err := l.CheckPayed("", zpayInvoice, "")
 
 	if err != nil {
@@ -283,6 +290,7 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 		Msat: amount.Amount,
 	}
 
+	//nolint:exhaustruct
 	queryRoutes := cln_grpc.GetrouteRequest{
 		Id:         zpayInvoice.Destination.SerializeCompressed(),
 		AmountMsat: &amountGrpc,
@@ -346,6 +354,7 @@ func (l CLNGRPCWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 		return response, fmt.Errorf(`uuid.NewRandom() %w`, err)
 	}
 
+	//nolint:exhaustruct
 	req := cln_grpc.InvoiceRequest{
 		AmountMsat: &cln_grpc.AmountOrAny{
 			Value: &amountOrAllCln,

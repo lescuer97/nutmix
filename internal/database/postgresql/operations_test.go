@@ -71,13 +71,17 @@ func TestAddAndRequestMintRequestValidPubkey(t *testing.T) {
 	now := time.Now().Unix()
 
 	mintRequestDB := cashu.MintRequestDB{
-		Quote:  quoteId,
-		Expiry: now,
-		Unit:   cashu.Sat.String(),
-		State:  cashu.UNPAID,
-		SeenAt: now,
-		Amount: &amount,
-		Pubkey: cashu.WrappedPublicKey{PublicKey: pubkey},
+		Amount:      &amount,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: pubkey},
+		Description: nil,
+		Quote:       quoteId,
+		Request:     "",
+		Unit:        cashu.Sat.String(),
+		State:       cashu.UNPAID,
+		CheckingId:  "",
+		Expiry:      now,
+		SeenAt:      now,
+		Minted:      false,
 	}
 
 	log.Println("adding mint request to database")
@@ -163,13 +167,17 @@ func TestAddAndRequestMintRequestNilPubkey(t *testing.T) {
 	now := time.Now().Unix()
 
 	mintRequestDB := cashu.MintRequestDB{
-		Quote:  quoteId,
-		Expiry: now,
-		Unit:   cashu.Sat.String(),
-		State:  cashu.UNPAID,
-		SeenAt: now,
-		Amount: &amount,
-		Pubkey: cashu.WrappedPublicKey{PublicKey: nil},
+		Amount:      &amount,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       quoteId,
+		Request:     "",
+		Unit:        cashu.Sat.String(),
+		State:       cashu.UNPAID,
+		CheckingId:  "",
+		Expiry:      now,
+		SeenAt:      now,
+		Minted:      false,
 	}
 
 	log.Println("adding mint request to database")
@@ -229,26 +237,32 @@ func TestGetMintMeltBalanceByTime_OnlyPubkey(t *testing.T) {
 
 	// Mint Request 1: Old, Issued (Excluded by time)
 	mint1 := cashu.MintRequestDB{
-		Quote:   "mint1",
-		State:   cashu.ISSUED,
-		SeenAt:  entryOldTime,
-		Amount:  ptr(100),
-		Pubkey:  wrappedPubkey,
-		Request: "req1",
-		Unit:    cashu.Sat.String(),
-		Expiry:  now + 10000,
+		Amount:      ptr(100),
+		Pubkey:      wrappedPubkey,
+		Description: nil,
+		Quote:       "mint1",
+		Request:     "req1",
+		Unit:        cashu.Sat.String(),
+		State:       cashu.ISSUED,
+		CheckingId:  "",
+		Expiry:      now + 10000,
+		SeenAt:      entryOldTime,
+		Minted:      false,
 	}
 
 	// Mint Request 2: New, Issued (Included)
 	mint2 := cashu.MintRequestDB{
-		Quote:   "mint2",
-		State:   cashu.ISSUED,
-		SeenAt:  entryNewTime,
-		Amount:  ptr(200),
-		Pubkey:  wrappedPubkey,
-		Request: "req2",
-		Unit:    cashu.Sat.String(),
-		Expiry:  now + 10000,
+		Amount:      ptr(200),
+		Pubkey:      wrappedPubkey,
+		Description: nil,
+		Quote:       "mint2",
+		Request:     "req2",
+		Unit:        cashu.Sat.String(),
+		State:       cashu.ISSUED,
+		CheckingId:  "",
+		Expiry:      now + 10000,
+		SeenAt:      entryNewTime,
+		Minted:      false,
 	}
 
 	tx, err := db.GetTx(ctx)
@@ -268,24 +282,36 @@ func TestGetMintMeltBalanceByTime_OnlyPubkey(t *testing.T) {
 	// Melt Requests
 	// Melt Request 1: Old, Issued (Excluded by time)
 	melt1 := cashu.MeltRequestDB{
-		Quote:   "melt1",
-		State:   cashu.ISSUED,
-		SeenAt:  entryOldTime,
-		Amount:  100,
-		Request: "reqMelt1",
-		Unit:    cashu.Sat.String(),
-		Expiry:  now + 10000,
+		PaymentPreimage: "",
+		Unit:            cashu.Sat.String(),
+		Request:         "reqMelt1",
+		State:           cashu.ISSUED,
+		Quote:           "melt1",
+		CheckingId:      "",
+		Expiry:          now + 10000,
+		Amount:          100,
+		FeeReserve:      0,
+		FeePaid:         0,
+		SeenAt:          entryOldTime,
+		Melted:          false,
+		Mpp:             false,
 	}
 
 	// Melt Request 2: New, Paid (Included)
 	melt2 := cashu.MeltRequestDB{
-		Quote:   "melt2",
-		State:   cashu.PAID,
-		SeenAt:  entryNewTime,
-		Amount:  200,
-		Request: "reqMelt2",
-		Unit:    cashu.Sat.String(),
-		Expiry:  now + 10000,
+		PaymentPreimage: "",
+		Unit:            cashu.Sat.String(),
+		Request:         "reqMelt2",
+		State:           cashu.PAID,
+		Quote:           "melt2",
+		CheckingId:      "",
+		Expiry:          now + 10000,
+		Amount:          200,
+		FeeReserve:      0,
+		FeePaid:         0,
+		SeenAt:          entryNewTime,
+		Melted:          false,
+		Mpp:             false,
 	}
 
 	tx, err = db.GetTx(ctx)
@@ -350,26 +376,32 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 
 	// Mint Request with Pubkey
 	mint1 := cashu.MintRequestDB{
-		Quote:   "mintWithKey",
-		State:   cashu.ISSUED,
-		SeenAt:  entryNewTime,
-		Amount:  ptr(200),
-		Pubkey:  wrappedPubkey,
-		Request: "reqWithKey",
-		Unit:    cashu.Sat.String(),
-		Expiry:  now + 10000,
+		Amount:      ptr(200),
+		Pubkey:      wrappedPubkey,
+		Description: nil,
+		Quote:       "mintWithKey",
+		Request:     "reqWithKey",
+		Unit:        cashu.Sat.String(),
+		State:       cashu.ISSUED,
+		CheckingId:  "",
+		Expiry:      now + 10000,
+		SeenAt:      entryNewTime,
+		Minted:      false,
 	}
 
 	// Mint Request without Pubkey
 	mint2 := cashu.MintRequestDB{
-		Quote:   "mintNoKey",
-		State:   cashu.ISSUED,
-		SeenAt:  entryNewTime,
-		Amount:  ptr(400),
-		Pubkey:  cashu.WrappedPublicKey{PublicKey: nil},
-		Request: "reqNokey",
-		Unit:    cashu.Sat.String(),
-		Expiry:  now + 10000,
+		Amount:      ptr(400),
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       "mintNoKey",
+		Request:     "reqNokey",
+		Unit:        cashu.Sat.String(),
+		State:       cashu.ISSUED,
+		CheckingId:  "",
+		Expiry:      now + 10000,
+		SeenAt:      entryNewTime,
+		Minted:      false,
 	}
 
 	tx, err := db.GetTx(ctx)
@@ -388,13 +420,19 @@ func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
 
 	// Melt Requests
 	melt1 := cashu.MeltRequestDB{
-		Quote:   "melt1",
-		State:   cashu.ISSUED,
-		SeenAt:  entryNewTime,
-		Amount:  100,
-		Request: "reqMelt1",
-		Unit:    cashu.Sat.String(),
-		Expiry:  now + 10000,
+		PaymentPreimage: "",
+		Unit:            cashu.Sat.String(),
+		Request:         "reqMelt1",
+		State:           cashu.ISSUED,
+		Quote:           "melt1",
+		CheckingId:      "",
+		Expiry:          now + 10000,
+		Amount:          100,
+		FeeReserve:      0,
+		FeePaid:         0,
+		SeenAt:          entryNewTime,
+		Melted:          false,
+		Mpp:             false,
 	}
 
 	tx, err = db.GetTx(ctx)
@@ -696,12 +734,13 @@ func TestSaveRestoreSigsAndGet_ValidPubkeys(t *testing.T) {
 	now := time.Now().Unix()
 
 	recoverSig := cashu.RecoverSigDB{
-		Amount:    100,
-		Id:        "test_keyset_id",
 		B_:        wrappedB,
 		C_:        wrappedC,
-		CreatedAt: now,
 		Dleq:      dleq,
+		Id:        "test_keyset_id",
+		MeltQuote: "",
+		Amount:    100,
+		CreatedAt: now,
 	}
 
 	// Save the recovery signature
@@ -802,21 +841,23 @@ func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
 	now := time.Now().Unix()
 
 	sig1 := cashu.RecoverSigDB{
-		Amount:    100,
-		Id:        "keyset1",
 		B_:        wrappedB1,
 		C_:        wrappedC1,
-		CreatedAt: now,
 		Dleq:      dleq,
+		Id:        "keyset1",
+		MeltQuote: "",
+		Amount:    100,
+		CreatedAt: now,
 	}
 
 	sig2 := cashu.RecoverSigDB{
-		Amount:    200,
-		Id:        "keyset2",
 		B_:        wrappedB2,
 		C_:        wrappedC2,
-		CreatedAt: now,
 		Dleq:      dleq,
+		Id:        "keyset2",
+		MeltQuote: "",
+		Amount:    200,
+		CreatedAt: now,
 	}
 
 	// Save both recovery signatures

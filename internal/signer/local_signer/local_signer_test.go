@@ -11,7 +11,7 @@ import (
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
 
 func TestRotateUnexistingSeedUnit(t *testing.T) {
-	db := mockdb.MockDB{}
+	db := mockdb.MockDB{} //nolint:exhaustruct
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	localsigner, err := SetupLocalSigner(&db)
 	if err != nil {
@@ -75,7 +75,7 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 }
 
 func TestCreateNewSeed(t *testing.T) {
-	db := mockdb.MockDB{}
+	db := mockdb.MockDB{} //nolint:exhaustruct
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	localsigner, err := SetupLocalSigner(&db)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestCreateNewSeed(t *testing.T) {
 	}
 }
 func TestRotateAuthSeedUnit(t *testing.T) {
-	db := mockdb.MockDB{}
+	db := mockdb.MockDB{} //nolint:exhaustruct
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	localsigner, err := SetupLocalSigner(&db)
 	if err != nil {
@@ -137,14 +137,17 @@ func TestRotateAuthSeedUnit(t *testing.T) {
 
 func TestBackwardCompatibilityV1Keysets(t *testing.T) {
 	// Pre-populate MockDB with a V1 keyset seed (simulating existing database with old keyset)
+	var finalExpiry uint64 = 0
 	v1Seed := cashu.Seed{
 		Id:          "00bfa73302d12ffd", // Old V1 keyset ID
 		Unit:        cashu.Sat.String(),
 		Version:     1,
 		InputFeePpk: 0,
 		Active:      true,
+		FinalExpiry: &finalExpiry,
+		CreatedAt:   0,
 	}
-	db := mockdb.MockDB{
+	db := mockdb.MockDB{ //nolint:exhaustruct
 		Seeds: []cashu.Seed{v1Seed},
 	}
 
@@ -180,14 +183,17 @@ func TestBackwardCompatibilityV1Keysets(t *testing.T) {
 
 func TestMixedV1AndV2Keysets(t *testing.T) {
 	// Pre-populate MockDB with V1 seed (simulating existing keyset)
+	var finalExpiry uint64 = 0
 	v1Seed := cashu.Seed{
 		Id:          "00bfa73302d12ffd",
 		Unit:        cashu.Sat.String(),
 		Version:     1,
 		InputFeePpk: 0,
 		Active:      true,
+		FinalExpiry: &finalExpiry,
+		CreatedAt:   0,
 	}
-	db := mockdb.MockDB{
+	db := mockdb.MockDB{ //nolint:exhaustruct
 		Seeds: []cashu.Seed{v1Seed},
 	}
 

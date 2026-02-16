@@ -44,12 +44,21 @@ func (a *adminHandler) getKeysets(filterUnits []string) (map[string][]templates.
 				continue
 			}
 		}
+
+		var expireTime *time.Time = nil
+		if seed.FinalExpiry != nil {
+			unixTime := time.Unix(int64(*seed.FinalExpiry), 0)
+			expireTime = &unixTime
+		}
+
 		keysetMap[seed.Unit] = append(keysetMap[seed.Unit], templates.KeysetData{
-			Id:      seed.Id,
-			Active:  seed.Active,
-			Unit:    seed.Unit,
-			Fees:    seed.InputFeePpk,
-			Version: seed.Version,
+			Id:          seed.Id,
+			Active:      seed.Active,
+			Unit:        seed.Unit,
+			Fees:        seed.InputFeePpk,
+			Version:     seed.Version,
+			CreatedAt:   0,
+			ExpireLimit: expireTime,
 		})
 	}
 	for _, seed := range authKeysets.Keysets {
@@ -59,12 +68,20 @@ func (a *adminHandler) getKeysets(filterUnits []string) (map[string][]templates.
 			}
 		}
 
+		var expireTime *time.Time = nil
+		if seed.FinalExpiry != nil {
+			unixTime := time.Unix(int64(*seed.FinalExpiry), 0)
+			expireTime = &unixTime
+		}
+
 		keysetMap[seed.Unit] = append(keysetMap[seed.Unit], templates.KeysetData{
-			Id:      seed.Id,
-			Active:  seed.Active,
-			Unit:    seed.Unit,
-			Fees:    seed.InputFeePpk,
-			Version: seed.Version,
+			Id:          seed.Id,
+			Active:      seed.Active,
+			Unit:        seed.Unit,
+			Fees:        seed.InputFeePpk,
+			Version:     seed.Version,
+			CreatedAt:   0,
+			ExpireLimit: expireTime,
 		})
 	}
 

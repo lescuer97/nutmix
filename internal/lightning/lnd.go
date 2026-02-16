@@ -71,7 +71,7 @@ func (l *LndGrpcWallet) lndGrpcPayInvoice(routerrpcClient routerrpc.RouterClient
 	if decodedInvoice.MilliSat == nil {
 		return fmt.Errorf("amount is not available for the invoice")
 	}
-	sendRequest := routerrpc.SendPaymentRequest{PaymentRequest: invoiceString, FeeLimitSat: int64(feeReserve), AllowSelfPayment: true}
+	sendRequest := routerrpc.SendPaymentRequest{PaymentRequest: invoiceString, FeeLimitSat: int64(feeReserve), AllowSelfPayment: true} //nolint:exhaustruct
 	res, err := routerrpcClient.SendPaymentV2(ctx, &sendRequest)
 	if err != nil {
 		lightningResponse.PaymentState = FAILED
@@ -132,6 +132,7 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 	var routes []*lnrpc.Route
 	for i := 0; i < totalAttempts; i++ {
 
+		//nolint:exhaustruct
 		queryRoutes := lnrpc.QueryRoutesRequest{
 			PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
 			UseMissionControl: true,
@@ -165,7 +166,7 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 
 		routes[0].Hops[len(routes[0].Hops)-1].MppRecord = &mppRecord
 
-		sendRequest := routerrpc.SendToRouteRequest{PaymentHash: zpayInvoice.PaymentHash[:], Route: routes[0], SkipTempErr: true}
+		sendRequest := routerrpc.SendToRouteRequest{PaymentHash: zpayInvoice.PaymentHash[:], Route: routes[0], SkipTempErr: true} //nolint:exhaustruct
 
 		res, err := routerrpcClient.SendToRouteV2(ctx, &sendRequest)
 
@@ -241,7 +242,7 @@ func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, 
 	var payStatus LndPayStatus
 	hash := invoice.PaymentHash[:]
 
-	paymentstatusRequest := routerrpc.TrackPaymentRequest{PaymentHash: hash}
+	paymentstatusRequest := routerrpc.TrackPaymentRequest{PaymentHash: hash} //nolint:exhaustruct
 
 	res, err := routerClient.TrackPaymentV2(ctx, &paymentstatusRequest)
 
@@ -292,6 +293,7 @@ func (l LndGrpcWallet) getInvoiceStatus(invoice *zpay32.Invoice) (*lnrpc.Invoice
 
 	hash := invoice.PaymentHash[:]
 
+	//nolint:exhaustruct
 	rhash := lnrpc.PaymentHash{
 		RHash: hash,
 	}
@@ -367,6 +369,7 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 	featureBits := getFeatureBits(zpayInvoice.Features)
 
+	//nolint:exhaustruct
 	queryRoutes := lnrpc.QueryRoutesRequest{
 		PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
 		RouteHints:        routeHints,
@@ -377,18 +380,22 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 
 	res, err := client.QueryRoutes(ctx, &queryRoutes)
 
-	feesResponse := FeesResponse{}
-
 	if err != nil {
-		return feesResponse, err
+		return FeesResponse{}, err
 	}
 	if res == nil {
-		return feesResponse, fmt.Errorf("no routes found")
+		return FeesResponse{}, fmt.Errorf("no routes found")
 	}
 
 	fee := GetAverageRouteFee(res.Routes) / 1000
 
 	fee = GetFeeReserve(amount.Amount, fee)
+
+	feesResponse := FeesResponse{
+		Fees:         cashu.Amount{Unit: cashu.Sat, Amount: fee},
+		AmountToSend: cashu.Amount{Unit: cashu.Sat, Amount: amount.Amount},
+		CheckingId:   "",
+	}
 
 	hash := zpayInvoice.PaymentHash[:]
 
@@ -414,7 +421,7 @@ func (l LndGrpcWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 		return response, fmt.Errorf(`amount.To(cashu.Sat) %w`, err)
 	}
 
-	Lndinvoice := lnrpc.Invoice{Value: int64(amount.Amount), Expiry: 900}
+	Lndinvoice := lnrpc.Invoice{Value: int64(amount.Amount), Expiry: 900} //nolint:exhaustruct
 	if quote.Description != nil {
 		Lndinvoice.Memo = *quote.Description
 	}

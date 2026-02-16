@@ -94,6 +94,9 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			Amount:      &mintRequest.Amount,
 			Pubkey:      mintRequest.Pubkey,
 			Description: mintRequest.Description,
+			Request:     "",
+			CheckingId:  "",
+			Minted:      false,
 		}
 
 		resInvoice, err := mint.LightningBackend.RequestInvoice(mintRequestDB, cashu.Amount{Unit: unit, Amount: mintRequest.Amount})
@@ -476,8 +479,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		dbRequest := cashu.MeltRequestDB{}
-
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 		now := time.Now().Unix()
 
@@ -534,7 +535,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		}
 		queryFee := uint64(0)
 		checkingId := quoteId
-		dbRequest = cashu.MeltRequestDB{
+		dbRequest := cashu.MeltRequestDB{
 			Amount:          cashuAmount.Amount,
 			Quote:           quoteId,
 			Request:         meltRequest.Request,
@@ -546,6 +547,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			SeenAt:          now,
 			Mpp:             isMpp,
 			CheckingId:      checkingId,
+			FeePaid:         0,
+			Melted:          false,
 		}
 
 		if !isInternal {

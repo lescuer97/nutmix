@@ -56,7 +56,7 @@ var ErrLnbitsFailedPayment = errors.New("failed payment")
 var ErrLnBitsNoRouteFound = errors.New("no route found")
 
 func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
-	client := &http.Client{}
+	client := &http.Client{} //nolint:exhaustruct
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("json.Marshal: %w", err)
@@ -86,7 +86,10 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 		return fmt.Errorf("ioutil.ReadAll: %w", err)
 	}
 
-	detailBody := LNBitsDetailErrorData{}
+	detailBody := LNBitsDetailErrorData{
+		Detail: "",
+		Status: "",
+	}
 	err = json.Unmarshal(body, &detailBody)
 	if err != nil {
 		return fmt.Errorf("json.Unmarshal(detailBody): %w", err)
@@ -129,9 +132,13 @@ func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zp
 	}
 
 	reqInvoice := lnbitsInvoiceRequest{
-		Out:    true,
-		Bolt11: melt_quote.Request,
-		Amount: amount.Amount,
+		Out:        true,
+		Bolt11:     melt_quote.Request,
+		Amount:     amount.Amount,
+		Unit:       "",
+		Memo:       "",
+		Expiry:     0,
+		CheckingId: "",
 	}
 
 	err := l.LnbitsRequest("POST", "/api/v1/payments", reqInvoice, &lnbitsInvoice)
@@ -214,28 +221,31 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 	err := l.LnbitsRequest("GET", invoiceString, nil, &queryResponse)
 	queryResponse.FeeReserve = queryResponse.FeeReserve / 1000
 
-	feesResponse := FeesResponse{}
 	if err != nil {
-		return feesResponse, fmt.Errorf("json.Marshal: %w", err)
+		return FeesResponse{}, fmt.Errorf("json.Marshal: %w", err)
 	}
 
 	fee := GetFeeReserve(amount.Amount, queryResponse.FeeReserve)
 	hash := zpayInvoice.PaymentHash[:]
 
-	feesResponse.Fees.Amount = fee
-	feesResponse.AmountToSend.Amount = amount.Amount
-	feesResponse.CheckingId = hex.EncodeToString(hash)
+	feesResponse := FeesResponse{
+		Fees:         cashu.Amount{Unit: cashu.Sat, Amount: fee},
+		AmountToSend: cashu.Amount{Unit: cashu.Sat, Amount: amount.Amount},
+		CheckingId:   hex.EncodeToString(hash),
+	}
 
 	return feesResponse, nil
 }
 
 func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
 	reqInvoice := lnbitsInvoiceRequest{
-		Amount: amount.Amount,
-		Unit:   cashu.Sat.String(),
-		Memo:   "",
-		Out:    false,
-		Expiry: 900,
+		Amount:     amount.Amount,
+		Unit:       cashu.Sat.String(),
+		Memo:       "",
+		Out:        false,
+		Expiry:     900,
+		Bolt11:     "",
+		CheckingId: "",
 	}
 
 	if quote.Description != nil {

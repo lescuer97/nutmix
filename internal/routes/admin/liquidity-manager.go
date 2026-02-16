@@ -172,6 +172,7 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 		}
 
 		uuid := uuid.New().String()
+		now := decodedInvoice.Timestamp.Add(decodedInvoice.Expiry()).Unix()
 		swap := utils.LiquiditySwap{
 			Amount:           uint64(amount),
 			LightningInvoice: invoice,
@@ -179,10 +180,8 @@ func SwapOutRequest(mint *m.Mint) gin.HandlerFunc {
 			Id:               uuid,
 			Type:             utils.LiquidityOut,
 			CheckingId:       feesResponse.CheckingId,
+			Expiration:       uint64(now),
 		}
-
-		now := decodedInvoice.Timestamp.Add(decodedInvoice.Expiry()).Unix()
-		swap.Expiration = uint64(now)
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
@@ -257,6 +256,7 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 
 		uuid := uuid.New().String()
 
+		//nolint:exhaustruct
 		resp, err := mint.LightningBackend.RequestInvoice(cashu.MintRequestDB{Quote: uuid}, cashu.Amount{Amount: amount, Unit: cashu.Sat})
 		if err != nil {
 			slog.Warn("mint.LightningBackend.RequestInvoice", slog.Any("error", err))
@@ -265,15 +265,6 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 			}
 			return
 		}
-		swap := utils.LiquiditySwap{
-			Amount:           amount,
-			LightningInvoice: resp.PaymentRequest,
-			State:            utils.MintWaitingPaymentRecv,
-			Id:               uuid,
-			Type:             utils.LiquidityIn,
-			CheckingId:       resp.CheckingId,
-		}
-
 		decodedInvoice, err := zpay32.Decode(resp.PaymentRequest, mint.LightningBackend.GetNetwork())
 		if err != nil {
 			// If the fees are acceptable, continue to create the Receive Payment
@@ -283,7 +274,15 @@ func SwapInRequest(mint *m.Mint, newLiquidity chan string) gin.HandlerFunc {
 		}
 
 		now := decodedInvoice.Timestamp.Add(decodedInvoice.Expiry()).Unix()
-		swap.Expiration = uint64(now)
+		swap := utils.LiquiditySwap{
+			Amount:           amount,
+			LightningInvoice: resp.PaymentRequest,
+			State:            utils.MintWaitingPaymentRecv,
+			Id:               uuid,
+			Type:             utils.LiquidityIn,
+			CheckingId:       resp.CheckingId,
+			Expiration:       uint64(now),
+		}
 
 		tx, err := mint.MintDB.GetTx(ctx)
 		if err != nil {
@@ -468,6 +467,7 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 
 		slog.Info("making payment to invoice", slog.String("invoice", swapRequest.LightningInvoice))
 
+		//nolint:exhaustruct
 		payment, err := mint.LightningBackend.PayInvoice(cashu.MeltRequestDB{Request: swapRequest.LightningInvoice}, decodedInvoice, fee, false, cashu.Amount{Unit: cashu.Sat, Amount: swapRequest.Amount})
 
 		// Hardened error handling

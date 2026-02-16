@@ -24,6 +24,7 @@ func checkOrigin(r *http.Request) bool {
 
 func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 	v1 := r.Group("/v1")
+	//nolint:exhaustruct
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  4096,
 		WriteBufferSize: 4096,
@@ -93,11 +94,13 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 						JsonRpc: "2.0",
 						Method:  cashu.Subcribe,
 						Params: cashu.WebRequestParams{
-							SubId: request.Params.SubId,
+							SubId:   request.Params.SubId,
+							Payload: cashu.CheckState{Y: proof.Y, State: proof.State, Witness: &proof.Witness},
+							Kind:    "",
+							Filters: []string{},
 						},
+						Id: 0,
 					}
-					state := cashu.CheckState{Y: proof.Y, State: proof.State, Witness: &proof.Witness}
-					statusNotif.Params.Payload = state
 
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
@@ -112,10 +115,13 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 						JsonRpc: "2.0",
 						Method:  cashu.Subcribe,
 						Params: cashu.WebRequestParams{
-							SubId: request.Params.SubId,
+							SubId:   request.Params.SubId,
+							Payload: mintState.PostMintQuoteBolt11Response(),
+							Kind:    "",
+							Filters: []string{},
 						},
+						Id: 0,
 					}
-					statusNotif.Params.Payload = mintState.PostMintQuoteBolt11Response()
 
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
@@ -129,10 +135,13 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 						JsonRpc: "2.0",
 						Method:  cashu.Subcribe,
 						Params: cashu.WebRequestParams{
-							SubId: request.Params.SubId,
+							SubId:   request.Params.SubId,
+							Payload: meltState.GetPostMeltQuoteResponse(),
+							Kind:    "",
+							Filters: []string{},
 						},
+						Id: 0,
 					}
-					statusNotif.Params.Payload = meltState.GetPostMeltQuoteResponse()
 
 					err = m.SendJson(conn, statusNotif)
 					if err != nil {
@@ -210,8 +219,12 @@ func CheckStatusOfSub(ctx context.Context, request cashu.WsRequest, mint *m.Mint
 		JsonRpc: "2.0",
 		Method:  cashu.Subcribe,
 		Params: cashu.WebRequestParams{
-			SubId: request.Params.SubId,
+			SubId:   request.Params.SubId,
+			Payload: nil,
+			Kind:    "",
+			Filters: []string{},
 		},
+		Id: 0,
 	}
 	alreadyCheckedFilter := make(map[string]any)
 	for _, filter := range request.Params.Filters {

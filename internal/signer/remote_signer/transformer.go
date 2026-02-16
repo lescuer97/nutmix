@@ -37,6 +37,7 @@ func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) ([]c
 }
 
 func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.BlindedMessages, error) {
+	//nolint:exhaustruct
 	messagesGrpc := sig.BlindedMessages{
 		BlindedMessages: make([]*sig.BlindedMessage, len(messages)),
 	}

@@ -401,7 +401,9 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		case string(utils.FAKE_WALLET):
 			newBackendType = utils.FAKE_WALLET
 			fakeWalletBackend := lightning.FakeWallet{
-				Network: chainparam,
+				Network:         chainparam,
+				UnpurposeErrors: []lightning.FakeWalletError{},
+				InvoiceFee:      0,
 			}
 			newBackend = fakeWalletBackend
 
@@ -508,6 +510,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		// 2. Check invoice generation (100 sats)
 		// We use a dummy quote ID to avoid messing with real DB if possible.
 		testQuote := "verification-test-" + strconv.FormatInt(time.Now().Unix(), 10)
+		//nolint:exhaustruct
 		invoiceResp, err := newBackend.RequestInvoice(
 			cashu.MintRequestDB{Quote: testQuote},
 			cashu.Amount{Unit: cashu.Sat, Amount: 100},

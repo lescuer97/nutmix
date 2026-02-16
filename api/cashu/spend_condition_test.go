@@ -674,9 +674,15 @@ func TestAnyOneCanSpendDetection(t *testing.T) {
 	// #nosec G101
 	plainSecret := "a3d98f6b2c1e4f5d8c7b6a9e0f1d2c3b4a5e6f7d8c9b0a1e2f3d4c5b6a7e8f9d"
 	proofWithPlainSecret := Proof{
-		Amount: 1,
-		Id:     "009a1f293253e41e",
-		Secret: plainSecret,
+		Amount:  1,
+		Id:      "009a1f293253e41e",
+		Secret:  plainSecret,
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Witness: "",
+		State:   PROOF_UNSPENT,
+		SeenAt:  0,
 	}
 
 	// IsProofSpendConditioned should return false for plain secrets
@@ -943,6 +949,7 @@ func TestInvalidSpendConditionJSONStructure(t *testing.T) {
 			name:      "not an array",
 			json:      `{"type":"P2PK"}`,
 			expectErr: true,
+			validate:  nil,
 		},
 		{
 			name:      "array with only one element",
@@ -970,6 +977,7 @@ func TestInvalidSpendConditionJSONStructure(t *testing.T) {
 			name:      "second element not an object",
 			json:      `["P2PK","not_an_object"]`,
 			expectErr: true,
+			validate:  nil,
 		},
 	}
 
@@ -997,6 +1005,15 @@ func TestMarshalAnyOneCanSpendError(t *testing.T) {
 		Data: SpendConditionData{
 			Nonce: "test",
 			Data:  "test",
+			Tags: TagsInfo{
+				originalTag: "",
+				Pubkeys:     nil,
+				Refund:      nil,
+				Sigflag:     0,
+				NSigs:       0,
+				Locktime:    0,
+				NSigRefund:  0,
+			},
 		},
 	}
 
@@ -1015,9 +1032,16 @@ func TestCheckValidWithTooManyPubkeys(t *testing.T) {
 	sc := SpendCondition{
 		Type: P2PK,
 		Data: SpendConditionData{
+			Nonce: "",
+			Data:  "",
 			Tags: TagsInfo{
-				Pubkeys: make([]*btcec.PublicKey, 6),
-				Refund:  make([]*btcec.PublicKey, 5), // Total = 11 > 10
+				Pubkeys:     make([]*btcec.PublicKey, 6),
+				Refund:      make([]*btcec.PublicKey, 5), // Total = 11 > 10
+				originalTag: "",
+				Sigflag:     0,
+				NSigs:       0,
+				Locktime:    0,
+				NSigRefund:  0,
 			},
 		},
 	}
@@ -1095,9 +1119,15 @@ func TestSpendConditionTypeStringInvalid(t *testing.T) {
 func TestProofsHaveSigAllWithInvalidProof(t *testing.T) {
 	// Create a proof with invalid secret that will cause parse error
 	invalidProof := Proof{
-		Amount: 1,
-		Id:     "test",
-		Secret: `["INVALID",{"malformed":true}]`, // Invalid structure
+		Amount:  1,
+		Id:      "test",
+		Secret:  `["INVALID",{"malformed":true}]`, // Invalid structure
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Witness: "",
+		State:   PROOF_UNSPENT,
+		SeenAt:  0,
 	}
 
 	proofs := Proofs{invalidProof}

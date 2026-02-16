@@ -448,7 +448,7 @@ func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *
 		bucketTs := (mintRequest.SeenAt / bucketSeconds) * bucketSeconds
 
 		if _, ok := mintBuckets[bucketTs]; !ok {
-			mintBuckets[bucketTs] = &templates.MintMeltTimeSeriesPoint{Timestamp: bucketTs}
+			mintBuckets[bucketTs] = &templates.MintMeltTimeSeriesPoint{Timestamp: bucketTs, MintAmount: 0, MeltAmount: 0, MintCount: 0, MeltCount: 0}
 		}
 		mintBuckets[bucketTs].MintAmount += amount
 		mintBuckets[bucketTs].MintCount++
@@ -476,7 +476,7 @@ func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *
 		bucketTs := (meltRequest.SeenAt / bucketSeconds) * bucketSeconds
 
 		if _, ok := meltBuckets[bucketTs]; !ok {
-			meltBuckets[bucketTs] = &templates.MintMeltTimeSeriesPoint{Timestamp: bucketTs}
+			meltBuckets[bucketTs] = &templates.MintMeltTimeSeriesPoint{Timestamp: bucketTs, MintAmount: 0, MeltAmount: 0, MintCount: 0, MeltCount: 0}
 		}
 		meltBuckets[bucketTs].MeltAmount += amount
 		meltBuckets[bucketTs].MeltCount++
@@ -501,7 +501,7 @@ func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *
 	// Build final result combining mint and melt data
 	result := make([]templates.MintMeltTimeSeriesPoint, 0, len(timestamps))
 	for _, ts := range timestamps {
-		point := templates.MintMeltTimeSeriesPoint{Timestamp: ts}
+		point := templates.MintMeltTimeSeriesPoint{Timestamp: ts, MintAmount: 0, MeltAmount: 0, MintCount: 0, MeltCount: 0}
 		if mintData, ok := mintBuckets[ts]; ok {
 			point.MintAmount = mintData.MintAmount
 			point.MintCount = mintData.MintCount
@@ -531,7 +531,7 @@ func LnChartCard(mint *mint.Mint) gin.HandlerFunc {
 			slog.Error(
 				"mint.MintDB.GetMintMeltBalanceByTime()",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			mintMeltBalance = database.MintMeltBalance{}
+			mintMeltBalance = database.MintMeltBalance{Mint: []cashu.MintRequestDB{}, Melt: []cashu.MeltRequestDB{}}
 		}
 
 		// Process and aggregate into time series using zpay32 for invoice decoding
@@ -562,7 +562,7 @@ func LnChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 			slog.Error(
 				"mint.MintDB.GetMintMeltBalanceByTime()",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			mintMeltBalance = database.MintMeltBalance{}
+			mintMeltBalance = database.MintMeltBalance{Mint: []cashu.MintRequestDB{}, Melt: []cashu.MeltRequestDB{}}
 		}
 
 		// Process and aggregate into time series using zpay32 for invoice decoding

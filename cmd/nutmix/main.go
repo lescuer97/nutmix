@@ -62,6 +62,7 @@ func main() {
 
 	w := io.MultiWriter(os.Stdout, logFile)
 
+	//nolint:exhaustruct
 	opts := &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}
@@ -148,6 +149,7 @@ func main() {
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
 	// Define a custom http.Server
+	//nolint:exhaustruct
 	srv := &http.Server{
 		Addr:         PORT,
 		Handler:      r,

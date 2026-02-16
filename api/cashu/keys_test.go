@@ -23,6 +23,9 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 		Unit:        Sat.String(),
 		Version:     0,
 		InputFeePpk: 0,
+		FinalExpiry: nil,
+		CreatedAt:   0,
+		Active:      false,
 	}
 
 	generatedKeysets, err := GenerateKeysets(key, GetAmountsForKeysets(), seed)
@@ -66,12 +69,26 @@ func TestChangeProofsStateToPending(t *testing.T) {
 
 	proofs := Proofs{
 		Proof{
-			Amount: 1,
-			State:  PROOF_UNSPENT,
+			Amount:  1,
+			State:   PROOF_UNSPENT,
+			C:       WrappedPublicKey{PublicKey: nil},
+			Y:       WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "",
+			Secret:  "",
+			Witness: "",
+			SeenAt:  0,
 		},
 		Proof{
-			Amount: 2,
-			State:  PROOF_UNSPENT,
+			Amount:  2,
+			State:   PROOF_UNSPENT,
+			C:       WrappedPublicKey{PublicKey: nil},
+			Y:       WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "",
+			Secret:  "",
+			Witness: "",
+			SeenAt:  0,
 		},
 	}
 	proofs.SetProofsState(PROOF_PENDING)
@@ -89,12 +106,26 @@ func TestChangeProofsStateToPendingAndQuoteSet(t *testing.T) {
 
 	proofs := Proofs{
 		Proof{
-			Amount: 1,
-			State:  PROOF_UNSPENT,
+			Amount:  1,
+			State:   PROOF_UNSPENT,
+			C:       WrappedPublicKey{PublicKey: nil},
+			Y:       WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "",
+			Secret:  "",
+			Witness: "",
+			SeenAt:  0,
 		},
 		Proof{
-			Amount: 2,
-			State:  PROOF_UNSPENT,
+			Amount:  2,
+			State:   PROOF_UNSPENT,
+			C:       WrappedPublicKey{PublicKey: nil},
+			Y:       WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "",
+			Secret:  "",
+			Witness: "",
+			SeenAt:  0,
 		},
 	}
 	proofs.SetPendingAndQuoteRef("123")

@@ -1,14 +1,19 @@
 package mint
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
 func TestDeleteSubIdKeepOther(t *testing.T) {
-	observer := Observer{}
-	observer.Proofs = make(map[string][]ProofWatchChannel)
+	observer := Observer{
+		Proofs:    make(map[string][]ProofWatchChannel),
+		MintQuote: make(map[string][]MintQuoteChannel),
+		MeltQuote: make(map[string][]MeltQuoteChannel),
+		Mutex:     sync.Mutex{},
+	}
 
 	proofChan1 := make(chan cashu.Proof)
 	proofChan2 := make(chan cashu.Proof)

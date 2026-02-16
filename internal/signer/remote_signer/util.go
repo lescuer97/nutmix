@@ -43,6 +43,7 @@ func GetTlsSecurityCredential() (credentials.TransportCredentials, error) {
 		}
 	}
 
+	//nolint:exhaustruct
 	// Create TLS configuration
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
@@ -66,11 +67,12 @@ func OrderKeysetByUnit(keysets []MintPublicKeyset) signer.GetKeysResponse {
 			typesOfUnits[keyset.Unit] = append(typesOfUnits[keyset.Unit], keyset)
 		}
 	}
-	res := signer.GetKeysResponse{}
-	res.Keysets = []signer.KeysetResponse{}
+	res := signer.GetKeysResponse{
+		Keysets: []signer.KeysetResponse{},
+	}
 	for _, unitKeysets := range typesOfUnits {
 		for _, mintKey := range unitKeysets {
-			keyset := signer.KeysetResponse{}
+			keyset := signer.KeysetResponse{} //nolint:exhaustruct
 			keyset.Id = hex.EncodeToString(mintKey.Id)
 			keyset.Active = mintKey.Active
 			keyset.Unit = mintKey.Unit
