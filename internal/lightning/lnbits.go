@@ -229,8 +229,8 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 	hash := zpayInvoice.PaymentHash[:]
 
 	feesResponse := FeesResponse{
-		Fees:         cashu.Amount{Unit: cashu.Sat, Amount: fee},
-		AmountToSend: cashu.Amount{Unit: cashu.Sat, Amount: amount.Amount},
+		Fees:         cashu.Amount{Unit: amount.Unit, Amount: fee},
+		AmountToSend: amount,
 		CheckingId:   hex.EncodeToString(hash),
 	}
 

@@ -204,14 +204,7 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 		return nil
 
 	default:
-		errorBody := strikeErrorStatus{
-			TraceId: nil,
-			Data: struct {
-				Code    string `json:"string"`
-				Message string `json:"message"`
-				Status  uint   `json:"status"`
-			}{"", "", 0},
-		}
+		var errorBody strikeErrorStatus
 		err = json.Unmarshal(body, &errorBody)
 		if err != nil {
 			return fmt.Errorf("json.Unmarshal(errorBody): %w", err)
