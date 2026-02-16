@@ -1695,7 +1695,7 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
 		Amount:      10000,
-		Unit:        cashu.Msat.String(),
+		Unit:        "milisat",
 		Description: nil,
 		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
 	}

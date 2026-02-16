@@ -79,7 +79,7 @@ func (d Unit) EnumIndex() int {
 }
 
 func UnitFromString(s string) (Unit, error) {
-	switch s {
+	switch strings.Trim(strings.ToLower(s), " ") {
 	case "sat":
 		return Sat, nil
 	case "msat":
