@@ -479,22 +479,6 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		dbRequest := cashu.MeltRequestDB{
-			PaymentPreimage: "",
-			Unit:            "",
-			Request:         "",
-			State:           "",
-			Quote:           "",
-			CheckingId:      "",
-			Expiry:          0,
-			Amount:          0,
-			FeeReserve:      0,
-			FeePaid:         0,
-			SeenAt:          0,
-			Melted:          false,
-			Mpp:             false,
-		}
-
 		expireTime := cashu.ExpiryTimeMinUnit(15)
 		now := time.Now().Unix()
 
@@ -551,7 +535,7 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		}
 		queryFee := uint64(0)
 		checkingId := quoteId
-		dbRequest = cashu.MeltRequestDB{
+		dbRequest := cashu.MeltRequestDB{
 			Amount:          cashuAmount.Amount,
 			Quote:           quoteId,
 			Request:         meltRequest.Request,
