@@ -1118,6 +1118,7 @@ func TestSpendConditionTypeStringInvalid(t *testing.T) {
 // TestProofsHaveSigAllWithInvalidProof tests ProofsHaveSigAll with proof that fails to parse
 func TestProofsHaveSigAllWithInvalidProof(t *testing.T) {
 	// Create a proof with invalid secret that will cause parse error
+	//nolint:gosec
 	invalidProof := Proof{
 		Amount:  1,
 		Id:      "test",
