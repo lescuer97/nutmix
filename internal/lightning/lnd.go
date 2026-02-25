@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"strings"
 	"time"
 
 	"crypto/x509"
@@ -19,12 +20,24 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type LndGrpcWallet struct {
 	grpcClient *grpc.ClientConn
 	macaroon   string
 	Network    chaincfg.Params
+}
+
+func isLndNoRouteError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	if statusErr, ok := status.FromError(err); ok {
+		message = statusErr.Message()
+	}
+	return strings.Contains(message, "unable to find a path to destination")
 }
 
 func (l *LndGrpcWallet) SetupGrpc(host string, macaroon string, tlsCrt string) error {
@@ -99,6 +112,9 @@ func (l *LndGrpcWallet) lndGrpcPayInvoice(routerrpcClient routerrpc.RouterClient
 				continue
 			}
 			lightningResponse.PaymentState = FAILED
+			if payment.GetFailureReason() == lnrpc.PaymentFailureReason_FAILURE_REASON_NO_ROUTE {
+				return fmt.Errorf("payment failed: %w", cashu.ErrPaymentNoRoute)
+			}
 			return fmt.Errorf("PaymentFailed  %+v", payment.GetFailureReason().String())
 		case lnrpc.Payment_SUCCEEDED:
 			lightningResponse.PaymentRequest = invoiceString
@@ -408,6 +424,9 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	res, err := client.QueryRoutes(ctx, &queryRoutes)
 
 	if err != nil {
+		if isLndNoRouteError(err) {
+			return FeesResponse{}, fmt.Errorf("client.QueryRoutes(ctx, &queryRoutes) %w", cashu.ErrPaymentNoRoute)
+		}
 		return FeesResponse{}, err
 	}
 	if res == nil {

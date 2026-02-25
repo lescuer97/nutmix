@@ -563,7 +563,8 @@ func v1bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			feesResponse, err := mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)
 			if err != nil {
 				slog.Info("mint.LightningBackend.QueryFees(meltRequest.Request, invoice, isMpp, cashuAmount)", slog.Any("error", err))
-				c.JSON(500, "Opps!, something went wrong")
+				errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+				c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 				return
 			}
 			dbRequest.CheckingId = feesResponse.CheckingId
