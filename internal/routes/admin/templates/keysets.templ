@@ -2,6 +2,8 @@ package templates
 
 import "strconv"
 import "time"
+import "strings"
+import "github.com/lescuer97/nutmix/api/cashu"
 
 type KeysetData struct {
 	Id          string
@@ -17,7 +19,7 @@ func isLegacyKeyset(id string) bool {
 	return len(id) == 16 && id[:2] == "00"
 }
 
-templ KeysetsPage() {
+templ KeysetsPage(listOfUnitsAvailable []cashu.Unit) {
 	@Layout("keysets") {
 		<main class="main-content">
 			<div class="card p-6 mb-8">
@@ -32,9 +34,11 @@ templ KeysetsPage() {
 					<label class="settings-input min-w-[120px]">
 						<span class="text-secondary text-sm font-medium mb-2">Unit</span>
 						<select name="UNIT">
-							<option value="sat">SAT</option>
-							<option value="eur">EUR</option>
-							<option value="auth">AUTH</option>
+							for i := range listOfUnitsAvailable {
+								<option value={ strings.ToLower(listOfUnitsAvailable[i].String()) }>
+									{ strings.ToUpper(listOfUnitsAvailable[i].String()) }
+								</option>
+							}
 						</select>
 					</label>
 					<label class="settings-input min-w-[200px] flex-1">
@@ -85,7 +89,7 @@ templ keysetCard(keyset KeysetData) {
 	<div class="card card-hover transition-all w-full max-w-sm">
 		<div class="card-header">
 			<span class="font-mono text-sm text-secondary truncate" title={ keyset.Id }>Id: { keyset.Id }</span>
-			<div class="card-header-active"> 
+			<div class="card-header-active">
 				if keyset.Active {
 					<span
 						class="text-xs font-bold text-success bg-opacity-10 bg-green-500 px-2 py-1 rounded-full uppercase"

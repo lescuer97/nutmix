@@ -70,7 +70,7 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 		}
 
 		summary := templates.Summary{
-			LnBalance:  lnBalance / 1000,
+			LnBalance:  lnBalance,
 			FakeWallet: mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET,
 			Fees:       fees(proofsCount, keysets.Keysets),
 			SinceDate:  sinceDate,

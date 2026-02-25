@@ -27,8 +27,8 @@ func GetAverageRouteFee(routes []*lnrpc.Route) uint64 {
 	return fees / amount_routes
 }
 
-func GetFeeReserve(invoiceSatAmount uint64, queriedFee uint64) uint64 {
-	invoiceMinFee := float64(invoiceSatAmount) * MinimumLightningFee
+func GetFeeReserve(invoiceAmount uint64, queriedFee uint64) uint64 {
+	invoiceMinFee := float64(invoiceAmount) * MinimumLightningFee
 
 	fee := uint64(math.Max(invoiceMinFee, float64(queriedFee)))
 	return fee
