@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -141,6 +142,17 @@ func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTi
 	}
 
 	return logRecords
+}
+
+func GetConfigDirectory() (string, error) {
+	dir, err := os.UserConfigDir()
+
+	if err != nil {
+		return "", fmt.Errorf("could not get config dir: %w", err)
+	}
+	pathToProjectDir := filepath.Join(dir, ConfigDirName)
+
+	return pathToProjectDir, nil
 }
 
 func GetLogsDirectory() (string, error) {

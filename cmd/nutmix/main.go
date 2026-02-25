@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/database/postgresql"
+	"github.com/lescuer97/nutmix/internal/lightning/ldk"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
@@ -46,12 +48,12 @@ func main() {
 		log.Panicln("Could not get Logs directory")
 	}
 
-	err = utils.CreateDirectoryAndPath(logsdir, mint.LogFileName)
+	err = utils.CreateDirectoryAndPath(logsdir, utils.LogFileName)
 	if err != nil {
 		log.Panicf("utils.CreateDirectoryAndPath(pathToProjectDir, logFileName ) %+v", err)
 	}
 
-	pathToConfigFile := logsdir + "/" + mint.LogFileName
+	pathToConfigFile := logsdir + "/" + utils.LogFileName
 
 	// Manipulate Config file
 	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
@@ -174,6 +176,8 @@ func main() {
 	}
 
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
+	signalCtx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
 
 	// Define a custom http.Server
 	//nolint:exhaustruct
@@ -184,11 +188,73 @@ func main() {
 		WriteTimeout: 4 * time.Second,
 		IdleTimeout:  3 * time.Minute,
 	}
+
+	var shutdownOnce sync.Once
+	shutdown := func() {
+		shutdownOnce.Do(func() {
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutdownCancel()
+
+			if err := shutdownServerAndBackend(shutdownCtx, srv, mint); err != nil {
+				slog.Warn("shutdown finished with errors", slog.Any("error", err))
+			}
+		})
+	}
+
+	go func() {
+		<-signalCtx.Done()
+		slog.Info("shutdown signal received")
+		shutdown()
+	}()
+
 	// Start the server
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server failed", slog.Any("error", err))
 		os.Exit(1)
 	}
+
+	shutdown()
+}
+
+func shutdownServerAndBackend(ctx context.Context, srv *http.Server, mintInstance *mint.Mint) error {
+	var shutdownErr error
+
+	if srv != nil {
+		slog.Info("shutting down http server")
+		if err := srv.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
+			shutdownErr = err
+		}
+	}
+
+	if err := stopLDKBackend(mintInstance); err != nil {
+		if shutdownErr != nil {
+			shutdownErr = fmt.Errorf("http shutdown: %w; ldk shutdown: %w", shutdownErr, err)
+		} else {
+			shutdownErr = err
+		}
+		return shutdownErr
+	}
+
+	slog.Info("shutdown complete")
+	return shutdownErr
+}
+
+func stopLDKBackend(mintInstance *mint.Mint) error {
+	if mintInstance == nil {
+		return nil
+	}
+
+	ldkBackend, ok := mintInstance.LightningBackend.(*ldk.LDK)
+	if !ok {
+		return nil
+	}
+
+	slog.Info("stopping ldk backend")
+	if err := ldkBackend.Stop(); err != nil {
+		return fmt.Errorf("failed to stop ldk backend: %w", err)
+	}
+
+	return nil
 }
 
 const MemorySigner = "memory"

@@ -23,6 +23,7 @@ const FAKEWALLET Backend = iota + 4
 
 // Deprecated: Strike backend will be removed in v0.7.0.
 const STRIKE Backend = iota + 5
+const LDKNODE Backend = iota + 6
 
 type LightningBackend interface {
 	PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error)
@@ -40,13 +41,6 @@ type LightningBackend interface {
 	DescriptionSupport() bool
 }
 
-type PaymentStatus uint
-
-const SETTLED PaymentStatus = iota + 1
-const FAILED PaymentStatus = iota + 2
-const PENDING PaymentStatus = iota + 3
-const UNKNOWN PaymentStatus = iota + 999
-
 type PaymentResponse struct {
 	Preimage       string
 	PaymentRequest string
@@ -55,6 +49,7 @@ type PaymentResponse struct {
 	PaymentState   PaymentStatus
 	PaidFee        cashu.Amount
 }
+
 type FeesResponse struct {
 	CheckingId   string
 	Fees         cashu.Amount
@@ -66,3 +61,10 @@ type InvoiceResponse struct {
 	CheckingId     string
 	Rhash          string
 }
+
+type PaymentStatus uint
+
+const SETTLED PaymentStatus = iota + 1
+const FAILED PaymentStatus = iota + 2
+const PENDING PaymentStatus = iota + 3
+const UNKNOWN PaymentStatus = iota + 999

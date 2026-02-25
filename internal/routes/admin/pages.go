@@ -21,6 +21,10 @@ import (
 const lightningSearchLimit = 200
 const minLightningSearchLength = 2
 
+func showLDKNodeLink(m *mint.Mint) bool {
+	return m.Config.MINT_LIGHTNING_BACKEND == utils.LDK
+}
+
 func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// generate nonce for login nostr
@@ -69,6 +73,7 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 		err := templates.MintActivityLayout(
 			utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND),
 			selectedRange,
+			showLDKNodeLink(mint),
 		).Render(ctx, c.Writer)
 
 		if err != nil {
@@ -255,7 +260,7 @@ func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		err := templates.LiquidityDashboard().Render(ctx, c.Writer)
+		err := templates.LiquidityDashboard(showLDKNodeLink(mint)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)
@@ -322,7 +327,7 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 
 		}
 
-		err = templates.SwapStatusPage(component).Render(ctx, c.Writer)
+		err = templates.SwapStatusPage(component, showLDKNodeLink(mint)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)
@@ -340,7 +345,7 @@ func LnPage(mint *mint.Mint) gin.HandlerFunc {
 		selectedRange := c.DefaultQuery("since", "1w")
 		searchQuery := strings.TrimSpace(c.Query("search"))
 
-		err := templates.LightningActivityLayout(mint.Config, selectedRange, searchQuery).Render(ctx, c.Writer)
+		err := templates.LightningActivityLayout(mint.Config, selectedRange, searchQuery, showLDKNodeLink(mint)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)

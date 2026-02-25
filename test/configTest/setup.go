@@ -3,8 +3,9 @@ package configTest
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
-	"github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 type ConfigFiles struct {
@@ -39,13 +40,16 @@ func RemoveConfigFile(filepath string) error {
 }
 
 func WriteConfigFile(file []byte) error {
-	dir, err := os.UserConfigDir()
-
+	pathToProjectDir, err := utils.GetConfigDirectory()
 	if err != nil {
-		return fmt.Errorf("os.UserHomeDir(), %w", err)
+		return fmt.Errorf("utils.GetConfigDirectory(), %w", err)
 	}
-	var pathToProjectDir = dir + "/" + mint.ConfigDirName
-	var pathToProjectConfigFile = pathToProjectDir + "/" + mint.ConfigFileName
+	pathToProjectConfigFile := filepath.Join(pathToProjectDir, utils.ConfigFileName)
+
+	err = utils.CreateDirectoryAndPath(pathToProjectDir, utils.ConfigFileName)
+	if err != nil {
+		return fmt.Errorf("utils.CreateDirectoryAndPath(pathToProjectDir, utils.ConfigFileName), %w", err)
+	}
 
 	err = os.WriteFile(pathToProjectConfigFile, file, 0600)
 	if err != nil {

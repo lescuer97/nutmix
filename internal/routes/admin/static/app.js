@@ -78,6 +78,20 @@ nip07form?.addEventListener("submit", (e) => {
     });
 });
 
+window.openLdkChannelDialog = function openLdkChannelDialog(id) {
+  var dialog = document.getElementById(id);
+  if (dialog && dialog.showModal) {
+    dialog.showModal();
+  }
+};
+
+window.closeLdkChannelDialog = function closeLdkChannelDialog(id) {
+  var dialog = document.getElementById(id);
+  if (dialog && dialog.close) {
+    dialog.close();
+  }
+};
+
 // // check for click on button for age of logs
 
 // /**

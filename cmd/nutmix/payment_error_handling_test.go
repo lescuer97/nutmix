@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -159,10 +160,12 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		_ = mint.MintDB.Rollback(ctx, tx)
 	}()
 
+	log.Printf("\n meltproffs: %+v: ", meltProofs)
 	proofs, err := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret}): %+v", err)
 	}
+	log.Printf("\n proofs: %+v: ", proofs)
 
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)

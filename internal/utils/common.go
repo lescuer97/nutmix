@@ -25,6 +25,7 @@ const CLNGRPC LightningBackend = "ClnGrpcWallet"
 
 // Deprecated: Strike backend will be removed in v0.7.0.
 const Strike LightningBackend = "Strike"
+const LDK LightningBackend = "LDK"
 
 func StringToLightningBackend(text string) LightningBackend {
 
@@ -35,8 +36,12 @@ func StringToLightningBackend(text string) LightningBackend {
 		return LNDGRPC
 	case string(LNBITS):
 		return LNBITS
+	case string(CLNGRPC):
+		return CLNGRPC
 	case string(Strike):
 		return Strike
+	case string(LDK):
+		return LDK
 	default:
 		return FAKE_WALLET
 

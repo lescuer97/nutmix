@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lescuer97/nutmix/internal/lightning/ldk"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -37,7 +38,11 @@ func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		err := templates.MintSettings(mint.Config, nostrNotificationConfigValue(mint.NostrNotificationConfig)).Render(ctx, c.Writer)
+		err := templates.MintSettings(
+			mint.Config,
+			nostrNotificationConfigValue(mint.NostrNotificationConfig),
+			showLDKNodeLink(mint),
+		).Render(ctx, c.Writer)
 		if err != nil {
 			_ = c.Error(err)
 			c.Status(400)
@@ -61,6 +66,104 @@ func checkLimitSat(text string) (*int, error) {
 	}
 
 	return finalInt, nil
+}
+
+func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig, configDirectory string) (ldk.PersistedConfig, error) {
+	chainSourceType := normalizeLDKChainSourceType(c.Request.PostFormValue("LDK_CHAIN_SOURCE_TYPE"))
+	config := existingConfig
+	config.ConfigDirectory = configDirectory
+
+	switch ldk.ChainSourceType(chainSourceType) {
+	case ldk.ChainSourceElectrum:
+		electrumServerURL := strings.TrimSpace(c.Request.PostFormValue("ELECTRUM_SERVER_URL"))
+		if electrumServerURL == "" {
+			return ldk.PersistedConfig{}, fmt.Errorf("electrum server url is required")
+		}
+
+		persistedConfig, err := ldk.NewPersistedConfigWithChainSource(ldk.ChainSourceElectrum, config.Rpc, electrumServerURL, configDirectory)
+		if err != nil {
+			return ldk.PersistedConfig{}, fmt.Errorf("ldk.NewPersistedConfigWithChainSource(...): %w", err)
+		}
+
+		return persistedConfig, nil
+	case ldk.ChainSourceBitcoind:
+		address := strings.TrimSpace(c.Request.PostFormValue("BITCOIN_NODE_RPC_ADDRESS"))
+		portText := strings.TrimSpace(c.Request.PostFormValue("BITCOIN_NODE_RPC_PORT"))
+		username := strings.TrimSpace(c.Request.PostFormValue("BITCOIN_NODE_RPC_USERNAME"))
+		password := strings.TrimSpace(c.Request.PostFormValue("BITCOIN_NODE_RPC_PASSWORD"))
+
+		if address == "" {
+			return ldk.PersistedConfig{}, fmt.Errorf("bitcoin node rpc address is required")
+		}
+		if portText == "" {
+			return ldk.PersistedConfig{}, fmt.Errorf("bitcoin node rpc port is required")
+		}
+		portValue, err := strconv.Atoi(portText)
+		if err != nil {
+			return ldk.PersistedConfig{}, fmt.Errorf("bitcoin node rpc port is invalid")
+		}
+		if portValue < 1 || portValue > 65535 {
+			return ldk.PersistedConfig{}, fmt.Errorf("bitcoin node rpc port must be between 1 and 65535")
+		}
+		if username == "" {
+			return ldk.PersistedConfig{}, fmt.Errorf("bitcoin node rpc username is required")
+		}
+		if password == "" {
+			password = config.Rpc.Password
+		}
+		if password == "" {
+			return ldk.PersistedConfig{}, fmt.Errorf("bitcoin node rpc password is required")
+		}
+
+		persistedConfig, err := ldk.NewPersistedConfigWithChainSource(ldk.ChainSourceBitcoind, ldk.RPCConfig{
+			Address:  address,
+			Port:     uint16(portValue),
+			Username: username,
+			Password: password,
+		}, config.ElectrumServerURL, configDirectory)
+		if err != nil {
+			return ldk.PersistedConfig{}, fmt.Errorf("ldk.NewPersistedConfigWithChainSource(...): %w", err)
+		}
+
+		return persistedConfig, nil
+	default:
+		return ldk.PersistedConfig{}, fmt.Errorf("invalid ldk chain source type")
+	}
+}
+
+func ldkConfigsEqual(current ldk.PersistedConfig, incoming ldk.PersistedConfig) bool {
+	return current.ChainSourceType == incoming.ChainSourceType &&
+		current.ElectrumServerURL == incoming.ElectrumServerURL &&
+		current.Rpc.Address == incoming.Rpc.Address &&
+		current.Rpc.Port == incoming.Rpc.Port &&
+		current.Rpc.Username == incoming.Rpc.Username &&
+		current.Rpc.Password == incoming.Rpc.Password &&
+		current.ConfigDirectory == incoming.ConfigDirectory
+}
+
+func ldkConfigBackendForMint(mint *m.Mint, network string) (*ldk.LDK, error) {
+	if currentLDK, ok := mint.LightningBackend.(*ldk.LDK); ok && mint.Config.MINT_LIGHTNING_BACKEND == utils.LDK {
+		return currentLDK, nil
+	}
+	ldk, err := ldk.NewConfigBackend(mint.MintDB, network)
+	if err != nil {
+		return nil, err
+	}
+
+	return ldk, nil
+}
+
+func ldkConfigUnchanged(ctx context.Context, backend *ldk.LDK, currentNetwork string, nextNetwork string, config ldk.PersistedConfig) bool {
+	if backend == nil {
+		return false
+	}
+
+	existingConfig, err := backend.PersistedConfig(ctx)
+	if err != nil {
+		return false
+	}
+
+	return currentNetwork == nextNetwork && ldkConfigsEqual(existingConfig, config)
 }
 
 func decodeNpubToHex(npub string) (string, error) {
@@ -697,10 +800,10 @@ func persistNostrNotificationConfigTx(ctx context.Context, mint *m.Mint, config 
 func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		err := templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer)
+		err := templates.LightningBackendPage(mint.Config, showLDKNodeLink(mint)).Render(ctx, c.Writer)
 
 		if err != nil {
-			_ = c.Error(fmt.Errorf("templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer). %w", err))
+			_ = c.Error(fmt.Errorf("templates.LightningBackendPage(mint.Config, showLDKNodeLink(mint)).Render(ctx, c.Writer). %w", err))
 			return
 		}
 	}
@@ -712,24 +815,24 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 		chainparam, err := m.CheckChainParams(formNetwork)
 		if err != nil {
-			slog.Warn(
-				"m.CheckChainParams(formNetwork)",
-				slog.String(utils.LogExtraInfo, err.Error()))
-
+			slog.Warn("m.CheckChainParams(formNetwork)", slog.String(utils.LogExtraInfo, err.Error()))
 			if renderErr := RenderError(c, "Could not setup network for lightning"); renderErr != nil {
 				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
 
+		ctx := c.Request.Context()
+		oldConfig := mint.Config
+		oldBackend := mint.LightningBackend
+
 		var newBackend lightning.LightningBackend
 		var newBackendType utils.LightningBackend
+		var ldkConfig ldk.PersistedConfig
 
-		// Temporary config variables to hold the new settings
-		// Initialize with existing config values
 		var (
 			lndHost     = mint.Config.LND_GRPC_HOST
-			lndTls      = mint.Config.LND_TLS_CERT
+			lndTLS      = mint.Config.LND_TLS_CERT
 			lndMacaroon = mint.Config.LND_MACAROON
 
 			lnbitsKey      = mint.Config.MINT_LNBITS_KEY
@@ -739,39 +842,30 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			strikeEndpoint = mint.Config.STRIKE_ENDPOINT
 
 			clnHost     = mint.Config.CLN_GRPC_HOST
-			clnCa       = mint.Config.CLN_CA_CERT
+			clnCA       = mint.Config.CLN_CA_CERT
 			clnClient   = mint.Config.CLN_CLIENT_CERT
 			clnKey      = mint.Config.CLN_CLIENT_KEY
 			clnMacaroon = mint.Config.CLN_MACAROON
 		)
 
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
-
 		case string(utils.FAKE_WALLET):
 			newBackendType = utils.FAKE_WALLET
-			fakeWalletBackend := lightning.FakeWallet{
+			newBackend = lightning.FakeWallet{
 				Network:         chainparam,
 				UnpurposeErrors: []lightning.FakeWalletError{},
 				InvoiceFee:      0,
 			}
-			newBackend = fakeWalletBackend
 
 		case string(utils.LNDGRPC):
 			newBackendType = utils.LNDGRPC
 			lndHost = c.Request.PostFormValue("LND_GRPC_HOST")
-			lndTls = c.Request.PostFormValue("LND_TLS_CERT")
+			lndTLS = c.Request.PostFormValue("LND_TLS_CERT")
 			lndMacaroon = c.Request.PostFormValue("LND_MACAROON")
 
-			lndWallet := lightning.LndGrpcWallet{
-				Network: chainparam,
-			}
-
-			err := lndWallet.SetupGrpc(lndHost, lndMacaroon, lndTls)
-			if err != nil {
-				slog.Warn(
-					"lndWallet.SetupGrpc",
-					slog.String(utils.LogExtraInfo, err.Error()))
-
+			lndWallet := lightning.LndGrpcWallet{Network: chainparam}
+			if err := lndWallet.SetupGrpc(lndHost, lndMacaroon, lndTLS); err != nil {
+				slog.Warn("lndWallet.SetupGrpc", slog.String(utils.LogExtraInfo, err.Error()))
 				if renderErr := RenderError(c, "Something went wrong setting up LND communications"); renderErr != nil {
 					slog.Warn("failed to render error", slog.Any("error", renderErr))
 				}
@@ -798,12 +892,8 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			strikeKey = c.Request.PostFormValue("STRIKE_KEY")
 			strikeEndpoint = c.Request.PostFormValue("STRIKE_ENDPOINT")
 
-			strikeWallet := lightning.Strike{
-				Network: chainparam,
-			}
-
-			err := strikeWallet.Setup(strikeKey, strikeEndpoint)
-			if err != nil {
+			strikeWallet := lightning.Strike{Network: chainparam}
+			if err := strikeWallet.Setup(strikeKey, strikeEndpoint); err != nil {
 				_ = c.Error(fmt.Errorf("strikeWallet.Setup(strikeKey, strikeEndpoint) %w %w", err, ErrInvalidStrikeConfig))
 				if renderErr := RenderError(c, "Invalid Strike configuration"); renderErr != nil {
 					slog.Warn("failed to render error", slog.Any("error", renderErr))
@@ -815,27 +905,77 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		case string(utils.CLNGRPC):
 			newBackendType = utils.CLNGRPC
 			clnHost = c.Request.PostFormValue("CLN_GRPC_HOST")
-			clnCa = c.Request.PostFormValue("CLN_CA_CERT")
+			clnCA = c.Request.PostFormValue("CLN_CA_CERT")
 			clnClient = c.Request.PostFormValue("CLN_CLIENT_CERT")
 			clnKey = c.Request.PostFormValue("CLN_CLIENT_KEY")
 			clnMacaroon = c.Request.PostFormValue("CLN_MACAROON")
 
-			clnWallet := lightning.CLNGRPCWallet{
-				Network: chainparam,
-			}
-
-			err := clnWallet.SetupGrpc(clnHost, clnCa, clnClient, clnKey, clnMacaroon)
-			if err != nil {
-				slog.Warn(
-					"clnWallet.SetupGrpc",
-					slog.String(utils.LogExtraInfo, err.Error()))
-
+			clnWallet := lightning.CLNGRPCWallet{Network: chainparam}
+			if err := clnWallet.SetupGrpc(clnHost, clnCA, clnClient, clnKey, clnMacaroon); err != nil {
+				slog.Warn("clnWallet.SetupGrpc", slog.String(utils.LogExtraInfo, err.Error()))
 				if renderErr := RenderError(c, "Something went wrong setting up CLN communications"); renderErr != nil {
 					slog.Warn("failed to render error", slog.Any("error", renderErr))
 				}
 				return
 			}
 			newBackend = clnWallet
+
+		case string(utils.LDK):
+			newBackendType = utils.LDK
+			defaultConfigDirectory, err := ldk.DefaultConfigDirectory()
+			if err != nil {
+				if renderErr := RenderError(c, "Could not determine LDK storage directory"); renderErr != nil {
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
+				}
+				return
+			}
+
+			existingLDKConfig := ldk.PersistedConfig{
+				ConfigDirectory: defaultConfigDirectory,
+				ChainSourceType: ldk.ChainSourceBitcoind,
+			}
+			if persistedConfig, getConfigErr := ldk.GetPersistedConfig(ctx, mint.MintDB); getConfigErr == nil {
+				existingLDKConfig = persistedConfig
+			}
+
+			ldkConfig, err = parseLDKPersistedConfig(c, existingLDKConfig, defaultConfigDirectory)
+			if err != nil {
+				if renderErr := RenderError(c, err.Error()); renderErr != nil {
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
+				}
+				return
+			}
+
+			configBackend, err := ldkConfigBackendForMint(mint, chainparam.Name)
+			if err != nil {
+				if renderErr := RenderError(c, err.Error()); renderErr != nil {
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
+				}
+				return
+			}
+			if ldkConfigUnchanged(ctx, configBackend, mint.Config.NETWORK, chainparam.Name, ldkConfig) {
+				if err := RenderSuccess(c, "No changes detected"); err != nil {
+					slog.Warn("failed to render success", slog.Any("error", err))
+				}
+				return
+			}
+
+			if err := configBackend.SaveConfig(ctx, ldkConfig); err != nil {
+				slog.Warn("configBackend.SaveConfig", slog.String(utils.LogExtraInfo, err.Error()))
+				if renderErr := RenderError(c, "Could not persist LDK configuration"); renderErr != nil {
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
+				}
+				return
+			}
+
+			newBackend, err = ldk.NewLdk(ctx, mint.MintDB, chainparam.Name)
+			if err != nil {
+				slog.Warn("ldk.NewLdk(ctx, mint.MintDB)", slog.String(utils.LogExtraInfo, err.Error()))
+				if renderErr := RenderError(c, "Something went wrong setting up LDK communications"); renderErr != nil {
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
+				}
+				return
+			}
 
 		default:
 			if renderErr := RenderError(c, "Invalid backend selection"); renderErr != nil {
@@ -844,22 +984,15 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		// --- VERIFICATION STEP ---
-
-		// 1. Check connection/balance
 		_, err = newBackend.WalletBalance()
 		if err != nil {
-			slog.Warn(
-				"Could not get lightning balance",
-				slog.String(utils.LogExtraInfo, err.Error()))
+			slog.Warn("Could not get lightning balance", slog.String(utils.LogExtraInfo, err.Error()))
 			if renderErr := RenderError(c, "Could not check established connection with Node (WalletBalance failed)"); renderErr != nil {
 				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
 
-		// 2. Check invoice generation (100 sats)
-		// We use a dummy quote ID to avoid messing with real DB if possible.
 		testQuote := "verification-test-" + strconv.FormatInt(time.Now().Unix(), 10)
 		//nolint:exhaustruct
 		invoiceResp, err := newBackend.RequestInvoice(
@@ -874,7 +1007,6 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		// 3. Decode invoice and verify network
 		decodedInvoice, err := zpay32.Decode(invoiceResp.PaymentRequest, &chainparam)
 		if err != nil {
 			slog.Warn("zpay32.Decode failed during verification", slog.String("err", err.Error()))
@@ -884,14 +1016,10 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		// Verify amount matches (sanity check)
 		if decodedInvoice.MilliSat == nil || int64(decodedInvoice.MilliSat.ToSatoshis()) != 100 {
 			slog.Warn("Decoded invoice amount mismatch")
 		}
 
-		// --- APPLY SETTINGS ---
-
-		// Update Config object
 		mint.Config.NETWORK = chainparam.Name
 		mint.Config.MINT_LIGHTNING_BACKEND = newBackendType
 
@@ -899,7 +1027,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		case utils.LNDGRPC:
 			mint.Config.LND_GRPC_HOST = lndHost
 			mint.Config.LND_MACAROON = lndMacaroon
-			mint.Config.LND_TLS_CERT = lndTls
+			mint.Config.LND_TLS_CERT = lndTLS
 		case utils.LNBITS: //nolint:staticcheck // LNBITS config is still persisted until its planned removal in v0.8.0.
 			mint.Config.MINT_LNBITS_KEY = lnbitsKey
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
@@ -909,25 +1037,22 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		case utils.CLNGRPC:
 			mint.Config.CLN_GRPC_HOST = clnHost
 			mint.Config.CLN_MACAROON = clnMacaroon
-			mint.Config.CLN_CA_CERT = clnCa
+			mint.Config.CLN_CA_CERT = clnCA
 			mint.Config.CLN_CLIENT_KEY = clnKey
 			mint.Config.CLN_CLIENT_CERT = clnClient
 		}
 
-		// Switch the live backend
-		mint.LightningBackend = newBackend
-
-		// Save to DB
-		err = persistConfigTx(c.Request.Context(), mint, mint.Config)
-		if err != nil {
-			slog.Warn(
-				"persistConfigTx(c.Request.Context(), mint, mint.Config)",
-				slog.String(utils.LogExtraInfo, err.Error()))
+		if err = persistConfigTx(c.Request.Context(), mint, mint.Config); err != nil {
+			mint.Config = oldConfig
+			mint.LightningBackend = oldBackend
+			slog.Warn("persistConfigTx(c.Request.Context(), mint, mint.Config)", slog.String(utils.LogExtraInfo, err.Error()))
 			if renderErr := RenderError(c, "Settings applied but failed to save to database"); renderErr != nil {
 				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
 		}
+
+		mint.LightningBackend = newBackend
 
 		if err := RenderSuccess(c, "Lightning node settings changed and verified successfully"); err != nil {
 			slog.Warn("failed to render success", slog.Any("error", err))

@@ -19,8 +19,8 @@ func isLegacyKeyset(id string) bool {
 	return len(id) == 16 && id[:2] == "00"
 }
 
-templ KeysetsPage(listOfUnitsAvailable []cashu.Unit) {
-	@Layout("keysets") {
+templ KeysetsPage(listOfUnitsAvailable []cashu.Unit, showLDKNodeLink bool) {
+	@Layout("keysets", showLDKNodeLink) {
 		<main class="main-content">
 			<div class="card p-6 mb-8">
 				<h3 class="text-lg font-semibold mb-4 text-primary">Rotate Keysets</h3>
