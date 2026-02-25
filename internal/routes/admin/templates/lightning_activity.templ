@@ -59,8 +59,8 @@ templ LightningActivityTable(invoices []LightningInvoiceVisual) {
 	</div>
 }
 
-templ LightningActivityLayout(config utils.Config, selectedRange string, searchQuery string) {
-	@Layout("lightning") {
+templ LightningActivityLayout(config utils.Config, selectedRange string, searchQuery string, showLDKNodeLink bool) {
+	@Layout("lightning", showLDKNodeLink) {
 		<main class="main-content">
 			@TimeRangeSelector(selectedRange)
 			<div

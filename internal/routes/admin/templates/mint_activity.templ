@@ -154,8 +154,8 @@ templ MintMeltEventList(eventList []MintMeltRequestVisual) {
 	</div>
 }
 
-templ MintActivityLayout(liquidityManagerAvailable bool, selectedRange string) {
-	@Layout("stats") {
+templ MintActivityLayout(liquidityManagerAvailable bool, selectedRange string, showLDKNodeLink bool) {
+	@Layout("stats", showLDKNodeLink) {
 		<main class="main-content">
 			@TimeRangeSelector(selectedRange)
 			<div

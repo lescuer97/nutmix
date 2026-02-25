@@ -1,0 +1,206 @@
+package templates
+
+import "strconv"
+
+templ LdkPageShell(showLDKNodeLink bool, activeSection LdkSection, content templ.Component) {
+	@Layout("ldk", showLDKNodeLink) {
+		<main class="main-content">
+			<div class="ldk-page-layout">
+				@LdkSectionNav(activeSection)
+				<div class="ldk-section-content mt-4">
+					@content
+				</div>
+			</div>
+		</main>
+	}
+}
+
+templ LdkSectionNav(activeSection LdkSection) {
+	<div class="ldk-section-nav" aria-label="LDK sections">
+		@LdkSectionTab("On-chain", LdkSectionOnchain, activeSection)
+		@LdkSectionTab("Lightning", LdkSectionLightning, activeSection)
+		@LdkSectionTab("Payments", LdkSectionPayments, activeSection)
+	</div>
+}
+
+templ LdkSectionTab(label string, section LdkSection, activeSection LdkSection) {
+	{{ sectionClass := "ldk-section-tab" }}
+	if section == LdkSectionLightning {
+		{{ sectionClass += " ldk-section-tab-lightning" }}
+	}
+	if section == activeSection {
+		{{ sectionClass += " ldk-section-tab-active" }}
+	}
+	<a href={ section.Path() } class={ sectionClass }>{ label }</a>
+}
+
+templ LdkOnchainPageContent() {
+	<div class="grid gap-4 ldk-dashboard ldk-dashboard-onchain">
+		<div
+			id="ldk-balances-fragment"
+			hx-get="/admin/ldk/onchain/balances"
+			hx-trigger="load"
+			hx-target="#ldk-balances-fragment"
+			hx-swap="outerHTML"
+		>
+			@LdkBalancesCard("Loading...", "Loading...")
+		</div>
+		@LdkOnchainActionsCard()
+	</div>
+}
+
+templ LdkLightningPageContent() {
+	<div class="grid gap-4 ldk-dashboard ldk-dashboard-lightning">
+		<div
+			id="ldk-network-summary-fragment"
+			hx-get="/admin/ldk/lightning/network-summary"
+			hx-trigger="load"
+			hx-target="#ldk-network-summary-fragment"
+			hx-swap="outerHTML"
+		>
+			@LdkNetworkSummaryCard("Loading...", 0, 0, 0, 0)
+		</div>
+		@LdkLightningActionsCard()
+		<div
+			id="ldk-channels-fragment"
+			hx-get="/admin/ldk/lightning/channels"
+			hx-trigger="load"
+			hx-target="#ldk-channels-fragment"
+			hx-swap="outerHTML"
+		>
+			@LdkChannelsCardLoading()
+		</div>
+	</div>
+}
+
+templ LdkPaymentsPageContent() {
+	<div
+		id="ldk-payments-fragment"
+		hx-get="/admin/ldk/payments/list?type=all&show=25"
+		hx-trigger="load"
+		hx-target="#ldk-payments-fragment"
+		hx-swap="outerHTML"
+	>
+		@LdkPaymentsCardLoading()
+	</div>
+}
+
+templ LdkBalancesFragment(totalOnchain string, availableOnchain string) {
+	<div id="ldk-balances-fragment">
+		@LdkBalancesCard(totalOnchain, availableOnchain)
+	</div>
+}
+
+templ LdkNetworkSummaryFragment(lightning string, totalPeers int, activePeers int, totalChannels int, activeChannels int) {
+	<div id="ldk-network-summary-fragment">
+		@LdkNetworkSummaryCard(lightning, totalPeers, activePeers, totalChannels, activeChannels)
+	</div>
+}
+
+templ LdkBalancesLoadingFragment() {
+	<div id="ldk-balances-fragment">
+		@LdkBalancesCard("Loading...", "Loading...")
+	</div>
+}
+
+templ LdkNetworkSummaryLoadingFragment() {
+	<div id="ldk-network-summary-fragment">
+		@LdkNetworkSummaryCard("Loading...", 0, 0, 0, 0)
+	</div>
+}
+
+templ LdkBalancesErrorFragment(message string) {
+	<div id="ldk-balances-fragment">
+		@LdkBalancesCardError(message)
+	</div>
+}
+
+templ LdkNetworkSummaryErrorFragment(message string) {
+	<div id="ldk-network-summary-fragment">
+		@LdkNetworkSummaryCardError(message)
+	</div>
+}
+
+templ LdkBalancesOOBFragment(totalOnchain string, availableOnchain string) {
+	<div id="ldk-balances-fragment" hx-swap-oob="outerHTML">
+		@LdkBalancesCard(totalOnchain, availableOnchain)
+	</div>
+}
+
+templ LdkBalancesErrorOOBFragment(message string) {
+	<div id="ldk-balances-fragment" hx-swap-oob="outerHTML">
+		@LdkBalancesCardError(message)
+	</div>
+}
+
+templ LdkNetworkSummaryOOBFragment(lightning string, totalPeers int, activePeers int, totalChannels int, activeChannels int) {
+	<div id="ldk-network-summary-fragment" hx-swap-oob="outerHTML">
+		@LdkNetworkSummaryCard(lightning, totalPeers, activePeers, totalChannels, activeChannels)
+	</div>
+}
+
+templ LdkNetworkSummaryErrorOOBFragment(message string) {
+	<div id="ldk-network-summary-fragment" hx-swap-oob="outerHTML">
+		@LdkNetworkSummaryCardError(message)
+	</div>
+}
+
+templ LdkChannelsFragment(rows []LdkChannelRow) {
+	<div id="ldk-channels-fragment">
+		@LdkChannelsCard(rows)
+	</div>
+}
+
+templ LdkChannelsLoadingFragment() {
+	<div id="ldk-channels-fragment">
+		@LdkChannelsCardLoading()
+	</div>
+}
+
+templ LdkChannelsErrorFragment(message string) {
+	<div id="ldk-channels-fragment">
+		@LdkChannelsCardError(message)
+	</div>
+}
+
+templ LdkPaymentsFragment(page LdkPaymentsPage) {
+	<div id="ldk-payments-fragment">
+		@LdkPaymentsCard(page)
+	</div>
+}
+
+templ LdkAddressFragment(address string, qrCode string) {
+	<div id="ldk-action-panel">
+		@LdkAddressPanel(address, qrCode)
+	</div>
+}
+
+templ LdkActionPanelErrorFragment(message string) {
+	<div id="ldk-action-panel">
+		@LdkActionPanelErrorCard(message)
+	</div>
+}
+
+templ LdkOpenChannelFormFragment(maxSats uint64) {
+	<div id="ldk-action-panel">
+		@LdkOpenChannelPanel(maxSats)
+	</div>
+}
+
+templ LdkOnchainSendFormFragment(availableSats uint64) {
+	<div id="ldk-action-panel">
+		@LdkOnchainSendPanel(availableSats)
+	</div>
+}
+
+templ LdkOnchainSendSubmittedOOBFragment() {
+	<div id="ldk-action-panel" hx-swap-oob="outerHTML">
+		@LdkOnchainSendSubmittedPanel()
+	</div>
+}
+
+func ldkBalanceBarStyle(percent uint8) map[string]string {
+	return map[string]string{
+		"width": strconv.FormatUint(uint64(percent), 10) + "%",
+	}
+}
