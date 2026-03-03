@@ -187,6 +187,12 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.POST("/mintsettings/lightning", MintSettingsLightning(mint))
 		// nolint: contextcheck
 		adminRoute.POST("/mintsettings/auth", MintSettingsAuth(mint))
+		// nolint: contextcheck
+		adminRoute.POST("/mintsettings/notifications", MintSettingsNotifications(mint))
+		// nolint: contextcheck
+		adminRoute.POST("/mintsettings/notifications/test", MintSettingsNotificationsTest(mint))
+		// nolint: contextcheck
+		adminRoute.DELETE("/mintsettings/notifications/npubs/:npub", MintSettingsNotificationDeleteNpub(mint))
 		// Legacy/Fallback
 		// nolint: contextcheck
 		adminRoute.POST("/bolt11", Bolt11Post(mint))

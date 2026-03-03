@@ -38,6 +38,7 @@ func getConfigFile() ([]byte, error) {
 func SetUpConfigDB(db database.MintDB) (utils.Config, error) {
 
 	var config utils.Config
+	configMissingFromDB := false
 	// check if config in db exists if it doesn't check for config file or set default
 	config, err := db.GetConfig()
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -45,6 +46,7 @@ func SetUpConfigDB(db database.MintDB) (utils.Config, error) {
 	}
 
 	if errors.Is(err, sql.ErrNoRows) {
+		configMissingFromDB = true
 		// check if config file exists
 		file, err := getConfigFile()
 		if err != nil {
@@ -74,6 +76,11 @@ func SetUpConfigDB(db database.MintDB) (utils.Config, error) {
 		if err != nil {
 			return config, fmt.Errorf("db.SetConfig(config) %w", err)
 		}
+	}
+
+	err = utils.SyncNostrNotificationNsec(&config, configMissingFromDB)
+	if err != nil {
+		return config, fmt.Errorf("utils.SyncNostrNotificationNsec(&config, configMissingFromDB): %w", err)
 	}
 
 	return config, nil

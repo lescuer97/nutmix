@@ -144,14 +144,7 @@ func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTi
 }
 
 func GetLogsDirectory() (string, error) {
-	dir, err := os.UserConfigDir()
-
-	if err != nil {
-		return "", fmt.Errorf("could not get config dir: %w", err)
-	}
-	var pathToProjectDir = dir + "/" + ConfigDirName
-
-	return pathToProjectDir, nil
+	return GetConfigDirectory()
 }
 
 func CreateDirectoryAndPath(dirPath string, filename string) error {

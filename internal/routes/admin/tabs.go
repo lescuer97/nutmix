@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
@@ -61,22 +63,94 @@ func checkLimitSat(text string) (*int, error) {
 	return finalInt, nil
 }
 
-func isNostrKeyValid(nostrKey string) (bool, error) {
-	_, key, err := nip19.Decode(nostrKey)
-
+func decodeNpubToHex(npub string) (string, error) {
+	prefix, key, err := nip19.Decode(strings.TrimSpace(npub))
 	if err != nil {
+		return "", fmt.Errorf("nip19.Decode(npub): %w", err)
+	}
 
-		return false, fmt.Errorf("nip19.Decode(key): %w ", err)
-
+	if prefix != "npub" {
+		return "", fmt.Errorf("invalid nostr key prefix: %s", prefix)
 	}
 
 	keyStr, ok := key.(string)
 	if !ok {
-		return false, fmt.Errorf("nip19.Decode(nostrKey) returned %T", key)
+		return "", fmt.Errorf("nip19.Decode(npub) returned %T", key)
 	}
 
-	return nostr.IsValid32ByteHex(keyStr), nil
+	if !nostr.IsValid32ByteHex(keyStr) {
+		return "", fmt.Errorf("invalid 32 byte public key")
+	}
 
+	return keyStr, nil
+}
+
+func parseNpubToWrappedPublicKey(npub string) (cashu.WrappedPublicKey, error) {
+	pubkeyHex, err := decodeNpubToHex(npub)
+	if err != nil {
+		return cashu.WrappedPublicKey{}, fmt.Errorf("decodeNpubToHex(npub): %w", err)
+	}
+
+	pubkeyBytes, err := hex.DecodeString(pubkeyHex)
+	if err != nil {
+		return cashu.WrappedPublicKey{}, fmt.Errorf("hex.DecodeString(pubkeyHex): %w", err)
+	}
+
+	pubkey, err := schnorr.ParsePubKey(pubkeyBytes)
+	if err != nil {
+		return cashu.WrappedPublicKey{}, fmt.Errorf("schnorr.ParsePubKey(pubkeyBytes): %w", err)
+	}
+
+	return cashu.WrappedPublicKey{PublicKey: pubkey}, nil
+}
+
+func parseNpubArrayToWrappedPublicKeys(npubs []string) ([]cashu.WrappedPublicKey, error) {
+	parsed := make([]cashu.WrappedPublicKey, 0, len(npubs))
+	for _, npub := range npubs {
+		trimmed := strings.TrimSpace(npub)
+		if trimmed == "" {
+			continue
+		}
+
+		pubkey, err := parseNpubToWrappedPublicKey(trimmed)
+		if err != nil {
+			return nil, fmt.Errorf("parseNpubToWrappedPublicKey(%q): %w", trimmed, err)
+		}
+		parsed = append(parsed, pubkey)
+	}
+
+	return parsed, nil
+}
+
+func dedupeWrappedPublicKeys(pubkeys []cashu.WrappedPublicKey) []cashu.WrappedPublicKey {
+	if len(pubkeys) == 0 {
+		return pubkeys
+	}
+
+	seen := make(map[string]struct{}, len(pubkeys))
+	unique := make([]cashu.WrappedPublicKey, 0, len(pubkeys))
+	for _, key := range pubkeys {
+		hexValue := key.ToHex()
+		if hexValue == "" {
+			continue
+		}
+		if _, ok := seen[hexValue]; ok {
+			continue
+		}
+		seen[hexValue] = struct{}{}
+		unique = append(unique, key)
+	}
+
+	return unique
+}
+
+func isNostrKeyValid(nostrKey string) (bool, error) {
+	_, err := decodeNpubToHex(nostrKey)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func validateURL(urlStr string) error {
@@ -343,6 +417,244 @@ func MintSettingsAuth(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 	}
+}
+
+func MintSettingsNotifications(mint *m.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		nostrNotificationsEnabled := c.Request.PostFormValue("NOSTR_NOTIFICATIONS") == "on"
+		nostrNotificationsNip04DMEnabled := c.Request.PostFormValue("NOSTR_NOTIFICATION_NIP04_DM") == "on"
+		npubInputs := c.PostFormArray("NOSTR_NOTIFICATION_NPUBS")
+
+		nextConfig := mint.Config
+		npubsToPersist := nextConfig.NOSTR_NOTIFICATION_NPUBS
+
+		if len(npubInputs) > 0 {
+			npubs, err := parseNpubArrayToWrappedPublicKeys(npubInputs)
+			if err != nil {
+				slog.Warn(
+					"parseNpubArrayToWrappedPublicKeys(npubInputs)",
+					slog.String(utils.LogExtraInfo, err.Error()))
+				if renderErr := RenderError(c, "Nostr notification npub is not valid"); renderErr != nil {
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
+				}
+				return
+			}
+			npubsToPersist = dedupeWrappedPublicKeys(npubs)
+		}
+
+		err := nextConfig.SetNostrNotificationConfig(nostrNotificationsEnabled, nil, npubsToPersist)
+		if err != nil {
+			slog.Warn(
+				"mint.Config.SetNostrNotificationConfig(...)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			if renderErr := RenderError(c, "Could not update nostr notification settings"); renderErr != nil {
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
+			}
+			return
+		}
+
+		err = syncNostrNotificationNsec(&nextConfig)
+		if err != nil {
+			slog.Warn(
+				"syncNostrNotificationNsec(&nextConfig)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			if renderErr := RenderError(c, "Could not update nostr notification settings"); renderErr != nil {
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
+			}
+			return
+		}
+
+		nextConfig.NOSTR_NOTIFICATION_NIP04_DM = nostrNotificationsNip04DMEnabled
+		nextConfig.NOSTR_NOTIFICATION_NPUBS = npubsToPersist
+		nextConfig.NOSTR_NOTIFICATIONS = nostrNotificationsEnabled
+
+		err = persistNostrNotificationConfigTx(c.Request.Context(), mint, nextConfig)
+		if err != nil {
+			slog.Warn(
+				"persistNostrNotificationConfigTx(c.Request.Context(), mint, nextConfig)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			if renderErr := RenderError(c, "Could not persist nostr notification settings"); renderErr != nil {
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
+			}
+			return
+		}
+
+		mint.Config = nextConfig
+
+		if err := renderNotificationsForm(c, nextConfig, "Nostr notification settings successfully set", true); err != nil {
+			slog.Warn("failed to render notifications form", slog.Any("error", err))
+		}
+	}
+}
+
+func MintSettingsNotificationsTest(mint *m.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if mint == nil {
+			if err := templates.ObbNotification(templates.ErrorNotif("Mint is not available")).Render(c.Request.Context(), c.Writer); err != nil {
+				slog.Warn("failed to render test notification error", slog.Any("error", err))
+			}
+			return
+		}
+
+		if !mint.Config.NOSTR_NOTIFICATIONS {
+			if err := templates.ObbNotification(templates.ErrorNotif("Enable nostr notifications first")).Render(c.Request.Context(), c.Writer); err != nil {
+				slog.Warn("failed to render test notification disabled error", slog.Any("error", err))
+			}
+			return
+		}
+
+		now := time.Now().UTC()
+		slog.Error(
+			"nostr test notification trigger",
+			slog.String("source", "admin.nostr_notifications.test_button"),
+			slog.String("nonce", strconv.FormatInt(now.UnixNano(), 10)),
+			slog.Time("triggered_at", now),
+		)
+
+		if err := templates.ObbNotification(templates.SuccessNotif("Test error log has been written")).Render(c.Request.Context(), c.Writer); err != nil {
+			slog.Warn("failed to render test notification success", slog.Any("error", err))
+		}
+	}
+}
+
+func MintSettingsNotificationDeleteNpub(mint *m.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		npub := c.Param("npub")
+		if strings.TrimSpace(npub) == "" {
+			if renderErr := RenderError(c, "Missing nostr notification npub"); renderErr != nil {
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
+			}
+			return
+		}
+
+		pubkeyToDelete, err := parseNpubToWrappedPublicKey(npub)
+		if err != nil {
+			slog.Warn(
+				"parseNpubToWrappedPublicKey(npub)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			if renderErr := RenderError(c, "Nostr notification npub is not valid"); renderErr != nil {
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
+			}
+			return
+		}
+
+		nextConfig := mint.Config
+		filteredNpubs := make([]cashu.WrappedPublicKey, 0, len(nextConfig.NOSTR_NOTIFICATION_NPUBS))
+		deleted := false
+		for _, existing := range nextConfig.NOSTR_NOTIFICATION_NPUBS {
+			if existing.ToHex() == pubkeyToDelete.ToHex() {
+				deleted = true
+				continue
+			}
+			filteredNpubs = append(filteredNpubs, existing)
+		}
+
+		if !deleted {
+			if err := renderNotificationsForm(c, mint.Config, "Nostr recipient was not found", false); err != nil {
+				slog.Warn("failed to render notifications form", slog.Any("error", err))
+			}
+			return
+		}
+
+		err = nextConfig.SetNostrNotificationConfig(
+			nextConfig.NOSTR_NOTIFICATIONS,
+			nextConfig.NOSTR_NOTIFICATION_NSEC,
+			filteredNpubs,
+		)
+		if err != nil {
+			slog.Warn(
+				"mint.Config.SetNostrNotificationConfig(...)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			if renderErr := RenderError(c, "Could not update nostr notification settings"); renderErr != nil {
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
+			}
+			return
+		}
+
+		err = syncNostrNotificationNsec(&nextConfig)
+		if err != nil {
+			slog.Warn(
+				"syncNostrNotificationNsec(&nextConfig)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			if renderErr := RenderError(c, "Could not update nostr notification settings"); renderErr != nil {
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
+			}
+			return
+		}
+
+		err = persistNostrNotificationConfigTx(c.Request.Context(), mint, nextConfig)
+		if err != nil {
+			slog.Warn(
+				"persistNostrNotificationConfigTx(c.Request.Context(), mint, nextConfig)",
+				slog.String(utils.LogExtraInfo, err.Error()))
+			if renderErr := RenderError(c, "Could not persist nostr notification settings"); renderErr != nil {
+				slog.Warn("failed to render error", slog.Any("error", renderErr))
+			}
+			return
+		}
+
+		mint.Config = nextConfig
+
+		if err := renderNotificationsForm(c, nextConfig, "Nostr recipient deleted", true); err != nil {
+			slog.Warn("failed to render notifications form", slog.Any("error", err))
+		}
+	}
+}
+
+func syncNostrNotificationNsec(config *utils.Config) error {
+	if config == nil {
+		return fmt.Errorf("config is nil")
+	}
+
+	if !config.NOSTR_NOTIFICATIONS && len(config.NOSTR_NOTIFICATION_NSEC) == 0 {
+		return nil
+	}
+
+	return utils.SyncNostrNotificationNsec(config, true)
+}
+
+func renderNotificationsForm(c *gin.Context, config utils.Config, message string, isSuccess bool) error {
+	if err := templates.Notifications(config).Render(c.Request.Context(), c.Writer); err != nil {
+		return fmt.Errorf("templates.Notifications(config).Render(...): %w", err)
+	}
+
+	if message == "" {
+		return nil
+	}
+
+	if isSuccess {
+		return templates.ObbNotification(templates.SuccessNotif(message)).Render(c.Request.Context(), c.Writer)
+	}
+
+	return templates.ObbNotification(templates.ErrorNotif(message)).Render(c.Request.Context(), c.Writer)
+}
+
+func persistNostrNotificationConfigTx(ctx context.Context, mint *m.Mint, config utils.Config) (err error) {
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		return fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
+	}
+
+	defer func() {
+		if err == nil {
+			return
+		}
+		if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+			slog.Warn("mint.MintDB.Rollback(ctx, tx)", slog.String(utils.LogExtraInfo, rollbackErr.Error()))
+		}
+	}()
+
+	err = mint.MintDB.UpdateNostrNotificationConfigTx(tx, config)
+	if err != nil {
+		return fmt.Errorf("mint.MintDB.UpdateNostrNotificationConfigTx(tx, config): %w", err)
+	}
+
+	err = mint.MintDB.Commit(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("mint.MintDB.Commit(ctx, tx): %w", err)
+	}
+
+	return nil
 }
 
 func LightningNodePage(mint *m.Mint) gin.HandlerFunc {

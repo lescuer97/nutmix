@@ -6,13 +6,51 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
+func wrappedPublicKeysToBytes(npubs []cashu.WrappedPublicKey) ([][]byte, error) {
+	if npubs == nil {
+		return nil, nil
+	}
+
+	bytesList := make([][]byte, 0, len(npubs))
+	for _, pubkey := range npubs {
+		if pubkey.PublicKey == nil {
+			return nil, fmt.Errorf("wrapped public key is nil")
+		}
+		serialized := pubkey.SerializeCompressed()
+		serializedCopy := make([]byte, len(serialized))
+		copy(serializedCopy, serialized)
+		bytesList = append(bytesList, serializedCopy)
+	}
+
+	return bytesList, nil
+}
+
+func bytesToWrappedPublicKeys(rawPubkeys [][]byte) ([]cashu.WrappedPublicKey, error) {
+	if rawPubkeys == nil {
+		return nil, nil
+	}
+
+	parsed := make([]cashu.WrappedPublicKey, 0, len(rawPubkeys))
+	for _, value := range rawPubkeys {
+		var wrapped cashu.WrappedPublicKey
+		if err := wrapped.Scan(value); err != nil {
+			return nil, fmt.Errorf("wrapped.Scan(value): %w", err)
+		}
+		parsed = append(parsed, wrapped)
+	}
+
+	return parsed, nil
+}
+
 func (pql Postgresql) GetConfig() (utils.Config, error) {
 	var config utils.Config
+	var npubsRaw [][]byte
 
-	rows, err := pql.pool.Query(context.Background(), `SELECT
+	err := pql.pool.QueryRow(context.Background(), `SELECT
             name,
             description,
             description_long,
@@ -41,11 +79,50 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
             mint_auth_max_blind_tokens,
             mint_auth_clear_auth_urls,
             mint_auth_blind_auth_urls,
-            strike_key,
-            strike_endpoint,
-            icon_url,
-            tos_url
-         FROM config WHERE id = 1`)
+	            strike_key,
+	            strike_endpoint,
+	            icon_url,
+	            tos_url,
+		            nostr_notification_npubs,
+		            nostr_notifications,
+		            nostr_notification_nip04_dm
+         FROM config WHERE id = 1`).Scan(
+		&config.NAME,
+		&config.DESCRIPTION,
+		&config.DESCRIPTION_LONG,
+		&config.MOTD,
+		&config.EMAIL,
+		&config.NOSTR,
+		&config.NETWORK,
+		&config.MINT_LIGHTNING_BACKEND,
+		&config.LND_GRPC_HOST,
+		&config.LND_TLS_CERT,
+		&config.LND_MACAROON,
+		&config.MINT_LNBITS_ENDPOINT,
+		&config.MINT_LNBITS_KEY,
+		&config.CLN_GRPC_HOST,
+		&config.CLN_CA_CERT,
+		&config.CLN_CLIENT_CERT,
+		&config.CLN_CLIENT_KEY,
+		&config.CLN_MACAROON,
+		&config.PEG_OUT_ONLY,
+		&config.PEG_OUT_LIMIT_SATS,
+		&config.PEG_IN_LIMIT_SATS,
+		&config.MINT_REQUIRE_AUTH,
+		&config.MINT_AUTH_OICD_URL,
+		&config.MINT_AUTH_OICD_CLIENT_ID,
+		&config.MINT_AUTH_RATE_LIMIT_PER_MINUTE,
+		&config.MINT_AUTH_MAX_BLIND_TOKENS,
+		&config.MINT_AUTH_CLEAR_AUTH_URLS,
+		&config.MINT_AUTH_BLIND_AUTH_URLS,
+		&config.STRIKE_KEY,
+		&config.STRIKE_ENDPOINT,
+		&config.IconUrl,
+		&config.TosUrl,
+		&npubsRaw,
+		&config.NOSTR_NOTIFICATIONS,
+		&config.NOSTR_NOTIFICATION_NIP04_DM,
+	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return config, fmt.Errorf("could not find config in database: %w", err)
@@ -53,18 +130,22 @@ func (pql Postgresql) GetConfig() (utils.Config, error) {
 
 		return config, fmt.Errorf("error checking for seeds: %w", err)
 	}
-	defer rows.Close()
 
-	config, err = pgx.CollectOneRow(rows, pgx.RowToStructByName[utils.Config])
-
+	npubs, err := bytesToWrappedPublicKeys(npubsRaw)
 	if err != nil {
-		return config, fmt.Errorf("pgx.CollectExactlyOneRow(rows, pgx.RowToStructByName[utils.Config]): %w", err)
+		return config, fmt.Errorf("bytesToWrappedPublicKeys(npubsRaw): %w", err)
 	}
+	config.NOSTR_NOTIFICATION_NPUBS = npubs
 
 	return config, nil
 }
 
 func (pql Postgresql) SetConfig(config utils.Config) error {
+	npubsBytes, err := wrappedPublicKeysToBytes(config.NOSTR_NOTIFICATION_NPUBS)
+	if err != nil {
+		return databaseError(fmt.Errorf("wrappedPublicKeysToBytes(config.NOSTR_NOTIFICATION_NPUBS): %w", err))
+	}
+
 	tries := 0
 	stmt := `
         INSERT INTO config (
@@ -100,8 +181,11 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
 			strike_key,
 			strike_endpoint,
 			icon_url,
-			tos_url
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,$26,$27, $28, $29,$30,$31,$32,$33)`
+			tos_url,
+			nostr_notification_npubs,
+			nostr_notifications,
+			nostr_notification_nip04_dm
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,$26,$27, $28, $29,$30,$31,$32,$33,$34,$35,$36)`
 
 	for {
 		tries += 1
@@ -139,6 +223,9 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
 			config.STRIKE_ENDPOINT,
 			config.IconUrl,
 			config.TosUrl,
+			npubsBytes,
+			config.NOSTR_NOTIFICATIONS,
+			config.NOSTR_NOTIFICATION_NIP04_DM,
 		)
 
 		switch {
@@ -154,6 +241,11 @@ func (pql Postgresql) SetConfig(config utils.Config) error {
 }
 
 func (pql Postgresql) UpdateConfig(config utils.Config) error {
+	npubsBytes, err := wrappedPublicKeysToBytes(config.NOSTR_NOTIFICATION_NPUBS)
+	if err != nil {
+		return databaseError(fmt.Errorf("wrappedPublicKeysToBytes(config.NOSTR_NOTIFICATION_NPUBS): %w", err))
+	}
+
 	tries := 0
 	for {
 		tries += 1
@@ -187,10 +279,13 @@ func (pql Postgresql) UpdateConfig(config utils.Config) error {
             mint_auth_max_blind_tokens = $26,
             mint_auth_clear_auth_urls = $27,
             mint_auth_blind_auth_urls = $28,
-            strike_key = $29,
-            strike_endpoint = $30,
-            icon_url = $31,
-            tos_url = $32
+		            strike_key = $29,
+		            strike_endpoint = $30,
+		            icon_url = $31,
+		            tos_url = $32,
+		            nostr_notification_npubs = $33,
+		            nostr_notifications = $34,
+		            nostr_notification_nip04_dm = $35
         WHERE id = 1`
 		_, err := pql.pool.Exec(context.Background(), stmt,
 			config.NAME,
@@ -225,6 +320,9 @@ func (pql Postgresql) UpdateConfig(config utils.Config) error {
 			config.STRIKE_ENDPOINT,
 			config.IconUrl,
 			config.TosUrl,
+			npubsBytes,
+			config.NOSTR_NOTIFICATIONS,
+			config.NOSTR_NOTIFICATION_NIP04_DM,
 		)
 
 		switch {
@@ -236,5 +334,56 @@ func (pql Postgresql) UpdateConfig(config utils.Config) error {
 			return nil
 		}
 
+	}
+}
+
+func (pql Postgresql) UpdateNostrNotificationConfig(config utils.Config) error {
+	tx, err := pql.pool.Begin(context.Background())
+	if err != nil {
+		return databaseError(fmt.Errorf("pql.pool.Begin(...): %w", err))
+	}
+
+	defer func() {
+		_ = tx.Rollback(context.Background())
+	}()
+
+	if err := pql.UpdateNostrNotificationConfigTx(tx, config); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(context.Background()); err != nil {
+		return databaseError(fmt.Errorf("tx.Commit(...): %w", err))
+	}
+
+	return nil
+}
+
+func (pql Postgresql) UpdateNostrNotificationConfigTx(tx pgx.Tx, config utils.Config) error {
+	npubsBytes, err := wrappedPublicKeysToBytes(config.NOSTR_NOTIFICATION_NPUBS)
+	if err != nil {
+		return databaseError(fmt.Errorf("wrappedPublicKeysToBytes(config.NOSTR_NOTIFICATION_NPUBS): %w", err))
+	}
+
+	tries := 0
+	for {
+		tries += 1
+		_, err = tx.Exec(context.Background(), `UPDATE config SET
+			nostr_notification_npubs = $1,
+			nostr_notifications = $2,
+			nostr_notification_nip04_dm = $3
+		WHERE id = 1`,
+			npubsBytes,
+			config.NOSTR_NOTIFICATIONS,
+			config.NOSTR_NOTIFICATION_NIP04_DM,
+		)
+
+		switch {
+		case err != nil && tries < 3:
+			continue
+		case err != nil && tries >= 3:
+			return databaseError(fmt.Errorf("could not update nostr notification config: %w", err))
+		case err == nil:
+			return nil
+		}
 	}
 }

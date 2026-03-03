@@ -107,6 +107,8 @@ type MintDB interface {
 	GetConfig() (utils.Config, error)
 	SetConfig(config utils.Config) error
 	UpdateConfig(config utils.Config) error
+	UpdateNostrNotificationConfig(config utils.Config) error
+	UpdateNostrNotificationConfigTx(tx pgx.Tx, config utils.Config) error
 
 	SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error
 	GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error)

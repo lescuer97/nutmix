@@ -80,8 +80,7 @@ func main() {
 		opts.AddSource = true
 	}
 
-	logger := slog.New(slog.NewJSONHandler(w, opts))
-	slog.SetDefault(logger)
+	baseJSONHandler := slog.NewJSONHandler(w, opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Minute)
 	defer cancel()
@@ -110,6 +109,9 @@ func main() {
 		slog.Warn("SetUpMint", slog.Any("error", err))
 		return
 	}
+
+	logger := slog.New(admin.NewNostrErrorNotifyHandler(baseJSONHandler, mint))
+	slog.SetDefault(logger)
 
 	r := gin.Default()
 
