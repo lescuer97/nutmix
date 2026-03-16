@@ -2,7 +2,6 @@ package mint
 
 import (
 	"encoding/json"
-	"slices"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -70,45 +69,66 @@ func (o *Observer) AddMeltWatch(quote string, meltChan MeltQuoteChannel) {
 
 func (o *Observer) RemoveWatch(subId string) {
 	o.Lock()
-	proofChans := []chan cashu.Proof{}
-	mintRequestChans := []chan cashu.MintRequestDB{}
-	meltRequestChans := []chan cashu.MeltRequestDB{}
+	proofChans := make(map[chan cashu.Proof]struct{})
+	mintRequestChans := make(map[chan cashu.MintRequestDB]struct{})
+	meltRequestChans := make(map[chan cashu.MeltRequestDB]struct{})
+
 	for key, proofWatchArray := range o.Proofs {
-		for i, proofWatch := range proofWatchArray {
+		kept := proofWatchArray[:0]
+		for _, proofWatch := range proofWatchArray {
 			if proofWatch.SubId == subId {
-				newArray := slices.Delete(proofWatchArray, i, i+1)
-				o.Proofs[key] = newArray
-				proofChans = append(proofChans, proofWatch.Channel)
+				proofChans[proofWatch.Channel] = struct{}{}
+				continue
 			}
+			kept = append(kept, proofWatch)
 		}
+		if len(kept) == 0 {
+			delete(o.Proofs, key)
+			continue
+		}
+		o.Proofs[key] = kept
 	}
+
 	for key, mintWatchArray := range o.MintQuote {
-		for i, mintWatch := range mintWatchArray {
+		kept := mintWatchArray[:0]
+		for _, mintWatch := range mintWatchArray {
 			if mintWatch.SubId == subId {
-				newArray := slices.Delete(mintWatchArray, i, i+1)
-				o.MintQuote[key] = newArray
-				mintRequestChans = append(mintRequestChans, mintWatch.Channel)
+				mintRequestChans[mintWatch.Channel] = struct{}{}
+				continue
 			}
+			kept = append(kept, mintWatch)
 		}
+		if len(kept) == 0 {
+			delete(o.MintQuote, key)
+			continue
+		}
+		o.MintQuote[key] = kept
 	}
+
 	for key, meltWatchArray := range o.MeltQuote {
-		for i, meltWatch := range meltWatchArray {
+		kept := meltWatchArray[:0]
+		for _, meltWatch := range meltWatchArray {
 			if meltWatch.SubId == subId {
-				newArray := slices.Delete(meltWatchArray, i, i+1)
-				o.MeltQuote[key] = newArray
-				meltRequestChans = append(meltRequestChans, meltWatch.Channel)
+				meltRequestChans[meltWatch.Channel] = struct{}{}
+				continue
 			}
+			kept = append(kept, meltWatch)
 		}
+		if len(kept) == 0 {
+			delete(o.MeltQuote, key)
+			continue
+		}
+		o.MeltQuote[key] = kept
 	}
 	o.Unlock()
-	for i := range proofChans {
-		close(proofChans[i])
+	for proofChan := range proofChans {
+		close(proofChan)
 	}
-	for i := range mintRequestChans {
-		close(mintRequestChans[i])
+	for mintRequestChan := range mintRequestChans {
+		close(mintRequestChan)
 	}
-	for i := range meltRequestChans {
-		close(meltRequestChans[i])
+	for meltRequestChan := range meltRequestChans {
+		close(meltRequestChan)
 	}
 }
 

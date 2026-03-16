@@ -49,6 +49,9 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 		if err != nil {
 			return
 		}
+		if request.Method == cashu.Subcribe {
+			defer mint.Observer.RemoveWatch(request.Params.SubId)
+		}
 
 		proofChan := make(chan cashu.Proof, 2)
 		mintChan := make(chan cashu.MintRequestDB, 1)
