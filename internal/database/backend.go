@@ -60,7 +60,6 @@ type MintDB interface {
 	GetTx(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context, tx pgx.Tx) error
 	Rollback(ctx context.Context, tx pgx.Tx) error
-	SubTx(ctx context.Context, tx pgx.Tx) (pgx.Tx, error)
 
 	/// Calls for the Functioning of the mint
 	GetAllSeeds() ([]cashu.Seed, error)

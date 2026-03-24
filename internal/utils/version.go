@@ -9,4 +9,6 @@ var (
 
 	// GitCommit is the Git commit hash
 	GitCommit = "unknown"
+
+	Version = "nutmix/" + AppVersion
 )

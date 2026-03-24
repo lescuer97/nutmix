@@ -5,23 +5,25 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"math"
+	"strconv"
 	"time"
 
 	"github.com/lescuer97/nutmix/api/cashu"
 	sig "github.com/lescuer97/nutmix/internal/gen"
 	"github.com/lescuer97/nutmix/internal/signer"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type MintPublicKeyset struct {
-	Keys        map[uint64]string
-	FinalExpiry *uint64
-	Unit        string
-	Id          []byte
-	InputFeePpk uint
-	Version     uint32
-	Active      bool
+	Keys          map[uint64]string
+	FinalExpiry   *uint64
+	IssuerVersion *string
+	Unit          string
+	Id            []byte
+	InputFeePpk   uint
+	Version       uint32
+	Active        bool
 }
 
 type RemoteSigner struct {
@@ -52,7 +54,9 @@ func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (RemoteSign
 	}
 
 	conn, err := grpc.NewClient(target,
-		grpc.WithTransportCredentials(certs))
+		grpc.WithTransportCredentials(certs),
+		grpc.WithUnaryInterceptor(clientVersionInterceptor()),
+	)
 
 	if err != nil {
 		log.Fatalf("grpc connection failed: %v", err)
@@ -70,6 +74,13 @@ func SetupRemoteSigner(connectToNetwork bool, networkAddress string) (RemoteSign
 	return socketSigner, nil
 }
 
+func clientVersionInterceptor() grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		ctx = metadata.AppendToOutgoingContext(ctx, "x-signatory-schema-version", strconv.FormatUint(uint64(sig.Constants_CONSTANTS_VERSION), 10))
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}
+
 // gets all active keys
 func (s *RemoteSigner) setupSignerPubkeys() error {
 
@@ -77,9 +88,11 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 	emptyRequest := sig.EmptyRequest{}
 
 	keys, err := s.grpcClient.Keysets(ctx, &emptyRequest)
-	// log.Printf("keys: %+v", keys)
 	if err != nil {
 		return fmt.Errorf("s.grpcClient.Keysets(ctx, &emptyRequest). %w", err)
+	}
+	if err := signerValidator.Struct(keys); err != nil {
+		return fmt.Errorf("signer keysets response validation failed: %w", err)
 	}
 
 	err = CheckIfSignerErrorExists(keys.GetError())
@@ -91,15 +104,28 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 		return fmt.Errorf("no keysets on the signer: %w", err)
 	}
 
+	if err := signerValidator.Struct(keys.GetKeysets()); err != nil {
+		return fmt.Errorf("signer keysets payload validation failed: %w", err)
+	}
+
 	s.pubkey = keys.GetKeysets().Pubkey
 
 	for i, key := range keys.GetKeysets().Keysets {
 		if key == nil {
 			return fmt.Errorf("there was a nil key, index: %v", i)
 		}
+		if err := signerValidator.Struct(key); err != nil {
+			return fmt.Errorf("signer keyset validation failed at index %d: %w", i, err)
+		}
 
 		if key.Keys == nil {
 			return fmt.Errorf("no keys on keyset, id: %v", key.Id)
+		}
+		if err := signerValidator.Struct(key.Keys); err != nil {
+			return fmt.Errorf("signer keyset keys validation failed at index %d: %w", i, err)
+		}
+		if key.Unit == nil {
+			return fmt.Errorf("signer keyset missing unit at index %d", i)
 		}
 
 		unit, err := ConvertSigUnitToCashuUnit(key.Unit)
@@ -113,13 +139,14 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 		}
 
 		mintKeyset := MintPublicKeyset{
-			Id:          key.Id,
-			Unit:        unit.String(),
-			Active:      key.Active,
-			InputFeePpk: uint(key.InputFeePpk),
-			Version:     key.Version,
-			FinalExpiry: key.FinalExpiry,
-			Keys:        stringKeys,
+			Id:            key.Id,
+			Unit:          unit.String(),
+			Active:        key.Active,
+			InputFeePpk:   uint(key.InputFeePpk),
+			Version:       key.Version,
+			FinalExpiry:   key.FinalExpiry,
+			Keys:          stringKeys,
+			IssuerVersion: key.IssuerVersion,
 		}
 
 		if mintKeyset.Active {
@@ -180,21 +207,25 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hour
 	now := time.Now()
 	now = now.Add(time.Duration(expiry_limit_hours) * time.Hour)
 
-	amounts := GetAmountsFromMaxOrder(64)
+	amounts := cashu.GetAmountsForKeysets(cashu.MaxKeysetAmount)
 	if unit == cashu.AUTH {
-		amounts = []uint64{1}
+		amounts = []uint64{amounts[0]}
 	}
 
 	unixTime := uint64(now.Unix())
 	rotationReq := sig.RotationRequest{
-		Unit:        unitSig,
-		InputFeePpk: uint64(fee),
-		Amounts:     amounts,
-		FinalExpiry: &unixTime,
+		Unit:         unitSig,
+		InputFeePpk:  uint64(fee),
+		Amounts:      amounts,
+		FinalExpiry:  &unixTime,
+		KeysetIdType: sig.KeysetVersion_KEYSET_VERSION_V2,
 	}
 	rotationResponse, err := s.grpcClient.RotateKeyset(ctx, &rotationReq)
 	if err != nil {
-		return fmt.Errorf("s.grpcClient.BlindSign(ctx, &blindedMessageRequest). %w", err)
+		return fmt.Errorf("s.grpcClient.RotateKeyset(ctx, &rotationReq). %w", err)
+	}
+	if err := signerValidator.Struct(rotationResponse); err != nil {
+		return fmt.Errorf("signer rotate keyset response validation failed: %w", err)
 	}
 	err = CheckIfSignerErrorExists(rotationResponse.GetError())
 	if err != nil {
@@ -212,23 +243,23 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hour
 func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
 
 	ctx := context.Background()
-	blindedMessageRequest := sig.BlindedMessages{} //nolint:exhaustruct
+	blindedMessageRequest := sig.BlindedMessages{
+		BlindedMessages: make([]*sig.BlindedMessage, len(messages)),
+	}
 
-	blindedMessageRequest.BlindedMessages = []*sig.BlindedMessage{}
-	for _, val := range messages {
-		B_ := val.B_.SerializeCompressed()
+	for i := range messages {
+		B_ := messages[i].B_.SerializeCompressed()
 
-		bytesId, err := hex.DecodeString(val.Id)
+		bytesId, err := hex.DecodeString(messages[i].Id)
 		if err != nil {
 			return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("hex.DecodeString(val.Id). %w", err)
 		}
 
-		blindedMessageRequest.BlindedMessages = append(blindedMessageRequest.BlindedMessages, &sig.BlindedMessage{
-			Amount:        val.Amount,
+		blindedMessageRequest.BlindedMessages[i] = &sig.BlindedMessage{
+			Amount:        messages[i].Amount,
 			KeysetId:      bytesId,
 			BlindedSecret: B_,
-			// Witness: &sig.Witness{} val.Witness,
-		})
+		}
 	}
 
 	blindSigsResponse, err := s.grpcClient.BlindSign(ctx, &blindedMessageRequest)
@@ -272,7 +303,7 @@ func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {
 
 	ctx := context.Background()
 	// INFO: we verify locally if the proofs are locked and valid before sending to the crypto signer
-	proofsVericationRequest := sig.Proofs{ //nolint:exhaustruct
+	proofsVericationRequest := sig.Proofs{
 		Proof: make([]*sig.Proof, len(proofs)),
 	}
 	for i, val := range proofs {
@@ -295,6 +326,9 @@ func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {
 	boolResponse, err := s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest)
 	if err != nil {
 		return fmt.Errorf("s.grpcClient.VerifyProofs(ctx, &proofsVericationRequest). %w", err)
+	}
+	if err := signerValidator.Struct(boolResponse); err != nil {
+		return fmt.Errorf("signer verify proofs response validation failed: %w", err)
 	}
 
 	err = CheckIfSignerErrorExists(boolResponse.GetError())
@@ -358,11 +392,11 @@ func (l *RemoteSigner) GetAuthKeys() (signer.GetKeysetsResponse, error) {
 	return response, nil
 }
 
-func GetAmountsFromMaxOrder(max_order uint32) []uint64 {
-	keys := make([]uint64, 0)
-
-	for i := 0; i < int(max_order); i++ {
-		keys = append(keys, uint64(math.Pow(2, float64(i))))
-	}
-	return keys
-}
+// func GetAmountsFromMaxOrder(max_order uint32) []uint64 {
+// 	keys := make([]uint64, 0)
+//
+// 	for i := 0; i < int(max_order); i++ {
+// 		keys = append(keys, uint64(math.Pow(2, float64(i))))
+// 	}
+// 	return keys
+// }

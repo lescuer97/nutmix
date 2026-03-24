@@ -12,6 +12,9 @@ import (
 	"github.com/tyler-smith/go-bip32"
 )
 
+const LegacyMaxKeysetAmount int = 64
+const MaxKeysetAmount int = 32
+
 // Deprecated: Use DeriveKeysetIdV2 instead. This function generates V1 keyset IDs which are less unique.
 func DeriveKeysetId(keysets []*secp256k1.PublicKey) (string, error) {
 	concatBinaryArray := []byte{}
@@ -112,12 +115,10 @@ func GenerateKeysets(versionKey *bip32.Key, values []uint64, seed Seed) ([]MintK
 	return keysets, nil
 }
 
-const MaxKeysetAmount int = 64
-
-func GetAmountsForKeysets() []uint64 {
+func GetAmountsForKeysets(max_order int) []uint64 {
 	keys := make([]uint64, 0)
 
-	for i := 0; i < MaxKeysetAmount; i++ {
+	for i := 0; i < max_order; i++ {
 		keys = append(keys, uint64(math.Pow(2, float64(i))))
 	}
 	return keys

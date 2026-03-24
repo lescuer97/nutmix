@@ -7,37 +7,55 @@ import (
 	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/go-playground/validator/v10"
 	"github.com/lescuer97/nutmix/api/cashu"
 	sig "github.com/lescuer97/nutmix/internal/gen"
 )
+
+var signerValidator = validator.New()
 
 func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) ([]cashu.BlindSignature, error) {
 	blindSigs := []cashu.BlindSignature{}
 
 	if sigs == nil {
-		return blindSigs, nil
+		return blindSigs, errors.New("signer response is nil")
+	}
+
+	if err := signerValidator.Struct(sigs); err != nil {
+		return blindSigs, fmt.Errorf("signer response validation failed: %w", err)
 	}
 
 	blindSigs = []cashu.BlindSignature{}
 
-	for _, val := range sigs.GetSigs().BlindSignatures {
-		dleq := cashu.BlindSignatureDLEQ{
-			E: secp256k1.PrivKeyFromBytes(val.Dleq.E),
-			S: secp256k1.PrivKeyFromBytes(val.Dleq.S),
+	for i, val := range sigs.GetSigs().BlindSignatures {
+		if err := signerValidator.Struct(val); err != nil {
+			return blindSigs, fmt.Errorf("signer signature validation failed at index %d: %w", i, err)
+		}
+		if val.Dleq != nil {
+			if err := signerValidator.Struct(val.Dleq); err != nil {
+				return blindSigs, fmt.Errorf("signer signature dleq validation failed at index %d: %w", i, err)
+			}
+		}
+
+		var dleq *cashu.BlindSignatureDLEQ
+		if val.Dleq != nil {
+			dleq = &cashu.BlindSignatureDLEQ{
+				E: secp256k1.PrivKeyFromBytes(val.Dleq.E),
+				S: secp256k1.PrivKeyFromBytes(val.Dleq.S),
+			}
 		}
 
 		C_, err := secp256k1.ParsePubKey(val.BlindedSecret)
 		if err != nil {
 			return blindSigs, fmt.Errorf("secp.secp256k1(ParsePubKey(val.BlindedSecret) %w", err)
 		}
-		blindSigs = append(blindSigs, cashu.BlindSignature{Amount: val.Amount, C_: cashu.WrappedPublicKey{PublicKey: C_}, Id: hex.EncodeToString(val.KeysetId), Dleq: &dleq})
+		blindSigs = append(blindSigs, cashu.BlindSignature{Amount: val.Amount, C_: cashu.WrappedPublicKey{PublicKey: C_}, Id: hex.EncodeToString(val.KeysetId), Dleq: dleq})
 	}
 
 	return blindSigs, nil
 }
 
 func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.BlindedMessages, error) {
-	//nolint:exhaustruct
 	messagesGrpc := sig.BlindedMessages{
 		BlindedMessages: make([]*sig.BlindedMessage, len(messages)),
 	}
@@ -78,6 +96,13 @@ func ConvertCashuUnitToSignature(unit cashu.Unit) (*sig.CurrencyUnit, error) {
 }
 
 func ConvertSigUnitToCashuUnit(sigUnit *sig.CurrencyUnit) (cashu.Unit, error) {
+	if sigUnit == nil {
+		return cashu.Sat, errors.New("signer currency unit is nil")
+	}
+	if err := signerValidator.Struct(sigUnit); err != nil {
+		return cashu.Sat, fmt.Errorf("signer currency unit validation failed: %w", err)
+	}
+
 	switch sigUnit.GetUnit().Number() {
 	case sig.CurrencyUnitType_CURRENCY_UNIT_TYPE_SAT.Enum().Number():
 		return cashu.Sat, nil

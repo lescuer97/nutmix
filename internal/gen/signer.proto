@@ -13,71 +13,74 @@ service Signatory {
   rpc RotateKeyset(RotationRequest) returns (KeyRotationResponse);
 }
 
-enum Operation {
-  OPERATION_UNSPECIFIED = 0;
-  OPERATION_MINT = 1;
-  OPERATION_MELT = 2;
-  OPERATION_SWAP = 3;
+enum Constants {
+  CONSTANTS_UNSPECIFIED = 0;
+  // this constant should be sent on the header of the grpc code for verification
+  CONSTANTS_VERSION = 1;
 }
 
 message BlindSignResponse {
-  Error error = 1;
-  BlindSignatures sigs = 2;
+  Error error = 1; 
+  BlindSignatures sigs = 2; 
 }
 
 message BlindedMessages {
-  repeated BlindedMessage blinded_messages = 1;
-  Operation operation = 2;
-  string correlation_id = 3;
+  repeated BlindedMessage blinded_messages = 1; // @gotags: validate:"required"
 }
 
 // Represents a blinded message
 message BlindedMessage {
-  uint64 amount = 1;
-  bytes keyset_id = 2;
-  bytes blinded_secret = 3;
+  uint64 amount = 1; // @gotags: validate:"required"
+  bytes keyset_id = 2; // @gotags: validate:"required"
+  bytes blinded_secret = 3; // @gotags: validate:"required"
 }
 
 message BooleanResponse {
-  Error error = 1;
-  bool success = 2;
+  Error error = 1; 
+  bool success = 2; 
 }
 
 message KeyRotationResponse {
-  Error error = 1;
-  KeySet keyset = 2;
+  Error error = 1; 
+  KeySet keyset = 2; 
 }
 
 message KeysResponse {
-  Error error = 1;
-  SignatoryKeysets keysets = 2;
+  Error error = 1; 
+  SignatoryKeysets keysets = 2; 
 }
 
 message SignatoryKeysets {
-  bytes pubkey = 1;
-  repeated KeySet keysets = 2;
+  bytes pubkey = 1; // @gotags: validate:"required"
+  repeated KeySet keysets = 2; 
 }
 
 message KeySet {
-  bytes id = 1;
-  CurrencyUnit unit = 2;
-  bool active = 3;
-  uint64 input_fee_ppk = 4;
-  Keys keys = 5;
-  uint32 version  = 6;
-  optional uint64 final_expiry  = 7;
+  bytes id = 1; // @gotags: validate:"required"
+  CurrencyUnit unit = 2; // @gotags: validate:"required"
+  bool active = 3; 
+  uint64 input_fee_ppk = 4; 
+  Keys keys = 5; // @gotags: validate:"required"
+  optional uint64 final_expiry = 6;
+  uint32 version = 7; 
+  optional string issuer_version = 8;
 }
 
 message Keys {
-  map<uint64, bytes> keys = 1;
+  map<uint64, bytes> keys = 1; // @gotags: validate:"required"
 }
 
+enum KeysetVersion {
+  KEYSET_VERSION_UNSPECIFIED = 0;
+  KEYSET_VERSION_V1 = 1;
+  KEYSET_VERSION_V2 = 2;
+}
 message RotationRequest {
-  CurrencyUnit unit = 1;
-  uint64 input_fee_ppk = 2;
-  repeated uint64 amounts = 3;
-  // unix timestamp for expiration
+  CurrencyUnit unit = 1; // @gotags: validate:"required"
+  uint64 input_fee_ppk = 2; 
+  repeated uint64 amounts = 3; // @gotags: validate:"required"
   optional uint64 final_expiry = 4;
+  KeysetVersion keyset_id_type = 5; // @gotags: validate:"required"
 }
 
 enum CurrencyUnitType {
@@ -91,38 +94,36 @@ enum CurrencyUnitType {
 
 message CurrencyUnit {
   oneof currency_unit {
-    CurrencyUnitType unit = 1;
-    string custom_unit = 2;
+    CurrencyUnitType unit = 1; // @gotags: validate:"required"
+    string custom_unit = 2; // @gotags: validate:"required"
   }
 }
 
 message Proofs {
-  repeated Proof proof = 1;
-  Operation operation = 3;
-  string correlation_id = 4;
+  repeated Proof proof = 1; // @gotags: validate:"required"
 }
 
 message Proof {
-  uint64 amount = 1;
-  bytes keyset_id = 2;
-  bytes secret = 3;
-  bytes c = 4;
+  uint64 amount = 1; // @gotags: validate:"required"
+  bytes keyset_id = 2; // @gotags: validate:"required"
+  bytes secret = 3; // @gotags: validate:"required"
+  bytes c = 4; // @gotags: validate:"required"
 }
 
 message BlindSignatures {
-  repeated BlindSignature blind_signatures = 1;
+  repeated BlindSignature blind_signatures = 1; // @gotags: validate:"required"
 }
 
 message BlindSignature {
-  uint64 amount = 1;
-  bytes keyset_id = 2;
-  bytes blinded_secret = 3;
+  uint64 amount = 1; // @gotags: validate:"required"
+  bytes keyset_id = 2; // @gotags: validate:"required"
+  bytes blinded_secret = 3; // @gotags: validate:"required"
   optional BlindSignatureDLEQ dleq = 4;
 }
 
 message BlindSignatureDLEQ {
-  bytes e = 1;
-  bytes s = 2;
+  bytes e = 1; // @gotags: validate:"required"
+  bytes s = 2; // @gotags: validate:"required"
 }
 
 enum ErrorCode {
@@ -137,11 +138,12 @@ enum ErrorCode {
   ERROR_CODE_INVALID_PROOF = 8;
   ERROR_CODE_INVALID_BLIND_MESSAGE = 9;
   ERROR_CODE_UNIT_NOT_SUPPORTED = 10;
+  ERROR_CODE_INVALID_SIGNER_PROTO_VERSION = 999;
 }
 
 message Error {
-  ErrorCode code = 1;
-  string detail = 2;
+  ErrorCode code = 1; // @gotags: validate:"required"
+  string detail = 2; 
 }
 
 message EmptyRequest {}
