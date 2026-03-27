@@ -45,14 +45,11 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 		timeRange := c.Query("since")
 		startTime, _ := parseTimeRange(timeRange)
 
-		proofsCount, err := adminHandler.getProofsCountByKeyset(startTime)
+		statsRows, err := mint.MintDB.GetStatsSnapshotsBySince(c.Request.Context(), startTime.Unix())
 		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-
-		keysets, err := mint.Signer.GetKeysets()
-		if err != nil {
+			slog.Error(
+				"mint.MintDB.GetStatsSnapshotsBySince()",
+				slog.String(utils.LogExtraInfo, err.Error()))
 			_ = c.Error(err)
 			return
 		}
@@ -69,12 +66,7 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 			sinceDate = "the beginning"
 		}
 
-		summary := templates.Summary{
-			LnBalance:  lnBalance,
-			FakeWallet: mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET,
-			Fees:       fees(proofsCount, keysets.Keysets),
-			SinceDate:  sinceDate,
-		}
+		summary := buildSummaryFromStats(statsRows, lnBalance, mint.Config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET, sinceDate)
 
 		err = templates.SummaryComponent(summary).Render(c.Request.Context(), c.Writer)
 		if err != nil {
@@ -84,21 +76,19 @@ func SummaryComponent(mint *m.Mint, adminHandler *adminHandler) gin.HandlerFunc 
 	}
 }
 
-func fees(proofs map[string]database.ProofsCountByKeyset, keysets []cashu.BasicKeysetResponse) uint64 {
-	totalFees := uint64(0)
-
-	for _, keyset := range keysets {
-		if keyset.Unit != cashu.AUTH.String() {
-			for keysetId, proof := range proofs {
-				if keyset.Id == keysetId {
-					totalFees += proof.Count * uint64(keyset.InputFeePpk)
-				}
-			}
-		}
-
+func buildSummaryFromStats(rows []database.StatsSnapshot, lnBalance cashu.Amount, fakeWallet bool, sinceDate string) templates.Summary {
+	return templates.Summary{
+		LnBalance:  lnBalance,
+		FakeWallet: fakeWallet,
+		Fees:       sumFeesFromStats(rows),
+		SinceDate:  sinceDate,
 	}
+}
 
-	totalFees = (totalFees + 999) / 1000
-
+func sumFeesFromStats(rows []database.StatsSnapshot) uint64 {
+	totalFees := uint64(0)
+	for _, row := range rows {
+		totalFees += row.Fees
+	}
 	return totalFees
 }

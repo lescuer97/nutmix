@@ -3,17 +3,12 @@ package database
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-type MintMeltBalance struct {
-	Mint []cashu.MintRequestDB
-	Melt []cashu.MeltRequestDB
-}
 type NostrLoginAuth struct {
 	Nonce     string
 	Activated bool
@@ -42,22 +37,52 @@ type ProofTimeSeriesPoint struct {
 	Count       uint64 `json:"count"`       // Number of proofs in this bucket
 }
 
-// ProofsCountByKeyset represents the total amount and count of proofs grouped by keyset ID
-type ProofsCountByKeyset struct {
-	KeysetId    string `json:"keyset_id"`
-	TotalAmount uint64 `json:"total_amount"`
-	Count       uint64 `json:"count"`
+type StatsSummaryItem struct {
+	Unit     string `json:"unit"`
+	Quantity uint64 `json:"quantity"`
+	Amount   uint64 `json:"amount"`
 }
 
-// BlindSigsCountByKeyset represents the total amount and count of blind signatures grouped by keyset ID
-type BlindSigsCountByKeyset struct {
-	KeysetId    string `json:"keyset_id"`
-	TotalAmount uint64 `json:"total_amount"`
-	Count       uint64 `json:"count"`
+type StatsSnapshot struct {
+	MintSummary      []StatsSummaryItem `db:"mint_summary"`
+	MeltSummary      []StatsSummaryItem `db:"melt_summary"`
+	BlindSigsSummary []StatsSummaryItem `db:"blind_sigs_summary"`
+	ProofsSummary    []StatsSummaryItem `db:"proofs_summary"`
+	ID               int64              `db:"id"`
+	StartDate        int64              `db:"start_date"`
+	EndDate          int64              `db:"end_date"`
+	Fees             uint64             `db:"fees"`
+}
+
+type MintStatsRow struct {
+	Quote   string
+	Unit    string
+	Amount  *uint64
+	Request string
+}
+
+type MeltStatsRow struct {
+	Quote  string
+	Unit   string
+	Amount uint64
+}
+
+type KeysetStatsRow struct {
+	KeysetID string
+	Unit     string
+	Amount   uint64
+}
+
+type KeysetFeeRow struct {
+	KeysetID    string
+	Unit        string
+	Quantity    uint64
+	InputFeePpk uint64
 }
 
 type MintDB interface {
 	GetTx(ctx context.Context) (pgx.Tx, error)
+	GetReadTx(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context, tx pgx.Tx) error
 	Rollback(ctx context.Context, tx pgx.Tx) error
 
@@ -92,15 +117,6 @@ type MintDB interface {
 	GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error)
 	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
 
-	// GetProofsTimeSeries returns proofs aggregated by time buckets for charting
-	// since: lower bound unix timestamp (inclusive)
-	// bucketMinutes: size of each time bucket in minutes
-	GetProofsTimeSeries(since int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
-	// GetBlindSigsTimeSeries returns blind signatures aggregated by time buckets for charting
-	// since: lower bound unix timestamp (inclusive)
-	// bucketMinutes: size of each time bucket in minutes
-	GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]ProofTimeSeriesPoint, error)
-
 	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	GetConfig(tx pgx.Tx) (utils.Config, error)
@@ -112,16 +128,6 @@ type MintDB interface {
 	SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error
 	GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error)
 	DeleteChangeByQuote(tx pgx.Tx, quote string) error
-
-	/// Calls for the admin dashboard
-
-	GetMintMeltBalanceByTime(time int64) (MintMeltBalance, error)
-	// GetProofsCountByKeyset returns the total amount and count of proofs grouped by keyset ID
-	// since: lower bound time (inclusive)
-	GetProofsCountByKeyset(since time.Time) (map[string]ProofsCountByKeyset, error)
-	// GetBlindSigsCountByKeyset returns the total amount and count of blind signatures grouped by keyset ID
-	// since: lower bound time (inclusive)
-	GetBlindSigsCountByKeyset(since time.Time) (map[string]BlindSigsCountByKeyset, error)
 
 	SaveNostrAuth(auth NostrLoginAuth) error
 	UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error
@@ -139,6 +145,12 @@ type MintDB interface {
 	MakeAuthUser(tx pgx.Tx, auth AuthUser) error
 	UpdateLastLoggedIn(tx pgx.Tx, sub string, lastLoggedIn uint64) error
 
-	GetMintRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MintRequestDB, error)
-	GetMeltRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MeltRequestDB, error)
+	GetLatestStatsSnapshot(ctx context.Context, tx pgx.Tx) (*StatsSnapshot, error)
+	GetMintStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]MintStatsRow, error)
+	GetMeltStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]MeltStatsRow, error)
+	GetProofStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]KeysetStatsRow, error)
+	GetBlindSigStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]KeysetStatsRow, error)
+	GetStatsFeeRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]KeysetFeeRow, error)
+	GetStatsSnapshotsBySince(ctx context.Context, since int64) ([]StatsSnapshot, error)
+	InsertStatsSnapshot(ctx context.Context, snapshot StatsSnapshot) error
 }

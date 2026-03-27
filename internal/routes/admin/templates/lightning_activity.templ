@@ -1,61 +1,51 @@
 package templates
 
-import "github.com/lescuer97/nutmix/internal/utils"
-import "time"
-import "strings"
+import (
+	"github.com/lescuer97/nutmix/internal/utils"
+	"time"
+)
 
-type LightningInvoiceVisual struct {
-	Id      string
-	Type    string
-	Invoice string
-	Status  string
-	Unit    string
-	Time    int64
+type LightningSnapshotRow struct {
+	StartDate  int64
+	EndDate    int64
+	MintCount  uint64
+	MintAmount uint64
+	MeltCount  uint64
+	MeltAmount uint64
+	NetFlow    uint64
+	Fees       uint64
 }
 
-templ LightningActivityTable(invoices []LightningInvoiceVisual) {
+templ LightningActivityTable(rows []LightningSnapshotRow) {
 	<div class="table">
 		<div class="table-header">
-			<div class="cell cell-id" style="width: 25%;"><span class="cell-text">ID</span></div>
-			<div class="cell" style="width: 5%;"><span class="cell-text">Type</span></div>
-			<div class="cell" style="width: 35%;"><span class="cell-text">Invoice</span></div>
-			<div class="cell" style="width: 10%;"><span class="cell-text">Status</span></div>
-			<div class="cell" style="width: 10%;"><span class="cell-text">Unit</span></div>
-			<div class="cell" style="width: 15%;"><span class="cell-text">Time</span></div>
+			<div class="cell" style="width: 12%;"><span class="cell-text">Start</span></div>
+			<div class="cell" style="width: 12%;"><span class="cell-text">End</span></div>
+			<div class="cell" style="width: 10%;"><span class="cell-text">Mint Count</span></div>
+			<div class="cell" style="width: 14%;"><span class="cell-text">Mint Amount</span></div>
+			<div class="cell" style="width: 10%;"><span class="cell-text">Melt Count</span></div>
+			<div class="cell" style="width: 14%;"><span class="cell-text">Melt Amount</span></div>
+			<div class="cell" style="width: 14%;"><span class="cell-text">Net Flow</span></div>
+			<div class="cell" style="width: 14%;"><span class="cell-text">Fees</span></div>
 		</div>
-		if len(invoices) == 0 {
+		if len(rows) == 0 {
 			<div class="h-full flex items-center justify-center p-4">
-				<h2 class="text-gray-500">No Mint or Melt activity found</h2>
+				<h2 class="text-gray-500">No lightning snapshot activity found</h2>
 			</div>
 		} else {
 			<div class="rows">
-				for _, invoice := range invoices {
-					{{ formattedTime := time.Unix(invoice.Time, 0).Format(time.UnixDate) }}
-					<div class={ "row-item" , invoice.Type }>
-						<div class="cell cell-id" style="width: 25%;" title={ invoice.Id }>
-							<span class="cell-text">
-								{ invoice.Id }
-							</span>
-						</div>
-						<div class="cell" style="width: 5%;" title={ invoice.Type }>
-							<span class={ "pill" , "pill-" + invoice.Type }>{ invoice.Type }</span>
-						</div>
-						<div class="cell" style="width: 35%;" title={ invoice.Invoice }>
-							<span class="cell-text">
-								{ invoice.Invoice }
-							</span>
-						</div>
-						<div class="cell" style="width: 10%;" title={ invoice.Status }>
-							<span class={ "cell-text" , "status-" + strings.ToLower(invoice.Status) }>{ invoice.Status }</span>
-						</div>
-						<div class="cell" style="width: 10%; text-transform: uppercase;" title={ invoice.Unit }>
-							<span class="cell-text">{ invoice.Unit }</span>
-						</div>
-						<div class="cell" style="width: 15%;" title={ formattedTime }>
-							<span class="cell-text">
-								{ formattedTime }
-							</span>
-						</div>
+				for _, row := range rows {
+					{{ formattedStart := time.Unix(row.StartDate, 0).Format(time.UnixDate) }}
+					{{ formattedEnd := time.Unix(row.EndDate, 0).Format(time.UnixDate) }}
+					<div class="row-item">
+						<div class="cell" style="width: 12%;" title={ formattedStart }><span class="cell-text">{ formattedStart }</span></div>
+						<div class="cell" style="width: 12%;" title={ formattedEnd }><span class="cell-text">{ formattedEnd }</span></div>
+						<div class="cell" style="width: 10%;"><span class="cell-text">{ row.MintCount }</span></div>
+						<div class="cell" style="width: 14%;"><span class="cell-text">{ row.MintAmount }</span></div>
+						<div class="cell" style="width: 10%;"><span class="cell-text">{ row.MeltCount }</span></div>
+						<div class="cell" style="width: 14%;"><span class="cell-text">{ row.MeltAmount }</span></div>
+						<div class="cell" style="width: 14%;"><span class="cell-text">{ row.NetFlow }</span></div>
+						<div class="cell" style="width: 14%;"><span class="cell-text">{ row.Fees }</span></div>
 					</div>
 				}
 			</div>
@@ -83,22 +73,12 @@ templ LightningActivityLayout(config utils.Config, selectedRange string, searchQ
 					</div>
 				</div>
 			</div>
-			<div class="search-container mb-4 flex justify-end">
-				<input
-					type="text"
-					id="ln-search-input"
-					name="search"
-					placeholder="Search by ID..."
-					class="input search-input"
-					value={ searchQuery }
-				/>
-			</div>
 			<div
 				id="ln-table-container"
 				class="mt-6 mb-6"
 				hx-get="/admin/ln-table"
-				hx-trigger="load, change from:#timeRangeSelect, input from:#ln-search-input delay:500ms"
-				hx-include="#timeRangeSelect, #ln-search-input"
+				hx-trigger="load, change from:#timeRangeSelect"
+				hx-include="#timeRangeSelect"
 				hx-swap="innerHTML"
 			>
 				<div class="card card-md">
@@ -116,23 +96,17 @@ templ LightningActivityLayout(config utils.Config, selectedRange string, searchQ
 		</main>
 		<script src="/js/modules/chart.js"></script>
 		<script>
-	// Update URL when search or time range changes
+	// Update URL when time range changes
 	(function () {
 		const updateUrl = () => {
-			const searchInput = document.getElementById('ln-search-input');
 			const rangeSelect = document.getElementById('timeRangeSelect');
 
-			if (!searchInput || !rangeSelect) return;
+			if (!rangeSelect) return;
 
-			const search = searchInput.value;
 			const range = rangeSelect.value;
 			const url = new URL(window.location);
 
-			if (search) {
-				url.searchParams.set('search', search);
-			} else {
-				url.searchParams.delete('search');
-			}
+			url.searchParams.delete('search');
 
 			if (range) {
 				url.searchParams.set('since', range);
@@ -141,12 +115,8 @@ templ LightningActivityLayout(config utils.Config, selectedRange string, searchQ
 			window.history.replaceState({}, '', url);
 		};
 
-		const searchInput = document.getElementById('ln-search-input');
 		const rangeSelect = document.getElementById('timeRangeSelect');
 
-		if (searchInput) {
-			searchInput.addEventListener('input', updateUrl);
-		}
 		if (rangeSelect) {
 			rangeSelect.addEventListener('change', updateUrl);
 		}

@@ -8,6 +8,37 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 )
 
+func (pql Postgresql) SaveNostrAuth(auth database.NostrLoginAuth) error {
+	_, err := pql.pool.Exec(context.Background(), "INSERT INTO nostr_login (nonce, expiry , activated) VALUES ($1, $2, $3)", auth.Nonce, auth.Expiry, auth.Activated)
+	if err != nil {
+		return databaseError(fmt.Errorf("inserting to nostr_login: %w", err))
+	}
+	return nil
+}
+
+func (pql Postgresql) UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error {
+	_, err := tx.Exec(context.Background(), "UPDATE nostr_login SET activated = $1 WHERE nonce = $2", activated, nonce)
+	if err != nil {
+		return databaseError(fmt.Errorf("update to seeds: %w", err))
+	}
+	return nil
+}
+
+func (pql Postgresql) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLoginAuth, error) {
+	rows, err := tx.Query(context.Background(), "SELECT nonce, activated, expiry FROM nostr_login WHERE nonce = $1 FOR UPDATE", nonce)
+	if err != nil {
+		return database.NostrLoginAuth{}, fmt.Errorf("error checking for active seeds: %w", err)
+	}
+	defer rows.Close()
+
+	nostrLogin, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[database.NostrLoginAuth])
+	if err != nil {
+		return nostrLogin, fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.NostrLoginAuth]): %w", err)
+	}
+
+	return nostrLogin, nil
+}
+
 func (pql Postgresql) MakeAuthUser(tx pgx.Tx, auth database.AuthUser) error {
 
 	_, err := tx.Exec(context.Background(), "INSERT INTO user_auth (sub, aud , last_logged_in) VALUES ($1, $2, $3)", auth.Sub, auth.Aud, auth.LastLoggedIn)
