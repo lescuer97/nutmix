@@ -61,16 +61,6 @@ func (pql Postgresql) GetTx(ctx context.Context) (pgx.Tx, error) {
 	return pql.pool.Begin(ctx)
 }
 
-func (pql Postgresql) GetReadTx(ctx context.Context) (pgx.Tx, error) {
-	return pql.pool.BeginTx(ctx, pgx.TxOptions{
-		IsoLevel:       pgx.RepeatableRead,
-		AccessMode:     pgx.ReadOnly,
-		DeferrableMode: pgx.NotDeferrable,
-		BeginQuery:     "",
-		CommitQuery:    "",
-	})
-}
-
 func (pql Postgresql) Commit(ctx context.Context, tx pgx.Tx) error {
 	return tx.Commit(ctx)
 }

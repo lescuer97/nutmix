@@ -46,12 +46,6 @@ func (m *MockDB) GetAllSeeds() ([]cashu.Seed, error) {
 func (m *MockDB) GetTx(ctx context.Context) (pgx.Tx, error) {
 	return &pgxpool.Tx{}, nil
 }
-func (m *MockDB) GetReadTx(ctx context.Context) (pgx.Tx, error) {
-	return &pgxpool.Tx{}, nil
-}
-func (m *MockDB) SubTx(ctx context.Context, tx pgx.Tx) (pgx.Tx, error) {
-	return &pgxpool.Tx{}, nil
-}
 func (m *MockDB) Commit(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }

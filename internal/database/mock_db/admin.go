@@ -80,7 +80,7 @@ func (m *MockDB) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapState) 
 
 }
 
-func (m *MockDB) GetLatestStatsSnapshot(ctx context.Context, tx pgx.Tx) (*database.StatsSnapshot, error) {
+func (m *MockDB) GetLatestStatsSnapshot(ctx context.Context) (*database.StatsSnapshot, error) {
 	if m.ReturnError != 0 {
 		return nil, database.ErrDB
 	}

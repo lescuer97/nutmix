@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,8 +17,8 @@ import (
 )
 
 type statsMethodContract interface {
-	GetReadTx(context.Context) (pgx.Tx, error)
-	GetLatestStatsSnapshot(context.Context, pgx.Tx) (*database.StatsSnapshot, error)
+	GetTx(context.Context) (pgx.Tx, error)
+	GetLatestStatsSnapshot(context.Context) (*database.StatsSnapshot, error)
 	GetMintStatsRows(context.Context, pgx.Tx, int64, int64) ([]database.MintStatsRow, error)
 	GetMeltStatsRows(context.Context, pgx.Tx, int64, int64) ([]database.MeltStatsRow, error)
 	GetProofStatsRows(context.Context, pgx.Tx, int64, int64) ([]database.KeysetStatsRow, error)
@@ -39,6 +41,7 @@ func TestStatsTypesIncludeFees(t *testing.T) {
 //nolint:govet // test double field order is not performance critical
 type stubStore struct {
 	latest       *database.StatsSnapshot
+	latestErr    error
 	mintRows     []database.MintStatsRow
 	meltRows     []database.MeltStatsRow
 	proofRows    []database.KeysetStatsRow
@@ -46,36 +49,60 @@ type stubStore struct {
 	feeRows      []database.KeysetFeeRow
 	inserted     []database.StatsSnapshot
 	insertErr    error
+	getTxErr     error
+	queryErr     error
 	rollbacks    int
+	events       []string
 }
 
-func (s *stubStore) GetReadTx(context.Context) (pgx.Tx, error) { return nil, nil }
+func (s *stubStore) GetTx(context.Context) (pgx.Tx, error) {
+	s.events = append(s.events, "get_tx")
+	return nil, s.getTxErr
+}
 func (s *stubStore) Rollback(context.Context, pgx.Tx) error {
+	s.events = append(s.events, "rollback")
 	s.rollbacks++
 	return nil
 }
-func (s *stubStore) GetLatestStatsSnapshot(context.Context, pgx.Tx) (*database.StatsSnapshot, error) {
-	return s.latest, nil
+func (s *stubStore) GetLatestStatsSnapshot(context.Context) (*database.StatsSnapshot, error) {
+	s.events = append(s.events, "latest")
+	return s.latest, s.latestErr
 }
 func (s *stubStore) GetMintStatsRows(context.Context, pgx.Tx, int64, int64) ([]database.MintStatsRow, error) {
+	if s.queryErr != nil {
+		return nil, s.queryErr
+	}
 	return s.mintRows, nil
 }
 func (s *stubStore) GetMeltStatsRows(context.Context, pgx.Tx, int64, int64) ([]database.MeltStatsRow, error) {
+	if s.queryErr != nil {
+		return nil, s.queryErr
+	}
 	return s.meltRows, nil
 }
 func (s *stubStore) GetProofStatsRows(context.Context, pgx.Tx, int64, int64) ([]database.KeysetStatsRow, error) {
+	if s.queryErr != nil {
+		return nil, s.queryErr
+	}
 	return s.proofRows, nil
 }
 func (s *stubStore) GetBlindSigStatsRows(context.Context, pgx.Tx, int64, int64) ([]database.KeysetStatsRow, error) {
+	if s.queryErr != nil {
+		return nil, s.queryErr
+	}
 	return s.blindSigRows, nil
 }
 func (s *stubStore) GetStatsFeeRows(context.Context, pgx.Tx, int64, int64) ([]database.KeysetFeeRow, error) {
+	if s.queryErr != nil {
+		return nil, s.queryErr
+	}
 	return s.feeRows, nil
 }
 func (s *stubStore) GetStatsSnapshotsBySince(context.Context, int64) ([]database.StatsSnapshot, error) {
 	return s.inserted, nil
 }
 func (s *stubStore) InsertStatsSnapshot(_ context.Context, snapshot database.StatsSnapshot) error {
+	s.events = append(s.events, "insert")
 	s.inserted = append(s.inserted, snapshot)
 	return s.insertErr
 }
@@ -91,6 +118,16 @@ func newTestService(store Store) Service {
 			return 77, nil
 		},
 	}
+}
+
+func filterEvents(events []string, allowed ...string) []string {
+	filtered := make([]string, 0, len(events))
+	for _, event := range events {
+		if slices.Contains(allowed, event) {
+			filtered = append(filtered, event)
+		}
+	}
+	return filtered
 }
 
 func TestCreateSnapshotStartsAtZeroWhenNoPriorSnapshot(t *testing.T) {
@@ -125,6 +162,88 @@ func TestCreateSnapshotUsesPreviousEndDatePlusOne(t *testing.T) {
 	}
 	if result.StartDate != 13 {
 		t.Fatalf("expected start date 13, got %d", result.StartDate)
+	}
+}
+
+func TestCreateSnapshotReadsLatestSnapshotBeforeOpeningStatsTx(t *testing.T) {
+	store := &stubStore{ //nolint:exhaustruct
+		latest:   &database.StatsSnapshot{EndDate: 12},
+		meltRows: []database.MeltStatsRow{{Quote: "m1", Unit: "sat", Amount: 1}},
+	}
+	service := newTestService(store)
+
+	_, err := service.CreateSnapshot(context.Background())
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	if !slices.Equal([]string{"latest", "get_tx"}, store.events[:2]) {
+		t.Fatalf("unexpected call order: %#v", store.events)
+	}
+}
+
+func TestCreateSnapshotReturnsLatestSnapshotErrorWithoutOpeningStatsTx(t *testing.T) {
+	store := &stubStore{latestErr: errors.New("latest down")} //nolint:exhaustruct
+	service := newTestService(store)
+
+	_, err := service.CreateSnapshot(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "GetLatestStatsSnapshot") {
+		t.Fatalf("expected latest snapshot error, got %v", err)
+	}
+	if slices.Contains(store.events, "get_tx") {
+		t.Fatalf("did not expect GetTx call after latest snapshot failure: %#v", store.events)
+	}
+}
+
+func TestCreateSnapshotSkipsBeforeOpeningStatsTxWhenWindowIsEmpty(t *testing.T) {
+	store := &stubStore{latest: &database.StatsSnapshot{EndDate: 100}} //nolint:exhaustruct
+	service := newTestService(store)
+	service.Now = func() time.Time { return time.Unix(105, 0) }
+
+	result, err := service.CreateSnapshot(context.Background())
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	if result.Outcome != SnapshotSkipped {
+		t.Fatalf("expected skipped outcome, got %s", result.Outcome)
+	}
+	if slices.Contains(store.events, "get_tx") {
+		t.Fatalf("did not expect GetTx call for empty window: %#v", store.events)
+	}
+}
+
+func TestCreateSnapshotClosesStatsTxBeforeInsert(t *testing.T) {
+	store := &stubStore{meltRows: []database.MeltStatsRow{{Quote: "m1", Unit: "sat", Amount: 1}}} //nolint:exhaustruct
+	service := newTestService(store)
+
+	_, err := service.CreateSnapshot(context.Background())
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	if !slices.Equal([]string{"latest", "get_tx", "rollback", "insert"}, filterEvents(store.events, "latest", "get_tx", "rollback", "insert")) {
+		t.Fatalf("unexpected lifecycle order: %#v", store.events)
+	}
+}
+
+func TestCreateSnapshotRollsBackStatsTxWhenStatsQueryFails(t *testing.T) {
+	store := &stubStore{queryErr: errors.New("boom")} //nolint:exhaustruct
+	service := newTestService(store)
+
+	_, err := service.CreateSnapshot(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if store.rollbacks != 1 {
+		t.Fatalf("expected one rollback, got %d", store.rollbacks)
+	}
+}
+
+func TestCreateSnapshotReturnsGetTxError(t *testing.T) {
+	store := &stubStore{getTxErr: errors.New("tx down")} //nolint:exhaustruct
+	service := newTestService(store)
+
+	_, err := service.CreateSnapshot(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "GetTx") {
+		t.Fatalf("expected GetTx error, got %v", err)
 	}
 }
 

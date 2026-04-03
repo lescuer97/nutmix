@@ -13,9 +13,9 @@ import (
 )
 
 type Store interface {
-	GetReadTx(ctx context.Context) (pgx.Tx, error)
+	GetTx(ctx context.Context) (pgx.Tx, error)
 	Rollback(ctx context.Context, tx pgx.Tx) error
-	GetLatestStatsSnapshot(ctx context.Context, tx pgx.Tx) (*database.StatsSnapshot, error)
+	GetLatestStatsSnapshot(ctx context.Context) (*database.StatsSnapshot, error)
 	GetMintStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]database.MintStatsRow, error)
 	GetMeltStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]database.MeltStatsRow, error)
 	GetProofStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]database.KeysetStatsRow, error)
@@ -138,15 +138,7 @@ func (s Service) CreateSnapshot(ctx context.Context) (SnapshotResult, error) {
 		return result, fmt.Errorf("mint amount decoder is nil")
 	}
 
-	tx, err := s.DB.GetReadTx(ctx)
-	if err != nil {
-		return result, fmt.Errorf("GetReadTx: %w", err)
-	}
-	defer func() {
-		_ = s.DB.Rollback(ctx, tx)
-	}()
-
-	latest, err := s.DB.GetLatestStatsSnapshot(ctx, tx)
+	latest, err := s.DB.GetLatestStatsSnapshot(ctx)
 	if err != nil {
 		return result, fmt.Errorf("GetLatestStatsSnapshot: %w", err)
 	}
@@ -161,25 +153,40 @@ func (s Service) CreateSnapshot(ctx context.Context) (SnapshotResult, error) {
 		return result, nil
 	}
 
-	mintRows, err := s.DB.GetMintStatsRows(ctx, tx, result.StartDate, result.EndDate)
+	mintRows, meltRows, proofRows, blindSigRows, feeRows, err := func() ([]database.MintStatsRow, []database.MeltStatsRow, []database.KeysetStatsRow, []database.KeysetStatsRow, []database.KeysetFeeRow, error) {
+		tx, err := s.DB.GetTx(ctx)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("GetTx: %w", err)
+		}
+		defer func() {
+			_ = s.DB.Rollback(ctx, tx)
+		}()
+
+		mintRows, err := s.DB.GetMintStatsRows(ctx, tx, result.StartDate, result.EndDate)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("GetMintStatsRows: %w", err)
+		}
+		meltRows, err := s.DB.GetMeltStatsRows(ctx, tx, result.StartDate, result.EndDate)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("GetMeltStatsRows: %w", err)
+		}
+		proofRows, err := s.DB.GetProofStatsRows(ctx, tx, result.StartDate, result.EndDate)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("GetProofStatsRows: %w", err)
+		}
+		blindSigRows, err := s.DB.GetBlindSigStatsRows(ctx, tx, result.StartDate, result.EndDate)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("GetBlindSigStatsRows: %w", err)
+		}
+		feeRows, err := s.DB.GetStatsFeeRows(ctx, tx, result.StartDate, result.EndDate)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("GetStatsFeeRows: %w", err)
+		}
+
+		return mintRows, meltRows, proofRows, blindSigRows, feeRows, nil
+	}()
 	if err != nil {
-		return result, fmt.Errorf("GetMintStatsRows: %w", err)
-	}
-	meltRows, err := s.DB.GetMeltStatsRows(ctx, tx, result.StartDate, result.EndDate)
-	if err != nil {
-		return result, fmt.Errorf("GetMeltStatsRows: %w", err)
-	}
-	proofRows, err := s.DB.GetProofStatsRows(ctx, tx, result.StartDate, result.EndDate)
-	if err != nil {
-		return result, fmt.Errorf("GetProofStatsRows: %w", err)
-	}
-	blindSigRows, err := s.DB.GetBlindSigStatsRows(ctx, tx, result.StartDate, result.EndDate)
-	if err != nil {
-		return result, fmt.Errorf("GetBlindSigStatsRows: %w", err)
-	}
-	feeRows, err := s.DB.GetStatsFeeRows(ctx, tx, result.StartDate, result.EndDate)
-	if err != nil {
-		return result, fmt.Errorf("GetStatsFeeRows: %w", err)
+		return result, err
 	}
 
 	mintSummaryMap := make(map[string]*database.StatsSummaryItem)

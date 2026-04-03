@@ -152,28 +152,10 @@ func TestStatsTableMigrationCreatesFeesColumn(t *testing.T) {
 	}
 }
 
-func TestGetReadTxStartsReadOnlyTransaction(t *testing.T) {
-	ctx := context.Background()
-	db := setupTestDatabase(t, ctx)
-	tx, err := db.GetReadTx(ctx)
-	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
-	}
-	defer func() { _ = db.Rollback(ctx, tx) }()
-	if _, err := tx.Exec(ctx, `INSERT INTO stats (start_date, end_date, mint_summary, melt_summary, blind_sigs_summary, proofs_summary, fees) VALUES (1,1,'[]','[]','[]','[]',0)`); err == nil {
-		t.Fatal("expected read-only transaction to reject writes")
-	}
-}
-
 func TestGetLatestStatsSnapshotReturnsNilWhenEmpty(t *testing.T) {
 	ctx := context.Background()
 	db := setupTestDatabase(t, ctx)
-	tx, err := db.GetReadTx(ctx)
-	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
-	}
-	defer func() { _ = db.Rollback(ctx, tx) }()
-	snapshot, err := db.GetLatestStatsSnapshot(ctx, tx)
+	snapshot, err := db.GetLatestStatsSnapshot(ctx)
 	if err != nil {
 		t.Fatalf("GetLatestStatsSnapshot: %v", err)
 	}
@@ -191,12 +173,7 @@ func TestGetLatestStatsSnapshotUsesGreatestEndDateThenID(t *testing.T) {
 		(21, 20, '[{"unit":"sat","quantity":1,"amount":2}]', '[]', '[]', '[]', 3)`); err != nil {
 		t.Fatalf("insert stats: %v", err)
 	}
-	tx, err := db.GetReadTx(ctx)
-	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
-	}
-	defer func() { _ = db.Rollback(ctx, tx) }()
-	snapshot, err := db.GetLatestStatsSnapshot(ctx, tx)
+	snapshot, err := db.GetLatestStatsSnapshot(ctx)
 	if err != nil {
 		t.Fatalf("GetLatestStatsSnapshot: %v", err)
 	}
@@ -205,15 +182,10 @@ func TestGetLatestStatsSnapshotUsesGreatestEndDateThenID(t *testing.T) {
 	}
 }
 
-func TestGetLatestStatsSnapshotUsesCallerProvidedTransactionSnapshot(t *testing.T) {
+func TestGetLatestStatsSnapshotSeesLatestCommittedRow(t *testing.T) {
 	ctx := context.Background()
 	db := setupTestDatabase(t, ctx)
-	tx, err := db.GetReadTx(ctx)
-	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
-	}
-	defer func() { _ = db.Rollback(ctx, tx) }()
-	first, err := db.GetLatestStatsSnapshot(ctx, tx)
+	first, err := db.GetLatestStatsSnapshot(ctx)
 	if err != nil {
 		t.Fatalf("GetLatestStatsSnapshot first: %v", err)
 	}
@@ -223,12 +195,12 @@ func TestGetLatestStatsSnapshotUsesCallerProvidedTransactionSnapshot(t *testing.
 	if _, err := db.pool.Exec(ctx, `INSERT INTO stats (start_date, end_date, mint_summary, melt_summary, blind_sigs_summary, proofs_summary, fees) VALUES (0, 10, '[]', '[]', '[]', '[]', 0)`); err != nil {
 		t.Fatalf("insert stats: %v", err)
 	}
-	second, err := db.GetLatestStatsSnapshot(ctx, tx)
+	second, err := db.GetLatestStatsSnapshot(ctx)
 	if err != nil {
 		t.Fatalf("GetLatestStatsSnapshot second: %v", err)
 	}
-	if second != nil {
-		t.Fatalf("expected repeatable-read snapshot to hide later row, got %#v", second)
+	if second == nil || second.EndDate != 10 {
+		t.Fatalf("expected latest snapshot, got %#v", second)
 	}
 }
 
@@ -248,12 +220,7 @@ func TestGetLatestStatsSnapshotRoundTripsJSONBSummaries(t *testing.T) {
 	if err := db.InsertStatsSnapshot(ctx, expected); err != nil {
 		t.Fatalf("InsertStatsSnapshot: %v", err)
 	}
-	tx, err := db.GetReadTx(ctx)
-	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
-	}
-	defer func() { _ = db.Rollback(ctx, tx) }()
-	snapshot, err := db.GetLatestStatsSnapshot(ctx, tx)
+	snapshot, err := db.GetLatestStatsSnapshot(ctx)
 	if err != nil {
 		t.Fatalf("GetLatestStatsSnapshot: %v", err)
 	}
@@ -268,34 +235,6 @@ func TestGetLatestStatsSnapshotRoundTripsJSONBSummaries(t *testing.T) {
 	}
 }
 
-func TestStatsReadsUseCallerProvidedTransactionSnapshot(t *testing.T) {
-	ctx := context.Background()
-	db := setupTestDatabase(t, ctx)
-	tx, err := db.GetReadTx(ctx)
-	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
-	}
-	defer func() { _ = db.Rollback(ctx, tx) }()
-	rows, err := db.GetMintStatsRows(ctx, tx, 0, 100)
-	if err != nil {
-		t.Fatalf("GetMintStatsRows first: %v", err)
-	}
-	if len(rows) != 0 {
-		t.Fatalf("expected no rows, got %#v", rows)
-	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO mint_request (quote, request, expiry, unit, minted, state, seen_at, amount, checking_id, pubkey, description)
-		VALUES ('q1', 'request', 100, 'sat', true, 'ISSUED', 10, 5, '', NULL, NULL)`); err != nil {
-		t.Fatalf("insert mint_request: %v", err)
-	}
-	rows, err = db.GetMintStatsRows(ctx, tx, 0, 100)
-	if err != nil {
-		t.Fatalf("GetMintStatsRows second: %v", err)
-	}
-	if len(rows) != 0 {
-		t.Fatalf("expected repeatable-read snapshot to hide later mint row, got %#v", rows)
-	}
-}
-
 func TestGetMintStatsRowsFiltersPaidAndIssuedInInclusiveRange(t *testing.T) {
 	ctx := context.Background()
 	db := setupTestDatabase(t, ctx)
@@ -305,9 +244,9 @@ func TestGetMintStatsRowsFiltersPaidAndIssuedInInclusiveRange(t *testing.T) {
 		('q-pending', 'request', 100, 'sat', false, 'PENDING', 15, 9, '', NULL, NULL)`); err != nil {
 		t.Fatalf("insert mint_request: %v", err)
 	}
-	tx, err := db.GetReadTx(ctx)
+	tx, err := db.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
+		t.Fatalf("GetTx: %v", err)
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
 	rows, err := db.GetMintStatsRows(ctx, tx, 10, 20)
@@ -328,9 +267,9 @@ func TestGetMeltStatsRowsUsesInclusiveRangeAndStateFilter(t *testing.T) {
 		('m-unpaid', 'request', 0, 100, 'sat', 9, false, 'UNPAID', '', 15, false, 0, '')`); err != nil {
 		t.Fatalf("insert melt_request: %v", err)
 	}
-	tx, err := db.GetReadTx(ctx)
+	tx, err := db.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
+		t.Fatalf("GetTx: %v", err)
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
 	rows, err := db.GetMeltStatsRows(ctx, tx, 10, 20)
@@ -352,9 +291,9 @@ func TestGetProofStatsRowsUsesInclusiveRangeAndReturnsSpentProofsWithResolvedUni
 		(5, 'proof-keyset', 's3', decode('05','hex'), decode('06','hex'), '', 15, 'PENDING', NULL)`); err != nil {
 		t.Fatalf("insert proofs: %v", err)
 	}
-	tx, err := db.GetReadTx(ctx)
+	tx, err := db.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
+		t.Fatalf("GetTx: %v", err)
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
 	rows, err := db.GetProofStatsRows(ctx, tx, 10, 20)
@@ -375,9 +314,9 @@ func TestGetBlindSigStatsRowsUsesInclusiveRangeAndReturnsResolvedUnits(t *testin
 		('blind-keyset', 4, decode('03','hex'), decode('04','hex'), 20, NULL, NULL)`); err != nil {
 		t.Fatalf("insert recovery_signature: %v", err)
 	}
-	tx, err := db.GetReadTx(ctx)
+	tx, err := db.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
+		t.Fatalf("GetTx: %v", err)
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
 	rows, err := db.GetBlindSigStatsRows(ctx, tx, 10, 20)
@@ -396,9 +335,9 @@ func TestGetProofStatsRowsExposesUnresolvedKeysetIDs(t *testing.T) {
 		VALUES (3, 'missing-proof', 's1', decode('01','hex'), decode('02','hex'), '', 10, 'SPENT', NULL)`); err != nil {
 		t.Fatalf("insert proofs: %v", err)
 	}
-	tx, err := db.GetReadTx(ctx)
+	tx, err := db.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
+		t.Fatalf("GetTx: %v", err)
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
 	rows, err := db.GetProofStatsRows(ctx, tx, 0, 20)
@@ -417,9 +356,9 @@ func TestGetBlindSigStatsRowsExposesUnresolvedKeysetIDs(t *testing.T) {
 		VALUES ('missing-blind', 3, decode('01','hex'), decode('02','hex'), 10, NULL, NULL)`); err != nil {
 		t.Fatalf("insert recovery_signature: %v", err)
 	}
-	tx, err := db.GetReadTx(ctx)
+	tx, err := db.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
+		t.Fatalf("GetTx: %v", err)
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
 	rows, err := db.GetBlindSigStatsRows(ctx, tx, 0, 20)
@@ -473,9 +412,9 @@ func TestGetStatsFeeRowsReturnsSpentProofCountsByKeyset(t *testing.T) {
 		(6, 'fee-sat', 's4', decode('07','hex'), decode('08','hex'), '', 22, 'PENDING', NULL)`); err != nil {
 		t.Fatalf("insert proofs: %v", err)
 	}
-	tx, err := db.GetReadTx(ctx)
+	tx, err := db.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
+		t.Fatalf("GetTx: %v", err)
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
 	rows, err := db.GetStatsFeeRows(ctx, tx, 10, 20)

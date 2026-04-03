@@ -41,13 +41,7 @@ func TestCreateSnapshotWithRealPostgresPersistsExpectedStatsRow(t *testing.T) {
 		t.Fatalf("unexpected window: %#v", result)
 	}
 
-	readTx, err := db.GetReadTx(ctx)
-	if err != nil {
-		t.Fatalf("GetReadTx: %v", err)
-	}
-	defer func() { _ = db.Rollback(ctx, readTx) }()
-
-	snapshot, err := db.GetLatestStatsSnapshot(ctx, readTx)
+	snapshot, err := db.GetLatestStatsSnapshot(ctx)
 	if err != nil {
 		t.Fatalf("GetLatestStatsSnapshot: %v", err)
 	}

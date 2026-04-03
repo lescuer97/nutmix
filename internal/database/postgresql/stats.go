@@ -17,8 +17,8 @@ func normalizeStatsSummary(items []database.StatsSummaryItem) []database.StatsSu
 	return items
 }
 
-func (pql Postgresql) GetLatestStatsSnapshot(ctx context.Context, tx pgx.Tx) (*database.StatsSnapshot, error) {
-	row := tx.QueryRow(ctx, `SELECT id, start_date, end_date, mint_summary, melt_summary, blind_sigs_summary, proofs_summary, fees
+func (pql Postgresql) GetLatestStatsSnapshot(ctx context.Context) (*database.StatsSnapshot, error) {
+	row := pql.pool.QueryRow(ctx, `SELECT id, start_date, end_date, mint_summary, melt_summary, blind_sigs_summary, proofs_summary, fees
 		FROM stats
 		ORDER BY end_date DESC, id DESC
 		LIMIT 1`)

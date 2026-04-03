@@ -82,7 +82,6 @@ type KeysetFeeRow struct {
 
 type MintDB interface {
 	GetTx(ctx context.Context) (pgx.Tx, error)
-	GetReadTx(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context, tx pgx.Tx) error
 	Rollback(ctx context.Context, tx pgx.Tx) error
 
@@ -145,7 +144,7 @@ type MintDB interface {
 	MakeAuthUser(tx pgx.Tx, auth AuthUser) error
 	UpdateLastLoggedIn(tx pgx.Tx, sub string, lastLoggedIn uint64) error
 
-	GetLatestStatsSnapshot(ctx context.Context, tx pgx.Tx) (*StatsSnapshot, error)
+	GetLatestStatsSnapshot(ctx context.Context) (*StatsSnapshot, error)
 	GetMintStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]MintStatsRow, error)
 	GetMeltStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]MeltStatsRow, error)
 	GetProofStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]KeysetStatsRow, error)

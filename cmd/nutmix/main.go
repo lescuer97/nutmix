@@ -156,7 +156,7 @@ func main() {
 			return uint64(invoice.MilliSat.ToSatoshis()), nil
 		},
 	}
-	go statsService.Run(appCtx, 30*time.Minute)
+	go statsService.Run(appCtx, 15*time.Minute)
 
 	routes.V1Routes(r, mint)
 
