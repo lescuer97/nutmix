@@ -78,7 +78,6 @@ func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 	}
 
 	return mint
-
 }
 
 const quoteId = "quoteid"
@@ -194,6 +193,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 	if meltRequest.State != cashu.PAID {
 		t.Errorf("State should be paid: %+v ", meltRequest.State)
 	}
+	if !meltRequest.Melted {
+		t.Errorf("melt request should be marked melted: %+v ", meltRequest)
+	}
 
 	ctx := context.Background()
 	tx, err := mint.MintDB.GetTx(ctx)
@@ -213,6 +215,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 	}
 	if savedQuote.State != cashu.PAID {
 		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
+	}
+	if !savedQuote.Melted {
+		t.Errorf("saved quote should be marked melted: %+v ", savedQuote)
 	}
 
 	meltChange, err := mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote)
@@ -244,7 +249,6 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.Commit(ctx, tx): %+v ", err)
 	}
-
 }
 func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)

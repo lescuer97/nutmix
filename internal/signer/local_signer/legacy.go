@@ -37,7 +37,6 @@ func legacyGetMintPrivateKey() (*bip32.Key, error) {
 		return nil, fmt.Errorf(" bip32.NewMasterKey(privateKey.Serialize()). %w", err)
 	}
 	return masterKey, nil
-
 }
 
 func legacyDeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, error) {
@@ -49,7 +48,6 @@ func legacyDeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, e
 	unitKey, err := mintKey.NewChildKey(uint32(unit.EnumIndex()))
 
 	if err != nil {
-
 		return nil, fmt.Errorf("mintKey.NewChildKey(uint32(unit.EnumIndex())). %w", err)
 	}
 
@@ -67,7 +65,7 @@ func legacyDeriveKeyset(mintKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, e
 }
 
 func legacyGenerateKeysets(versionKey *bip32.Key, seed cashu.Seed) ([]cashu.MintKey, error) {
-	var keysets []cashu.MintKey
+	var keysets = make([]cashu.MintKey, len(seed.Amounts))
 
 	// Get the current time
 	currentTime := time.Now()
@@ -93,7 +91,7 @@ func legacyGenerateKeysets(versionKey *bip32.Key, seed cashu.Seed) ([]cashu.Mint
 			FinalExpiry: nil,
 		}
 
-		keysets = append(keysets, keyset)
+		keysets[i] = keyset
 	}
 
 	return keysets, nil

@@ -42,7 +42,6 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 	keys, err := localsigner.GetKeysets()
 	if err != nil {
 		t.Fatalf("localsigner.GetKeys() %+v", err)
-
 	}
 	if len(keys.Keysets) != 3 {
 		t.Errorf("Version should be 3. it's %v", len(keys.Keysets))
@@ -122,10 +121,8 @@ func TestRotateAuthSeedUnit(t *testing.T) {
 	keys, err := localsigner.GetAuthActiveKeys()
 	if err != nil {
 		t.Fatalf("localsigner.GetKeys() %+v", err)
-
 	}
 	if len(keys.Keysets) != 1 {
-
 		t.Errorf("There should only be one keyset for auth. there is: %v", len(keys.Keysets))
 	}
 
@@ -324,7 +321,6 @@ func TestAuthConvertToInteger(t *testing.T) {
 	if intRef != 1222349093 {
 		t.Errorf("auth bytes are wrong %v", intRef)
 	}
-
 }
 
 func TestDeriveKeysetSat(t *testing.T) {
@@ -509,7 +505,6 @@ func TestDeriveKeysetAuth(t *testing.T) {
 	if id != "00e1cf6079abb988" {
 		t.Errorf("id was incorrect. %v", id)
 	}
-
 }
 
 func TestLoadLegacyAndNonLegacySeeds(t *testing.T) {

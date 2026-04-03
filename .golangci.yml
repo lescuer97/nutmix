@@ -12,6 +12,8 @@ linters:
     - bidichk         # Checks for dangerous unicode character sequences
     - bodyclose       # Checks HTTP response body is closed
     - contextcheck    # Check for non-inherited context
+    - musttag # enforces field tags in (un)marshaled structs
+    - staticcheck # is a go vet on steroids, applying a ton of static analysis checks
     
     # Bug detection
     - staticcheck     # Comprehensive static analysis
@@ -26,6 +28,15 @@ linters:
     - unparam         # Unused function parameters
     - misspell        # Commonly misspelled words
     - exhaustruct # [highly recommend to enable] checks if all structure fields are initialized
+    - iface # checks the incorrect use of interfaces, helping developers avoid interface pollution
+    - sqlclosecheck # checks that sql.Rows and sql.Stmt are closed
+    - sloglint # ensure consistent code style when using log/slog
+    - unconvert # removes unnecessary type conversions
+    - unparam # reports unused function parameters
+    - unqueryvet # detects SELECT * in SQL queries and SQL builders, encouraging explicit column selection
+    - whitespace # detects leading and trailing whitespace
+    # - noinlineerr # disallows inline error handling `if err := ...; err != nil {`
+    - prealloc # [premature optimization, but can be used in some cases] finds slice declarations that could potentially be preallocated
 
   settings:
     gosec:

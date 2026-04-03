@@ -106,13 +106,10 @@ func TestCheckP2PKProof(t *testing.T) {
 	valid, err := proof.VerifyP2PK(spendCondition)
 	if err != nil {
 		t.Errorf("should not have errored. %+v", err)
-
 	}
 	if !valid {
-
 		t.Errorf("proof should have been valid")
 	}
-
 }
 
 func TestCheckP2PKProofInvalidSignature(t *testing.T) {
@@ -164,7 +161,6 @@ func TestCheckP2PKProofValidMultisig2of2(t *testing.T) {
 	valid, err := proof.VerifyP2PK(spendCondition)
 	if err != nil {
 		t.Errorf("should not have errored. %+v", err)
-
 	}
 	if !valid {
 		t.Errorf("proof should have been valid")
@@ -219,7 +215,6 @@ func TestCheckP2PKProofWithSpendableLocktime(t *testing.T) {
 	valid, err := proof.VerifyP2PK(spendCondition)
 	if err != nil {
 		t.Errorf("should not have errored. %+v", err)
-
 	}
 	if !valid {
 		t.Errorf("proof should have been valid")

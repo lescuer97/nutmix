@@ -47,11 +47,9 @@ func TestOrderKeysetByUnit(t *testing.T) {
 	if firstOrdKey.Keys["1"] != "03a524f43d6166ad3567f18b0a5c769c6ab4dc02149f4d5095ccf4e8ffa293e785" {
 		t.Errorf("keyset is not correct. %v", firstOrdKey.Keys["1"])
 	}
-
 }
 
 func TestAmountOfFeeProofs(t *testing.T) {
-
 	var proofs []cashu.Proof
 	var keysets []cashu.BasicKeysetResponse
 	id := "keysetID"
@@ -121,5 +119,4 @@ func TestAmountOfFeeProofs(t *testing.T) {
 	if fee != 2 {
 		t.Errorf("fee calculation is incorrect: %v. Should be 2", fee)
 	}
-
 }

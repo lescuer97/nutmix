@@ -166,7 +166,6 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 	totalAttempts := 50
 	var routes []*lnrpc.Route
 	for i := 0; i < totalAttempts; i++ {
-
 		//nolint:exhaustruct
 		queryRoutes := lnrpc.QueryRoutesRequest{
 			PubKey:            hex.EncodeToString(zpayInvoice.Destination.SerializeCompressed()),
@@ -237,12 +236,10 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 				return nil
 			default:
 				continue
-
 			}
 		}
 	}
 	return fmt.Errorf("multi nut no route. %w", cashu.ErrPaymentNoRoute)
-
 }
 
 func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
@@ -309,7 +306,6 @@ func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, 
 			return payStatus, nil
 		default:
 			continue
-
 		}
 	}
 }
@@ -359,7 +355,6 @@ func (l LndGrpcWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 
 	case lnrpc.Invoice_OPEN:
 		return PENDING, hex.EncodeToString(invoiceStatus.RPreimage), nil
-
 	}
 	return PENDING, "", nil
 }
@@ -453,7 +448,7 @@ func (l LndGrpcWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	return feesResponse, nil
 }
 
-func (l LndGrpcWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
+func (l LndGrpcWallet) RequestInvoice(amount cashu.Amount, description *string) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	supported := l.VerifyUnitSupport(amount.Unit)
 	if !supported {
@@ -469,13 +464,15 @@ func (l LndGrpcWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 		return response, fmt.Errorf(`amount.To(cashu.Sat) %w`, err)
 	}
 
-	Lndinvoice := lnrpc.Invoice{ValueMsat: int64(amount.Amount), Expiry: 900} //nolint:exhaustruct
-	if quote.Description != nil {
-		Lndinvoice.Memo = *quote.Description
+	var lndInvoice lnrpc.Invoice
+	lndInvoice.ValueMsat = int64(amount.Amount)
+	lndInvoice.Expiry = 900
+	if description != nil {
+		lndInvoice.Memo = *description
 	}
 
 	// Expiry time is 15 minutes
-	res, err := client.AddInvoice(ctx, &Lndinvoice)
+	res, err := client.AddInvoice(ctx, &lndInvoice)
 
 	if err != nil {
 		return response, err

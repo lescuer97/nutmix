@@ -102,7 +102,6 @@ func TestMintMatchPattern(t *testing.T) {
 	if matches {
 		t.Errorf(`This path should have not passed. "%s"`, "/v1/swap")
 	}
-
 }
 
 func TestMeltMatchPattern(t *testing.T) {
@@ -205,5 +204,4 @@ func TestMeltMatchPattern(t *testing.T) {
 	if matches {
 		t.Errorf(`This path should have not passed. "%s"`, "/v1/swap")
 	}
-
 }

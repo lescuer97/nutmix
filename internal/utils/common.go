@@ -27,7 +27,6 @@ const CLNGRPC LightningBackend = "ClnGrpcWallet"
 const Strike LightningBackend = "Strike"
 
 func StringToLightningBackend(text string) LightningBackend {
-
 	switch text {
 	case string(FAKE_WALLET):
 		return FAKE_WALLET
@@ -39,7 +38,6 @@ func StringToLightningBackend(text string) LightningBackend {
 		return Strike
 	default:
 		return FAKE_WALLET
-
 	}
 }
 
@@ -141,7 +139,6 @@ func (c *Config) UseEnviromentVars() {
 
 	c.MINT_LNBITS_ENDPOINT = os.Getenv("MINT_LNBITS_ENDPOINT")
 	c.MINT_LNBITS_KEY = os.Getenv("MINT_LNBITS_KEY")
-
 }
 func RandomHash() (string, error) {
 	// Create a byte slice of 30 random bytes

@@ -45,7 +45,6 @@ func TestSwapRequestMsg(t *testing.T) {
 	if hex.EncodeToString(hashMessage[:]) != "de7f9e3ca0fcc5ed3258fcf83dbf1be7fa78a5ed6da7bf2aa60d61e9dc6eb09a" {
 		t.Errorf("hash message is wrong %v", msg)
 	}
-
 }
 
 func TestSwapRequestValidSignature(t *testing.T) {
@@ -157,7 +156,6 @@ func TestSwapRequestValidMultiSig(t *testing.T) {
 	err = swapRequest.ValidateSigflag()
 	if err != nil {
 		t.Errorf("there should not have been any error on multisig! %+v ", err)
-
 	}
 }
 

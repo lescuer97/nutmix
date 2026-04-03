@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 
@@ -13,7 +12,6 @@ import (
 
 func AuthActivatedMiddleware(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		if !mint.Config.MINT_REQUIRE_AUTH {
 			slog.Warn(fmt.Errorf("tried using route that does not exist because auth not being active").Error())
 			c.JSON(404, "route does not exists")
@@ -74,15 +72,27 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		ctx := context.Background()
-		tx, err := mint.MintDB.GetTx(ctx)
+		amountBlindMessages := uint64(0)
+
+		for _, blindMessage := range mintRequest.Outputs {
+			amountBlindMessages += blindMessage.Amount
+			// check all blind messages have the same unit
+		}
+
+		if amountBlindMessages > mint.Config.MINT_AUTH_MAX_BLIND_TOKENS {
+			slog.Warn("Trying to mint auth tokens over the limit")
+			c.JSON(400, cashu.ErrorCodeToResponse(cashu.MAXIMUM_BAT_MINT_LIMIT_EXCEEDED, nil))
+			return
+		}
+		tx, err := mint.MintDB.GetTx(c.Request.Context())
 		if err != nil {
 			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
 			return
 		}
 		defer func() {
 			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				rollbackErr := mint.MintDB.Rollback(c.Request.Context(), tx)
+				if rollbackErr != nil {
 					slog.Warn("rollback error", slog.Any("error", rollbackErr))
 				}
 			}
@@ -95,7 +105,15 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
-		unit, err := mint.VerifyOutputs(tx, mintRequest.Outputs, keysets.Keysets)
+		unit, err := mint.VerifyOutputs(mintRequest.Outputs, keysets.Keysets)
+		if err != nil {
+			slog.Warn("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
+			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
+			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			return
+		}
+
+		err = mint.CheckOutputSpent(tx, mintRequest.Outputs)
 		if err != nil {
 			slog.Warn("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -106,19 +124,6 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		if unit != cashu.AUTH {
 			details := `You can only use "auth" tokens in this endpoint`
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.UNIT_NOT_SUPPORTED, &details))
-			return
-		}
-
-		amountBlindMessages := uint64(0)
-
-		for _, blindMessage := range mintRequest.Outputs {
-			amountBlindMessages += blindMessage.Amount
-			// check all blind messages have the same unit
-		}
-
-		if amountBlindMessages > mint.Config.MINT_AUTH_MAX_BLIND_TOKENS {
-			slog.Warn("Trying to mint auth tokens over the limit")
-			c.JSON(400, cashu.ErrorCodeToResponse(cashu.MAXIMUM_BAT_MINT_LIMIT_EXCEEDED, nil))
 			return
 		}
 
@@ -137,7 +142,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		err = mint.MintDB.Commit(ctx, tx)
+		err = mint.MintDB.Commit(c.Request.Context(), tx)
 		if err != nil {
 			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
 			return

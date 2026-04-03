@@ -28,7 +28,7 @@ type LightningBackend interface {
 	PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error)
 	CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error)
 	CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error)
-	RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error)
+	RequestInvoice(amount cashu.Amount, description *string) (InvoiceResponse, error)
 	// returns the amount in sats and the checking_id
 	QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error)
 	// returns milisats balance

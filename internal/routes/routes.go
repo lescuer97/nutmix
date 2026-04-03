@@ -13,5 +13,4 @@ func V1Routes(r *gin.Engine, mint *mint.Mint) {
 	v1MintRoutes(r, mint)
 	v1bolt11Routes(r, mint)
 	v1WebSocketRoute(r, mint)
-
 }

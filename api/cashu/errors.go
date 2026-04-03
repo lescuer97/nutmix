@@ -11,9 +11,20 @@ var (
 	ErrDifferentInputOutputUnit   = errors.New("different input output unit")
 	ErrNotEnoughtProofs           = errors.New("not enough proofs")
 	ErrProofSpent                 = errors.New("proof already spent")
+	ErrProofPending               = errors.New("Proofs are pending")
 	ErrBlindMessageAlreadySigned  = errors.New("blind message already signed")
 	ErrCommonSecretNotCorrectSize = errors.New("proof secret is not correct size")
 	ErrUnknown                    = errors.New("unknown error")
+	ErrPaymentMethodNotSupported  = errors.New("payment method not supported")
+
+	ErrMintRequestAlreadyIssued = errors.New("mint request already issued")
+	ErrAmountNotEqualToInvoice  = errors.New("Amount in request does not equal invoice")
+
+	ErrMintintDisabled    = errors.New("minting is disabled")
+	ErrAmountOutsideLimit = errors.New("amount is outside the limit")
+	ErrRequestNotPaid     = errors.New("request not paid yet")
+
+	ErrAmountlessInvoiceNotSupported = errors.New("Amount less invoices not supported")
 )
 
 type ErrorCode uint
@@ -21,17 +32,19 @@ type ErrorCode uint
 const (
 	PROOF_VERIFICATION_FAILED ErrorCode = 10001
 
-	PROOF_ALREADY_SPENT         ErrorCode = 11001
-	PROOFS_PENDING              ErrorCode = 11002
-	OUTPUTS_ALREADY_SIGNED      ErrorCode = 11003
-	OUTPUTS_PENDING             ErrorCode = 11004
-	TRANSACTION_NOT_BALANCED    ErrorCode = 11005
-	INSUFICIENT_FEE             ErrorCode = 11006
-	DUPLICATE_INPUTS            ErrorCode = 11007
-	DUPLICATE_OUTPUTS           ErrorCode = 11008
-	MULTIPLE_UNITS_OUTPUT_INPUT ErrorCode = 11009
-	INPUT_OUTPUT_NOT_SAME_UNIT  ErrorCode = 11010
-	UNIT_NOT_SUPPORTED          ErrorCode = 11013
+	PROOF_ALREADY_SPENT               ErrorCode = 11001
+	PROOFS_PENDING                    ErrorCode = 11002
+	OUTPUTS_ALREADY_SIGNED            ErrorCode = 11003
+	OUTPUTS_PENDING                   ErrorCode = 11004
+	TRANSACTION_NOT_BALANCED          ErrorCode = 11005
+	INSUFICIENT_OUTSIDE_LIMIT         ErrorCode = 11006
+	DUPLICATE_INPUTS                  ErrorCode = 11007
+	DUPLICATE_OUTPUTS                 ErrorCode = 11008
+	MULTIPLE_UNITS_OUTPUT_INPUT       ErrorCode = 11009
+	INPUT_OUTPUT_NOT_SAME_UNIT        ErrorCode = 11010
+	AMOUNT_LESS_INVOICE_NOT_SUPPORTED ErrorCode = 11011
+	AMOUNT_NOT_EQUAL_TO_INVOICE       ErrorCode = 11012
+	UNIT_NOT_SUPPORTED                ErrorCode = 11013
 
 	KEYSET_NOT_KNOW ErrorCode = 12001
 	INACTIVE_KEYSET ErrorCode = 12002
@@ -58,7 +71,6 @@ const (
 )
 
 func (e ErrorCode) String() string {
-
 	error := ""
 	switch e {
 	case OUTPUTS_ALREADY_SIGNED:
@@ -76,8 +88,8 @@ func (e ErrorCode) String() string {
 		error = "Transaction is not balanced (inputs != outputs)"
 	case UNIT_NOT_SUPPORTED:
 		error = "Unit in request is not supported"
-	case INSUFICIENT_FEE:
-		error = "Insufficient fee"
+	case INSUFICIENT_OUTSIDE_LIMIT:
+		error = "Amount outside limit"
 	case DUPLICATE_INPUTS:
 		error = "Duplicate inputs provided"
 	case DUPLICATE_OUTPUTS:
@@ -86,6 +98,10 @@ func (e ErrorCode) String() string {
 		error = "Inputs/Outputs of multiple units"
 	case INPUT_OUTPUT_NOT_SAME_UNIT:
 		error = "Inputs and outputs are not same unit"
+	case AMOUNT_NOT_EQUAL_TO_INVOICE:
+		error = "Amount in request does not equal invoice"
+	case AMOUNT_LESS_INVOICE_NOT_SUPPORTED:
+		error = "Amountless invoices are not supported"
 
 	case KEYSET_NOT_KNOW:
 		error = "Keyset is not known"
@@ -120,6 +136,8 @@ func (e ErrorCode) String() string {
 		error = "Maximum Blind auth token amounts execeeded"
 	case MAXIMUM_BAT_RATE_LIMIT_EXCEEDED:
 		error = "Maximum BAT rate limit execeeded"
+	case UNKNOWN:
+		error = "Unknown error"
 	}
 
 	return error
@@ -132,7 +150,6 @@ type ErrorResponse struct {
 }
 
 func ErrorCodeToResponse(code ErrorCode, detail *string) ErrorResponse {
-
 	return ErrorResponse{
 		Code:   code,
 		Error:  code.String(),

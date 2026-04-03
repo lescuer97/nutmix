@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
@@ -90,10 +91,8 @@ func CashuAmountToStrikeAmount(amount cashu.Amount) (strikeAmount, error) {
 			Amount:   floatStr,
 			Currency: EUR,
 		}, nil
-
 	}
 	return strikeAmt, cashu.ErrCouldNotConvertUnit
-
 }
 
 type strikeInvoiceResponse struct {
@@ -190,7 +189,6 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 		err := resp.Body.Close()
 		if err != nil {
 			slog.Error("could not close body from call.", slog.Any("error", err))
-
 		}
 	}()
 
@@ -221,9 +219,7 @@ func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, resp
 			return fmt.Errorf("unauthorized %+v", errorBody)
 		default:
 			return fmt.Errorf("unknown error %+v", errorBody)
-
 		}
-
 	}
 }
 
@@ -359,7 +355,7 @@ func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool,
 	return FeesResponse, nil
 }
 
-func (l Strike) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
+func (l Strike) RequestInvoice(amount cashu.Amount, description *string) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	supported := l.VerifyUnitSupport(amount.Unit)
 	if !supported {
@@ -371,8 +367,8 @@ func (l Strike) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (
 		return response, fmt.Errorf("CashuAmountToStrikeAmount(amount): %w", err)
 	}
 	reqInvoice := strikeInvoiceRequest{
-		CorrelationId: quote.Quote,
-		Description:   quote.Description,
+		CorrelationId: uuid.New().String(),
+		Description:   description,
 		Amount:        strikeAmt,
 	}
 
@@ -413,7 +409,6 @@ func (l Strike) WalletBalance() (cashu.Amount, error) {
 			}
 			balanceTotal += currentBalance.Amount
 		}
-
 	}
 
 	return cashu.Amount{Unit: cashu.Msat, Amount: balanceTotal * 1000}, nil

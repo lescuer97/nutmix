@@ -40,7 +40,6 @@ var (
 )
 
 func main() {
-
 	logsdir, err := utils.GetLogsDirectory()
 	if err != nil {
 		log.Panicln("Could not get Logs directory")
@@ -59,7 +58,8 @@ func main() {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
 	defer func() {
-		if err := logFile.Close(); err != nil {
+		err := logFile.Close()
+		if err != nil {
 			slog.Warn("failed to close log file", slog.Any("error", err))
 		}
 	}()
@@ -220,5 +220,4 @@ func GetSignerFromValue(signerType string, db database.MintDB) (signer.Signer, e
 	default:
 		return nil, fmt.Errorf("no signer type has been selected")
 	}
-
 }

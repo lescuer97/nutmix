@@ -101,7 +101,6 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Started:          true,
 	})
 	if err != nil {
-
 		return nil, nil, nil, nil, fmt.Errorf("could not create Alice lnd container  %w", err)
 	}
 
@@ -113,7 +112,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	buf := make([]byte, 1024)
 
 	type LndAddress struct {
-		Address string
+		Address string `json:"address"`
 	}
 
 	var address LndAddress
@@ -125,7 +124,6 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 			if err != nil {
 				log.Fatalln("json.Unmarshal: ", err)
 			}
-
 		}
 		if err != nil {
 			break
@@ -474,7 +472,6 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	// return alice, bob, btcNode, aliceLnbits, error
 	return lndAliceC, LndBobC, btcdC, aliceLnbitsC, nil
-
 }
 func ExtractInternalFile(ctx context.Context, container testcontainers.Container, path string) (string, error) {
 	catData, err := container.CopyFileFromContainer(ctx, path)

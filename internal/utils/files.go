@@ -40,7 +40,8 @@ func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTi
 
 		// unmarshal generically first
 		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(lineBytes, &raw); err != nil {
+		err := json.Unmarshal(lineBytes, &raw)
+		if err != nil {
 			continue
 		}
 
@@ -49,7 +50,8 @@ func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTi
 		// extract time (try RFC3339 string or unix int)
 		if tRaw, ok := raw["time"]; ok {
 			var tStr string
-			if err := json.Unmarshal(tRaw, &tStr); err == nil {
+			err := json.Unmarshal(tRaw, &tStr)
+			if err == nil {
 				// try common timestamp layouts
 				if parsed, err := time.Parse(time.RFC3339, tStr); err == nil {
 					logRecord.Time = parsed
@@ -58,7 +60,8 @@ func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTi
 				}
 			} else {
 				var unix int64
-				if err := json.Unmarshal(tRaw, &unix); err == nil {
+				err := json.Unmarshal(tRaw, &unix)
+				if err == nil {
 					logRecord.Time = time.Unix(unix, 0)
 				}
 			}
@@ -74,7 +77,8 @@ func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTi
 		// extract level
 		if lRaw, ok := raw["level"]; ok {
 			var lStr string
-			if err := json.Unmarshal(lRaw, &lStr); err == nil {
+			err := json.Unmarshal(lRaw, &lStr)
+			if err == nil {
 				switch strings.ToLower(lStr) {
 				case "debug":
 					logRecord.Level = slog.LevelDebug
@@ -92,7 +96,8 @@ func ParseLogFileByLevelAndTime(file *os.File, wantedLevel []slog.Level, limitTi
 		// keep existing extra-info if present
 		if eiRaw, ok := raw["extra-info"]; ok {
 			var eiStr string
-			if err := json.Unmarshal(eiRaw, &eiStr); err == nil {
+			err := json.Unmarshal(eiRaw, &eiStr)
+			if err == nil {
 				logRecord.ExtraInfo = eiStr
 			}
 			delete(raw, "extra-info")
@@ -148,7 +153,6 @@ func GetLogsDirectory() (string, error) {
 }
 
 func CreateDirectoryAndPath(dirPath string, filename string) error {
-
 	completeFilePath := dirPath + "/" + filename
 
 	_, err := os.Stat(dirPath)
@@ -170,5 +174,4 @@ func CreateDirectoryAndPath(dirPath string, filename string) error {
 	}
 
 	return nil
-
 }
