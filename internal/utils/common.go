@@ -17,6 +17,8 @@ const FAKE_WALLET LightningBackend = "FakeWallet"
 const LNDGRPC LightningBackend = "LndGrpcWallet"
 const LNBITS LightningBackend = "LNbitsWallet"
 const CLNGRPC LightningBackend = "ClnGrpcWallet"
+
+// Deprecated: Strike backend will be removed in v0.7.0.
 const Strike LightningBackend = "Strike"
 
 func StringToLightningBackend(text string) LightningBackend {

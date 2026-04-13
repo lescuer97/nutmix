@@ -16,6 +16,8 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
+// Strike implements the Strike-hosted lightning backend.
+// Deprecated: Strike backend will be removed in v0.7.0.
 type Strike struct {
 	endpoint string
 	key      string
@@ -145,6 +147,8 @@ type strikeErrorStatus struct {
 }
 
 func (l *Strike) Setup(key string, endpoint string) error {
+	slog.Warn("Strike backend is deprecated and will be removed in v0.7.0")
+
 	if key == "" {
 		return fmt.Errorf("Strike key not available")
 	}

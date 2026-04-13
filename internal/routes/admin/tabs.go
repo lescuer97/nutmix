@@ -442,8 +442,8 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			}
 			newBackend = lnbitsWallet
 
-		case string(utils.Strike):
-			newBackendType = utils.Strike
+		case string(utils.Strike): //nolint:staticcheck // Strike remains configurable until its planned removal in v0.7.0.
+			newBackendType = utils.Strike //nolint:staticcheck // Strike remains configurable until its planned removal in v0.7.0.
 			strikeKey = c.Request.PostFormValue("STRIKE_KEY")
 			strikeEndpoint = c.Request.PostFormValue("STRIKE_ENDPOINT")
 
@@ -552,7 +552,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		case utils.LNBITS:
 			mint.Config.MINT_LNBITS_KEY = lnbitsKey
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
-		case utils.Strike:
+		case utils.Strike: //nolint:staticcheck // Strike config is still persisted until its planned removal in v0.7.0.
 			mint.Config.STRIKE_KEY = strikeKey
 			mint.Config.STRIKE_ENDPOINT = strikeEndpoint
 		case utils.CLNGRPC:

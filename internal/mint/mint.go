@@ -141,7 +141,7 @@ func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig
 			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
 		}
 		mint.LightningBackend = clnWallet
-	case utils.Strike:
+	case utils.Strike: //nolint:staticcheck // Strike remains supported until its planned removal in v0.7.0.
 		strikeWallet := lightning.Strike{
 			Network: chainparam,
 		}
