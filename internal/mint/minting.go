@@ -25,9 +25,9 @@ func (m *Mint) CreateMintQuote(ctx context.Context, request cashu.PostMintQuoteB
 		if !supported {
 			return cashu.PostMintQuoteBolt11Response{}, errors.Join(err, cashu.ErrUnitNotSupported)
 		}
-		response, err := m.bolt11GenerateMintQuote(ctx, request, unit)
+		response, err := m.createBolt11MintQuote(ctx, request, unit)
 		if err != nil {
-			return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("m.generateBolt11MintRequest(request,unit). %w", err)
+			return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("m.createBolt11MintQuote(ctx, request, unit). %w", err)
 		}
 		return response, nil
 
@@ -60,7 +60,7 @@ func (m *Mint) validateMintConfiguration(request cashu.PostMintQuoteBolt11Reques
 	return unit, nil
 }
 
-func (m *Mint) bolt11GenerateMintQuote(ctx context.Context, request cashu.PostMintQuoteBolt11Request, unit cashu.Unit) (cashu.PostMintQuoteBolt11Response, error) {
+func (m *Mint) createBolt11MintQuote(ctx context.Context, request cashu.PostMintQuoteBolt11Request, unit cashu.Unit) (cashu.PostMintQuoteBolt11Response, error) {
 	resInvoice, err := m.LightningBackend.RequestInvoice(cashu.NewAmount(unit, request.Amount), request.Description)
 	if err != nil {
 		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" m.LightningBackend.RequestInvoice. %w", err)
@@ -113,7 +113,7 @@ func (m *Mint) bolt11GenerateMintQuote(ctx context.Context, request cashu.PostMi
 }
 
 // FIXME: the method should be inside the MintRequestDB struct. this needs to change in the db and add a migration
-func (m *Mint) MintQuoteStatus(ctx context.Context, quoteId string, method METHOD) (cashu.PostMintQuoteBolt11Response, error) {
+func (m *Mint) RefreshMintQuoteStatus(ctx context.Context, quoteId string, method METHOD) (cashu.PostMintQuoteBolt11Response, error) {
 	tx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
 		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" m.MintDB.GetTx(ctx). %w", err)
@@ -139,9 +139,9 @@ func (m *Mint) MintQuoteStatus(ctx context.Context, quoteId string, method METHO
 		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
 			return quote.PostMintQuoteBolt11Response(), nil
 		}
-		bolt11Quote, err := m.bolt11CheckQuote(ctx, quote, method)
+		bolt11Quote, err := m.reconcileBolt11MintQuoteState(ctx, quote, method)
 		if err != nil {
-			return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("m.bolt11CheckQuote(ctx, quote, method). %w", err)
+			return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("m.reconcileBolt11MintQuoteState(ctx, quote, method). %w", err)
 		}
 		return bolt11Quote.PostMintQuoteBolt11Response(), nil
 
@@ -151,7 +151,7 @@ func (m *Mint) MintQuoteStatus(ctx context.Context, quoteId string, method METHO
 }
 
 // FIXME: the method should be inside the MintRequestDB struct. this needs to change in the db and add a migration
-func (m *Mint) bolt11CheckQuote(ctx context.Context, request cashu.MintRequestDB, method METHOD) (cashu.MintRequestDB, error) {
+func (m *Mint) reconcileBolt11MintQuoteState(ctx context.Context, request cashu.MintRequestDB, method METHOD) (cashu.MintRequestDB, error) {
 	if method != Bolt11 {
 		return cashu.MintRequestDB{}, fmt.Errorf("request method is not BOLT11")
 	}
@@ -162,7 +162,7 @@ func (m *Mint) bolt11CheckQuote(ctx context.Context, request cashu.MintRequestDB
 
 	status, _, err := m.LightningBackend.CheckReceived(request, invoice)
 	if err != nil {
-		return cashu.MintRequestDB{}, fmt.Errorf("mint.VerifyLightingPaymentHappened(pool). %w", err)
+		return cashu.MintRequestDB{}, fmt.Errorf("m.LightningBackend.CheckReceived(request, invoice). %w", err)
 	}
 	stateChangeTX, err := m.MintDB.GetTx(ctx)
 	if err != nil {
@@ -204,10 +204,10 @@ func (m *Mint) bolt11CheckQuote(ctx context.Context, request cashu.MintRequestDB
 	return quote, nil
 }
 
-func (m *Mint) Mint(ctx context.Context, request cashu.PostMintBolt11Request, method METHOD) (cashu.PostMintBolt11Response, error) {
-	mintReq, err := m.mintRequestValidate(ctx, request)
+func (m *Mint) IssueTokens(ctx context.Context, request cashu.PostMintBolt11Request, method METHOD) (cashu.PostMintBolt11Response, error) {
+	mintReq, err := m.loadAndValidateMintQuoteForIssuance(ctx, request)
 	if err != nil {
-		return cashu.PostMintBolt11Response{}, fmt.Errorf(" mintRequestValidate(ctx, request). %w", err)
+		return cashu.PostMintBolt11Response{}, fmt.Errorf("m.loadAndValidateMintQuoteForIssuance(ctx, request). %w", err)
 	}
 	switch method {
 	case Bolt11:
@@ -223,7 +223,7 @@ func (m *Mint) Mint(ctx context.Context, request cashu.PostMintBolt11Request, me
 }
 
 // takes the general values of the minting process and analyses them even before going to the method branching.
-func (m *Mint) mintRequestValidate(ctx context.Context, request cashu.PostMintBolt11Request) (cashu.MintRequestDB, error) {
+func (m *Mint) loadAndValidateMintQuoteForIssuance(ctx context.Context, request cashu.PostMintBolt11Request) (cashu.MintRequestDB, error) {
 	preparationTx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf(" m.MintDB.GetTx(ctx). %w", err)
@@ -244,9 +244,9 @@ func (m *Mint) mintRequestValidate(ctx context.Context, request cashu.PostMintBo
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf(" m.MintDB.Commit(ctx, tx). %w", err)
 	}
-	err = m.validateMintStatusAndAuth(request, quote)
+	err = m.validateMintIssuanceAuth(request, quote)
 	if err != nil {
-		return cashu.MintRequestDB{}, fmt.Errorf(" m.bolt11ValidateMint(ctx, request, quote). %w", err)
+		return cashu.MintRequestDB{}, fmt.Errorf("m.validateMintIssuanceAuth(request, quote). %w", err)
 	}
 	keysets, err := m.Signer.GetKeysets()
 	if err != nil {
@@ -275,9 +275,9 @@ func (m *Mint) mintRequestValidate(ctx context.Context, request cashu.PostMintBo
 			}
 		}
 	}()
-	err = m.CheckOutputSpent(sizeCheckTx, request.Outputs)
+	err = m.ValidateOutputsNotSpent(sizeCheckTx, request.Outputs)
 	if err != nil {
-		return cashu.MintRequestDB{}, fmt.Errorf("m.checkOutputSpent(sizeCheckTx, request.Outputs). %w", err)
+		return cashu.MintRequestDB{}, fmt.Errorf("m.ValidateOutputsNotSpent(sizeCheckTx, request.Outputs). %w", err)
 	}
 	err = m.MintDB.Commit(ctx, sizeCheckTx)
 	if err != nil {
@@ -319,9 +319,9 @@ func (m *Mint) bolt11Mint(ctx context.Context, request cashu.PostMintBolt11Reque
 	}
 
 	if mintReq.State != cashu.PAID {
-		mintReq, err = m.bolt11CheckQuote(ctx, mintReq, method)
+		mintReq, err = m.reconcileBolt11MintQuoteState(ctx, mintReq, method)
 		if err != nil {
-			return cashu.PostMintBolt11Response{}, fmt.Errorf("m.bolt11CheckQuote(ctx, quote, method). %w", err)
+			return cashu.PostMintBolt11Response{}, fmt.Errorf("m.reconcileBolt11MintQuoteState(ctx, quote, method). %w", err)
 		}
 	}
 
@@ -329,14 +329,14 @@ func (m *Mint) bolt11Mint(ctx context.Context, request cashu.PostMintBolt11Reque
 		return cashu.PostMintBolt11Response{}, cashu.ErrRequestNotPaid
 	}
 
-	blindSigs, err := m.signAndSaveSigs(ctx, request, mintReq)
+	blindSigs, err := m.signMintOutputsAndMarkIssued(ctx, request, mintReq)
 	if err != nil {
 		return cashu.PostMintBolt11Response{}, err
 	}
 	return cashu.PostMintBolt11Response{Signatures: blindSigs}, nil
 }
 
-func (m *Mint) signAndSaveSigs(ctx context.Context, request cashu.PostMintBolt11Request, mintRequestDB cashu.MintRequestDB) ([]cashu.BlindSignature, error) {
+func (m *Mint) signMintOutputsAndMarkIssued(ctx context.Context, request cashu.PostMintBolt11Request, mintRequestDB cashu.MintRequestDB) ([]cashu.BlindSignature, error) {
 	blindedSignatures, recoverySigsDb, err := m.Signer.SignBlindMessages(request.Outputs)
 	if err != nil {
 		return nil, fmt.Errorf("m.Signer.SignBlindMessages(request.Outputs) %w", err)
@@ -373,7 +373,7 @@ func (m *Mint) signAndSaveSigs(ctx context.Context, request cashu.PostMintBolt11
 	return blindedSignatures, nil
 }
 
-func (m *Mint) validateMintStatusAndAuth(request cashu.PostMintBolt11Request, mintRequestDB cashu.MintRequestDB) error {
+func (m *Mint) validateMintIssuanceAuth(request cashu.PostMintBolt11Request, mintRequestDB cashu.MintRequestDB) error {
 	if mintRequestDB.Minted {
 		return cashu.ErrMintRequestAlreadyIssued
 	}

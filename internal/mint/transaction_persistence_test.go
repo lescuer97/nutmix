@@ -150,7 +150,7 @@ func createMeltTestProofs(t *testing.T, amount uint64, activeKeys signer.GetKeys
 	return proofs
 }
 
-func TestSignAndSaveSigsPersistsIssuedState(t *testing.T) {
+func TestSignMintOutputsAndMarkIssuedPersistsIssuedState(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	ctx := context.Background()
 
@@ -192,9 +192,9 @@ func TestSignAndSaveSigsPersistsIssuedState(t *testing.T) {
 	}
 
 	outputs := createMintTestBlindedMessages(t, amount, activeKeys)
-	_, err = mint.signAndSaveSigs(ctx, cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: outputs}, mintRequest)
+	_, err = mint.signMintOutputsAndMarkIssued(ctx, cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: outputs}, mintRequest)
 	if err != nil {
-		t.Fatalf("mint.signAndSaveSigs(ctx, request, mintRequest): %v", err)
+		t.Fatalf("mint.signMintOutputsAndMarkIssued(ctx, request, mintRequest): %v", err)
 	}
 
 	tx, err = mint.MintDB.GetTx(ctx)
@@ -323,7 +323,7 @@ func TestSettleIfInternalMeltPersistsMintRequestState(t *testing.T) {
 	}
 }
 
-func TestValidateMeltStatusAndSpentPersistsProofQuoteReference(t *testing.T) {
+func TestReserveMeltInputsAndMarkPendingPersistsProofQuoteReference(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	ctx := context.Background()
 
@@ -372,9 +372,9 @@ func TestValidateMeltStatusAndSpentPersistsProofQuoteReference(t *testing.T) {
 		Outputs: createMintTestBlindedMessages(t, 1, activeKeys),
 	}
 
-	savedQuote, err := mint.validateMeltStatusAndSpent(ctx, request)
+	savedQuote, err := mint.reserveMeltInputsAndMarkPending(ctx, request)
 	if err != nil {
-		t.Fatalf("mint.validateMeltStatusAndSpent(ctx, request): %v", err)
+		t.Fatalf("mint.reserveMeltInputsAndMarkPending(ctx, request): %v", err)
 	}
 
 	if savedQuote.State != cashu.PENDING {
@@ -413,7 +413,7 @@ func TestValidateMeltStatusAndSpentPersistsProofQuoteReference(t *testing.T) {
 	}
 }
 
-func TestMeltQuoteUsesBackendAmountToSend(t *testing.T) {
+func TestCreateMeltQuoteUsesBackendAmountToSend(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	mint.LightningBackend = quoteAmountBackend{
 		FakeWallet: lightning.FakeWallet{
@@ -428,13 +428,13 @@ func TestMeltQuoteUsesBackendAmountToSend(t *testing.T) {
 		},
 	}
 
-	quote, err := mint.MeltQuote(context.Background(), cashu.PostMeltQuoteBolt11Request{
+	quote, err := mint.CreateMeltQuote(context.Background(), cashu.PostMeltQuoteBolt11Request{
 		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 		Request: RegtestRequest,
 		Unit:    cashu.Sat.String(),
 	}, Bolt11)
 	if err != nil {
-		t.Fatalf("mint.MeltQuote(context.Background(), request, Bolt11): %v", err)
+		t.Fatalf("mint.CreateMeltQuote(context.Background(), request, Bolt11): %v", err)
 	}
 
 	if quote.Amount != 2 {
@@ -445,7 +445,7 @@ func TestMeltQuoteUsesBackendAmountToSend(t *testing.T) {
 	}
 }
 
-func TestSignAndSaveSigsSendsMintEvent(t *testing.T) {
+func TestSignMintOutputsAndMarkIssuedSendsMintEvent(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	ctx := context.Background()
 
@@ -490,9 +490,9 @@ func TestSignAndSaveSigsSendsMintEvent(t *testing.T) {
 	mint.Observer.AddMintWatch(mintRequest.Quote, MintQuoteChannel{SubId: "mint-event", Channel: mintChan})
 
 	outputs := createMintTestBlindedMessages(t, amount, activeKeys)
-	_, err = mint.signAndSaveSigs(ctx, cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: outputs}, mintRequest)
+	_, err = mint.signMintOutputsAndMarkIssued(ctx, cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: outputs}, mintRequest)
 	if err != nil {
-		t.Fatalf("mint.signAndSaveSigs(ctx, request, mintRequest): %v", err)
+		t.Fatalf("mint.signMintOutputsAndMarkIssued(ctx, request, mintRequest): %v", err)
 	}
 
 	select {

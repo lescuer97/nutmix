@@ -15,12 +15,12 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func (m *Mint) MeltQuote(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request, method METHOD) (cashu.MeltRequestDB, error) {
+func (m *Mint) CreateMeltQuote(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request, method METHOD) (cashu.MeltRequestDB, error) {
 	switch method {
 	case Bolt11:
-		response, err := m.bolt11CreateMelt(ctx, meltRequest)
+		response, err := m.createBolt11MeltQuote(ctx, meltRequest)
 		if err != nil {
-			return cashu.MeltRequestDB{}, fmt.Errorf("m.bolt11CreateMelt(ctx, meltRequest). %w ", err)
+			return cashu.MeltRequestDB{}, fmt.Errorf("m.createBolt11MeltQuote(ctx, meltRequest). %w ", err)
 		}
 		return response, nil
 
@@ -29,19 +29,20 @@ func (m *Mint) MeltQuote(ctx context.Context, meltRequest cashu.PostMeltQuoteBol
 	}
 }
 
-func (m *Mint) bolt11CreateMelt(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request) (cashu.MeltRequestDB, error) {
-	requestData, err := m.bolt11ValidateMeltRequestQuote(ctx, meltRequest)
+func (m *Mint) createBolt11MeltQuote(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request) (cashu.MeltRequestDB, error) {
+	requestData, err := m.validateBolt11MeltQuoteRequest(ctx, meltRequest)
 	if err != nil {
-		return cashu.MeltRequestDB{}, fmt.Errorf("m.bolt11ValidateMeltRequestQuote. %w ", err)
+		return cashu.MeltRequestDB{}, fmt.Errorf("m.validateBolt11MeltQuoteRequest. %w ", err)
 	}
 
-	dbRequest, err := m.bolt11CreateMeltRequest(ctx, meltRequest, requestData)
+	dbRequest, err := m.createAndStoreBolt11MeltQuote(ctx, meltRequest, requestData)
 	if err != nil {
-		return cashu.MeltRequestDB{}, fmt.Errorf("m.bolt11CreateMeltRequest. %w ", err)
+		return cashu.MeltRequestDB{}, fmt.Errorf("m.createAndStoreBolt11MeltQuote. %w ", err)
 	}
 	return dbRequest, nil
 }
-func (m *Mint) bolt11CreateMeltRequest(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request, requestData bolt11MeltReqData) (cashu.MeltRequestDB, error) {
+
+func (m *Mint) createAndStoreBolt11MeltQuote(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request, requestData bolt11MeltReqData) (cashu.MeltRequestDB, error) {
 	quoteId, err := utils.RandomHash()
 	if err != nil {
 		return cashu.MeltRequestDB{}, fmt.Errorf("utils.RandomHash(). %w", err)
@@ -112,7 +113,7 @@ type bolt11MeltReqData struct {
 	Mpp      bool
 }
 
-func (m *Mint) bolt11ValidateMeltRequestQuote(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request) (bolt11MeltReqData, error) {
+func (m *Mint) validateBolt11MeltQuoteRequest(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request) (bolt11MeltReqData, error) {
 	unit, err := cashu.UnitFromString(meltRequest.Unit)
 	if err != nil {
 		return bolt11MeltReqData{}, errors.Join(err, cashu.ErrUnitNotSupported)
@@ -212,7 +213,7 @@ func (m *Mint) settleIfInternalMelt(tx pgx.Tx, meltQuote cashu.MeltRequestDB) (c
 	return meltQuote, nil
 }
 
-func (m *Mint) CheckMeltQuoteState(ctx context.Context, quoteId string) (cashu.MeltRequestDB, error) {
+func (m *Mint) RefreshMeltQuoteState(ctx context.Context, quoteId string) (cashu.MeltRequestDB, error) {
 	initialTx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
@@ -390,7 +391,7 @@ func (m *Mint) CheckMeltQuoteState(ctx context.Context, quoteId string) (cashu.M
 	return quote, nil
 }
 
-func (m *Mint) CheckPendingQuoteAndProofs() error {
+func (m *Mint) ReconcilePendingMeltQuotes() error {
 	quotes, err := m.MintDB.GetMeltQuotesByState(cashu.PENDING)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetMeltQuotesByState(cashu.PENDING). %w", err)
@@ -398,9 +399,9 @@ func (m *Mint) CheckPendingQuoteAndProofs() error {
 
 	for _, quote := range quotes {
 		slog.Info("Attempting to solve pending quote for", slog.Any("quote", quote))
-		quote, err := m.CheckMeltQuoteState(context.Background(), quote.Quote)
+		quote, err := m.RefreshMeltQuoteState(context.Background(), quote.Quote)
 		if err != nil {
-			return fmt.Errorf("m.CheckMeltQuoteState(ctx, quote.Quote). %w", err)
+			return fmt.Errorf("m.RefreshMeltQuoteState(ctx, quote.Quote). %w", err)
 		}
 
 		slog.Info("Melt quote state", slog.String("quote", quote.Quote), slog.String("state", string(quote.State)))
@@ -415,7 +416,7 @@ type bolt11MeltData struct {
 	Unit         cashu.Unit
 }
 
-func (m *Mint) bolt11MeltValidate(meltRequest cashu.PostMeltBolt11Request, quote cashu.MeltRequestDB) (bolt11MeltData, error) {
+func (m *Mint) validateBolt11MeltInputs(meltRequest cashu.PostMeltBolt11Request, quote cashu.MeltRequestDB) (bolt11MeltData, error) {
 	if len(meltRequest.Inputs) == 0 {
 		return bolt11MeltData{}, fmt.Errorf("inputs or outputs are empty")
 	}
@@ -500,7 +501,7 @@ func (m *Mint) bolt11MeltValidate(meltRequest cashu.PostMeltBolt11Request, quote
 	return bolt11MeltData{Fee: cashu.NewAmount(proofUnit, uint64(fee)), Unit: unit, AmountProofs: cashu.NewAmount(proofUnit, proofsAmount)}, nil
 }
 
-func (m *Mint) validateMeltStatusAndSpent(ctx context.Context, meltRequest cashu.PostMeltBolt11Request) (cashu.MeltRequestDB, error) {
+func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest cashu.PostMeltBolt11Request) (cashu.MeltRequestDB, error) {
 	// check if proofs are spent and if outputs are spent
 	sizeCheckTx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
@@ -528,14 +529,14 @@ func (m *Mint) validateMeltStatusAndSpent(ctx context.Context, meltRequest cashu
 		return cashu.MeltRequestDB{}, cashu.ErrMeltAlreadyPaid
 	}
 
-	proofs, err := m.checkProofSpent(sizeCheckTx, meltRequest.Inputs)
+	proofs, err := m.validateProofsUnspent(sizeCheckTx, meltRequest.Inputs)
 	if err != nil {
-		return cashu.MeltRequestDB{}, fmt.Errorf("m.checkProofSpent(sizeCheckTx, request.Inputs). %w", err)
+		return cashu.MeltRequestDB{}, fmt.Errorf("m.validateProofsUnspent(sizeCheckTx, request.Inputs). %w", err)
 	}
 
-	err = m.CheckOutputSpent(sizeCheckTx, meltRequest.Outputs)
+	err = m.ValidateOutputsNotSpent(sizeCheckTx, meltRequest.Outputs)
 	if err != nil {
-		return cashu.MeltRequestDB{}, fmt.Errorf("m.checkOutputSpent(sizeCheckTx, request.Outputs). %w", err)
+		return cashu.MeltRequestDB{}, fmt.Errorf("m.ValidateOutputsNotSpent(sizeCheckTx, request.Outputs). %w", err)
 	}
 
 	proofs.SetPendingAndQuoteRef(quote.Quote)
@@ -567,7 +568,7 @@ func (m *Mint) validateMeltStatusAndSpent(ctx context.Context, meltRequest cashu
 	return quote, nil
 }
 
-func (m *Mint) bolt11PayInvoice(ctx context.Context, meltRequest cashu.PostMeltBolt11Request, quote cashu.MeltRequestDB) (cashu.MeltRequestDB, cashu.Amount, error) {
+func (m *Mint) attemptBolt11MeltPayment(ctx context.Context, meltRequest cashu.PostMeltBolt11Request, quote cashu.MeltRequestDB) (cashu.MeltRequestDB, cashu.Amount, error) {
 	// Commit all blind messages and proofs as pending before going over the network
 	invoice, err := zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork())
 	if err != nil {
@@ -691,7 +692,7 @@ func (m *Mint) bolt11PayInvoice(ctx context.Context, meltRequest cashu.PostMeltB
 	return quote, cashu.Amount{Amount: 0, Unit: unit}, nil
 }
 
-func (m *Mint) bolt11MeltBurnTokens(ctx context.Context, meltData bolt11MeltData, meltRequest cashu.PostMeltBolt11Request, quote cashu.MeltRequestDB, paidLightningFeeSat cashu.Amount) (cashu.MeltRequestDB, cashu.PostMeltQuoteBolt11Response, cashu.Proofs, error) {
+func (m *Mint) finalizePaidBolt11Melt(ctx context.Context, meltData bolt11MeltData, meltRequest cashu.PostMeltBolt11Request, quote cashu.MeltRequestDB, paidLightningFeeSat cashu.Amount) (cashu.MeltRequestDB, cashu.PostMeltQuoteBolt11Response, cashu.Proofs, error) {
 	err := paidLightningFeeSat.To(meltData.Unit)
 	if err != nil {
 		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, nil, fmt.Errorf("paidLightningFeeSat.To(meltData) %w", err)
@@ -768,29 +769,29 @@ func (m *Mint) bolt11MeltBurnTokens(ctx context.Context, meltData bolt11MeltData
 	return quote, response, meltRequest.Inputs, nil
 }
 func (m *Mint) bolt11Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11Request) (cashu.MeltRequestDB, cashu.PostMeltQuoteBolt11Response, error) {
-	quote, err := m.CheckMeltQuoteState(ctx, meltRequest.Quote)
+	quote, err := m.RefreshMeltQuoteState(ctx, meltRequest.Quote)
 	if err != nil {
-		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("mint.CheckMeltQuoteState(ctx, quoteId): %w", err)
+		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.RefreshMeltQuoteState(ctx, quoteId): %w", err)
 	}
 
-	meltRequestData, err := m.bolt11MeltValidate(meltRequest, quote)
+	meltRequestData, err := m.validateBolt11MeltInputs(meltRequest, quote)
 	if err != nil {
-		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.bolt11MeltValidate(meltRequest, quote): %w", err)
+		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.validateBolt11MeltInputs(meltRequest, quote): %w", err)
 	}
-	quote, err = m.validateMeltStatusAndSpent(ctx, meltRequest)
+	quote, err = m.reserveMeltInputsAndMarkPending(ctx, meltRequest)
 	if err != nil {
-		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.validateMeltStatusAndSpent(ctx, meltRequest): %w", err)
+		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.reserveMeltInputsAndMarkPending(ctx, meltRequest): %w", err)
 	}
 
-	quote, lnFee, err := m.bolt11PayInvoice(ctx, meltRequest, quote)
+	quote, lnFee, err := m.attemptBolt11MeltPayment(ctx, meltRequest, quote)
 	if err != nil {
-		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.bolt11PayInvoice(ctx, meltRequest, quote): %w", err)
+		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.attemptBolt11MeltPayment(ctx, meltRequest, quote): %w", err)
 	}
 
 	if quote.State == cashu.PAID {
-		quote, response, spentProofs, err := m.bolt11MeltBurnTokens(ctx, meltRequestData, meltRequest, quote, lnFee)
+		quote, response, spentProofs, err := m.finalizePaidBolt11Melt(ctx, meltRequestData, meltRequest, quote, lnFee)
 		if err != nil {
-			return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.bolt11MeltBurnTokens(ctx, meltRequestData, meltRequest, quote, lnFee): %w", err)
+			return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.finalizePaidBolt11Melt(ctx, meltRequestData, meltRequest, quote, lnFee): %w", err)
 		}
 
 		go m.Observer.SendProofsEvent(spentProofs)
@@ -804,7 +805,7 @@ func (m *Mint) bolt11Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11R
 	return quote, quote.GetPostMeltQuoteResponse(), nil
 }
 
-func (m *Mint) Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11Request, method METHOD) (cashu.PostMeltQuoteBolt11Response, error) {
+func (m *Mint) ExecuteMelt(ctx context.Context, meltRequest cashu.PostMeltBolt11Request, method METHOD) (cashu.PostMeltQuoteBolt11Response, error) {
 	switch method {
 	case Bolt11:
 		_, response, err := m.bolt11Melt(ctx, meltRequest)

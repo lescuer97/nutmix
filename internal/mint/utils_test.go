@@ -244,7 +244,7 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get tx: %+v", err)
 	}
-	err = mint.CheckOutputSpent(tx, outputs)
+	err = mint.ValidateOutputsNotSpent(tx, outputs)
 	if err == nil {
 		t.Errorf("should have failed because of there are repeated outputs: %+v ", err)
 	}

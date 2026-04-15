@@ -11,16 +11,16 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-func (m *Mint) Swap(ctx context.Context, request cashu.PostSwapRequest) (cashu.PostSwapResponse, error) {
-	amountValidationErr := m.swapRequestValidateAmount(request)
+func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (cashu.PostSwapResponse, error) {
+	amountValidationErr := m.validateSwapBalanceAndUnits(request)
 	if amountValidationErr != nil {
-		return cashu.PostSwapResponse{}, fmt.Errorf("m.validateInputAndOutput(request.Inputs, request.Outputs). %w", amountValidationErr)
+		return cashu.PostSwapResponse{}, fmt.Errorf("m.validateSwapBalanceAndUnits(request). %w", amountValidationErr)
 	}
 
 	// validate sig all
-	err := m.validateSwapRequest(request)
+	err := m.validateSwapProofsAndSpendConditions(request)
 	if err != nil {
-		return cashu.PostSwapResponse{}, fmt.Errorf("m.validateInputAndOutput(request.Inputs, request.Outputs). %w", err)
+		return cashu.PostSwapResponse{}, fmt.Errorf("m.validateSwapProofsAndSpendConditions(request). %w", err)
 	}
 
 	// check if proofs are spent and if outputs are spent
@@ -37,30 +37,30 @@ func (m *Mint) Swap(ctx context.Context, request cashu.PostSwapRequest) (cashu.P
 		}
 	}()
 
-	proofs, err := m.checkProofSpent(sizeCheckTx, request.Inputs)
+	proofs, err := m.validateProofsUnspent(sizeCheckTx, request.Inputs)
 	if err != nil {
-		return cashu.PostSwapResponse{}, fmt.Errorf("m.checkProofSpent(sizeCheckTx, request.Inputs). %w", err)
+		return cashu.PostSwapResponse{}, fmt.Errorf("m.validateProofsUnspent(sizeCheckTx, request.Inputs). %w", err)
 	}
 
-	err = m.CheckOutputSpent(sizeCheckTx, request.Outputs)
+	err = m.ValidateOutputsNotSpent(sizeCheckTx, request.Outputs)
 	if err != nil {
-		return cashu.PostSwapResponse{}, fmt.Errorf("m.checkOutputSpent(sizeCheckTx, request.Outputs). %w", err)
+		return cashu.PostSwapResponse{}, fmt.Errorf("m.ValidateOutputsNotSpent(sizeCheckTx, request.Outputs). %w", err)
 	}
 
 	proofs.SetProofsState(cashu.PROOF_PENDING)
 	err = m.MintDB.SaveProof(sizeCheckTx, proofs)
 	if err != nil {
-		return cashu.PostSwapResponse{}, fmt.Errorf("m.checkOutputSpent(sizeCheckTx, request.Outputs). %w", err)
+		return cashu.PostSwapResponse{}, fmt.Errorf("m.MintDB.SaveProof(sizeCheckTx, proofs). %w", err)
 	}
 
 	err = sizeCheckTx.Commit(ctx)
 	if err != nil {
-		return cashu.PostSwapResponse{}, fmt.Errorf("m.checkOutputSpent(sizeCheckTx, request.Outputs). %w", err)
+		return cashu.PostSwapResponse{}, fmt.Errorf("sizeCheckTx.Commit(ctx). %w", err)
 	}
 
-	blindSignatures, err := m.signAndSetInputs(ctx, proofs, request)
+	blindSignatures, err := m.signSwapOutputsAndMarkInputsSpent(ctx, proofs, request)
 	if err != nil {
-		return cashu.PostSwapResponse{}, fmt.Errorf("m.checkOutputSpent(sizeCheckTx, request.Outputs). %w", err)
+		return cashu.PostSwapResponse{}, fmt.Errorf("m.signSwapOutputsAndMarkInputsSpent(ctx, proofs, request). %w", err)
 	}
 
 	// mark as pending and sign
@@ -69,7 +69,7 @@ func (m *Mint) Swap(ctx context.Context, request cashu.PostSwapRequest) (cashu.P
 	}, nil
 }
 
-func (m *Mint) signAndSetInputs(ctx context.Context, inputs cashu.Proofs, swapRequest cashu.PostSwapRequest) ([]cashu.BlindSignature, error) {
+func (m *Mint) signSwapOutputsAndMarkInputsSpent(ctx context.Context, inputs cashu.Proofs, swapRequest cashu.PostSwapRequest) ([]cashu.BlindSignature, error) {
 	// sign the outputs
 	blindedSignatures, recoverySigsDb, err := m.Signer.SignBlindMessages(swapRequest.Outputs)
 	if err != nil {
@@ -78,7 +78,7 @@ func (m *Mint) signAndSetInputs(ctx context.Context, inputs cashu.Proofs, swapRe
 
 	afterSigningTx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("m.checkOutputSpent(sizeCheckTx, request.Outputs). %w", err)
+		return nil, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
 		rollbackErr := m.MintDB.Rollback(ctx, afterSigningTx)
@@ -103,7 +103,7 @@ func (m *Mint) signAndSetInputs(ctx context.Context, inputs cashu.Proofs, swapRe
 	return blindedSignatures, nil
 }
 
-func (m *Mint) validateSwapRequest(request cashu.PostSwapRequest) error {
+func (m *Mint) validateSwapProofsAndSpendConditions(request cashu.PostSwapRequest) error {
 	// validate if the proofs are correctly signed
 	err := m.VerifyProofsBDHKE(request.Inputs)
 	if err != nil {
@@ -132,7 +132,7 @@ func (m *Mint) validateSwapRequest(request cashu.PostSwapRequest) error {
 	return nil
 }
 
-func (m *Mint) swapRequestValidateAmount(request cashu.PostSwapRequest) error {
+func (m *Mint) validateSwapBalanceAndUnits(request cashu.PostSwapRequest) error {
 	if len(request.Inputs) == 0 || len(request.Outputs) == 0 {
 		return fmt.Errorf("inputs or outputs are empty")
 	}
@@ -175,7 +175,7 @@ func (m *Mint) swapRequestValidateAmount(request cashu.PostSwapRequest) error {
 }
 
 // returns the proofs with the Y's and seen at.
-func (m *Mint) checkProofSpent(tx pgx.Tx, proofs cashu.Proofs) (cashu.Proofs, error) {
+func (m *Mint) validateProofsUnspent(tx pgx.Tx, proofs cashu.Proofs) (cashu.Proofs, error) {
 	// gets the list of Y's. You need to calculate
 	YsList, err := utils.GetAndCalculateProofsValues(&proofs)
 	if err != nil {
@@ -199,7 +199,7 @@ func (m *Mint) checkProofSpent(tx pgx.Tx, proofs cashu.Proofs) (cashu.Proofs, er
 
 	return proofs, nil
 }
-func (m *Mint) CheckOutputSpent(tx pgx.Tx, blindedMessages cashu.BlindedMessages) error {
+func (m *Mint) ValidateOutputsNotSpent(tx pgx.Tx, blindedMessages cashu.BlindedMessages) error {
 	outputsMap := make(map[string]bool)
 	blindingFactors := []cashu.WrappedPublicKey{}
 

@@ -263,9 +263,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		Signature: nil,
 	}
 
-	postMintResponse, err := mintInstance.Mint(ctx, mintRequest, mint.Bolt11)
+	postMintResponse, err := mintInstance.IssueTokens(ctx, mintRequest, mint.Bolt11)
 	if err != nil {
-		t.Fatalf("mintInstance.Mint(ctx, mintRequest, mint.Bolt11): %v", err)
+		t.Fatalf("mintInstance.IssueTokens(ctx, mintRequest, mint.Bolt11): %v", err)
 	}
 
 	/// start doing melt quote
@@ -274,9 +274,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		Request: RegtestRequest,
 		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 	}
-	postMeltQuoteResponse, err := mintInstance.MeltQuote(ctx, meltQuoteRequest, mint.Bolt11)
+	postMeltQuoteResponse, err := mintInstance.CreateMeltQuote(ctx, meltQuoteRequest, mint.Bolt11)
 	if err != nil {
-		t.Fatalf("mintInstance.MeltQuote(ctx, meltQuoteRequest, mint.Bolt11): %v", err)
+		t.Fatalf("mintInstance.CreateMeltQuote(ctx, meltQuoteRequest, mint.Bolt11): %v", err)
 	}
 
 	// try melting
@@ -303,9 +303,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		Outputs: nil,
 	}
 
-	postMeltResponse, err := mintInstance.Melt(ctx, meltRequest, mint.Bolt11)
+	postMeltResponse, err := mintInstance.ExecuteMelt(ctx, meltRequest, mint.Bolt11)
 	if err != nil {
-		t.Fatalf("mintInstance.Melt(ctx, meltRequest, mint.Bolt11): %v", err)
+		t.Fatalf("mintInstance.ExecuteMelt(ctx, meltRequest, mint.Bolt11): %v", err)
 	}
 
 	if postMeltResponse.State == cashu.PAID {
@@ -333,7 +333,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		return
 	}
 
-	_, err = mintInstance.Melt(ctx, meltRequest, mint.Bolt11)
+	_, err = mintInstance.ExecuteMelt(ctx, meltRequest, mint.Bolt11)
 	if !errors.Is(err, cashu.ErrQuoteIsPending) {
 		t.Fatalf("Expected ErrQuoteIsPending, got %v", err)
 	}

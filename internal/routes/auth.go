@@ -113,7 +113,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		err = mint.CheckOutputSpent(tx, mintRequest.Outputs)
+		err = mint.ValidateOutputsNotSpent(tx, mintRequest.Outputs)
 		if err != nil {
 			slog.Warn("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)

@@ -9,7 +9,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
+func registerV1MintRoutes(r *gin.Engine, mint *m.Mint) {
 	v1 := r.Group("/v1")
 
 	v1.GET("/keys", func(c *gin.Context) {
@@ -63,9 +63,9 @@ func v1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		response, err := mint.Swap(c.Request.Context(), swapRequest)
+		response, err := mint.ExecuteSwap(c.Request.Context(), swapRequest)
 		if err != nil {
-			slog.Info("mint.Swap(c.Request.Context(), swapRequest)", slog.Any("error", err))
+			slog.Info("mint.ExecuteSwap(c.Request.Context(), swapRequest)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return

@@ -134,7 +134,7 @@ func main() {
 	// Add per-request timeout middleware (sets context deadline for handlers)
 	r.Use(middleware.TimeoutMiddleware(90 * time.Second))
 
-	err = mint.CheckPendingQuoteAndProofs()
+	err = mint.ReconcilePendingMeltQuotes()
 	if err != nil {
 		slog.Error("SetUpMint", slog.Any("error", err))
 		return
