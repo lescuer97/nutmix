@@ -49,7 +49,7 @@ templ LightningConnectionSettings(config utils.Config) {
 						hx-get="/admin/lightningdata"
 						hx-target="#lightning-data"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNBITS }
-					>LNBITS wallet</option>
+					>LNBITS wallet (deprecated, removed in v0.8.0)</option>
 					<option
 						value="Strike"
 						hx-trigger="selected"
@@ -127,7 +127,21 @@ templ ClnGrpc(host string, ca_cer string, client_cert string, client_key string,
 }
 
 templ Lnbits(endpoint string, key string) {
-	<div class="form-section mt-4">
+	<div class="form-section mt-4 mb-4">
+		<div class="deprecation-notice">
+			<div class="deprecation-header">
+				<div class="deprecation-title-row">
+					<span class="deprecation-badge">Deprecated</span>
+					<span class="deprecation-title">LNBITS backend</span>
+				</div>
+				<span class="deprecation-version">Removed in v0.8.0</span>
+			</div>
+			<p class="deprecation-copy">
+				LNBITS support is scheduled for removal in v0.8.0. Switch to another lightning backend before upgrading to avoid configuration breakage.
+			</p>
+		</div>
+	</div>
+	<div class="form-section">
 		<label for="MINT_LNBITS_ENDPOINT" class="settings-input">
 			LNBITS endpoint
 			<input type="text" name="MINT_LNBITS_ENDPOINT" value={ endpoint } placeholder="https://legend.lnbits.com"/>
@@ -141,15 +155,15 @@ templ Lnbits(endpoint string, key string) {
 
 templ Strike(key string, endpoint string) {
 	<div class="form-section mt-4 mb-4">
-		<div class="strike-deprecation-notice">
-			<div class="strike-deprecation-header">
-				<div class="strike-deprecation-title-row">
-					<span class="strike-deprecation-badge">Deprecated</span>
-					<span class="strike-deprecation-title">Strike backend</span>
+		<div class="deprecation-notice">
+			<div class="deprecation-header">
+				<div class="deprecation-title-row">
+					<span class="deprecation-badge">Deprecated</span>
+					<span class="deprecation-title">Strike backend</span>
 				</div>
-				<span class="strike-deprecation-version">Removed in v0.7.0</span>
+				<span class="deprecation-version">Removed in v0.7.0</span>
 			</div>
-			<p class="strike-deprecation-copy">
+			<p class="deprecation-copy">
 				Strike support is scheduled for removal in v0.7.0. Switch to another lightning backend before upgrading to avoid configuration breakage.
 			</p>
 		</div>
