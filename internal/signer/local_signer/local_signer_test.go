@@ -3,6 +3,7 @@ package localsigner
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"strconv"
 	"testing"
 	"time"
@@ -278,6 +279,42 @@ func TestMixedV1AndV2Keysets(t *testing.T) {
 
 	if activeKeys.Keysets[0].Id[:2] != "01" {
 		t.Errorf("Active keyset should be V2 (starts with '01'), got %s", activeKeys.Keysets[0].Id[:2])
+	}
+}
+
+func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
+	db := mockdb.MockDB{} //nolint:exhaustruct
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+
+	_, _, err = localsigner.SignBlindMessages([]cashu.BlindedMessage{{Id: "missing-keyset", Amount: 1}})
+	if err == nil {
+		t.Fatal("expected missing keyset to fail")
+	}
+	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
+		t.Errorf("Error should be keyset not known. %v", err)
+	}
+}
+
+func TestVerifyProofsFailsForUnknownKeyset(t *testing.T) {
+	db := mockdb.MockDB{} //nolint:exhaustruct
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+
+	err = localsigner.VerifyProofs([]cashu.Proof{{Id: "missing-keyset", Amount: 1}})
+	if err == nil {
+		t.Fatal("expected missing keyset to fail")
+	}
+	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
+		t.Errorf("Error should be keyset not known. %v", err)
 	}
 }
 

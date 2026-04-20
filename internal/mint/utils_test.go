@@ -210,6 +210,50 @@ func TestVerifyUnitOfProofPass(t *testing.T) {
 	}
 }
 
+func TestVerifyUnitOfProofFailsForUnknownKeyset(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+
+	keysets, err := mint.Signer.GetKeysets()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
+	}
+
+	proofs := cashu.Proofs{
+		{Id: keysets.Keysets[0].Id, Amount: 0},
+		{Id: "missing-keyset", Amount: 0},
+	}
+
+	_, err = mint.CheckProofsAreSameUnit(proofs, keysets.Keysets)
+	if err == nil {
+		t.Fatal("expected missing keyset to fail")
+	}
+	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
+		t.Errorf("Error should be keyset not known. %v", err)
+	}
+}
+
+func TestVerifyOutputsFailsForUnknownKeyset(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+
+	keysets, err := mint.Signer.GetKeysets()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
+	}
+
+	outputs := []cashu.BlindedMessage{
+		{Id: keysets.Keysets[0].Id, Amount: 0},
+		{Id: "missing-keyset", Amount: 0},
+	}
+
+	_, err = mint.VerifyOutputs(outputs, keysets.Keysets)
+	if err == nil {
+		t.Fatal("expected missing keyset to fail")
+	}
+	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
+		t.Errorf("Error should be keyset not known. %v", err)
+	}
+}
+
 func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 

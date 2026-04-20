@@ -43,9 +43,11 @@ func checkProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKeysetRespon
 
 	for _, proof := range proofs {
 		val, exists := seenKeys[proof.Id]
-		if exists {
-			units[val.Unit] = true
+		if !exists {
+			return cashu.Sat, cashu.ErrKeysetNotKnow
 		}
+
+		units[val.Unit] = true
 		if len(units) > 1 {
 			return cashu.Sat, cashu.ErrNotSameUnits
 		}

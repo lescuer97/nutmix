@@ -279,9 +279,17 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 	var recoverSigDB = make([]cashu.RecoverSigDB, len(messages))
 
 	for i, output := range messages {
-		correctKeyset := l.activeKeysets[output.Id][output.Amount]
+		keysetsByAmount, exists := l.activeKeysets[output.Id]
+		if !exists {
+			return nil, nil, cashu.ErrKeysetNotKnow
+		}
 
-		if correctKeyset.PrivKey == nil || !correctKeyset.Active {
+		correctKeyset, exists := keysetsByAmount[output.Amount]
+		if !exists || correctKeyset.PrivKey == nil {
+			return nil, nil, cashu.ErrKeysetNotKnow
+		}
+
+		if !correctKeyset.Active {
 			return nil, nil, cashu.ErrUsingInactiveKeyset
 		}
 
@@ -324,7 +332,7 @@ func (l *LocalSigner) validateProof(proof cashu.Proof) error {
 
 	keysets, exists := l.keysets[proof.Id]
 	if !exists {
-		return cashu.ErrKeysetForProofNotFound
+		return cashu.ErrKeysetNotKnow
 	}
 
 	for _, keyset := range keysets {
@@ -336,7 +344,7 @@ func (l *LocalSigner) validateProof(proof cashu.Proof) error {
 
 	// check if keysetToUse is not assigned
 	if keysetToUse.Id == "" {
-		return cashu.ErrKeysetForProofNotFound
+		return cashu.ErrKeysetNotKnow
 	}
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, proof.C.PublicKey)
 	if !verified {

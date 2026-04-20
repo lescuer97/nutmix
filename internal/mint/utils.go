@@ -50,10 +50,11 @@ func checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []cashu.Basi
 	}
 	for _, proof := range messages {
 		val, exists := seenKeys[proof.Id]
-
-		if exists {
-			units[val.Unit] = true
+		if !exists {
+			return cashu.Sat, cashu.ErrKeysetNotKnow
 		}
+
+		units[val.Unit] = true
 		if len(units) > 1 {
 			return cashu.Sat, fmt.Errorf("proofs are not the same unit")
 		}

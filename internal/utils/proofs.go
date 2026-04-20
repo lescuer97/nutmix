@@ -113,6 +113,10 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrBlindMessageAlreadySigned.Error()
 		return cashu.OUTPUTS_ALREADY_SIGNED, &message
 
+	case errors.Is(proofError, cashu.ErrKeysetNotKnow):
+		message := cashu.ErrKeysetNotKnow.Error()
+		return cashu.KEYSET_NOT_KNOW, &message
+
 	case strings.Contains(proofError.Error(), "could not obtain lock"):
 		message := "Transaction is already pending"
 		return cashu.QUOTE_PENDING, &message

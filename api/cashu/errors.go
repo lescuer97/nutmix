@@ -25,6 +25,8 @@ var (
 	ErrRequestNotPaid     = errors.New("request not paid yet")
 
 	ErrAmountlessInvoiceNotSupported = errors.New("Amount less invoices not supported")
+
+	ErrKeysetNotKnow = errors.New("keyset not known")
 )
 
 type ErrorCode uint

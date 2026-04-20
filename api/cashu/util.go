@@ -64,7 +64,7 @@ func Fees(proofs []Proof, keysets []BasicKeysetResponse) (uint, error) {
 				}
 			}
 			if keysetToUse.Id != proof.Id {
-				return 0, ErrKeysetForProofNotFound
+				return 0, ErrKeysetNotKnow
 			}
 		}
 

@@ -27,7 +27,6 @@ var (
 	ErrCouldNotEncryptSeed     = errors.New("could not encrypt seed")
 	ErrCouldNotDecryptSeed     = errors.New("could not decrypt seed")
 	ErrKeysetNotFound          = errors.New("keyset not found")
-	ErrKeysetForProofNotFound  = errors.New("keyset for proof not found")
 
 	ErrAlreadyActiveProof          = errors.New("proof already being spent")
 	ErrAlreadyActiveQuote          = errors.New("quote already being spent")
