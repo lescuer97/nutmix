@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
@@ -14,7 +15,11 @@ import (
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"golang.org/x/sync/errgroup"
 )
+
+const lightningSearchLimit = 200
+const minLightningSearchLength = 2
 
 func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -333,8 +338,9 @@ func LnPage(mint *mint.Mint) gin.HandlerFunc {
 
 		// Default time range is 1 week
 		selectedRange := c.DefaultQuery("since", "1w")
+		searchQuery := strings.TrimSpace(c.Query("search"))
 
-		err := templates.LightningActivityLayout(mint.Config, selectedRange, "").Render(ctx, c.Writer)
+		err := templates.LightningActivityLayout(mint.Config, selectedRange, searchQuery).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)
@@ -347,22 +353,82 @@ func LightningTable(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		_ = c.Query("search")
+		searchQuery := strings.TrimSpace(c.Query("search"))
 		timeRange := c.Query("since")
 		startTime, _ := parseTimeRange(timeRange)
 
-		statsRows, err := adminHandler.mint.MintDB.GetStatsSnapshotsBySince(ctx, startTime.Unix())
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-		rows, err := lightningSnapshotRows(statsRows)
-		if err != nil {
-			_ = c.Error(err)
-			return
+		mintRequests := make([]cashu.MintRequestDB, 0)
+		meltRequests := make([]cashu.MeltRequestDB, 0)
+		filtered := make([]templates.LightningInvoiceVisual, 0)
+
+		if len([]rune(searchQuery)) < minLightningSearchLength {
+			errGroup := errgroup.Group{}
+			errGroup.Go(func() error {
+				requests, err := adminHandler.mint.MintDB.GetMintRequestsByTime(ctx, startTime)
+				if err != nil {
+					return err
+				}
+				mintRequests = requests
+				return nil
+			})
+			errGroup.Go(func() error {
+				requests, err := adminHandler.mint.MintDB.GetMeltRequestsByTime(ctx, startTime)
+				if err != nil {
+					return err
+				}
+				meltRequests = requests
+				return nil
+			})
+			err := errGroup.Wait()
+			if err != nil {
+				_ = c.Error(err)
+				return
+			}
+
+			filtered = make([]templates.LightningInvoiceVisual, 0, len(mintRequests)+len(meltRequests))
+			for _, mintRequest := range mintRequests {
+				filtered = append(filtered, templates.LightningInvoiceVisual{
+					Id:      mintRequest.Quote,
+					Type:    "mint",
+					Invoice: mintRequest.Request,
+					Status:  string(mintRequest.State),
+					Unit:    mintRequest.Unit,
+					Time:    mintRequest.SeenAt,
+				})
+			}
+			for _, meltRequest := range meltRequests {
+				filtered = append(filtered, templates.LightningInvoiceVisual{
+					Id:      meltRequest.Quote,
+					Type:    "melt",
+					Invoice: meltRequest.Request,
+					Status:  string(meltRequest.State),
+					Unit:    meltRequest.Unit,
+					Time:    meltRequest.SeenAt,
+				})
+			}
+		} else {
+			searchRows, err := adminHandler.mint.MintDB.SearchLightningRequests(ctx, searchQuery, startTime, lightningSearchLimit)
+			if err != nil {
+				_ = c.Error(err)
+				return
+			}
+
+			filtered = make([]templates.LightningInvoiceVisual, 0, len(searchRows))
+			for _, row := range searchRows {
+				filtered = append(filtered, templates.LightningInvoiceVisual{
+					Id:      row.ID,
+					Type:    row.Type,
+					Invoice: row.Request,
+					Status:  row.State,
+					Unit:    row.Unit,
+					Time:    row.SeenAt,
+				})
+			}
 		}
 
-		err = templates.LightningActivityTable(rows).Render(ctx, c.Writer)
+		sort.Slice(filtered, func(i, j int) bool { return filtered[i].Time > filtered[j].Time })
+
+		err := templates.LightningActivityTable(filtered).Render(ctx, c.Writer)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -463,38 +529,6 @@ func buildProofTimeSeriesFromStats(rows []database.StatsSnapshot, selector func(
 		result = append(result, *buckets[ts])
 	}
 	return result
-}
-
-func lightningSnapshotRows(rows []database.StatsSnapshot) ([]templates.LightningSnapshotRow, error) {
-	result := make([]templates.LightningSnapshotRow, 0, len(rows))
-	for _, row := range rows {
-		if row.EndDate < row.StartDate {
-			return nil, fmt.Errorf("invalid stats snapshot window: start_date=%d end_date=%d", row.StartDate, row.EndDate)
-		}
-		mintAmount, mintCount := sumStatsSummary(row.MintSummary)
-		meltAmount, meltCount := sumStatsSummary(row.MeltSummary)
-		netFlow := uint64(0)
-		if mintAmount > meltAmount {
-			netFlow = uint64(mintAmount - meltAmount)
-		}
-		result = append(result, templates.LightningSnapshotRow{
-			StartDate:  row.StartDate,
-			EndDate:    row.EndDate,
-			MintCount:  mintCount,
-			MintAmount: uint64(mintAmount),
-			MeltCount:  meltCount,
-			MeltAmount: uint64(meltAmount),
-			NetFlow:    netFlow,
-			Fees:       row.Fees,
-		})
-	}
-	sort.Slice(result, func(i, j int) bool {
-		if result[i].EndDate == result[j].EndDate {
-			return result[i].StartDate > result[j].StartDate
-		}
-		return result[i].EndDate > result[j].EndDate
-	})
-	return result, nil
 }
 
 // LnChartCard returns the full LN chart card component (for HTMX load with optional date params)

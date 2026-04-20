@@ -34,6 +34,11 @@ type MockDB struct {
 	Config                           utils.Config
 	ReturnError                      int64
 	LastStatsSince                   int64
+	LastMintSince                    int64
+	LastMeltSince                    int64
+	LastLightningSearch              *string
+	LastSearchSince                  int64
+	LastSearchLimit                  int
 }
 
 func databaseError(err error) error {

@@ -689,3 +689,91 @@ func setupTestDB(t *testing.T) (Postgresql, context.Context) {
 
 	return db, ctx
 }
+
+func TestSearchLightningRequestsAppliesSinceLimitAndEscapesWildcards(t *testing.T) {
+	db, ctx := setupTestDB(t)
+	now := time.Now().Unix()
+	amount := uint64(100)
+
+	tx, err := db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction: %v", err)
+	}
+
+	for _, request := range []cashu.MintRequestDB{
+		{
+			Quote:   "mint-hit-new",
+			Request: "invoice-hit-new",
+			Unit:    cashu.Sat.String(),
+			State:   cashu.PAID,
+			SeenAt:  now - 60,
+			Amount:  &amount,
+		},
+		{
+			Quote:   "mint-hit-old",
+			Request: "invoice-hit-old",
+			Unit:    cashu.Sat.String(),
+			State:   cashu.PAID,
+			SeenAt:  now - 40*24*60*60,
+			Amount:  &amount,
+		},
+		{
+			Quote:   "percent%quote",
+			Request: "plain-request",
+			Unit:    cashu.Sat.String(),
+			State:   cashu.PAID,
+			SeenAt:  now - 120,
+			Amount:  &amount,
+		},
+	} {
+		if err := db.SaveMintRequest(tx, request); err != nil {
+			t.Fatalf("save mint request: %v", err)
+		}
+	}
+
+	for _, request := range []cashu.MeltRequestDB{
+		{
+			Quote:   "melt-hit-mid",
+			Request: "lnbc-hit-mid",
+			Unit:    cashu.Sat.String(),
+			State:   cashu.ISSUED,
+			SeenAt:  now - 90,
+			Amount:  amount,
+		},
+		{
+			Quote:   "melt-other",
+			Request: "lnbc-other",
+			Unit:    cashu.Sat.String(),
+			State:   cashu.ISSUED,
+			SeenAt:  now - 30,
+			Amount:  amount,
+		},
+	} {
+		if err := db.SaveMeltRequest(tx, request); err != nil {
+			t.Fatalf("save melt request: %v", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit transaction: %v", err)
+	}
+
+	rows, err := db.SearchLightningRequests(ctx, "hit", time.Unix(now-7*24*60*60, 0), 2)
+	if err != nil {
+		t.Fatalf("SearchLightningRequests hit: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 limited rows, got %#v", rows)
+	}
+	if rows[0].ID != "mint-hit-new" || rows[1].ID != "melt-hit-mid" {
+		t.Fatalf("expected newest two search results in desc order, got %#v", rows)
+	}
+
+	wildcardRows, err := db.SearchLightningRequests(ctx, "%", time.Unix(now-7*24*60*60, 0), 10)
+	if err != nil {
+		t.Fatalf("SearchLightningRequests wildcard: %v", err)
+	}
+	if len(wildcardRows) != 1 || wildcardRows[0].ID != "percent%quote" {
+		t.Fatalf("expected escaped wildcard to match only literal percent row, got %#v", wildcardRows)
+	}
+}

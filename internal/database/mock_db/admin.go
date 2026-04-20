@@ -3,6 +3,9 @@ package mockdb
 import (
 	"context"
 	"slices"
+	"sort"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -78,6 +81,87 @@ func (m *MockDB) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapState) 
 
 	return liquiditySwaps, nil
 
+}
+
+func cloneStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+func (m *MockDB) GetMintRequestsByTime(ctx context.Context, since time.Time) ([]cashu.MintRequestDB, error) {
+	m.LastMintSince = since.Unix()
+	m.LastLightningSearch = nil
+	if m.ReturnError != 0 {
+		return nil, database.ErrDB
+	}
+
+	requests := make([]cashu.MintRequestDB, 0)
+	for _, request := range m.MintRequest {
+		if request.SeenAt >= since.Unix() {
+			requests = append(requests, request)
+		}
+	}
+	return requests, nil
+}
+
+func (m *MockDB) GetMeltRequestsByTime(ctx context.Context, since time.Time) ([]cashu.MeltRequestDB, error) {
+	m.LastMeltSince = since.Unix()
+	m.LastLightningSearch = nil
+	if m.ReturnError != 0 {
+		return nil, database.ErrDB
+	}
+
+	requests := make([]cashu.MeltRequestDB, 0)
+	for _, request := range m.MeltRequest {
+		if request.SeenAt >= since.Unix() {
+			requests = append(requests, request)
+		}
+	}
+	return requests, nil
+}
+
+func (m *MockDB) SearchLightningRequests(ctx context.Context, query string, since time.Time, limit int) ([]database.LightningActivityRow, error) {
+	m.LastLightningSearch = cloneStringPtr(&query)
+	m.LastSearchSince = since.Unix()
+	m.LastSearchLimit = limit
+	if m.ReturnError != 0 {
+		return nil, database.ErrDB
+	}
+
+	query = strings.ToLower(query)
+	requests := make([]database.LightningActivityRow, 0)
+	for _, request := range m.MintRequest {
+		if request.SeenAt >= since.Unix() && (strings.Contains(strings.ToLower(request.Quote), query) || strings.Contains(strings.ToLower(request.Request), query)) {
+			requests = append(requests, database.LightningActivityRow{
+				ID:      request.Quote,
+				Type:    "mint",
+				Request: request.Request,
+				State:   string(request.State),
+				Unit:    request.Unit,
+				SeenAt:  request.SeenAt,
+			})
+		}
+	}
+	for _, request := range m.MeltRequest {
+		if request.SeenAt >= since.Unix() && (strings.Contains(strings.ToLower(request.Quote), query) || strings.Contains(strings.ToLower(request.Request), query)) {
+			requests = append(requests, database.LightningActivityRow{
+				ID:      request.Quote,
+				Type:    "melt",
+				Request: request.Request,
+				State:   string(request.State),
+				Unit:    request.Unit,
+				SeenAt:  request.SeenAt,
+			})
+		}
+	}
+	sort.Slice(requests, func(i, j int) bool { return requests[i].SeenAt > requests[j].SeenAt })
+	if limit > 0 && len(requests) > limit {
+		requests = requests[:limit]
+	}
+	return requests, nil
 }
 
 func (m *MockDB) GetLatestStatsSnapshot(ctx context.Context) (*database.StatsSnapshot, error) {

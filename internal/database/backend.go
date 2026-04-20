@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -80,6 +81,15 @@ type KeysetFeeRow struct {
 	InputFeePpk uint64
 }
 
+type LightningActivityRow struct {
+	ID      string
+	Type    string
+	Request string
+	State   string
+	Unit    string
+	SeenAt  int64
+}
+
 type MintDB interface {
 	GetTx(ctx context.Context) (pgx.Tx, error)
 	Commit(ctx context.Context, tx pgx.Tx) error
@@ -143,6 +153,9 @@ type MintDB interface {
 	GetAuthUser(tx pgx.Tx, sub string) (AuthUser, error)
 	MakeAuthUser(tx pgx.Tx, auth AuthUser) error
 	UpdateLastLoggedIn(tx pgx.Tx, sub string, lastLoggedIn uint64) error
+	GetMintRequestsByTime(ctx context.Context, since time.Time) ([]cashu.MintRequestDB, error)
+	GetMeltRequestsByTime(ctx context.Context, since time.Time) ([]cashu.MeltRequestDB, error)
+	SearchLightningRequests(ctx context.Context, query string, since time.Time, limit int) ([]LightningActivityRow, error)
 
 	GetLatestStatsSnapshot(ctx context.Context) (*StatsSnapshot, error)
 	GetMintStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]MintStatsRow, error)

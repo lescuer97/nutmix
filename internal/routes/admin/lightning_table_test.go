@@ -6,201 +6,229 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 )
 
-func TestLightningSnapshotRowsAggregatesMintMeltAndFees(t *testing.T) {
-	rowA := testStatsRow()
-	rowA.StartDate = 100
-	rowA.EndDate = 200
-	rowA.MintSummary = []database.StatsSummaryItem{{Unit: "sat", Quantity: 2, Amount: 20}}
-	rowA.MeltSummary = []database.StatsSummaryItem{{Unit: "sat", Quantity: 1, Amount: 5}}
-	rowA.Fees = 3
-	rowB := testStatsRow()
-	rowB.StartDate = 201
-	rowB.EndDate = 300
-	rowB.MintSummary = []database.StatsSummaryItem{{Unit: "usd", Quantity: 1, Amount: 2}}
-	rowB.MeltSummary = []database.StatsSummaryItem{{Unit: "usd", Quantity: 3, Amount: 6}}
-	rowB.Fees = 7
-	rows := []database.StatsSnapshot{rowA, rowB}
-	got, err := lightningSnapshotRows(rows)
-	if err != nil {
-		t.Fatalf("lightningSnapshotRows: %v", err)
-	}
-	if len(got) != 2 {
-		t.Fatalf("expected 2 rows, got %#v", got)
-	}
-	if got[0].EndDate != 300 || got[0].MintCount != 1 || got[0].MintAmount != 2 || got[0].MeltCount != 3 || got[0].MeltAmount != 6 || got[0].NetFlow != 0 || got[0].Fees != 7 {
-		t.Fatalf("unexpected first row: %#v", got[0])
-	}
-	if got[1].EndDate != 200 || got[1].MintCount != 2 || got[1].MintAmount != 20 || got[1].MeltCount != 1 || got[1].MeltAmount != 5 || got[1].NetFlow != 15 || got[1].Fees != 3 {
-		t.Fatalf("unexpected second row: %#v", got[1])
-	}
+func uint64Ptr(value uint64) *uint64 {
+	return &value
 }
 
-func TestLightningSnapshotRowsOrdersNewestEndDateFirst(t *testing.T) {
-	rowA := testStatsRow()
-	rowA.StartDate = 0
-	rowA.EndDate = 10
-	rowB := testStatsRow()
-	rowB.StartDate = 0
-	rowB.EndDate = 30
-	rowC := testStatsRow()
-	rowC.StartDate = 0
-	rowC.EndDate = 20
-	got, err := lightningSnapshotRows([]database.StatsSnapshot{rowA, rowB, rowC})
-	if err != nil {
-		t.Fatalf("lightningSnapshotRows: %v", err)
-	}
-	if got[0].EndDate != 30 || got[1].EndDate != 20 || got[2].EndDate != 10 {
-		t.Fatalf("unexpected order: %#v", got)
-	}
-}
-
-func TestLightningSnapshotRowsHandlesEmptySummaries(t *testing.T) {
-	row := testStatsRow()
-	row.StartDate = 0
-	row.EndDate = 10
-	got, err := lightningSnapshotRows([]database.StatsSnapshot{row})
-	if err != nil {
-		t.Fatalf("lightningSnapshotRows: %v", err)
-	}
-	if got[0].MintCount != 0 || got[0].MeltCount != 0 || got[0].Fees != 0 {
-		t.Fatalf("expected zero row, got %#v", got[0])
-	}
-}
-
-func TestLightningSnapshotRowsClampsNegativeNetFlowSafely(t *testing.T) {
-	row := testStatsRow()
-	row.StartDate = 0
-	row.EndDate = 10
-	row.MintSummary = []database.StatsSummaryItem{{Unit: "sat", Quantity: 1, Amount: 2}}
-	row.MeltSummary = []database.StatsSummaryItem{{Unit: "sat", Quantity: 1, Amount: 6}}
-	got, err := lightningSnapshotRows([]database.StatsSnapshot{row})
-	if err != nil {
-		t.Fatalf("lightningSnapshotRows: %v", err)
-	}
-	if got[0].NetFlow != 0 {
-		t.Fatalf("expected clamped net flow 0, got %#v", got[0])
-	}
-}
-
-func TestLightningSnapshotRowsReturnsErrorForInvalidWindowSemantics(t *testing.T) {
-	row := testStatsRow()
-	row.StartDate = 20
-	row.EndDate = 10
-	_, err := lightningSnapshotRows([]database.StatsSnapshot{row})
-	if err == nil {
-		t.Fatal("expected error for invalid window semantics")
-	}
-}
-
-func TestLightningActivityTableRendersSnapshotColumns(t *testing.T) {
+func TestLightningActivityTableRendersOperationColumns(t *testing.T) {
 	ctx, recorder := adminTestContext("/admin/ln-table?since=all")
-	row := templates.LightningSnapshotRow{ //nolint:exhaustruct
-		StartDate:  100,
-		EndDate:    200,
-		MintCount:  2,
-		MintAmount: 20,
-		MeltCount:  1,
-		MeltAmount: 5,
-		NetFlow:    15,
-		Fees:       3,
+	row := templates.LightningInvoiceVisual{
+		Id:      "mint-123",
+		Type:    "mint",
+		Invoice: "lnbc123",
+		Status:  "PAID",
+		Unit:    "sat",
+		Time:    200,
 	}
-	err := templates.LightningActivityTable([]templates.LightningSnapshotRow{row}).Render(ctx.Request.Context(), recorder)
+	err := templates.LightningActivityTable([]templates.LightningInvoiceVisual{row}).Render(ctx.Request.Context(), recorder)
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 	body := recorder.Body.String()
-	for _, want := range []string{"Start", "End", "Mint Count", "Mint Amount", "Melt Count", "Melt Amount", "Net Flow", "Fees"} {
+	for _, want := range []string{"ID", "Type", "Invoice", "Status", "Unit", "Time", "mint-123", "lnbc123", "PAID"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected body to contain %q, got %s", want, body)
 		}
 	}
-	for _, unwanted := range []string{"Invoice", "Status"} {
+	for _, unwanted := range []string{"Mint Count", "Net Flow", "Fees"} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("did not expect body to contain %q, got %s", unwanted, body)
 		}
 	}
 }
 
-func TestLightningTableUsesStatsRowsOnly(t *testing.T) {
+func TestLightningTableRendersRawMintAndMeltRowsSortedNewestFirst(t *testing.T) {
 	db := testMockDB()
-	row := testStatsRow()
-	row.StartDate = 100
-	row.EndDate = 200
-	row.MintSummary = []database.StatsSummaryItem{{Unit: "sat", Quantity: 2, Amount: 20}}
-	row.MeltSummary = []database.StatsSummaryItem{{Unit: "sat", Quantity: 1, Amount: 5}}
-	row.Fees = 3
-	db.Stats = []database.StatsSnapshot{row}
+	now := time.Now().Unix()
+	db.MintRequest = []cashu.MintRequestDB{{
+		Quote:   "mint-new",
+		Request: "lnbc-new",
+		Unit:    "sat",
+		State:   cashu.PAID,
+		SeenAt:  now,
+		Amount:  uint64Ptr(21),
+	}}
+	db.MeltRequest = []cashu.MeltRequestDB{{
+		Quote:   "melt-mid",
+		Request: "lnbc-mid",
+		Unit:    "sat",
+		State:   cashu.ISSUED,
+		SeenAt:  now - 60,
+		Amount:  10,
+	}}
 	ctx, recorder := adminTestContext("/admin/ln-table?since=all")
 	LightningTable(&adminHandler{mint: adminTestMint(db)})(ctx)
 	body := recorder.Body.String()
-	for _, want := range []string{"Mint Count", ">20<", ">5<", ">15<", ">3<"} {
+	for _, want := range []string{"mint-new", "melt-mid", "lnbc-new", "lnbc-mid", "pill-mint", "pill-melt"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected body to contain %q, got %s", want, body)
 		}
 	}
+	if strings.Index(body, "mint-new") > strings.Index(body, "melt-mid") {
+		t.Fatalf("expected newest row first, got %s", body)
+	}
 }
 
-func TestLightningTablePassesSinceUnixToStatsQuery(t *testing.T) {
+func TestLightningTablePassesSinceUnixToMintAndMeltQueries(t *testing.T) {
 	db := testMockDB()
-	db.Stats = []database.StatsSnapshot{}
 	ctx, _ := adminTestContext("/admin/ln-table?since=all")
 	LightningTable(&adminHandler{mint: adminTestMint(db)})(ctx)
-	if db.LastStatsSince != time.Unix(0, 0).Unix() {
-		t.Fatalf("expected since %d, got %d", time.Unix(0, 0).Unix(), db.LastStatsSince)
+	if db.LastMintSince != time.Unix(0, 0).Unix() {
+		t.Fatalf("expected mint since %d, got %d", time.Unix(0, 0).Unix(), db.LastMintSince)
+	}
+	if db.LastMeltSince != time.Unix(0, 0).Unix() {
+		t.Fatalf("expected melt since %d, got %d", time.Unix(0, 0).Unix(), db.LastMeltSince)
+	}
+	if db.LastLightningSearch != nil {
+		t.Fatalf("expected no search query for date fetch, got %v", db.LastLightningSearch)
 	}
 }
 
-func TestLightningTableIgnoresSearchParameter(t *testing.T) {
+func TestLightningTableFiltersByTimeWhenSearchEmpty(t *testing.T) {
 	db := testMockDB()
-	row := testStatsRow()
-	row.StartDate = 100
-	row.EndDate = 200
-	row.MintSummary = []database.StatsSummaryItem{{Unit: "sat", Quantity: 2, Amount: 20}}
-	row.Fees = 1
-	db.Stats = []database.StatsSnapshot{row}
-	ctxA, recA := adminTestContext("/admin/ln-table?since=all")
-	LightningTable(&adminHandler{mint: adminTestMint(db)})(ctxA)
-	ctxB, recB := adminTestContext("/admin/ln-table?since=all&search=abc")
-	LightningTable(&adminHandler{mint: adminTestMint(db)})(ctxB)
-	if recA.Body.String() != recB.Body.String() {
-		t.Fatalf("expected search to be ignored, got %q vs %q", recA.Body.String(), recB.Body.String())
+	now := time.Now().Unix()
+	db.MintRequest = []cashu.MintRequestDB{
+		{
+			Quote:   "mint-recent",
+			Request: "lnbc-recent",
+			Unit:    "sat",
+			State:   cashu.PAID,
+			SeenAt:  now - 24*60*60,
+			Amount:  uint64Ptr(5),
+		},
+		{
+			Quote:   "mint-old",
+			Request: "lnbc-old",
+			Unit:    "sat",
+			State:   cashu.PAID,
+			SeenAt:  now - 40*24*60*60,
+			Amount:  uint64Ptr(7),
+		},
+	}
+	ctx, recorder := adminTestContext("/admin/ln-table?since=1w")
+	LightningTable(&adminHandler{mint: adminTestMint(db)})(ctx)
+	body := recorder.Body.String()
+	if !strings.Contains(body, "mint-recent") {
+		t.Fatalf("expected recent row in body, got %s", body)
+	}
+	if strings.Contains(body, "mint-old") {
+		t.Fatalf("did not expect old row in body, got %s", body)
+	}
+	if db.LastLightningSearch != nil {
+		t.Fatalf("expected no search query, got %v", db.LastLightningSearch)
 	}
 }
 
-func TestLightningTableReturnsErrorWhenStatsReadFails(t *testing.T) {
+func TestLightningTableSearchUsesSameTimeRangeAndMatchesQuoteOrRequest(t *testing.T) {
+	db := testMockDB()
+	now := time.Now().Unix()
+	db.MintRequest = []cashu.MintRequestDB{
+		{
+			Quote:   "old-hit",
+			Request: "lnbc-old-hit",
+			Unit:    "sat",
+			State:   cashu.PAID,
+			SeenAt:  now - 40*24*60*60,
+			Amount:  uint64Ptr(5),
+		},
+		{
+			Quote:   "recent-miss",
+			Request: "invoice-hit-recent",
+			Unit:    "sat",
+			State:   cashu.PAID,
+			SeenAt:  now - 24*60*60,
+			Amount:  uint64Ptr(7),
+		},
+		{
+			Quote:   "recent-other",
+			Request: "lnbc-recent-other",
+			Unit:    "sat",
+			State:   cashu.PAID,
+			SeenAt:  now - 24*60*60,
+			Amount:  uint64Ptr(9),
+		},
+	}
+	db.MeltRequest = []cashu.MeltRequestDB{{
+		Quote:   "MELT-hit-recent",
+		Request: "lnbc-melt",
+		Unit:    "sat",
+		State:   cashu.ISSUED,
+		SeenAt:  now - 2*24*60*60,
+		Amount:  11,
+	}}
+	ctx, recorder := adminTestContext("/admin/ln-table?since=1w&search=HIT")
+	LightningTable(&adminHandler{mint: adminTestMint(db)})(ctx)
+	body := recorder.Body.String()
+	for _, want := range []string{"invoice-hit-recent", "MELT-hit-recent"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected matching recent search hit %q in body, got %s", want, body)
+		}
+	}
+	for _, unwanted := range []string{"old-hit", "lnbc-old-hit", "recent-other", "lnbc-recent-other"} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("did not expect %q in body, got %s", unwanted, body)
+		}
+	}
+	if db.LastLightningSearch == nil || *db.LastLightningSearch != "HIT" {
+		t.Fatalf("expected lightning search to be recorded, got %v", db.LastLightningSearch)
+	}
+	if db.LastMintSince != 0 || db.LastMeltSince != 0 {
+		t.Fatalf("expected search path to avoid date query, got mint since=%d melt since=%d", db.LastMintSince, db.LastMeltSince)
+	}
+	if db.LastSearchSince < now-8*24*60*60 || db.LastSearchSince > now-6*24*60*60 {
+		t.Fatalf("expected search since to be about one week ago, got %d", db.LastSearchSince)
+	}
+	if db.LastSearchLimit != lightningSearchLimit {
+		t.Fatalf("expected search limit %d, got %d", lightningSearchLimit, db.LastSearchLimit)
+	}
+}
+
+func TestLightningTableShortSearchFallsBackToDateQuery(t *testing.T) {
+	db := testMockDB()
+	now := time.Now().Unix()
+	db.MintRequest = []cashu.MintRequestDB{{
+		Quote:   "mint-recent",
+		Request: "lnbc-recent",
+		Unit:    "sat",
+		State:   cashu.PAID,
+		SeenAt:  now - 24*60*60,
+		Amount:  uint64Ptr(5),
+	}}
+	ctx, recorder := adminTestContext("/admin/ln-table?since=1w&search=h")
+	LightningTable(&adminHandler{mint: adminTestMint(db)})(ctx)
+	body := recorder.Body.String()
+	if !strings.Contains(body, "mint-recent") {
+		t.Fatalf("expected fallback date query row in body, got %s", body)
+	}
+	if db.LastLightningSearch != nil {
+		t.Fatalf("expected short search to skip search query, got %v", db.LastLightningSearch)
+	}
+	if db.LastMintSince == 0 || db.LastMeltSince == 0 {
+		t.Fatalf("expected short search to use date queries, got mint=%d melt=%d", db.LastMintSince, db.LastMeltSince)
+	}
+}
+
+func TestLightningTableReturnsErrorWhenRequestReadFails(t *testing.T) {
 	db := testMockDB()
 	db.ReturnError = 1
 	ctx, _ := adminTestContext("/admin/ln-table?since=all")
 	LightningTable(&adminHandler{mint: adminTestMint(db)})(ctx)
 	if len(ctx.Errors) == 0 {
-		t.Fatal("expected error when stats read fails")
+		t.Fatal("expected error when request read fails")
 	}
 }
 
-func TestLightningTableReturnsErrorWhenStatsTransformationFails(t *testing.T) {
-	db := testMockDB()
-	row := testStatsRow()
-	row.StartDate = 20
-	row.EndDate = 10
-	db.Stats = []database.StatsSnapshot{row}
-	ctx, _ := adminTestContext("/admin/ln-table?since=all")
-	LightningTable(&adminHandler{mint: adminTestMint(db)})(ctx)
-	if len(ctx.Errors) == 0 {
-		t.Fatal("expected error when stats transformation fails")
-	}
-}
-
-func TestLightningPageDoesNotRenderInvoiceSearchUI(t *testing.T) {
-	ctx, recorder := adminTestContext("/admin/ln?since=all")
+func TestLightningPageRendersInvoiceSearchUI(t *testing.T) {
+	ctx, recorder := adminTestContext("/admin/ln?since=all&search=abc")
 	LnPage(adminTestMint(testMockDB()))(ctx)
 	body := recorder.Body.String()
-	for _, unwanted := range []string{"ln-search-input", "Search by ID", "input from:#ln-search-input"} {
-		if strings.Contains(body, unwanted) {
-			t.Fatalf("did not expect body to contain %q, got %s", unwanted, body)
+	for _, want := range []string{"ln-search-input", "Search by ID", "input changed delay:300ms from:#ln-search-input", "value=\"abc\""} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected body to contain %q, got %s", want, body)
 		}
 	}
 }
