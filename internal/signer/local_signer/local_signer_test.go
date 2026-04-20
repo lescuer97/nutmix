@@ -291,7 +291,12 @@ func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
 		t.Fatalf("SetupLocalSigner(&db) %+v", err)
 	}
 
-	_, _, err = localsigner.SignBlindMessages([]cashu.BlindedMessage{{Id: "missing-keyset", Amount: 1}})
+	_, _, err = localsigner.SignBlindMessages([]cashu.BlindedMessage{{
+		B_:      cashu.WrappedPublicKey{PublicKey: nil},
+		Id:      "missing-keyset",
+		Witness: "",
+		Amount:  1,
+	}})
 	if err == nil {
 		t.Fatal("expected missing keyset to fail")
 	}
@@ -309,7 +314,17 @@ func TestVerifyProofsFailsForUnknownKeyset(t *testing.T) {
 		t.Fatalf("SetupLocalSigner(&db) %+v", err)
 	}
 
-	err = localsigner.VerifyProofs([]cashu.Proof{{Id: "missing-keyset", Amount: 1}})
+	err = localsigner.VerifyProofs([]cashu.Proof{{
+		C:       cashu.WrappedPublicKey{PublicKey: nil},
+		Y:       cashu.WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "missing-keyset",
+		Secret:  "",
+		Witness: "",
+		State:   "",
+		Amount:  1,
+		SeenAt:  0,
+	}})
 	if err == nil {
 		t.Fatal("expected missing keyset to fail")
 	}

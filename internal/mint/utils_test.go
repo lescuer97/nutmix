@@ -219,8 +219,28 @@ func TestVerifyUnitOfProofFailsForUnknownKeyset(t *testing.T) {
 	}
 
 	proofs := cashu.Proofs{
-		{Id: keysets.Keysets[0].Id, Amount: 0},
-		{Id: "missing-keyset", Amount: 0},
+		{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      keysets.Keysets[0].Id,
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
+		{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "missing-keyset",
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
 	}
 
 	_, err = mint.CheckProofsAreSameUnit(proofs, keysets.Keysets)
@@ -241,8 +261,18 @@ func TestVerifyOutputsFailsForUnknownKeyset(t *testing.T) {
 	}
 
 	outputs := []cashu.BlindedMessage{
-		{Id: keysets.Keysets[0].Id, Amount: 0},
-		{Id: "missing-keyset", Amount: 0},
+		{
+			B_:      cashu.WrappedPublicKey{PublicKey: nil},
+			Id:      keysets.Keysets[0].Id,
+			Witness: "",
+			Amount:  0,
+		},
+		{
+			B_:      cashu.WrappedPublicKey{PublicKey: nil},
+			Id:      "missing-keyset",
+			Witness: "",
+			Amount:  0,
+		},
 	}
 
 	_, err = mint.VerifyOutputs(outputs, keysets.Keysets)
