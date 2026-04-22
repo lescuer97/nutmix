@@ -49,14 +49,14 @@ templ LightningConnectionSettings(config utils.Config) {
 						hx-get="/admin/lightningdata"
 						hx-target="#lightning-data"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNBITS }
-					>LNBITS wallet (deprecated, removed in v0.8.0)</option>
+					>LNBITS wallet (deprecated, will be removed in v0.8.0)</option>
 					<option
 						value="Strike"
 						hx-trigger="selected"
 						hx-get="/admin/lightningdata"
 						hx-target="#lightning-data"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.Strike }
-					>Strike (deprecated, removed in v0.7.0)</option>
+					>Strike (deprecated, will be removed in v0.7.0)</option>
 				</select>
 			</label>
 		</div>
@@ -134,7 +134,7 @@ templ Lnbits(endpoint string, key string) {
 					<span class="deprecation-badge">Deprecated</span>
 					<span class="deprecation-title">LNBITS backend</span>
 				</div>
-				<span class="deprecation-version">Removed in v0.8.0</span>
+				<span class="deprecation-version">Will be removed in v0.8.0</span>
 			</div>
 			<p class="deprecation-copy">
 				LNBITS support is scheduled for removal in v0.8.0. Switch to another lightning backend before upgrading to avoid configuration breakage.
@@ -161,7 +161,7 @@ templ Strike(key string, endpoint string) {
 					<span class="deprecation-badge">Deprecated</span>
 					<span class="deprecation-title">Strike backend</span>
 				</div>
-				<span class="deprecation-version">Removed in v0.7.0</span>
+				<span class="deprecation-version">Will be removed in v0.7.0</span>
 			</div>
 			<p class="deprecation-copy">
 				Strike support is scheduled for removal in v0.7.0. Switch to another lightning backend before upgrading to avoid configuration breakage.
