@@ -430,10 +430,12 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			}
 			newBackend = lndWallet
 
-		case string(utils.LNBITS):
-			newBackendType = utils.LNBITS
+		case string(utils.LNBITS): //nolint:staticcheck // LNBITS remains configurable until its planned removal in v0.8.0.
+			newBackendType = utils.LNBITS //nolint:staticcheck // LNBITS remains configurable until its planned removal in v0.8.0.
 			lnbitsKey = c.Request.PostFormValue("MINT_LNBITS_KEY")
 			lnbitsEndpoint = c.Request.PostFormValue("MINT_LNBITS_ENDPOINT")
+
+			slog.Warn("LNBITS backend is deprecated and will be removed in v0.8.0")
 
 			lnbitsWallet := lightning.LnbitsWallet{
 				Network:  chainparam,
@@ -549,7 +551,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			mint.Config.LND_GRPC_HOST = lndHost
 			mint.Config.LND_MACAROON = lndMacaroon
 			mint.Config.LND_TLS_CERT = lndTls
-		case utils.LNBITS:
+		case utils.LNBITS: //nolint:staticcheck // LNBITS config is still persisted until its planned removal in v0.8.0.
 			mint.Config.MINT_LNBITS_KEY = lnbitsKey
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
 		case utils.Strike: //nolint:staticcheck // Strike config is still persisted until its planned removal in v0.7.0.

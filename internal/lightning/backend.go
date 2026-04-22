@@ -15,6 +15,8 @@ var (
 type Backend uint
 
 const LNDGRPC Backend = iota + 1
+
+// Deprecated: LNBITS backend will be removed in v0.8.0.
 const LNBITS Backend = iota + 2
 const CLNGRPC Backend = iota + 3
 const FAKEWALLET Backend = iota + 4

@@ -16,6 +16,8 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
+// LnbitsWallet implements the LNBits-hosted lightning backend.
+// Deprecated: LNBITS backend will be removed in v0.8.0.
 type LnbitsWallet struct {
 	Endpoint string
 	Key      string

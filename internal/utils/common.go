@@ -15,6 +15,8 @@ type LightningBackend string
 
 const FAKE_WALLET LightningBackend = "FakeWallet"
 const LNDGRPC LightningBackend = "LndGrpcWallet"
+
+// Deprecated: LNBITS backend will be removed in v0.8.0.
 const LNBITS LightningBackend = "LNbitsWallet"
 const CLNGRPC LightningBackend = "ClnGrpcWallet"
 

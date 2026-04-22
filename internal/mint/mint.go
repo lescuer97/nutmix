@@ -124,7 +124,9 @@ func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig
 			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
 		}
 		mint.LightningBackend = lndWallet
-	case utils.LNBITS:
+	case utils.LNBITS: //nolint:staticcheck // LNBITS remains supported until its planned removal in v0.8.0.
+		slog.Warn("LNBITS backend is deprecated and will be removed in v0.8.0")
+
 		lnbitsWallet := lightning.LnbitsWallet{
 			Network:  chainparam,
 			Endpoint: config.MINT_LNBITS_ENDPOINT,
