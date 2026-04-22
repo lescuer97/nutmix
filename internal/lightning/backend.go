@@ -18,6 +18,8 @@ const LNDGRPC Backend = iota + 1
 const LNBITS Backend = iota + 2
 const CLNGRPC Backend = iota + 3
 const FAKEWALLET Backend = iota + 4
+
+// Deprecated: Strike backend will be removed in v0.7.0.
 const STRIKE Backend = iota + 5
 
 type LightningBackend interface {
