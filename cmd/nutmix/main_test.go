@@ -693,7 +693,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 		log.Fatal("Error conecting to db", err)
 	}
 
-	config, err := mint.SetUpConfigDB(db)
+	config, nostrNotificationConfig, err := mint.SetUpConfigDB(db)
 
 	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 
@@ -713,7 +713,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 		log.Fatalf("localsigner.SetupLocalSigner(db): %+v ", err)
 	}
 
-	mint, err := mint.SetUpMint(ctx, config, db, &signer)
+	mint, err := mint.SetUpMint(ctx, config, nostrNotificationConfig, db, &signer)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)
@@ -740,7 +740,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 		log.Fatalf("localsigner.SetupLocalSigner(&db): %+v ", err)
 	}
 
-	config, err := mint.SetUpConfigDB(&db)
+	config, nostrNotificationConfig, err := mint.SetUpConfigDB(&db)
 
 	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 
@@ -755,7 +755,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
 
-	mint, err := mint.SetUpMint(ctx, config, &db, &signer)
+	mint, err := mint.SetUpMint(ctx, config, nostrNotificationConfig, &db, &signer)
 
 	if err != nil {
 		log.Fatalf("SetUpMint: %+v ", err)

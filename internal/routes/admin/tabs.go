@@ -37,7 +37,7 @@ func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		err := templates.MintSettings(mint.Config).Render(ctx, c.Writer)
+		err := templates.MintSettings(mint.Config, nostrNotificationConfigValue(mint.NostrNotificationConfig)).Render(ctx, c.Writer)
 		if err != nil {
 			_ = c.Error(err)
 			c.Status(400)
@@ -302,10 +302,10 @@ func MintSettingsGeneral(mint *m.Mint) gin.HandlerFunc {
 			mint.Config.NOSTR = ""
 		}
 
-		err := mint.MintDB.UpdateConfig(mint.Config)
+		err := persistConfigTx(c.Request.Context(), mint, mint.Config)
 		if err != nil {
 			slog.Warn(
-				"mint.MintDB.UpdateConfig(mint.Config) - Mocking success despite error",
+				"persistConfigTx(c.Request.Context(), mint, mint.Config) - Mocking success despite error",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
@@ -361,10 +361,10 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 		}
 		mint.Config.PEG_OUT_LIMIT_SATS = pegOutLitmit
 
-		err = mint.MintDB.UpdateConfig(mint.Config)
+		err = persistConfigTx(c.Request.Context(), mint, mint.Config)
 		if err != nil {
 			slog.Warn(
-				"mint.MintDB.UpdateConfig(mint.Config) - Mocking success despite error",
+				"persistConfigTx(c.Request.Context(), mint, mint.Config) - Mocking success despite error",
 				slog.String(utils.LogExtraInfo, err.Error()))
 		}
 
@@ -393,14 +393,14 @@ func MintSettingsAuth(mint *m.Mint) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 			return
 		}
-		err = mint.MintDB.UpdateConfig(mint.Config)
+		err = persistConfigTx(c.Request.Context(), mint, mint.Config)
 
 		if err != nil {
 			slog.Warn(
-				"mint.MintDB.UpdateConfig(mint.Config) - Mocking success despite error",
+				"persistConfigTx(c.Request.Context(), mint, mint.Config) - Mocking success despite error",
 				slog.String(utils.LogExtraInfo, err.Error()))
 
-			_ = c.Error(fmt.Errorf("mint.MintDB.UpdateConfig(mint.Config). %w", err))
+			_ = c.Error(fmt.Errorf("persistConfigTx(c.Request.Context(), mint, mint.Config). %w", err))
 			// return // Mocking success
 		}
 
@@ -425,7 +425,7 @@ func MintSettingsNotifications(mint *m.Mint) gin.HandlerFunc {
 		nostrNotificationsNip04DMEnabled := c.Request.PostFormValue("NOSTR_NOTIFICATION_NIP04_DM") == "on"
 		npubInputs := c.PostFormArray("NOSTR_NOTIFICATION_NPUBS")
 
-		nextConfig := mint.Config
+		nextConfig := nostrNotificationConfigValue(mint.NostrNotificationConfig)
 		npubsToPersist := nextConfig.NOSTR_NOTIFICATION_NPUBS
 
 		if len(npubInputs) > 0 {
@@ -479,7 +479,7 @@ func MintSettingsNotifications(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		mint.Config = nextConfig
+		mint.NostrNotificationConfig = &nextConfig
 
 		if err := renderNotificationsForm(c, nextConfig, "Nostr notification settings successfully set", true); err != nil {
 			slog.Warn("failed to render notifications form", slog.Any("error", err))
@@ -496,7 +496,7 @@ func MintSettingsNotificationsTest(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		if !mint.Config.NOSTR_NOTIFICATIONS {
+		if mint.NostrNotificationConfig == nil || !mint.NostrNotificationConfig.NOSTR_NOTIFICATIONS {
 			if err := templates.ObbNotification(templates.ErrorNotif("Enable nostr notifications first")).Render(c.Request.Context(), c.Writer); err != nil {
 				slog.Warn("failed to render test notification disabled error", slog.Any("error", err))
 			}
@@ -538,7 +538,7 @@ func MintSettingsNotificationDeleteNpub(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		nextConfig := mint.Config
+		nextConfig := nostrNotificationConfigValue(mint.NostrNotificationConfig)
 		filteredNpubs := make([]cashu.WrappedPublicKey, 0, len(nextConfig.NOSTR_NOTIFICATION_NPUBS))
 		deleted := false
 		for _, existing := range nextConfig.NOSTR_NOTIFICATION_NPUBS {
@@ -550,7 +550,7 @@ func MintSettingsNotificationDeleteNpub(mint *m.Mint) gin.HandlerFunc {
 		}
 
 		if !deleted {
-			if err := renderNotificationsForm(c, mint.Config, "Nostr recipient was not found", false); err != nil {
+			if err := renderNotificationsForm(c, nostrNotificationConfigValue(mint.NostrNotificationConfig), "Nostr recipient was not found", false); err != nil {
 				slog.Warn("failed to render notifications form", slog.Any("error", err))
 			}
 			return
@@ -593,7 +593,7 @@ func MintSettingsNotificationDeleteNpub(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		mint.Config = nextConfig
+		mint.NostrNotificationConfig = &nextConfig
 
 		if err := renderNotificationsForm(c, nextConfig, "Nostr recipient deleted", true); err != nil {
 			slog.Warn("failed to render notifications form", slog.Any("error", err))
@@ -601,7 +601,15 @@ func MintSettingsNotificationDeleteNpub(mint *m.Mint) gin.HandlerFunc {
 	}
 }
 
-func syncNostrNotificationNsec(config *utils.Config) error {
+func nostrNotificationConfigValue(config *utils.NostrNotificationConfig) utils.NostrNotificationConfig {
+	if config == nil {
+		return utils.NostrNotificationConfig{}
+	}
+
+	return *config
+}
+
+func syncNostrNotificationNsec(config *utils.NostrNotificationConfig) error {
 	if config == nil {
 		return fmt.Errorf("config is nil")
 	}
@@ -613,7 +621,7 @@ func syncNostrNotificationNsec(config *utils.Config) error {
 	return utils.SyncNostrNotificationNsec(config, true)
 }
 
-func renderNotificationsForm(c *gin.Context, config utils.Config, message string, isSuccess bool) error {
+func renderNotificationsForm(c *gin.Context, config utils.NostrNotificationConfig, message string, isSuccess bool) error {
 	if err := templates.Notifications(config).Render(c.Request.Context(), c.Writer); err != nil {
 		return fmt.Errorf("templates.Notifications(config).Render(...): %w", err)
 	}
@@ -629,7 +637,7 @@ func renderNotificationsForm(c *gin.Context, config utils.Config, message string
 	return templates.ObbNotification(templates.ErrorNotif(message)).Render(c.Request.Context(), c.Writer)
 }
 
-func persistNostrNotificationConfigTx(ctx context.Context, mint *m.Mint, config utils.Config) (err error) {
+func persistConfigTx(ctx context.Context, mint *m.Mint, config utils.Config) (err error) {
 	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
 		return fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
@@ -644,9 +652,37 @@ func persistNostrNotificationConfigTx(ctx context.Context, mint *m.Mint, config 
 		}
 	}()
 
-	err = mint.MintDB.UpdateNostrNotificationConfigTx(tx, config)
+	err = mint.MintDB.UpdateConfig(tx, config)
 	if err != nil {
-		return fmt.Errorf("mint.MintDB.UpdateNostrNotificationConfigTx(tx, config): %w", err)
+		return fmt.Errorf("mint.MintDB.UpdateConfig(tx, config): %w", err)
+	}
+
+	err = mint.MintDB.Commit(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("mint.MintDB.Commit(ctx, tx): %w", err)
+	}
+
+	return nil
+}
+
+func persistNostrNotificationConfigTx(ctx context.Context, mint *m.Mint, config utils.NostrNotificationConfig) (err error) {
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		return fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
+	}
+
+	defer func() {
+		if err == nil {
+			return
+		}
+		if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+			slog.Warn("mint.MintDB.Rollback(ctx, tx)", slog.String(utils.LogExtraInfo, rollbackErr.Error()))
+		}
+	}()
+
+	err = mint.MintDB.UpdateNostrNotificationConfig(tx, config)
+	if err != nil {
+		return fmt.Errorf("mint.MintDB.UpdateNostrNotificationConfig(tx, config): %w", err)
 	}
 
 	err = mint.MintDB.Commit(ctx, tx)
@@ -879,10 +915,10 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		mint.LightningBackend = newBackend
 
 		// Save to DB
-		err = mint.MintDB.UpdateConfig(mint.Config)
+		err = persistConfigTx(c.Request.Context(), mint, mint.Config)
 		if err != nil {
 			slog.Warn(
-				"mint.MintDB.UpdateConfig(mint.Config)",
+				"persistConfigTx(c.Request.Context(), mint, mint.Config)",
 				slog.String(utils.LogExtraInfo, err.Error()))
 			if renderErr := RenderError(c, "Settings applied but failed to save to database"); renderErr != nil {
 				slog.Warn("failed to render error", slog.Any("error", renderErr))

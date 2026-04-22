@@ -92,7 +92,7 @@ func main() {
 	}
 	defer db.Close()
 
-	config, err := mint.SetUpConfigDB(db)
+	config, nostrNotificationConfig, err := mint.SetUpConfigDB(db)
 	if err != nil {
 		log.Fatalf("mint.SetUpConfigDB(db): %+v ", err)
 	}
@@ -103,7 +103,7 @@ func main() {
 	}
 
 	// remove mint private key from variable
-	mint, err := mint.SetUpMint(ctx, config, db, signer)
+	mint, err := mint.SetUpMint(ctx, config, nostrNotificationConfig, db, signer)
 
 	if err != nil {
 		slog.Warn("SetUpMint", slog.Any("error", err))

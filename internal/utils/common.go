@@ -41,42 +41,45 @@ func StringToLightningBackend(text string) LightningBackend {
 
 //nolint:govet // db tag names are fixed and field order is intentional for clarity.
 type Config struct {
-	PEG_OUT_LIMIT_SATS              *int                     `db:"peg_out_limit_sats,omitempty"`
-	IconUrl                         *string                  `db:"icon_url,omitempty"`
-	TosUrl                          *string                  `db:"tos_url,omitempty"`
-	PEG_IN_LIMIT_SATS               *int                     `db:"peg_in_limit_sats,omitempty"`
-	NETWORK                         string                   `db:"network"`
-	CLN_CLIENT_CERT                 string                   `db:"cln_client_cert"`
-	EMAIL                           string                   `db:"email"`
-	NOSTR                           string                   `db:"nostr"`
-	NAME                            string                   `db:"name"`
-	MINT_LIGHTNING_BACKEND          LightningBackend         `db:"mint_lightning_backend"`
-	LND_GRPC_HOST                   string                   `db:"lnd_grpc_host"`
-	LND_TLS_CERT                    string                   `db:"lnd_tls_cert"`
-	LND_MACAROON                    string                   `db:"lnd_macaroon"`
-	MINT_LNBITS_ENDPOINT            string                   `db:"mint_lnbits_endpoint"`
-	MINT_LNBITS_KEY                 string                   `db:"mint_lnbits_key"`
-	CLN_GRPC_HOST                   string                   `db:"cln_grpc_host"`
-	CLN_CA_CERT                     string                   `db:"cln_ca_cert"`
-	MOTD                            string                   `db:"motd"`
-	CLN_CLIENT_KEY                  string                   `db:"cln_client_key"`
-	CLN_MACAROON                    string                   `db:"cln_macaroon"`
-	STRIKE_KEY                      string                   `db:"strike_key"`
-	STRIKE_ENDPOINT                 string                   `db:"strike_endpoint"`
-	MINT_AUTH_OICD_CLIENT_ID        string                   `db:"mint_auth_oicd_client_id,omitempty"`
-	DESCRIPTION_LONG                string                   `db:"description_long"`
-	DESCRIPTION                     string                   `db:"description"`
-	MINT_AUTH_OICD_URL              string                   `db:"mint_auth_oicd_url,omitempty"`
-	MINT_AUTH_CLEAR_AUTH_URLS       []string                 `db:"mint_auth_clear_auth_urls,omitempty"`
-	MINT_AUTH_BLIND_AUTH_URLS       []string                 `db:"mint_auth_blind_auth_urls,omitempty"`
-	MINT_AUTH_RATE_LIMIT_PER_MINUTE int                      `db:"mint_auth_rate_limit_per_minute,omitempty"`
-	MINT_AUTH_MAX_BLIND_TOKENS      uint64                   `db:"mint_auth_max_blind_tokens,omitempty"`
-	MINT_REQUIRE_AUTH               bool                     `db:"mint_require_auth,omitempty"`
-	PEG_OUT_ONLY                    bool                     `db:"peg_out_only"`
-	NOSTR_NOTIFICATIONS             bool                     `db:"nostr_notifications"`
-	NOSTR_NOTIFICATION_NIP04_DM     bool                     `db:"nostr_notification_nip04_dm"`
-	NOSTR_NOTIFICATION_NSEC         []byte                   `db:"-"`
-	NOSTR_NOTIFICATION_NPUBS        []cashu.WrappedPublicKey `db:"-"`
+	PEG_OUT_LIMIT_SATS              *int             `db:"peg_out_limit_sats,omitempty"`
+	IconUrl                         *string          `db:"icon_url,omitempty"`
+	TosUrl                          *string          `db:"tos_url,omitempty"`
+	PEG_IN_LIMIT_SATS               *int             `db:"peg_in_limit_sats,omitempty"`
+	NETWORK                         string           `db:"network"`
+	CLN_CLIENT_CERT                 string           `db:"cln_client_cert"`
+	EMAIL                           string           `db:"email"`
+	NOSTR                           string           `db:"nostr"`
+	NAME                            string           `db:"name"`
+	MINT_LIGHTNING_BACKEND          LightningBackend `db:"mint_lightning_backend"`
+	LND_GRPC_HOST                   string           `db:"lnd_grpc_host"`
+	LND_TLS_CERT                    string           `db:"lnd_tls_cert"`
+	LND_MACAROON                    string           `db:"lnd_macaroon"`
+	MINT_LNBITS_ENDPOINT            string           `db:"mint_lnbits_endpoint"`
+	MINT_LNBITS_KEY                 string           `db:"mint_lnbits_key"`
+	CLN_GRPC_HOST                   string           `db:"cln_grpc_host"`
+	CLN_CA_CERT                     string           `db:"cln_ca_cert"`
+	MOTD                            string           `db:"motd"`
+	CLN_CLIENT_KEY                  string           `db:"cln_client_key"`
+	CLN_MACAROON                    string           `db:"cln_macaroon"`
+	STRIKE_KEY                      string           `db:"strike_key"`
+	STRIKE_ENDPOINT                 string           `db:"strike_endpoint"`
+	MINT_AUTH_OICD_CLIENT_ID        string           `db:"mint_auth_oicd_client_id,omitempty"`
+	DESCRIPTION_LONG                string           `db:"description_long"`
+	DESCRIPTION                     string           `db:"description"`
+	MINT_AUTH_OICD_URL              string           `db:"mint_auth_oicd_url,omitempty"`
+	MINT_AUTH_CLEAR_AUTH_URLS       []string         `db:"mint_auth_clear_auth_urls,omitempty"`
+	MINT_AUTH_BLIND_AUTH_URLS       []string         `db:"mint_auth_blind_auth_urls,omitempty"`
+	MINT_AUTH_RATE_LIMIT_PER_MINUTE int              `db:"mint_auth_rate_limit_per_minute,omitempty"`
+	MINT_AUTH_MAX_BLIND_TOKENS      uint64           `db:"mint_auth_max_blind_tokens,omitempty"`
+	MINT_REQUIRE_AUTH               bool             `db:"mint_require_auth,omitempty"`
+	PEG_OUT_ONLY                    bool             `db:"peg_out_only"`
+}
+
+type NostrNotificationConfig struct {
+	NOSTR_NOTIFICATIONS         bool                     `db:"nostr_notifications"`
+	NOSTR_NOTIFICATION_NIP04_DM bool                     `db:"nostr_notification_nip04_dm"`
+	NOSTR_NOTIFICATION_NSEC     []byte                   `db:"-"`
+	NOSTR_NOTIFICATION_NPUBS    []cashu.WrappedPublicKey `db:"-"`
 }
 
 func (c *Config) Default() {
@@ -112,10 +115,6 @@ func (c *Config) Default() {
 	c.MINT_AUTH_CLEAR_AUTH_URLS = []string{}
 	c.MINT_AUTH_BLIND_AUTH_URLS = []string{}
 	c.STRIKE_KEY = ""
-	c.NOSTR_NOTIFICATION_NSEC = nil
-	c.NOSTR_NOTIFICATION_NPUBS = nil
-	c.NOSTR_NOTIFICATIONS = false
-	c.NOSTR_NOTIFICATION_NIP04_DM = false
 }
 
 func (c *Config) UseEnviromentVars() {
@@ -152,7 +151,7 @@ func RandomHash() (string, error) {
 	return base64.URLEncoding.EncodeToString(randomBytes), nil
 }
 
-func (c *Config) SetNostrNotificationConfig(enabled bool, nsec []byte, npubs []cashu.WrappedPublicKey) error {
+func (c *NostrNotificationConfig) SetNostrNotificationConfig(enabled bool, nsec []byte, npubs []cashu.WrappedPublicKey) error {
 	c.NOSTR_NOTIFICATIONS = enabled
 
 	if npubs == nil {

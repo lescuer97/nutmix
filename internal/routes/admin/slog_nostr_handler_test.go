@@ -7,6 +7,7 @@ import (
 	"time"
 
 	m "github.com/lescuer97/nutmix/internal/mint"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 func TestFormatRecordForNostrIncludesSortedAttrs(t *testing.T) {
@@ -23,7 +24,7 @@ func TestFormatRecordForNostrIncludesSortedAttrs(t *testing.T) {
 func TestNewNostrErrorNotifyHandlerCreatesHandlerWhenNotificationsDisabled(t *testing.T) {
 	base := slog.NewTextHandler(io.Discard, nil)
 	var mintValue m.Mint
-	mintValue.Config.NOSTR_NOTIFICATIONS = false
+	mintValue.NostrNotificationConfig = &utils.NostrNotificationConfig{}
 
 	h := NewNostrErrorNotifyHandler(base, &mintValue)
 	if h == nil {
@@ -34,8 +35,10 @@ func TestNewNostrErrorNotifyHandlerCreatesHandlerWhenNotificationsDisabled(t *te
 func TestNewNostrErrorNotifyHandlerCreatesHandlerWhenNip04DmDisabled(t *testing.T) {
 	base := slog.NewTextHandler(io.Discard, nil)
 	var mintValue m.Mint
-	mintValue.Config.NOSTR_NOTIFICATIONS = true
-	mintValue.Config.NOSTR_NOTIFICATION_NIP04_DM = false
+	mintValue.NostrNotificationConfig = &utils.NostrNotificationConfig{
+		NOSTR_NOTIFICATIONS:         true,
+		NOSTR_NOTIFICATION_NIP04_DM: false,
+	}
 
 	h := NewNostrErrorNotifyHandler(base, &mintValue)
 	if h == nil {

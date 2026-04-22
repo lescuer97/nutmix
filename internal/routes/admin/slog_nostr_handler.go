@@ -58,7 +58,7 @@ func (h *NostrErrorNotifyHandler) Handle(ctx context.Context, record slog.Record
 		return handleErr
 	}
 
-	if !h.mint.Config.NOSTR_NOTIFICATIONS {
+	if h.mint.NostrNotificationConfig == nil || !h.mint.NostrNotificationConfig.NOSTR_NOTIFICATIONS {
 		return handleErr
 	}
 
@@ -70,7 +70,7 @@ func (h *NostrErrorNotifyHandler) Handle(ctx context.Context, record slog.Record
 	go func(parentCtx context.Context, payload string) {
 		ctx, cancel := context.WithTimeout(parentCtx, 7*time.Second)
 		defer cancel()
-		for _, pubkey := range h.mint.Config.NOSTR_NOTIFICATION_NPUBS {
+		for _, pubkey := range h.mint.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS {
 
 			_ = h.SendPrivateNostrMessage(ctx, pubkey, payload)
 		}
@@ -116,12 +116,12 @@ func (h *NostrErrorNotifyHandler) SendPrivateNostrMessage(ctx context.Context, r
 	if trimmedMessage == "" {
 		return nil
 	}
-	if !h.mint.Config.NOSTR_NOTIFICATIONS || h.mint.Config.NOSTR_NOTIFICATION_NSEC == nil {
+	if h.mint.NostrNotificationConfig == nil || !h.mint.NostrNotificationConfig.NOSTR_NOTIFICATIONS || h.mint.NostrNotificationConfig.NOSTR_NOTIFICATION_NSEC == nil {
 		return nil
 	}
-	err := h.verifyNostrKeys(ctx, h.mint.Config.NOSTR_NOTIFICATION_NSEC)
+	err := h.verifyNostrKeys(ctx, h.mint.NostrNotificationConfig.NOSTR_NOTIFICATION_NSEC)
 	if err != nil {
-		return fmt.Errorf("h.verifyNostrKeys(ctx, h.mint.Config.NOSTR_NOTIFICATION_NSEC). %w", err)
+		return fmt.Errorf("h.verifyNostrKeys(ctx, h.mint.NostrNotificationConfig.NOSTR_NOTIFICATION_NSEC). %w", err)
 	}
 
 	recipientCtx, cancel := context.WithTimeout(ctx, nostrDMPublishTimeout)
@@ -131,7 +131,7 @@ func (h *NostrErrorNotifyHandler) SendPrivateNostrMessage(ctx context.Context, r
 	relays := nip17.GetDMRelays(recipientCtx, recipientHexPubKey, h.pool, bluePagesRelays)
 	relays = append(relays, nostrDefaultDMRelays...)
 
-	if h.mint.Config.NOSTR_NOTIFICATION_NIP04_DM {
+	if h.mint.NostrNotificationConfig.NOSTR_NOTIFICATION_NIP04_DM {
 		err = h.sendNIP04PrivateNostrMessage(recipientCtx, recipientHexPubKey, relays, trimmedMessage)
 		if err != nil {
 			return fmt.Errorf("h.sendNIP04PrivateNostrMessage(recipientCtx, recipientHexPubKey, relays, trimmedMessage). %w", err)
@@ -148,9 +148,9 @@ func (h *NostrErrorNotifyHandler) SendPrivateNostrMessage(ctx context.Context, r
 }
 
 func (h *NostrErrorNotifyHandler) sendNIP04PrivateNostrMessage(ctx context.Context, recipientHexPubKey string, relays []string, message string) error {
-	sharedSecret, err := nip04.ComputeSharedSecret(recipientHexPubKey, hex.EncodeToString(h.mint.Config.NOSTR_NOTIFICATION_NSEC))
+	sharedSecret, err := nip04.ComputeSharedSecret(recipientHexPubKey, hex.EncodeToString(h.mint.NostrNotificationConfig.NOSTR_NOTIFICATION_NSEC))
 	if err != nil {
-		return fmt.Errorf("nip04.ComputeSharedSecret(recipientHexPubKey, hex.EncodeToString(h.mint.Config.NOSTR_NOTIFICATION_NSEC)). %w", err)
+		return fmt.Errorf("nip04.ComputeSharedSecret(recipientHexPubKey, hex.EncodeToString(h.mint.NostrNotificationConfig.NOSTR_NOTIFICATION_NSEC)). %w", err)
 	}
 
 	encryptedContent, err := nip04.Encrypt(message, sharedSecret)
@@ -163,9 +163,9 @@ func (h *NostrErrorNotifyHandler) sendNIP04PrivateNostrMessage(ctx context.Conte
 		CreatedAt: nostr.Now(),
 		Tags:      nostr.Tags{nostr.Tag{"p", recipientHexPubKey}},
 		Content:   encryptedContent,
-		ID: "",
-		PubKey: "",
-		Sig: "",
+		ID:        "",
+		PubKey:    "",
+		Sig:       "",
 	}
 	if err := h.key.SignEvent(ctx, &event); err != nil {
 		return fmt.Errorf("h.key.SignEvent(ctx, &event). %w", err)

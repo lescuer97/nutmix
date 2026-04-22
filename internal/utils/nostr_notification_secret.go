@@ -22,7 +22,7 @@ func GetConfigDirectory() (string, error) {
 	return filepath.Join(configDir, ConfigDirName), nil
 }
 
-func SyncNostrNotificationNsec(config *Config, createIfMissing bool) error {
+func SyncNostrNotificationNsec(config *NostrNotificationConfig, createIfMissing bool) error {
 	if config == nil {
 		return fmt.Errorf("config is nil")
 	}

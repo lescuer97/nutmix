@@ -56,7 +56,7 @@ func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 		t.Fatalf("localsigner.SetupLocalSigner(db): %v", err)
 	}
 
-	config, err := SetUpConfigDB(db)
+	config, nostrNotificationConfig, err := SetUpConfigDB(db)
 
 	config.MINT_LIGHTNING_BACKEND = utils.FAKE_WALLET
 
@@ -71,7 +71,7 @@ func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 		t.Fatalf("could not setup config file: %+v ", err)
 	}
 
-	mint, err := SetUpMint(ctx, config, db, &signer)
+	mint, err := SetUpMint(ctx, config, nostrNotificationConfig, db, &signer)
 
 	if err != nil {
 		t.Fatalf("SetUpMint: %+v ", err)

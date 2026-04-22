@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-templ MintSettings(config utils.Config) {
+templ MintSettings(config utils.Config, nostrConfig utils.NostrNotificationConfig) {
 	@Layout("settings") {
 		<main class="main-content">
 			<div class="content-header">
@@ -21,13 +21,13 @@ templ MintSettings(config utils.Config) {
 				@Auth(config)
 			}
 			@ExpansionPanel("Nostr Notifications", "Configure nostr recipients for admin notifications", nil) {
-				@Notifications(config)
+				@Notifications(nostrConfig)
 			}
 		</main>
 	}
 }
 
-templ Notifications(config utils.Config) {
+templ Notifications(config utils.NostrNotificationConfig) {
 	{{ serviceNpub := NostrNotificationServiceNpub(config.NOSTR_NOTIFICATION_NSEC) }}
 	<form
 		id="nostr-notifications-form"

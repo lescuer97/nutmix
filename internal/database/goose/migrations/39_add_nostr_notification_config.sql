@@ -1,9 +1,10 @@
 -- +goose Up
-ALTER TABLE config ADD COLUMN nostr_notification_npubs BYTEA[];
-ALTER TABLE config ADD COLUMN nostr_notifications BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE config ADD COLUMN nostr_notification_nip04_dm BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE TABLE nostr_notification_config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    nostr_notification_npubs BYTEA[],
+    nostr_notifications BOOLEAN NOT NULL DEFAULT FALSE,
+    nostr_notification_nip04_dm BOOLEAN NOT NULL DEFAULT FALSE
+);
 
 -- +goose Down
-ALTER TABLE config DROP COLUMN IF EXISTS nostr_notification_npubs;
-ALTER TABLE config DROP COLUMN IF EXISTS nostr_notifications;
-ALTER TABLE config DROP COLUMN IF EXISTS nostr_notification_nip04_dm;
+DROP TABLE IF EXISTS nostr_notification_config;

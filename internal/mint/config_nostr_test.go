@@ -28,15 +28,19 @@ func TestSetUpConfigDBLoadsNostrNotificationNsecFromFile(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	config.NOSTR_NOTIFICATIONS = true
+	nostrNotificationConfig := &utils.NostrNotificationConfig{NOSTR_NOTIFICATIONS: true}
 
-	db := &mockdb.MockDB{Config: config} //nolint:exhaustruct
-	loadedConfig, err := SetUpConfigDB(db)
+	db := &mockdb.MockDB{Config: config, NostrNotificationConfig: nostrNotificationConfig} //nolint:exhaustruct
+	_, loadedNostrConfig, err := SetUpConfigDB(db)
 	if err != nil {
 		t.Fatalf("SetUpConfigDB(db): %v", err)
 	}
 
-	if !bytes.Equal(loadedConfig.NOSTR_NOTIFICATION_NSEC, privateKeyBytes) {
+	if loadedNostrConfig == nil {
+		t.Fatal("expected SetUpConfigDB to load a nostr notification config")
+	}
+
+	if !bytes.Equal(loadedNostrConfig.NOSTR_NOTIFICATION_NSEC, privateKeyBytes) {
 		t.Fatal("expected SetUpConfigDB to load nostr notification nsec from file")
 	}
 }
@@ -60,16 +64,20 @@ func TestSetUpConfigDBCreatesNostrNotificationNsecOnInitialBootstrap(t *testing.
 	}
 
 	db := &mockdb.MockDB{GetConfigErr: sql.ErrNoRows} //nolint:exhaustruct
-	loadedConfig, err := SetUpConfigDB(db)
+	_, loadedNostrConfig, err := SetUpConfigDB(db)
 	if err != nil {
 		t.Fatalf("SetUpConfigDB(db): %v", err)
 	}
 
-	if !loadedConfig.NOSTR_NOTIFICATIONS {
+	if loadedNostrConfig == nil {
+		t.Fatal("expected SetUpConfigDB to create nostr notification config on bootstrap")
+	}
+
+	if !loadedNostrConfig.NOSTR_NOTIFICATIONS {
 		t.Fatal("expected nostr notifications to remain enabled during bootstrap")
 	}
 
-	if len(loadedConfig.NOSTR_NOTIFICATION_NSEC) == 0 {
+	if len(loadedNostrConfig.NOSTR_NOTIFICATION_NSEC) == 0 {
 		t.Fatal("expected SetUpConfigDB to create a nostr notification nsec during bootstrap")
 	}
 
@@ -83,10 +91,10 @@ func TestSetUpConfigDBFailsWhenExistingEnabledNostrNotificationNsecFileIsMissing
 
 	var config utils.Config
 	config.Default()
-	config.NOSTR_NOTIFICATIONS = true
+	nostrNotificationConfig := &utils.NostrNotificationConfig{NOSTR_NOTIFICATIONS: true}
 
-	db := &mockdb.MockDB{Config: config} //nolint:exhaustruct
-	if _, err := SetUpConfigDB(db); err == nil {
+	db := &mockdb.MockDB{Config: config, NostrNotificationConfig: nostrNotificationConfig} //nolint:exhaustruct
+	if _, _, err := SetUpConfigDB(db); err == nil {
 		t.Fatal("expected SetUpConfigDB to fail when nostr notifications are enabled without an nsec file")
 	}
 }

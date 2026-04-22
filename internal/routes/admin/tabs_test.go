@@ -182,7 +182,11 @@ func TestMintSettingsNotificationsRendersComponentOnSuccess(t *testing.T) {
 		t.Fatalf("expected test notification button in response, got %q", body)
 	}
 
-	if !mintInstance.Config.NOSTR_NOTIFICATION_NIP04_DM {
+	if mintInstance.NostrNotificationConfig == nil {
+		t.Fatal("expected nostr notification config to be set")
+	}
+
+	if !mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NIP04_DM {
 		t.Fatal("expected NOSTR_NOTIFICATION_NIP04_DM to be enabled")
 	}
 
@@ -234,10 +238,10 @@ func TestMintSettingsNotificationsTestWritesSuccessNotification(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	config.NOSTR_NOTIFICATIONS = true
 
 	var mintInstance mint.Mint
 	mintInstance.Config = config
+	mintInstance.NostrNotificationConfig = &utils.NostrNotificationConfig{NOSTR_NOTIFICATIONS: true}
 
 	handler := MintSettingsNotificationsTest(&mintInstance)
 	handler(ctx)
@@ -266,21 +270,24 @@ func TestMintSettingsNotificationDeleteNpub(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	if err := config.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{wrapped}); err != nil {
-		t.Fatalf("config.SetNostrNotificationConfig(...): %v", err)
+	nostrConfig := utils.NostrNotificationConfig{}
+	if err := nostrConfig.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{wrapped}); err != nil {
+		t.Fatalf("nostrConfig.SetNostrNotificationConfig(...): %v", err)
 	}
 
 	nsec, err := utils.ReadOrCreateNostrNotificationNsec(nil)
 	if err != nil {
 		t.Fatalf("utils.ReadOrCreateNostrNotificationNsec(nil): %v", err)
 	}
-	config.NOSTR_NOTIFICATION_NSEC = nsec
+	nostrConfig.NOSTR_NOTIFICATION_NSEC = nsec
 
 	var mintInstance mint.Mint
 	mintInstance.Config = config
+	mintInstance.NostrNotificationConfig = &nostrConfig
 
 	var mockDatabase mockdb.MockDB
 	mockDatabase.Config = config
+	mockDatabase.NostrNotificationConfig = &nostrConfig
 	mintInstance.MintDB = &mockDatabase
 
 	req, err := http.NewRequest(http.MethodDelete, "/admin/mintsettings/notifications/npubs/"+npub, nil)
@@ -297,8 +304,12 @@ func TestMintSettingsNotificationDeleteNpub(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", recorder.Code)
 	}
 
-	if len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS) != 0 {
-		t.Fatalf("expected npub list to be empty after delete, got %d", len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS))
+	if mintInstance.NostrNotificationConfig == nil {
+		t.Fatal("expected nostr notification config to remain available after delete")
+	}
+
+	if len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS) != 0 {
+		t.Fatalf("expected npub list to be empty after delete, got %d", len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS))
 	}
 
 	body := recorder.Body.String()
@@ -325,21 +336,24 @@ func TestMintSettingsNotificationsKeepsNpubsWhenDisabled(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	if err := config.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{wrapped}); err != nil {
-		t.Fatalf("config.SetNostrNotificationConfig(...): %v", err)
+	nostrConfig := utils.NostrNotificationConfig{}
+	if err := nostrConfig.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{wrapped}); err != nil {
+		t.Fatalf("nostrConfig.SetNostrNotificationConfig(...): %v", err)
 	}
 
 	nsec, err := utils.ReadOrCreateNostrNotificationNsec(nil)
 	if err != nil {
 		t.Fatalf("utils.ReadOrCreateNostrNotificationNsec(nil): %v", err)
 	}
-	config.NOSTR_NOTIFICATION_NSEC = nsec
+	nostrConfig.NOSTR_NOTIFICATION_NSEC = nsec
 
 	var mintInstance mint.Mint
 	mintInstance.Config = config
+	mintInstance.NostrNotificationConfig = &nostrConfig
 
 	var mockDatabase mockdb.MockDB
 	mockDatabase.Config = config
+	mockDatabase.NostrNotificationConfig = &nostrConfig
 	mintInstance.MintDB = &mockDatabase
 
 	req, err := http.NewRequest(http.MethodPost, "/admin/mintsettings/notifications", strings.NewReader(url.Values{}.Encode()))
@@ -356,15 +370,19 @@ func TestMintSettingsNotificationsKeepsNpubsWhenDisabled(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", recorder.Code)
 	}
 
-	if mintInstance.Config.NOSTR_NOTIFICATIONS {
+	if mintInstance.NostrNotificationConfig == nil {
+		t.Fatal("expected nostr notification config to remain available")
+	}
+
+	if mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATIONS {
 		t.Fatal("expected notifications to be disabled")
 	}
 
-	if len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS) != 1 {
-		t.Fatalf("expected npub list to be preserved, got %d", len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS))
+	if len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS) != 1 {
+		t.Fatalf("expected npub list to be preserved, got %d", len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS))
 	}
 
-	if mintInstance.Config.NOSTR_NOTIFICATION_NIP04_DM {
+	if mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NIP04_DM {
 		t.Fatal("expected NOSTR_NOTIFICATION_NIP04_DM to be disabled")
 	}
 
@@ -408,8 +426,12 @@ func TestMintSettingsNotificationsDedupeNpubs(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", recorder.Code)
 	}
 
-	if len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS) != 1 {
-		t.Fatalf("expected npub list to be deduplicated to 1, got %d", len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS))
+	if mintInstance.NostrNotificationConfig == nil {
+		t.Fatal("expected nostr notification config to be set")
+	}
+
+	if len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS) != 1 {
+		t.Fatalf("expected npub list to be deduplicated to 1, got %d", len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS))
 	}
 }
 
@@ -427,15 +449,18 @@ func TestMintSettingsNotificationDeleteNpubNotFoundReturnsError(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	if err := config.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{storedKey}); err != nil {
-		t.Fatalf("config.SetNostrNotificationConfig(...): %v", err)
+	nostrConfig := utils.NostrNotificationConfig{}
+	if err := nostrConfig.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{storedKey}); err != nil {
+		t.Fatalf("nostrConfig.SetNostrNotificationConfig(...): %v", err)
 	}
 
 	var mintInstance mint.Mint
 	mintInstance.Config = config
+	mintInstance.NostrNotificationConfig = &nostrConfig
 
 	var mockDatabase mockdb.MockDB
 	mockDatabase.Config = config
+	mockDatabase.NostrNotificationConfig = &nostrConfig
 	mintInstance.MintDB = &mockDatabase
 
 	req, err := http.NewRequest(http.MethodDelete, "/admin/mintsettings/notifications/npubs/"+npubDelete, nil)
@@ -457,8 +482,12 @@ func TestMintSettingsNotificationDeleteNpubNotFoundReturnsError(t *testing.T) {
 		t.Fatalf("expected not-found error notification, got %q", body)
 	}
 
-	if len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS) != 1 {
-		t.Fatalf("expected npub list unchanged, got %d", len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS))
+	if mintInstance.NostrNotificationConfig == nil {
+		t.Fatal("expected nostr notification config to remain set")
+	}
+
+	if len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS) != 1 {
+		t.Fatalf("expected npub list unchanged, got %d", len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS))
 	}
 }
 
@@ -503,12 +532,12 @@ func TestMintSettingsNotificationsDoesNotMutateConfigOnDBFailure(t *testing.T) {
 		t.Fatalf("expected persist error notification, got %q", body)
 	}
 
-	if mintInstance.Config.NOSTR_NOTIFICATIONS {
+	if mintInstance.NostrNotificationConfig != nil && mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATIONS {
 		t.Fatal("expected in-memory config to remain unchanged after DB failure")
 	}
 
-	if len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS) != 0 {
-		t.Fatalf("expected npub list to remain unchanged after DB failure, got %d", len(mintInstance.Config.NOSTR_NOTIFICATION_NPUBS))
+	if mintInstance.NostrNotificationConfig != nil && len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS) != 0 {
+		t.Fatalf("expected npub list to remain unchanged after DB failure, got %d", len(mintInstance.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS))
 	}
 
 	if _, err := os.Stat(filepath.Join(configDir, utils.NostrNotificationNsecFileName)); err != nil {

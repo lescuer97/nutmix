@@ -32,6 +32,7 @@ type MockDB struct {
 	Seeds                            []cashu.Seed
 	AuthUser                         []database.AuthUser
 	Config                           utils.Config
+	NostrNotificationConfig          *utils.NostrNotificationConfig
 }
 
 func databaseError(err error) error {

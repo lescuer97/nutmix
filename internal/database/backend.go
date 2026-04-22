@@ -104,11 +104,11 @@ type MintDB interface {
 
 	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
-	GetConfig() (utils.Config, error)
-	SetConfig(config utils.Config) error
-	UpdateConfig(config utils.Config) error
-	UpdateNostrNotificationConfig(config utils.Config) error
-	UpdateNostrNotificationConfigTx(tx pgx.Tx, config utils.Config) error
+	GetConfig(tx pgx.Tx) (utils.Config, error)
+	SetConfig(tx pgx.Tx, config utils.Config) error
+	UpdateConfig(tx pgx.Tx, config utils.Config) error
+	GetNostrNotificationConfig(tx pgx.Tx) (*utils.NostrNotificationConfig, error)
+	UpdateNostrNotificationConfig(tx pgx.Tx, config utils.NostrNotificationConfig) error
 
 	SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error
 	GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error)
