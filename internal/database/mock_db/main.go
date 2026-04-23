@@ -22,17 +22,17 @@ var DATABASE_URL_ENV = "DATABASE_URL"
 type MockDB struct {
 	GetConfigErr                     error
 	UpdateNostrNotificationConfigErr error
-	Proofs                           []cashu.Proof
-	MeltRequest                      []cashu.MeltRequestDB
+	NostrNotificationConfig          *utils.NostrNotificationConfig
+	NostrAuth                        []database.NostrLoginAuth
 	MintRequest                      []cashu.MintRequestDB
 	RecoverSigDB                     []cashu.RecoverSigDB
-	NostrAuth                        []database.NostrLoginAuth
+	MeltRequest                      []cashu.MeltRequestDB
 	LiquiditySwap                    []utils.LiquiditySwap
 	MeltChange                       []cashu.MeltChange
 	Seeds                            []cashu.Seed
 	AuthUser                         []database.AuthUser
+	Proofs                           []cashu.Proof
 	Config                           utils.Config
-	NostrNotificationConfig          *utils.NostrNotificationConfig
 }
 
 func databaseError(err error) error {

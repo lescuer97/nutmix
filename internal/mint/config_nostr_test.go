@@ -2,6 +2,7 @@ package mint
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"os"
@@ -28,12 +29,13 @@ func TestSetUpConfigDBLoadsNostrNotificationNsecFromFile(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	nostrNotificationConfig := &utils.NostrNotificationConfig{NOSTR_NOTIFICATIONS: true}
+	var nostrNotificationConfig utils.NostrNotificationConfig
+	nostrNotificationConfig.NOSTR_NOTIFICATIONS = true
 
-	db := &mockdb.MockDB{Config: config, NostrNotificationConfig: nostrNotificationConfig} //nolint:exhaustruct
-	_, loadedNostrConfig, err := SetUpConfigDB(db)
+	db := &mockdb.MockDB{Config: config, NostrNotificationConfig: &nostrNotificationConfig} //nolint:exhaustruct
+	_, loadedNostrConfig, err := SetUpConfigDB(context.Background(), db)
 	if err != nil {
-		t.Fatalf("SetUpConfigDB(db): %v", err)
+		t.Fatalf("SetUpConfigDB(context.Background(), db): %v", err)
 	}
 
 	if loadedNostrConfig == nil {
@@ -64,9 +66,9 @@ func TestSetUpConfigDBCreatesNostrNotificationNsecOnInitialBootstrap(t *testing.
 	}
 
 	db := &mockdb.MockDB{GetConfigErr: sql.ErrNoRows} //nolint:exhaustruct
-	_, loadedNostrConfig, err := SetUpConfigDB(db)
+	_, loadedNostrConfig, err := SetUpConfigDB(context.Background(), db)
 	if err != nil {
-		t.Fatalf("SetUpConfigDB(db): %v", err)
+		t.Fatalf("SetUpConfigDB(context.Background(), db): %v", err)
 	}
 
 	if loadedNostrConfig == nil {
@@ -91,10 +93,11 @@ func TestSetUpConfigDBFailsWhenExistingEnabledNostrNotificationNsecFileIsMissing
 
 	var config utils.Config
 	config.Default()
-	nostrNotificationConfig := &utils.NostrNotificationConfig{NOSTR_NOTIFICATIONS: true}
+	var nostrNotificationConfig utils.NostrNotificationConfig
+	nostrNotificationConfig.NOSTR_NOTIFICATIONS = true
 
-	db := &mockdb.MockDB{Config: config, NostrNotificationConfig: nostrNotificationConfig} //nolint:exhaustruct
-	if _, _, err := SetUpConfigDB(db); err == nil {
+	db := &mockdb.MockDB{Config: config, NostrNotificationConfig: &nostrNotificationConfig} //nolint:exhaustruct
+	if _, _, err := SetUpConfigDB(context.Background(), db); err == nil {
 		t.Fatal("expected SetUpConfigDB to fail when nostr notifications are enabled without an nsec file")
 	}
 }

@@ -56,7 +56,7 @@ func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 		t.Fatalf("localsigner.SetupLocalSigner(db): %v", err)
 	}
 
-	config, nostrNotificationConfig, err := SetUpConfigDB(db)
+	config, nostrNotificationConfig, err := SetUpConfigDB(ctx, db)
 
 	config.MINT_LIGHTNING_BACKEND = utils.FAKE_WALLET
 

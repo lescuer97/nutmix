@@ -241,7 +241,9 @@ func TestMintSettingsNotificationsTestWritesSuccessNotification(t *testing.T) {
 
 	var mintInstance mint.Mint
 	mintInstance.Config = config
-	mintInstance.NostrNotificationConfig = &utils.NostrNotificationConfig{NOSTR_NOTIFICATIONS: true}
+	var nostrNotificationConfig utils.NostrNotificationConfig
+	nostrNotificationConfig.NOSTR_NOTIFICATIONS = true
+	mintInstance.NostrNotificationConfig = &nostrNotificationConfig
 
 	handler := MintSettingsNotificationsTest(&mintInstance)
 	handler(ctx)
@@ -270,7 +272,7 @@ func TestMintSettingsNotificationDeleteNpub(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	nostrConfig := utils.NostrNotificationConfig{}
+	var nostrConfig utils.NostrNotificationConfig
 	if err := nostrConfig.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{wrapped}); err != nil {
 		t.Fatalf("nostrConfig.SetNostrNotificationConfig(...): %v", err)
 	}
@@ -336,7 +338,7 @@ func TestMintSettingsNotificationsKeepsNpubsWhenDisabled(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	nostrConfig := utils.NostrNotificationConfig{}
+	var nostrConfig utils.NostrNotificationConfig
 	if err := nostrConfig.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{wrapped}); err != nil {
 		t.Fatalf("nostrConfig.SetNostrNotificationConfig(...): %v", err)
 	}
@@ -449,7 +451,7 @@ func TestMintSettingsNotificationDeleteNpubNotFoundReturnsError(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	nostrConfig := utils.NostrNotificationConfig{}
+	var nostrConfig utils.NostrNotificationConfig
 	if err := nostrConfig.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{storedKey}); err != nil {
 		t.Fatalf("nostrConfig.SetNostrNotificationConfig(...): %v", err)
 	}

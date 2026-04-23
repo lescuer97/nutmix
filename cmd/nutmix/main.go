@@ -92,9 +92,9 @@ func main() {
 	}
 	defer db.Close()
 
-	config, nostrNotificationConfig, err := mint.SetUpConfigDB(db)
+	config, nostrNotificationConfig, err := mint.SetUpConfigDB(ctx, db)
 	if err != nil {
-		log.Fatalf("mint.SetUpConfigDB(db): %+v ", err)
+		log.Fatalf("mint.SetUpConfigDB(ctx, db): %+v ", err)
 	}
 
 	signer, err := GetSignerFromValue(os.Getenv("SIGNER_TYPE"), db)

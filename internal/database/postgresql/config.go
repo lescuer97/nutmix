@@ -302,7 +302,7 @@ func (pql Postgresql) UpdateConfig(tx pgx.Tx, config utils.Config) error {
 
 func (pql Postgresql) GetNostrNotificationConfig(tx pgx.Tx) (*utils.NostrNotificationConfig, error) {
 	var npubsRaw [][]byte
-	config := utils.NostrNotificationConfig{}
+	var config utils.NostrNotificationConfig
 
 	err := tx.QueryRow(context.Background(), `SELECT
             nostr_notification_npubs,

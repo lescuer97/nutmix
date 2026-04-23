@@ -63,7 +63,7 @@ func TestUpdateNostrNotificationConfig_PersistsNpubsAndFlags(t *testing.T) {
 	npub1 := mustWrappedPubkey(t, "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac")
 	npub2 := mustWrappedPubkey(t, "02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2")
 
-	nostrConfig := utils.NostrNotificationConfig{}
+	var nostrConfig utils.NostrNotificationConfig
 	if err := nostrConfig.SetNostrNotificationConfig(true, nil, []cashu.WrappedPublicKey{npub1, npub2}); err != nil {
 		t.Fatalf("nostrConfig.SetNostrNotificationConfig(...): %v", err)
 	}
@@ -202,7 +202,7 @@ func TestUpdateNostrNotificationConfig_PreservesDisabledRow(t *testing.T) {
 	})
 
 	npub := mustWrappedPubkey(t, "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac")
-	nostrConfig := utils.NostrNotificationConfig{}
+	var nostrConfig utils.NostrNotificationConfig
 	if err := nostrConfig.SetNostrNotificationConfig(false, nil, []cashu.WrappedPublicKey{npub}); err != nil {
 		t.Fatalf("nostrConfig.SetNostrNotificationConfig(...): %v", err)
 	}

@@ -603,7 +603,8 @@ func MintSettingsNotificationDeleteNpub(mint *m.Mint) gin.HandlerFunc {
 
 func nostrNotificationConfigValue(config *utils.NostrNotificationConfig) utils.NostrNotificationConfig {
 	if config == nil {
-		return utils.NostrNotificationConfig{}
+		var emptyConfig utils.NostrNotificationConfig
+		return emptyConfig
 	}
 
 	return *config

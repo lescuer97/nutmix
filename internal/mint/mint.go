@@ -22,9 +22,9 @@ type Mint struct {
 	Signer                  signer.Signer
 	OICDClient              *oidc.Provider
 	Observer                *Observer
+	NostrNotificationConfig *utils.NostrNotificationConfig
 	MintPubkey              string
 	Config                  utils.Config
-	NostrNotificationConfig *utils.NostrNotificationConfig
 }
 
 var (

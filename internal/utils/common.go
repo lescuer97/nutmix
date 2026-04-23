@@ -76,10 +76,10 @@ type Config struct {
 }
 
 type NostrNotificationConfig struct {
-	NOSTR_NOTIFICATIONS         bool                     `db:"nostr_notifications"`
-	NOSTR_NOTIFICATION_NIP04_DM bool                     `db:"nostr_notification_nip04_dm"`
 	NOSTR_NOTIFICATION_NSEC     []byte                   `db:"-"`
 	NOSTR_NOTIFICATION_NPUBS    []cashu.WrappedPublicKey `db:"-"`
+	NOSTR_NOTIFICATIONS         bool                     `db:"nostr_notifications"`
+	NOSTR_NOTIFICATION_NIP04_DM bool                     `db:"nostr_notification_nip04_dm"`
 }
 
 func (c *Config) Default() {

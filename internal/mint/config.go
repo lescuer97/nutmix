@@ -41,8 +41,7 @@ type bootstrapNostrNotificationConfig struct {
 }
 
 // will not look for os.variable config only file config
-func SetUpConfigDB(db database.MintDB) (utils.Config, *utils.NostrNotificationConfig, error) {
-	ctx := context.Background()
+func SetUpConfigDB(ctx context.Context, db database.MintDB) (utils.Config, *utils.NostrNotificationConfig, error) {
 	tx, err := db.GetTx(ctx)
 	if err != nil {
 		return utils.Config{}, nil, fmt.Errorf("db.GetTx(ctx): %w", err)
@@ -103,6 +102,8 @@ func SetUpConfigDB(db database.MintDB) (utils.Config, *utils.NostrNotificationCo
 			nostrNotificationConfig = &utils.NostrNotificationConfig{
 				NOSTR_NOTIFICATIONS:         fileNostrConfig.NOSTR_NOTIFICATIONS,
 				NOSTR_NOTIFICATION_NIP04_DM: fileNostrConfig.NOSTR_NOTIFICATION_NIP04_DM,
+				NOSTR_NOTIFICATION_NSEC:     nil,
+				NOSTR_NOTIFICATION_NPUBS:    nil,
 			}
 			err = db.UpdateNostrNotificationConfig(tx, *nostrNotificationConfig)
 			if err != nil {

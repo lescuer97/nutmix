@@ -24,7 +24,8 @@ func TestFormatRecordForNostrIncludesSortedAttrs(t *testing.T) {
 func TestNewNostrErrorNotifyHandlerCreatesHandlerWhenNotificationsDisabled(t *testing.T) {
 	base := slog.NewTextHandler(io.Discard, nil)
 	var mintValue m.Mint
-	mintValue.NostrNotificationConfig = &utils.NostrNotificationConfig{}
+	var nostrNotificationConfig utils.NostrNotificationConfig
+	mintValue.NostrNotificationConfig = &nostrNotificationConfig
 
 	h := NewNostrErrorNotifyHandler(base, &mintValue)
 	if h == nil {
@@ -35,10 +36,9 @@ func TestNewNostrErrorNotifyHandlerCreatesHandlerWhenNotificationsDisabled(t *te
 func TestNewNostrErrorNotifyHandlerCreatesHandlerWhenNip04DmDisabled(t *testing.T) {
 	base := slog.NewTextHandler(io.Discard, nil)
 	var mintValue m.Mint
-	mintValue.NostrNotificationConfig = &utils.NostrNotificationConfig{
-		NOSTR_NOTIFICATIONS:         true,
-		NOSTR_NOTIFICATION_NIP04_DM: false,
-	}
+	var nostrNotificationConfig utils.NostrNotificationConfig
+	nostrNotificationConfig.NOSTR_NOTIFICATIONS = true
+	mintValue.NostrNotificationConfig = &nostrNotificationConfig
 
 	h := NewNostrErrorNotifyHandler(base, &mintValue)
 	if h == nil {
