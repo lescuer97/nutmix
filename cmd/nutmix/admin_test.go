@@ -143,7 +143,6 @@ func TestSetupMintAdminLoginSuccess(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("Expected status code 200, got %d", w.Code)
 	}
-
 }
 
 func TestSetupMintAdminLoginFailure(t *testing.T) {

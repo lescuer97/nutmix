@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"strings"
@@ -179,7 +180,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if errorResponse.Code != cashu.INVOICE_ALREADY_PAID {
+	if errorResponse.Code != cashu.QUOTE_PENDING {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 	}
 
@@ -202,7 +203,6 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Fatalf("mint.MintDB.Commit(ctx, tx) %s", err)
 		return
 	}
-
 }
 
 func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
@@ -233,9 +233,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 	t.Setenv(mint.NETWORK_ENV, "regtest")
 	t.Setenv("DATABASE_URL", connUri)
 
-	router, mint := SetupRoutingForTesting(ctx, false)
-
-	w := httptest.NewRecorder()
+	_, mintInstance := SetupRoutingForTesting(ctx, false)
 
 	mintQuoteRequest := cashu.PostMintQuoteBolt11Request{
 		Description: nil,
@@ -243,26 +241,14 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		Amount:      10000,
 		Unit:        cashu.Sat.String(),
 	}
-	jsonRequestBody, _ := json.Marshal(mintQuoteRequest)
-
-	req := httptest.NewRequest("POST", "/v1/mint/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
-
-	router.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Errorf("Expected status code 200, got %d", w.Code)
+	postMintQuoteResponse, err := mintInstance.CreateMintQuote(ctx, mintQuoteRequest, mint.Bolt11)
+	if err != nil {
+		t.Fatalf("mintInstance.CreateMintQuote(ctx, mintQuoteRequest, mint.Bolt11): %v", err)
 	}
 
-	var postMintQuoteResponse cashu.MintRequestDB
-	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponse)
-
+	activeKeys, err := mintInstance.Signer.GetActiveKeys()
 	if err != nil {
-		t.Errorf("Error unmarshalling response: %v", err)
-	}
-
-	activeKeys, err := mint.Signer.GetActiveKeys()
-	if err != nil {
-		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
+		t.Fatalf("mintInstance.Signer.GetKeysByUnit(cashu.Sat): %v", err)
 	}
 
 	// ASK FOR SUCCESSFUL MINTING
@@ -277,24 +263,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		Signature: nil,
 	}
 
-	jsonRequestBody, _ = json.Marshal(mintRequest)
-
-	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
-
-	w = httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
-	var postMintResponse cashu.PostMintBolt11Response
-
-	if w.Code != 200 {
-		t.Fatalf("Expected status code 200, got %d", w.Code)
-	}
-
-	err = json.Unmarshal(w.Body.Bytes(), &postMintResponse)
-
+	postMintResponse, err := mintInstance.IssueTokens(ctx, mintRequest, mint.Bolt11)
 	if err != nil {
-		t.Fatalf("Error unmarshalling response: %v", err)
+		t.Fatalf("mintInstance.IssueTokens(ctx, mintRequest, mint.Bolt11): %v", err)
 	}
 
 	/// start doing melt quote
@@ -303,34 +274,22 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		Request: RegtestRequest,
 		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 	}
-
-	jsonRequestBody, _ = json.Marshal(meltQuoteRequest)
-
-	req = httptest.NewRequest("POST", "/v1/melt/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
-
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	var postMeltQuoteResponse cashu.PostMeltQuoteBolt11Response
-	err = json.Unmarshal(w.Body.Bytes(), &postMeltQuoteResponse)
-
+	postMeltQuoteResponse, err := mintInstance.CreateMeltQuote(ctx, meltQuoteRequest, mint.Bolt11)
 	if err != nil {
-		t.Fatalf("Error unmarshalling response: %v", err)
+		t.Fatalf("mintInstance.CreateMeltQuote(ctx, meltQuoteRequest, mint.Bolt11): %v", err)
 	}
 
 	// try melting
-
-	w.Flush()
 	// errors to lightning to force payment checking
 	fakeWallet := lightning.FakeWallet{
-		Network: *mint.LightningBackend.GetNetwork(),
+		Network: *mintInstance.LightningBackend.GetNetwork(),
 		UnpurposeErrors: []lightning.FakeWalletError{
 			lightning.FailPaymentFailed, lightning.FailQueryPending,
 		},
 		InvoiceFee: 0,
 	}
 
-	mint.LightningBackend = &fakeWallet
+	mintInstance.LightningBackend = &fakeWallet
 
 	meltProofs, err := GenerateProofs(postMintResponse.Signatures, activeKeys, mintingSecrets, mintingSecretKeys)
 	if err != nil {
@@ -344,84 +303,67 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		Outputs: nil,
 	}
 
-	jsonRequestBody, _ = json.Marshal(meltRequest)
-
-	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	var postMeltResponse cashu.PostMeltQuoteBolt11Response
-
-	err = json.Unmarshal(w.Body.Bytes(), &postMeltResponse)
-
+	postMeltResponse, err := mintInstance.ExecuteMelt(ctx, meltRequest, mint.Bolt11)
 	if err != nil {
-		t.Fatalf("Error unmarshalling response: %v", err)
+		t.Fatalf("mintInstance.ExecuteMelt(ctx, meltRequest, mint.Bolt11): %v", err)
 	}
 
 	if postMeltResponse.State == cashu.PAID {
 		t.Errorf("Expected state to not be PAID because it's a fake wallet, got %v", postMeltResponse.State)
 	}
-	tx, err := mint.MintDB.GetTx(ctx)
+	tx, err := mintInstance.MintDB.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+		t.Fatalf("mintInstance.MintDB.GetTx(): %+v", err)
 	}
 	defer func() {
-		_ = mint.MintDB.Rollback(ctx, tx)
+		_ = mintInstance.MintDB.Rollback(ctx, tx)
 	}()
 
-	proofs, _ := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
+	proofs, err := mintInstance.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
+	if err != nil {
+		t.Fatalf("mintInstance.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret}): %+v", err)
+	}
 
 	if proofs[0].State != cashu.PROOF_PENDING {
 		t.Errorf("Proof should be pending. it is now: %v", proofs[0].State)
 	}
-	err = mint.MintDB.Commit(ctx, tx)
+	err = mintInstance.MintDB.Commit(ctx, tx)
 	if err != nil {
-		t.Fatalf("mint.MintDB.Commit(ctx, tx) %s", err)
+		t.Fatalf("mintInstance.MintDB.Commit(ctx, tx) %s", err)
 		return
 	}
 
-	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	var errorResponse cashu.ErrorResponse //nolint:exhaustruct
-
-	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
-
-	if err != nil {
-		t.Fatalf("Could not parse error response %s", w.Body.String())
-	}
-
-	if errorResponse.Code != cashu.INVOICE_ALREADY_PAID {
-		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+	_, err = mintInstance.ExecuteMelt(ctx, meltRequest, mint.Bolt11)
+	if !errors.Is(err, cashu.ErrQuoteIsPending) {
+		t.Fatalf("Expected ErrQuoteIsPending, got %v", err)
 	}
 
 	secreList := []string{}
 	for _, p := range meltProofs {
 		secreList = append(secreList, p.Secret)
 	}
-	tx, err = mint.MintDB.GetTx(ctx)
+	tx, err = mintInstance.MintDB.GetTx(ctx)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetTx(): %+v", err)
+		t.Fatalf("mintInstance.MintDB.GetTx(): %+v", err)
 	}
 	defer func() {
-		_ = mint.MintDB.Rollback(ctx, tx)
+		_ = mintInstance.MintDB.Rollback(ctx, tx)
 	}()
 
-	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
+	proofsDB, err := mintInstance.MintDB.GetProofsFromSecret(tx, secreList)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
+		t.Fatalf("mintInstance.MintDB.GetProofsFromSecret(): %+v", err)
 	}
 	for _, p := range proofsDB {
 		if p.State != cashu.PROOF_PENDING {
 			t.Errorf("Proof is not pending %+v", p)
 		}
 	}
-	err = mint.MintDB.Commit(ctx, tx)
+	err = mintInstance.MintDB.Commit(ctx, tx)
 	if err != nil {
-		t.Fatalf("mint.MintDB.Commit(ctx, tx) %s", err)
+		t.Fatalf("mintInstance.MintDB.Commit(ctx, tx) %s", err)
 		return
 	}
-
 }
 
 func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {

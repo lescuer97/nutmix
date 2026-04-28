@@ -51,7 +51,6 @@ func sortPubkeyMapToOrganizedArray(pubkeyMap map[uint64]*secp256k1.PublicKey) []
 		return int(a.Amount) - int(b.Amount)
 	})
 	return arrayPubkeys
-
 }
 
 func generateKeysetV2Preimage(sortedPubkeyArray []pubkeyWithAmount, unit string, fee uint, finalExpiry *time.Time) string {
@@ -83,7 +82,7 @@ func DeriveKeysetIdV2(pubKeysMap map[uint64]*secp256k1.PublicKey, unit string, f
 }
 
 func GenerateKeysets(versionKey *bip32.Key, values []uint64, seed Seed) ([]MintKey, error) {
-	var keysets []MintKey
+	var keysets = make([]MintKey, len(values))
 
 	// Get the current time
 	currentTime := time.Now()
@@ -109,7 +108,7 @@ func GenerateKeysets(versionKey *bip32.Key, values []uint64, seed Seed) ([]MintK
 			FinalExpiry: seed.FinalExpiry,
 		}
 
-		keysets = append(keysets, keyset)
+		keysets[i] = keyset
 	}
 
 	return keysets, nil

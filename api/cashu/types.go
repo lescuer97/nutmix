@@ -27,7 +27,6 @@ var (
 	ErrCouldNotEncryptSeed     = errors.New("could not encrypt seed")
 	ErrCouldNotDecryptSeed     = errors.New("could not decrypt seed")
 	ErrKeysetNotFound          = errors.New("keyset not found")
-	ErrKeysetForProofNotFound  = errors.New("keyset for proof not found")
 
 	ErrAlreadyActiveProof          = errors.New("proof already being spent")
 	ErrAlreadyActiveQuote          = errors.New("quote already being spent")
@@ -53,7 +52,6 @@ var validate *validator.Validate
 
 func init() {
 	validate = validator.New()
-
 }
 
 const (
@@ -112,7 +110,6 @@ type BlindedMessage struct {
 }
 
 func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
-
 	C_ := crypto.SignBlindedMessage(b.B_.PublicKey, k)
 
 	blindSig := BlindSignature{
@@ -128,6 +125,16 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 	}
 
 	return blindSig, nil
+}
+
+type BlindedMessages []BlindedMessage
+
+func (p *BlindedMessages) Amount() uint64 {
+	amount := uint64(0)
+	for i := 0; i < len(*p); i++ {
+		amount += (*p)[i].Amount
+	}
+	return amount
 }
 
 type BlindSignature struct {
@@ -174,18 +181,18 @@ func OrderedListOfPubkeys(listKeys []MintKey) []*secp256k1.PublicKey {
 	return pubkeys
 }
 
-type Seed struct { //nolint:govet
-	Amounts        []uint64 `json:"amounts" db:"amounts"`
+type Seed struct {
+	FinalExpiry    *uint64 `json:"final_expiry" db:"final_expiry"`
+	IssuerVersion  *string `json:"issuer_version" db:"issuer_version"`
 	Unit           string
 	Id             string
-	DerivationPath string `json:"derivation_path" db:"derivation_path"`
+	DerivationPath string   `json:"derivation_path" db:"derivation_path"`
+	Amounts        []uint64 `json:"amounts" db:"amounts"`
 	CreatedAt      int64
 	InputFeePpk    uint `json:"input_fee_ppk" db:"input_fee_ppk"`
 	Version        uint32
 	Active         bool
-	Legacy         bool    `json:"legacy" db:"legacy"`
-	FinalExpiry    *uint64 `json:"final_expiry" db:"final_expiry"`
-	IssuerVersion  *string `json:"issuer_version" db:"issuer_version"`
+	Legacy         bool `json:"legacy" db:"legacy"`
 }
 
 type SwapMintMethod struct {
@@ -312,7 +319,6 @@ func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Respons
 
 	if m.Amount != nil {
 		res.Amount = m.Amount
-
 	}
 	return res
 }
@@ -320,7 +326,7 @@ func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Respons
 type PostMintBolt11Request struct {
 	Signature *schnorr.Signature `json:"signature,omitempty"`
 	Quote     string             `json:"quote"`
-	Outputs   []BlindedMessage   `json:"outputs"`
+	Outputs   BlindedMessages    `json:"outputs"`
 }
 
 func (p *PostMintBolt11Request) UnmarshalJSON(data []byte) error {
@@ -329,7 +335,8 @@ func (p *PostMintBolt11Request) UnmarshalJSON(data []byte) error {
 		Quote     string           `json:"quote"`
 		Outputs   []BlindedMessage `json:"outputs"`
 	}
-	if err := json.Unmarshal(data, &aux); err != nil {
+	err := json.Unmarshal(data, &aux)
+	if err != nil {
 		return fmt.Errorf("could not marshall into PostMintBolt11Request: %w", err)
 	}
 
@@ -615,7 +622,6 @@ func (b *BlindSignature) VerifyDLEQ(
 
 	// I negate the hashed_keys_priv because the original key got altered when multiplying for A
 	return hashed_keys_priv.Key.Negate().String() == e.Key.String(), nil
-
 }
 
 type MeltChange struct {

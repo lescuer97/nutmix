@@ -12,15 +12,12 @@ type ConfigFiles struct {
 }
 
 func CopyConfigFiles(filepath string) (ConfigFiles, error) {
-
 	var config ConfigFiles
 
 	file, err := os.ReadFile(filepath)
 
 	if err != nil {
-
 		return config, fmt.Errorf("could not read file: %w", err)
-
 	}
 
 	config.TomlFile = file
@@ -29,7 +26,6 @@ func CopyConfigFiles(filepath string) (ConfigFiles, error) {
 }
 
 func RemoveConfigFile(filepath string) error {
-
 	err := os.Remove(filepath)
 	if err != nil {
 		return fmt.Errorf("os.Remove(), %w", err)

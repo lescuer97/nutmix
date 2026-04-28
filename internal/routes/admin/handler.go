@@ -92,7 +92,7 @@ func (a *adminHandler) getKeysets(filterUnits []string) (map[string][]templates.
 	}
 
 	// create ordered list of units
-	var orderedUnits []string
+	orderedUnits := make([]string, 0, len(keysetMap))
 	for unit := range keysetMap {
 		orderedUnits = append(orderedUnits, unit)
 	}
@@ -132,7 +132,6 @@ func (a *adminHandler) EcashBalance(since time.Time) (templates.Balance, error) 
 		return templates.Balance{}, fmt.Errorf("a.mint.MintDB.GetStatsSnapshotsBySince(context.Background(), since.Unix()). %w", err)
 	}
 	return balanceFromStatsSnapshots(statsRows), nil
-
 }
 
 func balanceFromStatsSnapshots(rows []database.StatsSnapshot) templates.Balance {

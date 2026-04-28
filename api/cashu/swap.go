@@ -6,8 +6,8 @@ import (
 )
 
 type PostSwapRequest struct {
-	Inputs  Proofs           `json:"inputs"`
-	Outputs []BlindedMessage `json:"outputs"`
+	Inputs  Proofs          `json:"inputs"`
+	Outputs BlindedMessages `json:"outputs"`
 }
 
 func (p *PostSwapRequest) ValidateSigflag() error {
@@ -86,7 +86,6 @@ func (p *PostSwapRequest) verifyConditions() error {
 		if spendCondition.Data.Tags.originalTag != firstSpendCondition.Data.Tags.originalTag {
 			return fmt.Errorf("not same tags %w", ErrInvalidSpendCondition)
 		}
-
 	}
 	return nil
 }

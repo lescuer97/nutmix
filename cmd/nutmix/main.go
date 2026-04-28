@@ -40,7 +40,6 @@ var (
 )
 
 func main() {
-
 	logsdir, err := utils.GetLogsDirectory()
 	if err != nil {
 		log.Panicln("Could not get Logs directory")
@@ -59,17 +58,16 @@ func main() {
 		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
 	}
 	defer func() {
-		if err := logFile.Close(); err != nil {
+		err := logFile.Close()
+		if err != nil {
 			slog.Warn("failed to close log file", slog.Any("error", err))
 		}
 	}()
 
 	w := io.MultiWriter(os.Stdout, logFile)
 
-	//nolint:exhaustruct
-	opts := &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}
+	opts := new(slog.HandlerOptions)
+	opts.Level = slog.LevelInfo
 
 	err = godotenv.Load(".env")
 	if err != nil {
@@ -134,7 +132,7 @@ func main() {
 	// Add per-request timeout middleware (sets context deadline for handlers)
 	r.Use(middleware.TimeoutMiddleware(90 * time.Second))
 
-	err = mint.CheckPendingQuoteAndProofs()
+	err = mint.ReconcilePendingMeltQuotes()
 	if err != nil {
 		slog.Error("SetUpMint", slog.Any("error", err))
 		return
@@ -176,14 +174,12 @@ func main() {
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
 	// Define a custom http.Server
-	//nolint:exhaustruct
-	srv := &http.Server{
-		Addr:         PORT,
-		Handler:      r,
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 4 * time.Second,
-		IdleTimeout:  3 * time.Minute,
-	}
+	srv := new(http.Server)
+	srv.Addr = PORT
+	srv.Handler = r
+	srv.ReadTimeout = 3 * time.Second
+	srv.WriteTimeout = 4 * time.Second
+	srv.IdleTimeout = 3 * time.Minute
 	// Start the server
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server failed", slog.Any("error", err))
@@ -220,5 +216,4 @@ func GetSignerFromValue(signerType string, db database.MintDB) (signer.Signer, e
 	default:
 		return nil, fmt.Errorf("no signer type has been selected")
 	}
-
 }

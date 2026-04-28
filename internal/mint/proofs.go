@@ -12,13 +12,13 @@ import (
 )
 
 func CheckProofState(ctx context.Context, mint *Mint, Ys []cashu.WrappedPublicKey) ([]cashu.CheckState, error) {
-	var states []cashu.CheckState
 	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
-		return states, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+		return nil, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if err := mint.MintDB.Rollback(ctx, tx); err != nil {
+		err := mint.MintDB.Rollback(ctx, tx)
+		if err != nil {
 			if !errors.Is(err, pgx.ErrTxClosed) {
 				slog.Warn("rotate keyset sql transaction error", slog.Any("error", err))
 			}
@@ -28,18 +28,18 @@ func CheckProofState(ctx context.Context, mint *Mint, Ys []cashu.WrappedPublicKe
 	// set as unspent
 	proofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, Ys)
 	if err != nil {
-		return states, fmt.Errorf("database.CheckListOfProofsBySecretCurve(pool, Ys). %w", err)
+		return nil, fmt.Errorf("database.CheckListOfProofsBySecretCurve(pool, Ys). %w", err)
 	}
 
 	err = mint.MintDB.Commit(ctx, tx)
 	if err != nil {
-		return states, fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
+		return nil, fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
 	}
 
 	proofsForRemoval := make([]cashu.Proof, 0)
 
-	for _, state := range Ys {
-
+	var states = make([]cashu.CheckState, len(Ys))
+	for i, state := range Ys {
 		pendingAndSpent := false
 
 		checkState := cashu.CheckState{
@@ -56,7 +56,6 @@ func CheckProofState(ctx context.Context, mint *Mint, Ys []cashu.WrappedPublicKe
 				checkState.Witness = &p.Witness
 			}
 			if compare && pendingAndSpent {
-
 				proofsForRemoval = append(proofsForRemoval, p)
 			}
 			return compare
@@ -64,7 +63,7 @@ func CheckProofState(ctx context.Context, mint *Mint, Ys []cashu.WrappedPublicKe
 			checkState.State = cashu.PROOF_SPENT
 		}
 
-		states = append(states, checkState)
+		states[i] = checkState
 	}
 
 	return states, nil

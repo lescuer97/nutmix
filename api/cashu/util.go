@@ -31,18 +31,15 @@ func OrderKeysetByUnit(keysets []MintKey) KeysResponse {
 		keysetResponse.FinalExpiry = value[0].FinalExpiry
 
 		for _, keyset := range value {
-
 			keysetResponse.Keys[strconv.FormatUint(keyset.Amount, 10)] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
 		}
 
 		res["keysets"] = append(res["keysets"], keysetResponse)
 	}
 	return res
-
 }
 
 func GenerateNonceHex() (string, error) {
-
 	// generate random Nonce
 	nonce := make([]byte, 32)  // create a slice with length 16 for the nonce
 	_, err := rand.Read(nonce) // read random bytes into the nonce slice
@@ -63,23 +60,18 @@ func Fees(proofs []Proof, keysets []BasicKeysetResponse) (uint, error) {
 		if keysetToUse.Id != proof.Id {
 			for _, keyset := range keysets {
 				if keyset.Id == proof.Id {
-
 					keysetToUse = keyset
 				}
 			}
 			if keysetToUse.Id != proof.Id {
-				return 0, ErrKeysetForProofNotFound
-
+				return 0, ErrKeysetNotKnow
 			}
-
 		}
 
 		totalFees += keysetToUse.InputFeePpk
-
 	}
 
 	totalFees = (totalFees + 999) / 1000
 
 	return totalFees, nil
-
 }

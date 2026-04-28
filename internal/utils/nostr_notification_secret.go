@@ -104,7 +104,6 @@ func ReadNostrNotificationNsec() ([]byte, error) {
 }
 
 func ReadNostrNotificationNsecFromDir(dirPath string) ([]byte, error) {
-
 	nsecPath := nostrNotificationNsecFilePath(dirPath)
 	fileInfo, err := os.Lstat(nsecPath)
 	if err != nil {

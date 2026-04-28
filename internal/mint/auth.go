@@ -24,7 +24,8 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 	}
 	defer func() {
 		if err != nil {
-			if rollbackErr := m.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+			rollbackErr := m.MintDB.Rollback(ctx, tx)
+			if rollbackErr != nil {
 				slog.Warn("rollback error", slog.Any("error", rollbackErr))
 			}
 		}
@@ -57,7 +58,6 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 	}
 
 	return nil
-
 }
 
 func (m *Mint) VerifyAuthClearToken(token string) error {
@@ -103,7 +103,8 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 	}
 	defer func() {
 		if err != nil {
-			if rollbackErr := m.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+			rollbackErr := m.MintDB.Rollback(ctx, tx)
+			if rollbackErr != nil {
 				slog.Warn("rollback error", slog.Any("error", rollbackErr))
 			}
 		}
@@ -133,7 +134,7 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 
 	err = m.MintDB.SetProofsState(tx, proofArray, cashu.PROOF_SPENT)
 	if err != nil {
-		return fmt.Errorf("m.MintDB.GetProofsFromSecretCurve(tx, []string{y} ). %w", err)
+		return fmt.Errorf("m.MintDB.SetProofsState(tx, proofArray, cashu.PROOF_SPENT). %w", err)
 	}
 
 	err = m.MintDB.Commit(ctx, tx)

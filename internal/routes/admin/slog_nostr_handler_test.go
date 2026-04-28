@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"io"
 	"log/slog"
 	"testing"
 	"time"
@@ -22,7 +21,7 @@ func TestFormatRecordForNostrIncludesSortedAttrs(t *testing.T) {
 }
 
 func TestNewNostrErrorNotifyHandlerCreatesHandlerWhenNotificationsDisabled(t *testing.T) {
-	base := slog.NewTextHandler(io.Discard, nil)
+	base := slog.DiscardHandler
 	var mintValue m.Mint
 	var nostrNotificationConfig utils.NostrNotificationConfig
 	mintValue.NostrNotificationConfig = &nostrNotificationConfig
@@ -34,7 +33,7 @@ func TestNewNostrErrorNotifyHandlerCreatesHandlerWhenNotificationsDisabled(t *te
 }
 
 func TestNewNostrErrorNotifyHandlerCreatesHandlerWhenNip04DmDisabled(t *testing.T) {
-	base := slog.NewTextHandler(io.Discard, nil)
+	base := slog.DiscardHandler
 	var mintValue m.Mint
 	var nostrNotificationConfig utils.NostrNotificationConfig
 	nostrNotificationConfig.NOSTR_NOTIFICATIONS = true

@@ -42,7 +42,6 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		Unit:            meltRequest.Unit,
 		Change:          []BlindSignature{},
 	}
-
 }
 
 type PostMeltQuoteBolt11Options struct {
@@ -77,7 +76,7 @@ type PostMeltQuoteBolt11Response struct {
 type PostMeltBolt11Request struct {
 	Quote   string           `json:"quote"`
 	Inputs  Proofs           `json:"inputs"`
-	Outputs []BlindedMessage `json:"outputs"`
+	Outputs BlindedMessages `json:"outputs"`
 }
 
 func (p *PostMeltBolt11Request) ValidateSigflag() error {
@@ -156,7 +155,6 @@ func (p *PostMeltBolt11Request) verifyConditions() error {
 		if spendCondition.Data.Tags.originalTag != firstSpendCondition.Data.Tags.originalTag {
 			return fmt.Errorf("not same tags %w", ErrInvalidSpendCondition)
 		}
-
 	}
 	return nil
 }

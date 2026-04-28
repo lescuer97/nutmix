@@ -25,8 +25,8 @@ type LnbitsWallet struct {
 }
 
 type LNBitsDetailErrorData struct {
-	Detail string
-	Status string
+	Detail string `json:"detail,omitempty"`
+	Status string `json:"status,omitempty"`
 }
 type lnbitsInvoiceRequest struct {
 	Unit       string `json:"unit,omitempty"`
@@ -79,7 +79,8 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 
 	body, err := io.ReadAll(resp.Body)
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
+		err := resp.Body.Close()
+		if err != nil {
 			slog.Warn("failed to close response body", slog.Any("error", err))
 		}
 	}()
@@ -249,7 +250,7 @@ func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp
 	return feesResponse, nil
 }
 
-func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
+func (l LnbitsWallet) RequestInvoice(amount cashu.Amount, description *string) (InvoiceResponse, error) {
 	// Convert amount to Sat for LNBits
 	amountSat := cashu.Amount{Unit: amount.Unit, Amount: amount.Amount}
 	err := amountSat.To(cashu.Sat)
@@ -267,8 +268,8 @@ func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amo
 		CheckingId: "",
 	}
 
-	if quote.Description != nil {
-		reqInvoice.Memo = *quote.Description
+	if description != nil {
+		reqInvoice.Memo = *description
 	}
 
 	var response InvoiceResponse
@@ -289,7 +290,6 @@ func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amo
 	}
 
 	if lnbitsInvoice.Bolt11 != "" {
-
 		response.PaymentRequest = lnbitsInvoice.Bolt11
 	} else {
 		response.PaymentRequest = lnbitsInvoice.PaymentRequest
@@ -299,7 +299,6 @@ func (l LnbitsWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amo
 	response.CheckingId = lnbitsInvoice.PaymentHash
 
 	return response, nil
-
 }
 
 func (l LnbitsWallet) WalletBalance() (cashu.Amount, error) {

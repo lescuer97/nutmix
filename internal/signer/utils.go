@@ -30,12 +30,10 @@ func OrderKeysetByUnit(keysets []cashu.MintKey) GetKeysResponse {
 		keysetResponse.InputFeePpk = value[0].InputFeePpk
 
 		for _, keyset := range value {
-
 			keysetResponse.Keys[keyset.Amount] = hex.EncodeToString(keyset.PrivKey.PubKey().SerializeCompressed())
 		}
 
 		res.Keysets = append(res.Keysets, keysetResponse)
 	}
 	return res
-
 }

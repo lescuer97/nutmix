@@ -12,7 +12,6 @@ import (
 )
 
 func GetTlsSecurityCredential() (credentials.TransportCredentials, error) {
-
 	tlsCertPath := os.Getenv("SIGNER_CLIENT_TLS_CERT")
 	if tlsCertPath == "" {
 		log.Panic("SIGNER_CLIENT_TLS_KEY path not available.")
@@ -55,7 +54,6 @@ func GetTlsSecurityCredential() (credentials.TransportCredentials, error) {
 	// Create the TLS credentials
 	creds := credentials.NewTLS(tlsConfig)
 	return creds, nil
-
 }
 func OrderKeysetByUnit(keysets []MintPublicKeyset) signer.GetKeysResponse {
 	var typesOfUnits = make(map[string][]MintPublicKeyset)

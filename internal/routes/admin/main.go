@@ -59,7 +59,6 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 				return
 			}
 		}
-
 	}
 }
 
@@ -239,7 +238,6 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		// nolint: contextcheck
 		go CheckStatusOfLiquiditySwaps(mint, newLiquidity)
 	}
-
 }
 func liquidityManagerMiddleware(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {

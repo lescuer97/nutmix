@@ -34,7 +34,8 @@ func TestAddAndRequestMintRequestValidPubkey(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := postgresContainer.Terminate(ctx); err != nil {
+		err := postgresContainer.Terminate(ctx)
+		if err != nil {
 			t.Fatalf("failed to terminate container: %s", err)
 		}
 	}()
@@ -49,7 +50,6 @@ func TestAddAndRequestMintRequestValidPubkey(t *testing.T) {
 	db, err := DatabaseSetup(ctx, "migrations")
 	if err != nil {
 		t.Fatalf("could not setup migration. %v", err)
-
 	}
 
 	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
@@ -141,7 +141,8 @@ func TestAddAndRequestMintRequestNilPubkey(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := postgresContainer.Terminate(ctx); err != nil {
+		err := postgresContainer.Terminate(ctx)
+		if err != nil {
 			t.Fatalf("failed to terminate container: %s", err)
 		}
 	}()
@@ -156,7 +157,6 @@ func TestAddAndRequestMintRequestNilPubkey(t *testing.T) {
 	db, err := DatabaseSetup(ctx, "migrations")
 	if err != nil {
 		t.Fatalf("could not setup migration. %v", err)
-
 	}
 
 	quoteId, err := utils.RandomHash()
@@ -670,7 +670,8 @@ func setupTestDB(t *testing.T) (Postgresql, context.Context) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := postgresContainer.Terminate(ctx); err != nil {
+		err := postgresContainer.Terminate(ctx)
+		if err != nil {
 			t.Fatalf("failed to terminate container: %s", err)
 		}
 	})

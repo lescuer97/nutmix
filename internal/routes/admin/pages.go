@@ -46,7 +46,6 @@ func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 				slog.String(utils.LogExtraInfo, err.Error()))
 			_ = c.Error(err)
 			return
-
 		}
 
 		ctx := c.Request.Context()
@@ -55,7 +54,6 @@ func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 			_ = c.Error(err)
 			return
 		}
-
 	}
 }
 
@@ -287,7 +285,6 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
-
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
@@ -319,7 +316,6 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 			component = templates.LightningReceiveSummary(amount, swap.LightningInvoice, qrcode, swap.Id)
 		case utils.LiquidityOut:
 			component = templates.LightningSendSummary(amount, swap.LightningInvoice, swap.Id)
-
 		}
 
 		err = templates.SwapStatusPage(component).Render(ctx, c.Writer)

@@ -11,7 +11,6 @@ type SeedType struct {
 }
 
 func CheckForInactiveSeeds(seeds []cashu.Seed) ([]SeedType, error) {
-
 	seedTypes := make(map[cashu.Unit]SeedType)
 
 	for _, seed := range seeds {
@@ -21,14 +20,12 @@ func CheckForInactiveSeeds(seeds []cashu.Seed) ([]SeedType, error) {
 			return nil, err
 		}
 		if seed.Version > seedTypes[unit].Version {
-
 			seedTypes[unit] = SeedType{
 				Version: seed.Version,
 				Active:  seed.Active,
 				Unit:    unit,
 			}
 		}
-
 	}
 	inactiveSeeds := make([]SeedType, 0)
 

@@ -34,12 +34,10 @@ func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, q
 		case err == nil:
 			return nil
 		}
-
 	}
 }
 
 func (pql Postgresql) GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error) {
-
 	meltChangeList := make([]cashu.MeltChange, 0)
 
 	rows, err := tx.Query(context.Background(), `SELECT "B_", id, quote, created_at FROM melt_change_message WHERE quote = $1 FOR UPDATE NOWAIT`, quote)
@@ -65,7 +63,6 @@ func (pql Postgresql) GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.Mel
 	return meltChangeList, nil
 }
 func (pql Postgresql) DeleteChangeByQuote(tx pgx.Tx, quote string) error {
-
 	_, err := tx.Exec(context.Background(), `DELETE FROM melt_change_message WHERE quote = $1`, quote)
 
 	if err != nil {
