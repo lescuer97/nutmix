@@ -13,7 +13,6 @@ import (
 
 func SwapsList(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		swaps, err := mint.MintDB.GetAllLiquiditySwaps()
 
 		if err != nil {
