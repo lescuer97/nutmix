@@ -80,8 +80,7 @@ func main() {
 		opts.AddSource = true
 	}
 
-	logger := slog.New(slog.NewJSONHandler(w, opts))
-	slog.SetDefault(logger)
+	baseJSONHandler := slog.NewJSONHandler(w, opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Minute)
 	defer cancel()
@@ -93,9 +92,9 @@ func main() {
 	}
 	defer db.Close()
 
-	config, err := mint.SetUpConfigDB(db)
+	config, nostrNotificationConfig, err := mint.SetUpConfigDB(ctx, db)
 	if err != nil {
-		log.Fatalf("mint.SetUpConfigDB(db): %+v ", err)
+		log.Fatalf("mint.SetUpConfigDB(ctx, db): %+v ", err)
 	}
 
 	signer, err := GetSignerFromValue(os.Getenv("SIGNER_TYPE"), db)
@@ -104,12 +103,15 @@ func main() {
 	}
 
 	// remove mint private key from variable
-	mint, err := mint.SetUpMint(ctx, config, db, signer)
+	mint, err := mint.SetUpMint(ctx, config, nostrNotificationConfig, db, signer)
 
 	if err != nil {
 		slog.Warn("SetUpMint", slog.Any("error", err))
 		return
 	}
+
+	logger := slog.New(admin.NewNostrErrorNotifyHandler(baseJSONHandler, mint))
+	slog.SetDefault(logger)
 
 	r := gin.Default()
 

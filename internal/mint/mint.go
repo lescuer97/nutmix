@@ -17,13 +17,14 @@ import (
 )
 
 type Mint struct {
-	LightningBackend lightning.LightningBackend
-	MintDB           database.MintDB
-	Signer           signer.Signer
-	OICDClient       *oidc.Provider
-	Observer         *Observer
-	MintPubkey       string
-	Config           utils.Config
+	LightningBackend        lightning.LightningBackend
+	MintDB                  database.MintDB
+	Signer                  signer.Signer
+	OICDClient              *oidc.Provider
+	Observer                *Observer
+	NostrNotificationConfig *utils.NostrNotificationConfig
+	MintPubkey              string
+	Config                  utils.Config
 }
 
 var (
@@ -87,15 +88,16 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 
 }
 
-func SetUpMint(ctx context.Context, config utils.Config, db database.MintDB, sig signer.Signer) (*Mint, error) {
+func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig *utils.NostrNotificationConfig, db database.MintDB, sig signer.Signer) (*Mint, error) {
 	mint := Mint{
-		Config:           config,
-		MintDB:           db,
-		Signer:           sig,
-		MintPubkey:       "",
-		LightningBackend: nil,
-		OICDClient:       nil,
-		Observer:         nil,
+		Config:                  config,
+		NostrNotificationConfig: nostrNotificationConfig,
+		MintDB:                  db,
+		Signer:                  sig,
+		MintPubkey:              "",
+		LightningBackend:        nil,
+		OICDClient:              nil,
+		Observer:                nil,
 	}
 
 	chainparam, err := CheckChainParams(config.NETWORK)

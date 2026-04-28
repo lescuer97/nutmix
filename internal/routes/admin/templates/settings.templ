@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-templ MintSettings(config utils.Config) {
+templ MintSettings(config utils.Config, nostrConfig utils.NostrNotificationConfig) {
 	@Layout("settings") {
 		<main class="main-content">
 			<div class="content-header">
@@ -20,8 +20,169 @@ templ MintSettings(config utils.Config) {
 			@ExpansionPanel("Authentication", "Manage authentication providers and limits", nil) {
 				@Auth(config)
 			}
+			@ExpansionPanel("Nostr Notifications", "Configure nostr recipients for admin notifications", nil) {
+				@Notifications(nostrConfig)
+			}
 		</main>
 	}
+}
+
+templ Notifications(config utils.NostrNotificationConfig) {
+	{{ serviceNpub := NostrNotificationServiceNpub(config.NOSTR_NOTIFICATION_NSEC) }}
+	<form
+		id="nostr-notifications-form"
+		class="form-group"
+		hx-post="/admin/mintsettings/notifications"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		<div class="form-section nostr-notification-toggles">
+			<label for="NOSTR_NOTIFICATIONS" class="settings-input-checkbox nostr-toggle-checkbox">
+				Enable nostr notifications
+				<input
+					name="NOSTR_NOTIFICATIONS"
+					type="checkbox"
+					checked?={ config.NOSTR_NOTIFICATIONS }
+					hx-trigger="change"
+					hx-post="/admin/mintsettings/notifications"
+					hx-include="closest form"
+					hx-target="closest form"
+					hx-swap="outerHTML"
+				/>
+			</label>
+			<label for="NOSTR_NOTIFICATION_NIP04_DM" class="settings-input-checkbox nostr-toggle-checkbox">
+				Use Legacy NOSTR DMs (NIP-04)
+				<input
+					name="NOSTR_NOTIFICATION_NIP04_DM"
+					type="checkbox"
+					checked?={ config.NOSTR_NOTIFICATION_NIP04_DM }
+					disabled?={ !config.NOSTR_NOTIFICATIONS }
+					hx-trigger="change"
+					hx-post="/admin/mintsettings/notifications"
+					hx-include="closest form"
+					hx-target="closest form"
+					hx-swap="outerHTML"
+				/>
+			</label>
+		</div>
+
+		if serviceNpub != "" {
+			<div class="nostr-service-key">
+				<span class="nostr-service-key-label">Service npub</span>
+				<div class="nostr-service-key-row">
+					<code class="nostr-service-key-value">{ serviceNpub }</code>
+					<span class="nostr-copy-feedback" aria-live="polite"></span>
+					<button
+						type="button"
+						class="btn-icon nostr-copy-btn js-copy-npub-btn"
+						data-copy-npub={ serviceNpub }
+						aria-label="Copy service npub"
+						title="Copy service npub"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+							<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+						</svg>
+					</button>
+				</div>
+			</div>
+		}
+
+		<fieldset class="nostr-recipients-fieldset" disabled?={ !config.NOSTR_NOTIFICATIONS }>
+			<div class="form-section nostr-recipients-list">
+				for _, recipient := range config.NOSTR_NOTIFICATION_NPUBS {
+					{{ recipientNpub := WrappedPublicKeyToNpub(recipient) }}
+					if recipientNpub != "" {
+						<div class="nostr-npub-row">
+							<button
+								type="button"
+								class="btn-icon nostr-delete-btn"
+								hx-delete={ "/admin/mintsettings/notifications/npubs/" + recipientNpub }
+								hx-target="closest form"
+								hx-swap="outerHTML"
+								aria-label="Delete recipient npub"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<path d="M3 6h18"></path>
+									<path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path>
+									<path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"></path>
+									<path d="M10 11v6"></path>
+									<path d="M14 11v6"></path>
+								</svg>
+							</button>
+							<input
+								name="NOSTR_NOTIFICATION_NPUBS"
+								value={ recipientNpub }
+								type="text"
+								placeholder="npub1..."
+								hx-trigger="keydown[key=='Enter']"
+								hx-post="/admin/mintsettings/notifications"
+								hx-include="closest form"
+								hx-target="closest form"
+								hx-swap="outerHTML"
+							/>
+						</div>
+					}
+				}
+				<div class="nostr-npub-row">
+					<span class="nostr-delete-placeholder" aria-hidden="true"></span>
+					<input
+						name="NOSTR_NOTIFICATION_NPUBS"
+						value=""
+						type="text"
+						placeholder="Add recipient npub and press Enter"
+						hx-trigger="keydown[key=='Enter']"
+						hx-post="/admin/mintsettings/notifications"
+						hx-include="closest form"
+						hx-target="closest form"
+						hx-swap="outerHTML"
+					/>
+				</div>
+			</div>
+			<div class="form-actions" style="margin-top: var(--space-4); display: flex; justify-content: flex-end;">
+				<button
+					type="button"
+					class="btn btn-primary"
+					hx-post="/admin/mintsettings/notifications/test"
+					hx-swap="none"
+					disabled?={ !config.NOSTR_NOTIFICATIONS }
+				>
+					Test notification
+				</button>
+			</div>
+		</fieldset>
+	</form>
+	<script>
+		if (!window.__nostrCopyNpubHandlerBound) {
+			window.__nostrCopyNpubHandlerBound = true;
+			document.body.addEventListener("click", async function (event) {
+				const button = event.target.closest(".js-copy-npub-btn");
+				if (!button) return;
+
+				const npub = button.dataset.copyNpub || "";
+				const feedback = button.parentElement?.querySelector(".nostr-copy-feedback");
+				if (!npub || !feedback) return;
+
+				try {
+					if (!navigator.clipboard || !navigator.clipboard.writeText) {
+						throw new Error("Clipboard API unavailable");
+					}
+					await navigator.clipboard.writeText(npub);
+					feedback.textContent = "Copied";
+					feedback.classList.remove("is-error");
+				} catch {
+					feedback.textContent = "Copy failed";
+					feedback.classList.add("is-error");
+				}
+
+				window.clearTimeout(window.__nostrCopyNpubFeedbackTimeout);
+				window.__nostrCopyNpubFeedbackTimeout = window.setTimeout(function () {
+					feedback.textContent = "";
+					feedback.classList.remove("is-error");
+				}, 1200);
+			});
+		}
+	</script>
 }
 
 templ General(config utils.Config) {

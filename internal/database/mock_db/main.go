@@ -20,17 +20,19 @@ var ErrDB = errors.New("ERROR DATABASE")
 var DATABASE_URL_ENV = "DATABASE_URL"
 
 type MockDB struct {
-	ErrorToReturn error
-	Proofs        []cashu.Proof
-	MeltRequest   []cashu.MeltRequestDB
-	MintRequest   []cashu.MintRequestDB
-	RecoverSigDB  []cashu.RecoverSigDB
-	NostrAuth     []database.NostrLoginAuth
-	LiquiditySwap []utils.LiquiditySwap
-	MeltChange    []cashu.MeltChange
-	Seeds         []cashu.Seed
-	AuthUser      []database.AuthUser
-	Config        utils.Config
+	GetConfigErr                     error
+	UpdateNostrNotificationConfigErr error
+	NostrNotificationConfig          *utils.NostrNotificationConfig
+	NostrAuth                        []database.NostrLoginAuth
+	MintRequest                      []cashu.MintRequestDB
+	RecoverSigDB                     []cashu.RecoverSigDB
+	MeltRequest                      []cashu.MeltRequestDB
+	LiquiditySwap                    []utils.LiquiditySwap
+	MeltChange                       []cashu.MeltChange
+	Seeds                            []cashu.Seed
+	AuthUser                         []database.AuthUser
+	Proofs                           []cashu.Proof
+	Config                           utils.Config
 }
 
 func databaseError(err error) error {

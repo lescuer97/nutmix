@@ -3,6 +3,9 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
+
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"os"
 )
@@ -40,6 +43,7 @@ func StringToLightningBackend(text string) LightningBackend {
 	}
 }
 
+//nolint:govet // db tag names are fixed and field order is intentional for clarity.
 type Config struct {
 	PEG_OUT_LIMIT_SATS              *int             `db:"peg_out_limit_sats,omitempty"`
 	IconUrl                         *string          `db:"icon_url,omitempty"`
@@ -73,6 +77,13 @@ type Config struct {
 	MINT_AUTH_MAX_BLIND_TOKENS      uint64           `db:"mint_auth_max_blind_tokens,omitempty"`
 	MINT_REQUIRE_AUTH               bool             `db:"mint_require_auth,omitempty"`
 	PEG_OUT_ONLY                    bool             `db:"peg_out_only"`
+}
+
+type NostrNotificationConfig struct {
+	NOSTR_NOTIFICATION_NSEC     []byte                   `db:"-"`
+	NOSTR_NOTIFICATION_NPUBS    []cashu.WrappedPublicKey `db:"-"`
+	NOSTR_NOTIFICATIONS         bool                     `db:"nostr_notifications"`
+	NOSTR_NOTIFICATION_NIP04_DM bool                     `db:"nostr_notification_nip04_dm"`
 }
 
 func (c *Config) Default() {
@@ -142,4 +153,30 @@ func RandomHash() (string, error) {
 
 	// Encode the random bytes as base64-urlsafe string
 	return base64.URLEncoding.EncodeToString(randomBytes), nil
+}
+
+func (c *NostrNotificationConfig) SetNostrNotificationConfig(enabled bool, nsec []byte, npubs []cashu.WrappedPublicKey) error {
+	c.NOSTR_NOTIFICATIONS = enabled
+
+	if npubs == nil {
+		c.NOSTR_NOTIFICATION_NPUBS = nil
+	} else {
+		parsedNpubs := make([]cashu.WrappedPublicKey, 0, len(npubs))
+		for _, pubkey := range npubs {
+			if pubkey.PublicKey == nil {
+				return fmt.Errorf("npub list contains nil public key")
+			}
+
+			parsedNpubs = append(parsedNpubs, pubkey)
+		}
+		c.NOSTR_NOTIFICATION_NPUBS = parsedNpubs
+	}
+
+	if len(nsec) > 0 {
+		copied := make([]byte, len(nsec))
+		copy(copied, nsec)
+		c.NOSTR_NOTIFICATION_NSEC = copied
+	}
+
+	return nil
 }
