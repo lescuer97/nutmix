@@ -307,6 +307,4 @@ func TestLoadLdkPaymentsPageAndErrorMapping(t *testing.T) {
 	}
 }
 
-func uint64Ptr(v uint64) *uint64 { return &v }
-
 func paymentID(i int) string { return fmt.Sprintf("payment-%02d", i) }

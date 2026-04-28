@@ -71,7 +71,6 @@ func checkLimitSat(text string) (*int, error) {
 func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig, configDirectory string) (ldk.PersistedConfig, error) {
 	chainSourceType := normalizeLDKChainSourceType(c.Request.PostFormValue("LDK_CHAIN_SOURCE_TYPE"))
 	config := existingConfig
-	config.ConfigDirectory = configDirectory
 
 	switch ldk.ChainSourceType(chainSourceType) {
 	case ldk.ChainSourceElectrum:
@@ -931,8 +930,15 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			}
 
 			existingLDKConfig := ldk.PersistedConfig{
-				ConfigDirectory: defaultConfigDirectory,
-				ChainSourceType: ldk.ChainSourceBitcoind,
+				ConfigDirectory:   defaultConfigDirectory,
+				ChainSourceType:   ldk.ChainSourceBitcoind,
+				ElectrumServerURL: "",
+				Rpc: ldk.RPCConfig{
+					Address:  "",
+					Username: "",
+					Password: "",
+					Port:     0,
+				},
 			}
 			if persistedConfig, getConfigErr := ldk.GetPersistedConfig(ctx, mint.MintDB); getConfigErr == nil {
 				existingLDKConfig = persistedConfig

@@ -31,7 +31,14 @@ func LightningDataFormFields(mint *m.Mint) gin.HandlerFunc {
 }
 
 func getLDKFormValues(c *gin.Context, mint *m.Mint) templates.LDKFormValues {
-	formValues := templates.LDKFormValues{ChainSourceType: string(ldk.ChainSourceBitcoind)}
+	formValues := templates.LDKFormValues{
+		ChainSourceType:   string(ldk.ChainSourceBitcoind),
+		Address:           "",
+		Port:              "",
+		Username:          "",
+		Password:          "",
+		ElectrumServerURL: "",
+	}
 
 	persistedConfig, err := ldk.GetPersistedConfig(c.Request.Context(), mint.MintDB)
 	if err == nil {
