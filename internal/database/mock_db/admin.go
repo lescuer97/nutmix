@@ -3,6 +3,8 @@ package mockdb
 import (
 	"context"
 	"slices"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -34,26 +36,6 @@ func (m *MockDB) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLoginAuth,
 
 }
 
-func (m *MockDB) GetMintMeltBalanceByTime(time int64) (database.MintMeltBalance, error) {
-	var mintmeltbalance database.MintMeltBalance
-
-	for i := 0; i < len(m.MeltRequest); i++ {
-		if m.MeltRequest[i].State == cashu.ISSUED || m.MeltRequest[i].State == cashu.PAID {
-			mintmeltbalance.Melt = append(mintmeltbalance.Melt, m.MeltRequest[i])
-
-		}
-
-	}
-
-	for j := 0; j < len(m.MeltRequest); j++ {
-		if m.MintRequest[j].State == cashu.ISSUED || m.MintRequest[j].State == cashu.PAID {
-			mintmeltbalance.Mint = append(mintmeltbalance.Mint, m.MintRequest[j])
-
-		}
-
-	}
-	return mintmeltbalance, nil
-}
 func (m *MockDB) AddLiquiditySwap(tx pgx.Tx, swap utils.LiquiditySwap) error {
 	m.LiquiditySwap = append(m.LiquiditySwap, swap)
 	return nil
@@ -101,40 +83,241 @@ func (m *MockDB) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapState) 
 
 }
 
-func (m *MockDB) GetMintRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MintRequestDB, error) {
-
-	if id != nil {
-		for i := 0; i < len(m.MintRequest); i++ {
-			if m.MintRequest[i].Quote == *id {
-				return []cashu.MintRequestDB{m.MintRequest[i]}, nil
-			}
-		}
+func cloneStringPtr(value *string) *string {
+	if value == nil {
+		return nil
 	}
-	mintRequests := make([]cashu.MintRequestDB, 0)
-	sinceUnix := since.Unix()
-	for i := 0; i < len(m.MintRequest); i++ {
-		if m.MintRequest[i].SeenAt >= sinceUnix {
-			mintRequests = append(mintRequests, m.MintRequest[i])
-		}
-	}
-	return mintRequests, nil
+	cloned := *value
+	return &cloned
 }
 
-func (m *MockDB) GetMeltRequestsByTimeAndId(ctx context.Context, since time.Time, id *string) ([]cashu.MeltRequestDB, error) {
+func (m *MockDB) GetMintRequestsByTime(ctx context.Context, since time.Time) ([]cashu.MintRequestDB, error) {
+	m.LastMintSince = since.Unix()
+	m.LastLightningSearch = nil
+	if m.ReturnError != 0 {
+		return nil, database.ErrDB
+	}
 
-	if id != nil {
-		for i := 0; i < len(m.MeltRequest); i++ {
-			if m.MeltRequest[i].Quote == *id {
-				return []cashu.MeltRequestDB{m.MeltRequest[i]}, nil
+	requests := make([]cashu.MintRequestDB, 0)
+	for _, request := range m.MintRequest {
+		if request.SeenAt >= since.Unix() {
+			requests = append(requests, request)
+		}
+	}
+	return requests, nil
+}
+
+func (m *MockDB) GetMeltRequestsByTime(ctx context.Context, since time.Time) ([]cashu.MeltRequestDB, error) {
+	m.LastMeltSince = since.Unix()
+	m.LastLightningSearch = nil
+	if m.ReturnError != 0 {
+		return nil, database.ErrDB
+	}
+
+	requests := make([]cashu.MeltRequestDB, 0)
+	for _, request := range m.MeltRequest {
+		if request.SeenAt >= since.Unix() {
+			requests = append(requests, request)
+		}
+	}
+	return requests, nil
+}
+
+func (m *MockDB) SearchLightningRequests(ctx context.Context, query string, since time.Time, limit int) ([]database.LightningActivityRow, error) {
+	m.LastLightningSearch = cloneStringPtr(&query)
+	m.LastSearchSince = since.Unix()
+	m.LastSearchLimit = limit
+	if m.ReturnError != 0 {
+		return nil, database.ErrDB
+	}
+
+	query = strings.ToLower(query)
+	requests := make([]database.LightningActivityRow, 0)
+	for _, request := range m.MintRequest {
+		if request.SeenAt >= since.Unix() && (strings.Contains(strings.ToLower(request.Quote), query) || strings.Contains(strings.ToLower(request.Request), query)) {
+			requests = append(requests, database.LightningActivityRow{
+				ID:      request.Quote,
+				Type:    "mint",
+				Request: request.Request,
+				State:   string(request.State),
+				Unit:    request.Unit,
+				SeenAt:  request.SeenAt,
+			})
+		}
+	}
+	for _, request := range m.MeltRequest {
+		if request.SeenAt >= since.Unix() && (strings.Contains(strings.ToLower(request.Quote), query) || strings.Contains(strings.ToLower(request.Request), query)) {
+			requests = append(requests, database.LightningActivityRow{
+				ID:      request.Quote,
+				Type:    "melt",
+				Request: request.Request,
+				State:   string(request.State),
+				Unit:    request.Unit,
+				SeenAt:  request.SeenAt,
+			})
+		}
+	}
+	sort.Slice(requests, func(i, j int) bool { return requests[i].SeenAt > requests[j].SeenAt })
+	if limit > 0 && len(requests) > limit {
+		requests = requests[:limit]
+	}
+	return requests, nil
+}
+
+func (m *MockDB) GetLatestStatsSnapshot(ctx context.Context) (*database.StatsSnapshot, error) {
+	if m.ReturnError != 0 {
+		return nil, database.ErrDB
+	}
+	if len(m.Stats) == 0 {
+		return nil, nil
+	}
+	latest := m.Stats[0]
+	for i := 1; i < len(m.Stats); i++ {
+		candidate := m.Stats[i]
+		if candidate.EndDate > latest.EndDate || (candidate.EndDate == latest.EndDate && candidate.ID > latest.ID) {
+			latest = candidate
+		}
+	}
+	return &latest, nil
+}
+
+func (m *MockDB) GetMintStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]database.MintStatsRow, error) {
+	rows := make([]database.MintStatsRow, 0)
+	for _, request := range m.MintRequest {
+		if request.SeenAt >= startDate && request.SeenAt <= endDate && (request.State == cashu.PAID || request.State == cashu.ISSUED) {
+			rows = append(rows, database.MintStatsRow{
+				Quote:   request.Quote,
+				Unit:    request.Unit,
+				Amount:  request.Amount,
+				Request: request.Request,
+			})
+		}
+	}
+	return rows, nil
+}
+
+func (m *MockDB) GetMeltStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]database.MeltStatsRow, error) {
+	rows := make([]database.MeltStatsRow, 0)
+	for _, request := range m.MeltRequest {
+		if request.SeenAt >= startDate && request.SeenAt <= endDate && (request.State == cashu.PAID || request.State == cashu.ISSUED) {
+			rows = append(rows, database.MeltStatsRow{
+				Quote:  request.Quote,
+				Unit:   request.Unit,
+				Amount: request.Amount,
+			})
+		}
+	}
+	return rows, nil
+}
+
+func (m *MockDB) GetProofStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]database.KeysetStatsRow, error) {
+	rows := make([]database.KeysetStatsRow, 0)
+	for _, proof := range m.Proofs {
+		if proof.SeenAt < startDate || proof.SeenAt > endDate || proof.State != cashu.PROOF_SPENT {
+			continue
+		}
+		unit := ""
+		for _, seed := range m.Seeds {
+			if seed.Id == proof.Id {
+				unit = seed.Unit
+				break
 			}
 		}
+		rows = append(rows, database.KeysetStatsRow{KeysetID: proof.Id, Unit: unit, Amount: proof.Amount})
 	}
-	meltRequests := make([]cashu.MeltRequestDB, 0)
-	sinceUnix := since.Unix()
-	for i := 0; i < len(m.MintRequest); i++ {
-		if m.MeltRequest[i].SeenAt >= sinceUnix {
-			meltRequests = append(meltRequests, m.MeltRequest[i])
+	return rows, nil
+}
+
+func (m *MockDB) GetBlindSigStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]database.KeysetStatsRow, error) {
+	rows := make([]database.KeysetStatsRow, 0)
+	for _, sig := range m.RecoverSigDB {
+		if sig.CreatedAt < startDate || sig.CreatedAt > endDate {
+			continue
+		}
+		unit := ""
+		for _, seed := range m.Seeds {
+			if seed.Id == sig.Id {
+				unit = seed.Unit
+				break
+			}
+		}
+		rows = append(rows, database.KeysetStatsRow{KeysetID: sig.Id, Unit: unit, Amount: sig.Amount})
+	}
+	return rows, nil
+}
+
+func (m *MockDB) GetStatsFeeRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]database.KeysetFeeRow, error) {
+	if m.ReturnError != 0 {
+		return nil, database.ErrDB
+	}
+	counts := map[string]*database.KeysetFeeRow{}
+	for _, proof := range m.Proofs {
+		if proof.SeenAt < startDate || proof.SeenAt > endDate || proof.State != cashu.PROOF_SPENT {
+			continue
+		}
+		row, ok := counts[proof.Id]
+		if !ok {
+			unit := ""
+			inputFeePpk := uint64(0)
+			for _, seed := range m.Seeds {
+				if seed.Id == proof.Id {
+					unit = seed.Unit
+					inputFeePpk = uint64(seed.InputFeePpk)
+					break
+				}
+			}
+			row = &database.KeysetFeeRow{KeysetID: proof.Id, Unit: unit, Quantity: 0, InputFeePpk: inputFeePpk}
+			counts[proof.Id] = row
+		}
+		row.Quantity++
+	}
+	rows := make([]database.KeysetFeeRow, 0, len(counts))
+	for _, row := range counts {
+		rows = append(rows, *row)
+	}
+	slices.SortFunc(rows, func(a, b database.KeysetFeeRow) int {
+		if a.KeysetID < b.KeysetID {
+			return -1
+		}
+		if a.KeysetID > b.KeysetID {
+			return 1
+		}
+		return 0
+	})
+	return rows, nil
+}
+
+func (m *MockDB) GetStatsSnapshotsBySince(ctx context.Context, since int64) ([]database.StatsSnapshot, error) {
+	m.LastStatsSince = since
+	if m.ReturnError != 0 {
+		return nil, database.ErrDB
+	}
+	rows := make([]database.StatsSnapshot, 0)
+	for _, snapshot := range m.Stats {
+		if snapshot.EndDate >= since {
+			rows = append(rows, snapshot)
 		}
 	}
-	return meltRequests, nil
+	slices.SortFunc(rows, func(a, b database.StatsSnapshot) int {
+		if a.EndDate < b.EndDate {
+			return -1
+		}
+		if a.EndDate > b.EndDate {
+			return 1
+		}
+		if a.ID < b.ID {
+			return -1
+		}
+		if a.ID > b.ID {
+			return 1
+		}
+		return 0
+	})
+	return rows, nil
+}
+
+func (m *MockDB) InsertStatsSnapshot(ctx context.Context, snapshot database.StatsSnapshot) error {
+	snapshot.ID = int64(len(m.Stats) + 1)
+	m.Stats = append(m.Stats, snapshot)
+	return nil
 }

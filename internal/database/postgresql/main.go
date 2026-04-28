@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/lescuer97/nutmix/api/cashu"
-	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/database/goose"
 )
 
@@ -62,6 +60,7 @@ func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error)
 func (pql Postgresql) GetTx(ctx context.Context) (pgx.Tx, error) {
 	return pql.pool.Begin(ctx)
 }
+
 func (pql Postgresql) Commit(ctx context.Context, tx pgx.Tx) error {
 	return tx.Commit(ctx)
 }
@@ -533,162 +532,6 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSig
 		}
 
 	}
-}
-
-func (pql Postgresql) GetProofsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
-	points := make([]database.ProofTimeSeriesPoint, 0)
-
-	bucketSeconds := int64(bucketMinutes * 60)
-
-	var query string
-	var args []any
-
-	// Use floor division to group proofs into time buckets
-	// (seen_at / bucket_seconds) * bucket_seconds gives us the bucket start timestamp
-
-	// Use current time as upper bound
-	now := time.Now().Unix()
-	query = `SELECT 
-				(seen_at / $3) * $3 as bucket_timestamp,
-				COALESCE(SUM(amount), 0) as total_amount,
-				COUNT(*) as count
-			 FROM proofs 
-			 WHERE seen_at >= $1 AND seen_at < $2
-			 GROUP BY bucket_timestamp
-			 ORDER BY bucket_timestamp ASC`
-	args = []any{since, now, bucketSeconds}
-
-	rows, err := pql.pool.Query(context.Background(), query, args...)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return points, nil
-		}
-		return points, databaseError(fmt.Errorf("GetProofsTimeSeries query error: %w", err))
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var point database.ProofTimeSeriesPoint
-		err := rows.Scan(&point.Timestamp, &point.TotalAmount, &point.Count)
-		if err != nil {
-			return points, databaseError(fmt.Errorf("GetProofsTimeSeries scan error: %w", err))
-		}
-		points = append(points, point)
-	}
-
-	return points, nil
-}
-
-func (pql Postgresql) GetBlindSigsTimeSeries(since int64, bucketMinutes int) ([]database.ProofTimeSeriesPoint, error) {
-	var points []database.ProofTimeSeriesPoint
-
-	bucketSeconds := int64(bucketMinutes * 60)
-
-	var query string
-	var args []any
-
-	// Use floor division to group blind sigs into time buckets
-	// (created_at / bucket_seconds) * bucket_seconds gives us the bucket start timestamp
-
-	// Use current time as upper bound
-	now := time.Now().Unix()
-	query = `SELECT 
-				(created_at / $3) * $3 as bucket_timestamp,
-				COALESCE(SUM(amount), 0) as total_amount,
-				COUNT(*) as count
-			 FROM recovery_signature 
-			 WHERE created_at >= $1 AND created_at < $2
-			 GROUP BY bucket_timestamp
-			 ORDER BY bucket_timestamp ASC`
-	args = []any{since, now, bucketSeconds}
-
-	rows, err := pql.pool.Query(context.Background(), query, args...)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return points, nil
-		}
-		return points, databaseError(fmt.Errorf("GetBlindSigsTimeSeries query error: %w", err))
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var point database.ProofTimeSeriesPoint
-		err := rows.Scan(&point.Timestamp, &point.TotalAmount, &point.Count)
-		if err != nil {
-			return points, databaseError(fmt.Errorf("GetBlindSigsTimeSeries scan error: %w", err))
-		}
-		points = append(points, point)
-	}
-
-	return points, nil
-}
-
-func (pql Postgresql) GetProofsCountByKeyset(since time.Time) (map[string]database.ProofsCountByKeyset, error) {
-	results := make(map[string]database.ProofsCountByKeyset)
-
-	var query string
-	var args []any
-
-	// Only since is provided
-	query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
-			 FROM proofs 
-			 WHERE seen_at >= $1
-			 GROUP BY id`
-	args = []any{since.Unix()}
-
-	rows, err := pql.pool.Query(context.Background(), query, args...)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return results, nil
-		}
-		return results, databaseError(fmt.Errorf("GetProofsCountByKeyset query error: %w", err))
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var item database.ProofsCountByKeyset
-		err := rows.Scan(&item.KeysetId, &item.TotalAmount, &item.Count)
-		if err != nil {
-			return results, databaseError(fmt.Errorf("GetProofsCountByKeyset scan error: %w", err))
-		}
-		results[item.KeysetId] = item
-	}
-
-	return results, nil
-}
-
-func (pql Postgresql) GetBlindSigsCountByKeyset(since time.Time) (map[string]database.BlindSigsCountByKeyset, error) {
-	results := make(map[string]database.BlindSigsCountByKeyset)
-
-	var query string
-	var args []any
-
-	// Only since is provided
-	query = `SELECT id, COALESCE(SUM(amount), 0), COUNT(*) 
-			 FROM recovery_signature 
-			 WHERE created_at >= $1
-			 GROUP BY id`
-	args = []any{since.Unix()}
-
-	rows, err := pql.pool.Query(context.Background(), query, args...)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return results, nil
-		}
-		return results, databaseError(fmt.Errorf("GetBlindSigsCountByKeyset query error: %w", err))
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var item database.BlindSigsCountByKeyset
-		err := rows.Scan(&item.KeysetId, &item.TotalAmount, &item.Count)
-		if err != nil {
-			return results, databaseError(fmt.Errorf("GetBlindSigsCountByKeyset scan error: %w", err))
-		}
-		results[item.KeysetId] = item
-	}
-
-	return results, nil
 }
 
 func (pql Postgresql) Close() {

@@ -1,8 +1,10 @@
 package templates
 
-import "github.com/lescuer97/nutmix/internal/utils"
-import "time"
-import "strings"
+import (
+	"github.com/lescuer97/nutmix/internal/utils"
+	"strings"
+	"time"
+)
 
 type LightningInvoiceVisual struct {
 	Id      string
@@ -31,30 +33,24 @@ templ LightningActivityTable(invoices []LightningInvoiceVisual) {
 			<div class="rows">
 				for _, invoice := range invoices {
 					{{ formattedTime := time.Unix(invoice.Time, 0).Format(time.UnixDate) }}
-					<div class={ "row-item" , invoice.Type }>
+					<div class={ "row-item", invoice.Type }>
 						<div class="cell cell-id" style="width: 25%;" title={ invoice.Id }>
-							<span class="cell-text">
-								{ invoice.Id }
-							</span>
+							<span class="cell-text">{ invoice.Id }</span>
 						</div>
 						<div class="cell" style="width: 5%;" title={ invoice.Type }>
-							<span class={ "pill" , "pill-" + invoice.Type }>{ invoice.Type }</span>
+							<span class={ "pill", "pill-" + invoice.Type }>{ invoice.Type }</span>
 						</div>
 						<div class="cell" style="width: 35%;" title={ invoice.Invoice }>
-							<span class="cell-text">
-								{ invoice.Invoice }
-							</span>
+							<span class="cell-text">{ invoice.Invoice }</span>
 						</div>
 						<div class="cell" style="width: 10%;" title={ invoice.Status }>
-							<span class={ "cell-text" , "status-" + strings.ToLower(invoice.Status) }>{ invoice.Status }</span>
+							<span class={ "cell-text", "status-" + strings.ToLower(invoice.Status) }>{ invoice.Status }</span>
 						</div>
 						<div class="cell" style="width: 10%; text-transform: uppercase;" title={ invoice.Unit }>
 							<span class="cell-text">{ invoice.Unit }</span>
 						</div>
 						<div class="cell" style="width: 15%;" title={ formattedTime }>
-							<span class="cell-text">
-								{ formattedTime }
-							</span>
+							<span class="cell-text">{ formattedTime }</span>
 						</div>
 					</div>
 				}
@@ -97,7 +93,7 @@ templ LightningActivityLayout(config utils.Config, selectedRange string, searchQ
 				id="ln-table-container"
 				class="mt-6 mb-6"
 				hx-get="/admin/ln-table"
-				hx-trigger="load, change from:#timeRangeSelect, input from:#ln-search-input delay:500ms"
+				hx-trigger="load, change from:#timeRangeSelect, input changed delay:300ms from:#ln-search-input"
 				hx-include="#timeRangeSelect, #ln-search-input"
 				hx-swap="innerHTML"
 			>

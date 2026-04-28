@@ -215,281 +215,6 @@ func TestAddAndRequestMintRequestNilPubkey(t *testing.T) {
 	}
 }
 
-func TestGetMintMeltBalanceByTime_OnlyPubkey(t *testing.T) {
-	db, ctx := setupTestDB(t)
-
-	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
-	pubkeyBytes, err := hex.DecodeString(pubkeyStr)
-	if err != nil {
-		t.Fatalf("could not decode hex string. %v", err)
-	}
-	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
-	if err != nil {
-		t.Fatalf("could not parse pubkey bytes correctly. %v", err)
-	}
-	wrappedPubkey := cashu.WrappedPublicKey{PublicKey: pubkey}
-
-	now := time.Now().Unix()
-	queryTime := now - 500
-
-	entryOldTime := now - 1000
-	entryNewTime := now - 100
-
-	// Mint Request 1: Old, Issued (Excluded by time)
-	mint1 := cashu.MintRequestDB{
-		Amount:      ptr(100),
-		Pubkey:      wrappedPubkey,
-		Description: nil,
-		Quote:       "mint1",
-		Request:     "req1",
-		Unit:        cashu.Sat.String(),
-		State:       cashu.ISSUED,
-		CheckingId:  "",
-		Expiry:      now + 10000,
-		SeenAt:      entryOldTime,
-		Minted:      false,
-	}
-
-	// Mint Request 2: New, Issued (Included)
-	mint2 := cashu.MintRequestDB{
-		Amount:      ptr(200),
-		Pubkey:      wrappedPubkey,
-		Description: nil,
-		Quote:       "mint2",
-		Request:     "req2",
-		Unit:        cashu.Sat.String(),
-		State:       cashu.ISSUED,
-		CheckingId:  "",
-		Expiry:      now + 10000,
-		SeenAt:      entryNewTime,
-		Minted:      false,
-	}
-
-	tx, err := db.GetTx(ctx)
-	if err != nil {
-		t.Fatalf("could not get transaction. %v", err)
-	}
-	if err := db.SaveMintRequest(tx, mint1); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.SaveMintRequest(tx, mint2); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	// Melt Requests
-	// Melt Request 1: Old, Issued (Excluded by time)
-	melt1 := cashu.MeltRequestDB{
-		PaymentPreimage: "",
-		Unit:            cashu.Sat.String(),
-		Request:         "reqMelt1",
-		State:           cashu.ISSUED,
-		Quote:           "melt1",
-		CheckingId:      "",
-		Expiry:          now + 10000,
-		Amount:          100,
-		FeeReserve:      0,
-		FeePaid:         0,
-		SeenAt:          entryOldTime,
-		Melted:          false,
-		Mpp:             false,
-	}
-
-	// Melt Request 2: New, Paid (Included)
-	melt2 := cashu.MeltRequestDB{
-		PaymentPreimage: "",
-		Unit:            cashu.Sat.String(),
-		Request:         "reqMelt2",
-		State:           cashu.PAID,
-		Quote:           "melt2",
-		CheckingId:      "",
-		Expiry:          now + 10000,
-		Amount:          200,
-		FeeReserve:      0,
-		FeePaid:         0,
-		SeenAt:          entryNewTime,
-		Melted:          false,
-		Mpp:             false,
-	}
-
-	tx, err = db.GetTx(ctx)
-	if err != nil {
-		t.Fatalf("could not get transaction. %v", err)
-	}
-	if err := db.SaveMeltRequest(tx, melt1); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.SaveMeltRequest(tx, melt2); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	// Query
-	res, err := db.GetMintMeltBalanceByTime(queryTime)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(res.Mint) != 1 {
-		t.Errorf("Expected 1 mint request, got %d", len(res.Mint))
-	} else {
-		if res.Mint[0].Quote != "mint2" {
-			t.Errorf("Expected mint2, got %s", res.Mint[0].Quote)
-		}
-		if res.Mint[0].Pubkey.PublicKey == nil {
-			t.Error("Expected pubkey to be present")
-		} else if hex.EncodeToString(res.Mint[0].Pubkey.SerializeCompressed()) != pubkeyStr {
-			t.Errorf("Pubkey mismatch. Got %x, expected %s", res.Mint[0].Pubkey.SerializeCompressed(), pubkeyStr)
-		}
-	}
-
-	if len(res.Melt) != 1 {
-		t.Errorf("Expected 1 melt request, got %d", len(res.Melt))
-	} else {
-		if res.Melt[0].Quote != "melt2" {
-			t.Errorf("Expected melt2, got %s", res.Melt[0].Quote)
-		}
-	}
-}
-
-func TestGetMintMeltBalanceByTime_MixedPubkeys(t *testing.T) {
-	db, ctx := setupTestDB(t)
-
-	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
-	pubkeyBytes, err := hex.DecodeString(pubkeyStr)
-	if err != nil {
-		t.Fatalf("could not decode hex string. %v", err)
-	}
-	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
-	if err != nil {
-		t.Fatalf("could not parse pubkey bytes correctly. %v", err)
-	}
-	wrappedPubkey := cashu.WrappedPublicKey{PublicKey: pubkey}
-
-	now := time.Now().Unix()
-	queryTime := now - 500
-	entryNewTime := now - 100
-
-	// Mint Request with Pubkey
-	mint1 := cashu.MintRequestDB{
-		Amount:      ptr(200),
-		Pubkey:      wrappedPubkey,
-		Description: nil,
-		Quote:       "mintWithKey",
-		Request:     "reqWithKey",
-		Unit:        cashu.Sat.String(),
-		State:       cashu.ISSUED,
-		CheckingId:  "",
-		Expiry:      now + 10000,
-		SeenAt:      entryNewTime,
-		Minted:      false,
-	}
-
-	// Mint Request without Pubkey
-	mint2 := cashu.MintRequestDB{
-		Amount:      ptr(400),
-		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
-		Description: nil,
-		Quote:       "mintNoKey",
-		Request:     "reqNokey",
-		Unit:        cashu.Sat.String(),
-		State:       cashu.ISSUED,
-		CheckingId:  "",
-		Expiry:      now + 10000,
-		SeenAt:      entryNewTime,
-		Minted:      false,
-	}
-
-	tx, err := db.GetTx(ctx)
-	if err != nil {
-		t.Fatalf("could not get transaction. %v", err)
-	}
-	if err := db.SaveMintRequest(tx, mint1); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.SaveMintRequest(tx, mint2); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	// Melt Requests
-	melt1 := cashu.MeltRequestDB{
-		PaymentPreimage: "",
-		Unit:            cashu.Sat.String(),
-		Request:         "reqMelt1",
-		State:           cashu.ISSUED,
-		Quote:           "melt1",
-		CheckingId:      "",
-		Expiry:          now + 10000,
-		Amount:          100,
-		FeeReserve:      0,
-		FeePaid:         0,
-		SeenAt:          entryNewTime,
-		Melted:          false,
-		Mpp:             false,
-	}
-
-	tx, err = db.GetTx(ctx)
-	if err != nil {
-		t.Fatalf("could not get transaction. %v", err)
-	}
-	if err := db.SaveMeltRequest(tx, melt1); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	// Query
-	res, err := db.GetMintMeltBalanceByTime(queryTime)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(res.Mint) != 2 {
-		t.Errorf("Expected 2 mint requests, got %d", len(res.Mint))
-	}
-
-	var foundWithKey, foundNoKey bool
-	for _, m := range res.Mint {
-		switch m.Quote {
-		case "mintWithKey":
-			foundWithKey = true
-			if m.Pubkey.PublicKey == nil {
-				t.Error("Expected mintWithKey to have a pubkey")
-			} else if hex.EncodeToString(m.Pubkey.SerializeCompressed()) != pubkeyStr {
-				t.Errorf("Pubkey mismatch. Got %x, expected %s", m.Pubkey.SerializeCompressed(), pubkeyStr)
-			}
-		case "mintNoKey":
-			foundNoKey = true
-			if m.Pubkey.PublicKey != nil {
-				t.Errorf("Expected mintNoKey to have NO pubkey, but got %v", m.Pubkey.PublicKey)
-			}
-		}
-	}
-
-	if !foundWithKey {
-		t.Error("Did not find mintWithKey")
-	}
-	if !foundNoKey {
-		t.Error("Did not find mintNoKey")
-	}
-
-	if len(res.Melt) != 1 {
-		t.Errorf("Expected 1 melt request, got %d", len(res.Melt))
-	} else {
-		if res.Melt[0].Quote != "melt1" {
-			t.Errorf("Expected melt1, got %s", res.Melt[0].Quote)
-		}
-	}
-}
-
 func TestSaveProofAndGetBySecret_ValidPubkey(t *testing.T) {
 	db, ctx := setupTestDB(t)
 
@@ -965,4 +690,119 @@ func setupTestDB(t *testing.T) (Postgresql, context.Context) {
 	return db, ctx
 }
 
-func ptr(v uint64) *uint64 { return &v }
+func TestSearchLightningRequestsAppliesSinceLimitAndEscapesWildcards(t *testing.T) {
+	db, ctx := setupTestDB(t)
+	now := time.Now().Unix()
+	amount := uint64(100)
+
+	tx, err := db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("could not get transaction: %v", err)
+	}
+
+	for _, request := range []cashu.MintRequestDB{
+		{
+			Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+			Description: nil,
+			Quote:       "mint-hit-new",
+			Request:     "invoice-hit-new",
+			Unit:        cashu.Sat.String(),
+			State:       cashu.PAID,
+			CheckingId:  "",
+			Expiry:      0,
+			SeenAt:      now - 60,
+			Amount:      &amount,
+			Minted:      false,
+		},
+		{
+			Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+			Description: nil,
+			Quote:       "mint-hit-old",
+			Request:     "invoice-hit-old",
+			Unit:        cashu.Sat.String(),
+			State:       cashu.PAID,
+			CheckingId:  "",
+			Expiry:      0,
+			SeenAt:      now - 40*24*60*60,
+			Amount:      &amount,
+			Minted:      false,
+		},
+		{
+			Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+			Description: nil,
+			Quote:       "percent%quote",
+			Request:     "plain-request",
+			Unit:        cashu.Sat.String(),
+			State:       cashu.PAID,
+			CheckingId:  "",
+			Expiry:      0,
+			SeenAt:      now - 120,
+			Amount:      &amount,
+			Minted:      false,
+		},
+	} {
+		if err := db.SaveMintRequest(tx, request); err != nil {
+			t.Fatalf("save mint request: %v", err)
+		}
+	}
+
+	for _, request := range []cashu.MeltRequestDB{
+		{
+			PaymentPreimage: "",
+			Quote:           "melt-hit-mid",
+			Request:         "lnbc-hit-mid",
+			Unit:            cashu.Sat.String(),
+			State:           cashu.ISSUED,
+			CheckingId:      "",
+			Expiry:          0,
+			SeenAt:          now - 90,
+			Amount:          amount,
+			FeeReserve:      0,
+			FeePaid:         0,
+			Melted:          false,
+			Mpp:             false,
+		},
+		{
+			PaymentPreimage: "",
+			Quote:           "melt-other",
+			Request:         "lnbc-other",
+			Unit:            cashu.Sat.String(),
+			State:           cashu.ISSUED,
+			CheckingId:      "",
+			Expiry:          0,
+			SeenAt:          now - 30,
+			Amount:          amount,
+			FeeReserve:      0,
+			FeePaid:         0,
+			Melted:          false,
+			Mpp:             false,
+		},
+	} {
+		if err := db.SaveMeltRequest(tx, request); err != nil {
+			t.Fatalf("save melt request: %v", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit transaction: %v", err)
+	}
+
+	rows, err := db.SearchLightningRequests(ctx, "hit", time.Unix(now-7*24*60*60, 0), 2)
+	if err != nil {
+		t.Fatalf("SearchLightningRequests hit: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 limited rows, got %#v", rows)
+	}
+	if rows[0].ID != "mint-hit-new" || rows[1].ID != "melt-hit-mid" {
+		t.Fatalf("expected newest two search results in desc order, got %#v", rows)
+	}
+
+	wildcardRows, err := db.SearchLightningRequests(ctx, "%", time.Unix(now-7*24*60*60, 0), 10)
+	if err != nil {
+		t.Fatalf("SearchLightningRequests wildcard: %v", err)
+	}
+	if len(wildcardRows) != 1 || wildcardRows[0].ID != "percent%quote" {
+		t.Fatalf("expected escaped wildcard to match only literal percent row, got %#v", wildcardRows)
+	}
+}

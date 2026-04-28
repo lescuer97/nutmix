@@ -8,7 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cache/persistence"
@@ -22,6 +24,8 @@ import (
 	"github.com/lescuer97/nutmix/internal/routes/admin"
 	"github.com/lescuer97/nutmix/internal/routes/middleware"
 	"github.com/lescuer97/nutmix/internal/signer"
+	"github.com/lescuer97/nutmix/internal/stats"
+	"github.com/lightningnetwork/lnd/zpay32"
 
 	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
 	remoteSigner "github.com/lescuer97/nutmix/internal/signer/remote_signer"
@@ -82,17 +86,19 @@ func main() {
 
 	baseJSONHandler := slog.NewJSONHandler(w, opts)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5)*time.Minute)
-	defer cancel()
+	startupCtx, startupCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer startupCancel()
+	appCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	db, err := postgresql.DatabaseSetup(ctx, "migrations")
+	db, err := postgresql.DatabaseSetup(startupCtx, "migrations")
 	if err != nil {
 		slog.Error("Error conecting to db", slog.Any("error", err))
 		log.Panic()
 	}
 	defer db.Close()
 
-	config, nostrNotificationConfig, err := mint.SetUpConfigDB(ctx, db)
+	config, nostrNotificationConfig, err := mint.SetUpConfigDB(startupCtx, db)
 	if err != nil {
 		log.Fatalf("mint.SetUpConfigDB(ctx, db): %+v ", err)
 	}
@@ -103,7 +109,7 @@ func main() {
 	}
 
 	// remove mint private key from variable
-	mint, err := mint.SetUpMint(ctx, config, nostrNotificationConfig, db, signer)
+	mint, err := mint.SetUpMint(startupCtx, config, nostrNotificationConfig, db, signer)
 
 	if err != nil {
 		slog.Warn("SetUpMint", slog.Any("error", err))
@@ -133,9 +139,28 @@ func main() {
 		slog.Error("SetUpMint", slog.Any("error", err))
 		return
 	}
+
+	statsService := stats.Service{
+		DB:        db,
+		Now:       time.Now,
+		Logger:    nil,
+		NewTicker: nil,
+		DecodeMintAmount: func(request string) (uint64, error) {
+			invoice, err := zpay32.Decode(request, mint.LightningBackend.GetNetwork())
+			if err != nil {
+				return 0, err
+			}
+			if invoice.MilliSat == nil {
+				return 0, fmt.Errorf("invoice has no amount")
+			}
+			return uint64(invoice.MilliSat.ToSatoshis()), nil
+		},
+	}
+	go statsService.Run(appCtx, 15*time.Minute)
+
 	routes.V1Routes(r, mint)
 
-	admin.AdminRoutes(ctx, r, mint)
+	admin.AdminRoutes(appCtx, r, mint)
 
 	PORT = ":8081"
 	PORTStr := os.Getenv("PORT")

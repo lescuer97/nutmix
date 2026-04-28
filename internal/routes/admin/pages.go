@@ -5,20 +5,21 @@ import (
 	"log/slog"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
-	"github.com/lightningnetwork/lnd/zpay32"
 	"golang.org/x/sync/errgroup"
 )
+
+const lightningSearchLimit = 200
+const minLightningSearchLength = 2
 
 func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -137,14 +138,17 @@ func ProofsChartCard(mint *mint.Mint) gin.HandlerFunc {
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
-		// Fetch proofs time-series data (use nil for until to get all data up to now)
-		data, err := mint.MintDB.GetProofsTimeSeries(startTime.Unix(), bucketMinutes)
+		statsRows, err := mint.MintDB.GetStatsSnapshotsBySince(ctx, startTime.Unix())
 		if err != nil {
 			slog.Error(
-				"mint.MintDB.GetProofsTimeSeries()",
+				"mint.MintDB.GetStatsSnapshotsBySince()",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			data = []database.ProofTimeSeriesPoint{}
+			statsRows = []database.StatsSnapshot{}
 		}
+
+		data := buildProofTimeSeriesFromStats(statsRows, func(row database.StatsSnapshot) []database.StatsSummaryItem {
+			return row.ProofsSummary
+		}, bucketMinutes)
 
 		summary := calculateChartSummary(data)
 
@@ -165,14 +169,17 @@ func ProofsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
-		data, err := mint.MintDB.GetProofsTimeSeries(startTime.Unix(), bucketMinutes)
+		statsRows, err := mint.MintDB.GetStatsSnapshotsBySince(ctx, startTime.Unix())
 		if err != nil {
 			slog.Error(
-				"mint.MintDB.GetProofsTimeSeries()",
+				"mint.MintDB.GetStatsSnapshotsBySince()",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			// Return empty data on error
-			data = []database.ProofTimeSeriesPoint{}
+			statsRows = []database.StatsSnapshot{}
 		}
+
+		data := buildProofTimeSeriesFromStats(statsRows, func(row database.StatsSnapshot) []database.StatsSummaryItem {
+			return row.ProofsSummary
+		}, bucketMinutes)
 
 		// Return HTML fragment for HTMX
 		err = templates.ProofsChartContent(data).Render(ctx, c.Writer)
@@ -192,14 +199,17 @@ func BlindSigsChartCard(mint *mint.Mint) gin.HandlerFunc {
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
-		// Fetch blind sigs time-series data (use nil for until to get all data up to now)
-		data, err := mint.MintDB.GetBlindSigsTimeSeries(startTime.Unix(), bucketMinutes)
+		statsRows, err := mint.MintDB.GetStatsSnapshotsBySince(ctx, startTime.Unix())
 		if err != nil {
 			slog.Error(
-				"mint.MintDB.GetBlindSigsTimeSeries()",
+				"mint.MintDB.GetStatsSnapshotsBySince()",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			data = []database.ProofTimeSeriesPoint{}
+			statsRows = []database.StatsSnapshot{}
 		}
+
+		data := buildProofTimeSeriesFromStats(statsRows, func(row database.StatsSnapshot) []database.StatsSummaryItem {
+			return row.BlindSigsSummary
+		}, bucketMinutes)
 
 		summary := calculateChartSummary(data)
 
@@ -220,14 +230,17 @@ func BlindSigsChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
-		data, err := mint.MintDB.GetBlindSigsTimeSeries(startTime.Unix(), bucketMinutes)
+		statsRows, err := mint.MintDB.GetStatsSnapshotsBySince(ctx, startTime.Unix())
 		if err != nil {
 			slog.Error(
-				"mint.MintDB.GetBlindSigsTimeSeries()",
+				"mint.MintDB.GetStatsSnapshotsBySince()",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			// Return empty data on error
-			data = []database.ProofTimeSeriesPoint{}
+			statsRows = []database.StatsSnapshot{}
 		}
+
+		data := buildProofTimeSeriesFromStats(statsRows, func(row database.StatsSnapshot) []database.StatsSummaryItem {
+			return row.BlindSigsSummary
+		}, bucketMinutes)
 
 		// Return HTML fragment for HTMX
 		err = templates.BlindSigsChartContent(data).Render(ctx, c.Writer)
@@ -325,7 +338,7 @@ func LnPage(mint *mint.Mint) gin.HandlerFunc {
 
 		// Default time range is 1 week
 		selectedRange := c.DefaultQuery("since", "1w")
-		searchQuery := c.Query("search")
+		searchQuery := strings.TrimSpace(c.Query("search"))
 
 		err := templates.LightningActivityLayout(mint.Config, selectedRange, searchQuery).Render(ctx, c.Writer)
 
@@ -340,68 +353,82 @@ func LightningTable(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		searchQuery := c.Query("search")
+		searchQuery := strings.TrimSpace(c.Query("search"))
 		timeRange := c.Query("since")
 		startTime, _ := parseTimeRange(timeRange)
 
 		mintRequests := make([]cashu.MintRequestDB, 0)
 		meltRequests := make([]cashu.MeltRequestDB, 0)
+		filtered := make([]templates.LightningInvoiceVisual, 0)
 
-		var searchQueryPtr *string
-		if searchQuery != "" {
-			searchQueryPtr = &searchQuery
-		}
-
-		errgroup := errgroup.Group{}
-		errgroup.Go(func() error {
-			mintRequestsDb, err := adminHandler.mint.MintDB.GetMintRequestsByTimeAndId(c.Request.Context(), startTime, searchQueryPtr)
+		if len([]rune(searchQuery)) < minLightningSearchLength {
+			errGroup := errgroup.Group{}
+			errGroup.Go(func() error {
+				requests, err := adminHandler.mint.MintDB.GetMintRequestsByTime(ctx, startTime)
+				if err != nil {
+					return err
+				}
+				mintRequests = requests
+				return nil
+			})
+			errGroup.Go(func() error {
+				requests, err := adminHandler.mint.MintDB.GetMeltRequestsByTime(ctx, startTime)
+				if err != nil {
+					return err
+				}
+				meltRequests = requests
+				return nil
+			})
+			err := errGroup.Wait()
 			if err != nil {
-				return err
+				_ = c.Error(err)
+				return
 			}
-			mintRequests = mintRequestsDb
-			return nil
-		})
-		errgroup.Go(func() error {
-			meltRequestsDb, err := adminHandler.mint.MintDB.GetMeltRequestsByTimeAndId(c.Request.Context(), startTime, searchQueryPtr)
+
+			filtered = make([]templates.LightningInvoiceVisual, 0, len(mintRequests)+len(meltRequests))
+			for _, mintRequest := range mintRequests {
+				filtered = append(filtered, templates.LightningInvoiceVisual{
+					Id:      mintRequest.Quote,
+					Type:    "mint",
+					Invoice: mintRequest.Request,
+					Status:  string(mintRequest.State),
+					Unit:    mintRequest.Unit,
+					Time:    mintRequest.SeenAt,
+				})
+			}
+			for _, meltRequest := range meltRequests {
+				filtered = append(filtered, templates.LightningInvoiceVisual{
+					Id:      meltRequest.Quote,
+					Type:    "melt",
+					Invoice: meltRequest.Request,
+					Status:  string(meltRequest.State),
+					Unit:    meltRequest.Unit,
+					Time:    meltRequest.SeenAt,
+				})
+			}
+		} else {
+			searchRows, err := adminHandler.mint.MintDB.SearchLightningRequests(ctx, searchQuery, startTime, lightningSearchLimit)
 			if err != nil {
-				return err
+				_ = c.Error(err)
+				return
 			}
-			meltRequests = meltRequestsDb
-			return nil
-		})
-		err := errgroup.Wait()
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
 
-		filtered := make([]templates.LightningInvoiceVisual, len(mintRequests)+len(meltRequests))
-		for i, mintRequest := range mintRequests {
-			filtered[i] = templates.LightningInvoiceVisual{
-				Id:      mintRequest.Quote,
-				Type:    "mint",
-				Invoice: mintRequest.Request,
-				Status:  string(mintRequest.State),
-				Unit:    mintRequest.Unit,
-				Time:    mintRequest.SeenAt,
-			}
-		}
-		for i, meltRequest := range meltRequests {
-			filtered[i+len(mintRequests)] = templates.LightningInvoiceVisual{
-				Id:      meltRequest.Quote,
-				Type:    "melt",
-				Invoice: meltRequest.Request,
-				Status:  string(meltRequest.State),
-				Unit:    meltRequest.Unit,
-				Time:    meltRequest.SeenAt,
+			filtered = make([]templates.LightningInvoiceVisual, 0, len(searchRows))
+			for _, row := range searchRows {
+				filtered = append(filtered, templates.LightningInvoiceVisual{
+					Id:      row.ID,
+					Type:    row.Type,
+					Invoice: row.Request,
+					Status:  row.State,
+					Unit:    row.Unit,
+					Time:    row.SeenAt,
+				})
 			}
 		}
 
-		sort.Slice(filtered, func(i, j int) bool {
-			return filtered[i].Time > filtered[j].Time
-		})
+		sort.Slice(filtered, func(i, j int) bool { return filtered[i].Time > filtered[j].Time })
 
-		err = templates.LightningActivityTable(filtered).Render(ctx, c.Writer)
+		err := templates.LightningActivityTable(filtered).Render(ctx, c.Writer)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -423,96 +450,84 @@ func calculateLnChartSummary(data []templates.MintMeltTimeSeriesPoint) templates
 	}
 }
 
-// buildMintMeltTimeSeries processes raw mint/melt data and aggregates into time buckets
-// using zpay32 to decode invoice amounts
-func buildMintMeltTimeSeries(mintMeltBalance database.MintMeltBalance, network *chaincfg.Params, bucketMinutes int) []templates.MintMeltTimeSeriesPoint {
+func sumStatsSummary(items []database.StatsSummaryItem) (int64, uint64) {
+	var amount int64
+	var count uint64
+	for _, item := range items {
+		amount += int64(item.Amount)
+		count += item.Quantity
+	}
+	return amount, count
+}
+
+func statsBucketTimestamp(endDate int64, bucketMinutes int) int64 {
 	bucketSeconds := int64(bucketMinutes * 60)
-
-	// Maps to aggregate data by bucket
-	mintBuckets := make(map[int64]*templates.MintMeltTimeSeriesPoint)
-	meltBuckets := make(map[int64]*templates.MintMeltTimeSeriesPoint)
-
-	// Process mint requests - decode invoice to get amount
-	for _, mintRequest := range mintMeltBalance.Mint {
-
-		invoice, err := zpay32.Decode(mintRequest.Request, network)
-		if err != nil {
-			slog.Debug(
-				"zpay32.Decode failed for mint request",
-				slog.String(utils.LogExtraInfo, err.Error()),
-				slog.String("quote", mintRequest.Quote))
-			continue // Skip this request
-		}
-
-		amount := int64(invoice.MilliSat.ToSatoshis().ToUnit(btcutil.AmountSatoshi))
-		bucketTs := (mintRequest.SeenAt / bucketSeconds) * bucketSeconds
-
-		if _, ok := mintBuckets[bucketTs]; !ok {
-			mintBuckets[bucketTs] = &templates.MintMeltTimeSeriesPoint{Timestamp: bucketTs, MintAmount: 0, MeltAmount: 0, MintCount: 0, MeltCount: 0}
-		}
-		mintBuckets[bucketTs].MintAmount += amount
-		mintBuckets[bucketTs].MintCount++
+	if bucketSeconds <= 0 {
+		return endDate
 	}
+	return (endDate / bucketSeconds) * bucketSeconds
+}
 
-	// Process melt requests - use Amount field if > 0, otherwise decode invoice
-	for _, meltRequest := range mintMeltBalance.Melt {
-
-		var amount int64
-		if meltRequest.Amount > 0 {
-			amount = int64(meltRequest.Amount)
-		} else {
-			// Try to decode invoice
-			invoice, err := zpay32.Decode(meltRequest.Request, network)
-			if err != nil {
-				slog.Debug(
-					"zpay32.Decode failed for melt request, skipping",
-					slog.String(utils.LogExtraInfo, err.Error()),
-					slog.String("quote", meltRequest.Quote))
-				continue // Skip this request
+func buildMintMeltTimeSeriesFromStats(rows []database.StatsSnapshot, bucketMinutes int) []templates.MintMeltTimeSeriesPoint {
+	buckets := make(map[int64]*templates.MintMeltTimeSeriesPoint)
+	for _, row := range rows {
+		bucketTs := statsBucketTimestamp(row.EndDate, bucketMinutes)
+		point, ok := buckets[bucketTs]
+		if !ok {
+			point = &templates.MintMeltTimeSeriesPoint{
+				Timestamp:  bucketTs,
+				MintAmount: 0,
+				MeltAmount: 0,
+				MintCount:  0,
+				MeltCount:  0,
 			}
-			amount = int64(invoice.MilliSat.ToSatoshis().ToUnit(btcutil.AmountSatoshi))
+			buckets[bucketTs] = point
 		}
-
-		bucketTs := (meltRequest.SeenAt / bucketSeconds) * bucketSeconds
-
-		if _, ok := meltBuckets[bucketTs]; !ok {
-			meltBuckets[bucketTs] = &templates.MintMeltTimeSeriesPoint{Timestamp: bucketTs, MintAmount: 0, MeltAmount: 0, MintCount: 0, MeltCount: 0}
-		}
-		meltBuckets[bucketTs].MeltAmount += amount
-		meltBuckets[bucketTs].MeltCount++
+		mintAmount, mintCount := sumStatsSummary(row.MintSummary)
+		meltAmount, meltCount := sumStatsSummary(row.MeltSummary)
+		point.MintAmount += mintAmount
+		point.MintCount += mintCount
+		point.MeltAmount += meltAmount
+		point.MeltCount += meltCount
 	}
-
-	// Collect all unique timestamps
-	allTimestamps := make(map[int64]bool)
-	for ts := range mintBuckets {
-		allTimestamps[ts] = true
-	}
-	for ts := range meltBuckets {
-		allTimestamps[ts] = true
-	}
-
-	// Convert to sorted slice
-	timestamps := make([]int64, 0, len(allTimestamps))
-	for ts := range allTimestamps {
+	timestamps := make([]int64, 0, len(buckets))
+	for ts := range buckets {
 		timestamps = append(timestamps, ts)
 	}
 	sort.Slice(timestamps, func(i, j int) bool { return timestamps[i] < timestamps[j] })
-
-	// Build final result combining mint and melt data
 	result := make([]templates.MintMeltTimeSeriesPoint, 0, len(timestamps))
 	for _, ts := range timestamps {
-		point := templates.MintMeltTimeSeriesPoint{Timestamp: ts, MintAmount: 0, MeltAmount: 0, MintCount: 0, MeltCount: 0}
-		if mintData, ok := mintBuckets[ts]; ok {
-			point.MintAmount = mintData.MintAmount
-			point.MintCount = mintData.MintCount
-		}
-		if meltData, ok := meltBuckets[ts]; ok {
-			point.MeltAmount = meltData.MeltAmount
-			point.MeltCount = meltData.MeltCount
-		}
-		result = append(result, point)
+		result = append(result, *buckets[ts])
 	}
+	return result
+}
 
+func buildProofTimeSeriesFromStats(rows []database.StatsSnapshot, selector func(database.StatsSnapshot) []database.StatsSummaryItem, bucketMinutes int) []database.ProofTimeSeriesPoint {
+	buckets := make(map[int64]*database.ProofTimeSeriesPoint)
+	for _, row := range rows {
+		bucketTs := statsBucketTimestamp(row.EndDate, bucketMinutes)
+		point, ok := buckets[bucketTs]
+		if !ok {
+			point = &database.ProofTimeSeriesPoint{
+				Timestamp:   bucketTs,
+				TotalAmount: 0,
+				Count:       0,
+			}
+			buckets[bucketTs] = point
+		}
+		amount, count := sumStatsSummary(selector(row))
+		point.TotalAmount += uint64(amount)
+		point.Count += count
+	}
+	timestamps := make([]int64, 0, len(buckets))
+	for ts := range buckets {
+		timestamps = append(timestamps, ts)
+	}
+	sort.Slice(timestamps, func(i, j int) bool { return timestamps[i] < timestamps[j] })
+	result := make([]database.ProofTimeSeriesPoint, 0, len(timestamps))
+	for _, ts := range timestamps {
+		result = append(result, *buckets[ts])
+	}
 	return result
 }
 
@@ -525,17 +540,15 @@ func LnChartCard(mint *mint.Mint) gin.HandlerFunc {
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
-		// Fetch raw mint/melt data
-		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(startTime.Unix())
+		statsRows, err := mint.MintDB.GetStatsSnapshotsBySince(ctx, startTime.Unix())
 		if err != nil {
 			slog.Error(
-				"mint.MintDB.GetMintMeltBalanceByTime()",
+				"mint.MintDB.GetStatsSnapshotsBySince()",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			mintMeltBalance = database.MintMeltBalance{Mint: []cashu.MintRequestDB{}, Melt: []cashu.MeltRequestDB{}}
+			statsRows = []database.StatsSnapshot{}
 		}
 
-		// Process and aggregate into time series using zpay32 for invoice decoding
-		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), bucketMinutes)
+		data := buildMintMeltTimeSeriesFromStats(statsRows, bucketMinutes)
 
 		summary := calculateLnChartSummary(data)
 
@@ -556,17 +569,15 @@ func LnChartDataAPI(mint *mint.Mint) gin.HandlerFunc {
 		timeRange := c.Query("since")
 		startTime, bucketMinutes := parseTimeRange(timeRange)
 
-		// Fetch raw mint/melt data
-		mintMeltBalance, err := mint.MintDB.GetMintMeltBalanceByTime(startTime.Unix())
+		statsRows, err := mint.MintDB.GetStatsSnapshotsBySince(ctx, startTime.Unix())
 		if err != nil {
 			slog.Error(
-				"mint.MintDB.GetMintMeltBalanceByTime()",
+				"mint.MintDB.GetStatsSnapshotsBySince()",
 				slog.String(utils.LogExtraInfo, err.Error()))
-			mintMeltBalance = database.MintMeltBalance{Mint: []cashu.MintRequestDB{}, Melt: []cashu.MeltRequestDB{}}
+			statsRows = []database.StatsSnapshot{}
 		}
 
-		// Process and aggregate into time series using zpay32 for invoice decoding
-		data := buildMintMeltTimeSeries(mintMeltBalance, mint.LightningBackend.GetNetwork(), bucketMinutes)
+		data := buildMintMeltTimeSeriesFromStats(statsRows, bucketMinutes)
 
 		// Return HTML fragment for HTMX
 		err = templates.LnChartContent(data).Render(ctx, c.Writer)

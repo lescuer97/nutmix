@@ -40,10 +40,10 @@ func TestSetUpConfigDBLoadsNostrNotificationNsecFromFile(t *testing.T) {
 
 	if loadedNostrConfig == nil {
 		t.Fatal("expected SetUpConfigDB to load a nostr notification config")
-	}
-
-	if !bytes.Equal(loadedNostrConfig.NOSTR_NOTIFICATION_NSEC, privateKeyBytes) {
-		t.Fatal("expected SetUpConfigDB to load nostr notification nsec from file")
+	} else {
+		if !bytes.Equal(loadedNostrConfig.NOSTR_NOTIFICATION_NSEC, privateKeyBytes) {
+			t.Fatal("expected SetUpConfigDB to load nostr notification nsec from file")
+		}
 	}
 }
 
@@ -73,14 +73,14 @@ func TestSetUpConfigDBCreatesNostrNotificationNsecOnInitialBootstrap(t *testing.
 
 	if loadedNostrConfig == nil {
 		t.Fatal("expected SetUpConfigDB to create nostr notification config on bootstrap")
-	}
+	} else {
+		if !loadedNostrConfig.NOSTR_NOTIFICATIONS {
+			t.Fatal("expected nostr notifications to remain enabled during bootstrap")
+		}
 
-	if !loadedNostrConfig.NOSTR_NOTIFICATIONS {
-		t.Fatal("expected nostr notifications to remain enabled during bootstrap")
-	}
-
-	if len(loadedNostrConfig.NOSTR_NOTIFICATION_NSEC) == 0 {
-		t.Fatal("expected SetUpConfigDB to create a nostr notification nsec during bootstrap")
+		if len(loadedNostrConfig.NOSTR_NOTIFICATION_NSEC) == 0 {
+			t.Fatal("expected SetUpConfigDB to create a nostr notification nsec during bootstrap")
+		}
 	}
 
 	if _, err := os.Stat(filepath.Join(configDir, utils.NostrNotificationNsecFileName)); err != nil {
