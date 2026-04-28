@@ -66,10 +66,8 @@ func main() {
 
 	w := io.MultiWriter(os.Stdout, logFile)
 
-	//nolint:exhaustruct
-	opts := &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}
+	opts := new(slog.HandlerOptions)
+	opts.Level = slog.LevelInfo
 
 	err = godotenv.Load(".env")
 	if err != nil {
@@ -176,14 +174,12 @@ func main() {
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
 	// Define a custom http.Server
-	//nolint:exhaustruct
-	srv := &http.Server{
-		Addr:         PORT,
-		Handler:      r,
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 4 * time.Second,
-		IdleTimeout:  3 * time.Minute,
-	}
+	srv := new(http.Server)
+	srv.Addr = PORT
+	srv.Handler = r
+	srv.ReadTimeout = 3 * time.Second
+	srv.WriteTimeout = 4 * time.Second
+	srv.IdleTimeout = 3 * time.Minute
 	// Start the server
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server failed", slog.Any("error", err))
