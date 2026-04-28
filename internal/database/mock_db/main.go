@@ -21,22 +21,22 @@ type MockDB struct {
 	GetConfigErr                     error
 	UpdateNostrNotificationConfigErr error
 	NostrNotificationConfig          *utils.NostrNotificationConfig
+	LastLightningSearch              *string
+	MeltChange                       []cashu.MeltChange
 	Proofs                           []cashu.Proof
-	MeltRequest                      []cashu.MeltRequestDB
-	MintRequest                      []cashu.MintRequestDB
 	Stats                            []database.StatsSnapshot
 	RecoverSigDB                     []cashu.RecoverSigDB
 	NostrAuth                        []database.NostrLoginAuth
 	LiquiditySwap                    []utils.LiquiditySwap
-	MeltChange                       []cashu.MeltChange
+	MeltRequest                      []cashu.MeltRequestDB
 	Seeds                            []cashu.Seed
 	AuthUser                         []database.AuthUser
+	MintRequest                      []cashu.MintRequestDB
 	Config                           utils.Config
-	ReturnError                      int64
 	LastStatsSince                   int64
 	LastMintSince                    int64
 	LastMeltSince                    int64
-	LastLightningSearch              *string
+	ReturnError                      int64
 	LastSearchSince                  int64
 	LastSearchLimit                  int
 }

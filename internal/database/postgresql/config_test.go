@@ -98,30 +98,30 @@ func TestUpdateNostrNotificationConfig_PersistsNpubsAndFlags(t *testing.T) {
 
 	if updatedNostrConfig == nil {
 		t.Fatal("expected nostr notification config row")
-	}
+	} else {
+		if !updatedNostrConfig.NOSTR_NOTIFICATIONS {
+			t.Fatal("expected nostr notifications to be enabled")
+		}
 
-	if !updatedNostrConfig.NOSTR_NOTIFICATIONS {
-		t.Fatal("expected nostr notifications to be enabled")
-	}
+		if !updatedNostrConfig.NOSTR_NOTIFICATION_NIP04_DM {
+			t.Fatal("expected nostr notification NIP-04 DM flag to be enabled")
+		}
 
-	if !updatedNostrConfig.NOSTR_NOTIFICATION_NIP04_DM {
-		t.Fatal("expected nostr notification NIP-04 DM flag to be enabled")
-	}
+		if len(updatedNostrConfig.NOSTR_NOTIFICATION_NSEC) != 0 {
+			t.Fatal("expected nostr notification nsec to stay out of database reads")
+		}
 
-	if len(updatedNostrConfig.NOSTR_NOTIFICATION_NSEC) != 0 {
-		t.Fatal("expected nostr notification nsec to stay out of database reads")
-	}
+		if len(updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS) != 2 {
+			t.Fatalf("expected 2 stored npubs, got %d", len(updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS))
+		}
 
-	if len(updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS) != 2 {
-		t.Fatalf("expected 2 stored npubs, got %d", len(updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS))
-	}
+		if updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS[0].ToHex() != npub1.ToHex() {
+			t.Fatalf("first stored npub mismatch: got %s want %s", updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS[0].ToHex(), npub1.ToHex())
+		}
 
-	if updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS[0].ToHex() != npub1.ToHex() {
-		t.Fatalf("first stored npub mismatch: got %s want %s", updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS[0].ToHex(), npub1.ToHex())
-	}
-
-	if updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS[1].ToHex() != npub2.ToHex() {
-		t.Fatalf("second stored npub mismatch: got %s want %s", updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS[1].ToHex(), npub2.ToHex())
+		if updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS[1].ToHex() != npub2.ToHex() {
+			t.Fatalf("second stored npub mismatch: got %s want %s", updatedNostrConfig.NOSTR_NOTIFICATION_NPUBS[1].ToHex(), npub2.ToHex())
+		}
 	}
 }
 
@@ -227,13 +227,13 @@ func TestUpdateNostrNotificationConfig_PreservesDisabledRow(t *testing.T) {
 
 	if loadedConfig == nil {
 		t.Fatal("expected disabled nostr notification row to remain present")
-	}
+	} else {
+		if loadedConfig.NOSTR_NOTIFICATIONS {
+			t.Fatal("expected nostr notifications to remain disabled")
+		}
 
-	if loadedConfig.NOSTR_NOTIFICATIONS {
-		t.Fatal("expected nostr notifications to remain disabled")
-	}
-
-	if len(loadedConfig.NOSTR_NOTIFICATION_NPUBS) != 1 {
-		t.Fatalf("expected 1 stored npub, got %d", len(loadedConfig.NOSTR_NOTIFICATION_NPUBS))
+		if len(loadedConfig.NOSTR_NOTIFICATION_NPUBS) != 1 {
+			t.Fatalf("expected 1 stored npub, got %d", len(loadedConfig.NOSTR_NOTIFICATION_NPUBS))
+		}
 	}
 }
