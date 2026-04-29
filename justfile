@@ -172,9 +172,9 @@ test *args:
     set -euo pipefail
     echo "Running tests..."
     if [ -z "{{args}}" ]; then
-        CGO_ENABLED=1 CGO_LDFLAGS="-L./internal/lightning/ldk/ldk_node/lib -lldk_node -lm" go test -v ./...
+        CGO_ENABLED=1 go test -v ./...
     else
-        CGO_ENABLED=1 CGO_LDFLAGS="-L./internal/lightning/ldk/ldk_node/lib -lldk_node -lm" go test -v {{args}}
+        CGO_ENABLED=1 go test -v {{args}}
     fi
 
 # Lint prerequisites
