@@ -31,6 +31,10 @@ templ LightningConnectionSettings(config utils.Config) {
 				<select hx-trigger="change, load" hx-post="/admin/lightningdata" hx-target="#lightning-data" hx-include="closest form" name="MINT_LIGHTNING_BACKEND">
 					<option value="FakeWallet" selected?={ config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET }>Fake Wallet</option>
 					<option
+						value="LDK"
+						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LDK }
+					>Embedded LDK Node</option>
+					<option
 						value="LndGrpcWallet"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNDGRPC }
 					>LND Grpc wallet</option>
@@ -46,10 +50,6 @@ templ LightningConnectionSettings(config utils.Config) {
 						value="Strike"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.Strike }
 					>Strike (deprecated, will be removed in v0.7.0)</option>
-					<option
-						value="LDK"
-						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LDK }
-					>Embedded LDK Node</option>
 				</select>
 			</label>
 		</div>
