@@ -79,7 +79,19 @@ func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig,
 			return ldk.PersistedConfig{}, fmt.Errorf("electrum server url is required")
 		}
 
-		persistedConfig, err := ldk.NewPersistedConfigWithChainSource(ldk.ChainSourceElectrum, config.Rpc, electrumServerURL, configDirectory)
+		persistedConfig, err := ldk.NewPersistedConfigWithChainSource(ldk.ChainSourceElectrum, config.Rpc, electrumServerURL, config.EsploraServerURL, configDirectory)
+		if err != nil {
+			return ldk.PersistedConfig{}, fmt.Errorf("ldk.NewPersistedConfigWithChainSource(...): %w", err)
+		}
+
+		return persistedConfig, nil
+	case ldk.ChainSourceEsplora:
+		esploraServerURL := strings.TrimSpace(c.Request.PostFormValue("ESPLORA_SERVER_URL"))
+		if esploraServerURL == "" {
+			return ldk.PersistedConfig{}, fmt.Errorf("esplora server url is required")
+		}
+
+		persistedConfig, err := ldk.NewPersistedConfigWithChainSource(ldk.ChainSourceEsplora, config.Rpc, config.ElectrumServerURL, esploraServerURL, configDirectory)
 		if err != nil {
 			return ldk.PersistedConfig{}, fmt.Errorf("ldk.NewPersistedConfigWithChainSource(...): %w", err)
 		}
@@ -119,7 +131,7 @@ func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig,
 			Port:     uint16(portValue),
 			Username: username,
 			Password: password,
-		}, config.ElectrumServerURL, configDirectory)
+		}, config.ElectrumServerURL, config.EsploraServerURL, configDirectory)
 		if err != nil {
 			return ldk.PersistedConfig{}, fmt.Errorf("ldk.NewPersistedConfigWithChainSource(...): %w", err)
 		}
@@ -133,6 +145,7 @@ func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig,
 func ldkConfigsEqual(current ldk.PersistedConfig, incoming ldk.PersistedConfig) bool {
 	return current.ChainSourceType == incoming.ChainSourceType &&
 		current.ElectrumServerURL == incoming.ElectrumServerURL &&
+		current.EsploraServerURL == incoming.EsploraServerURL &&
 		current.Rpc.Address == incoming.Rpc.Address &&
 		current.Rpc.Port == incoming.Rpc.Port &&
 		current.Rpc.Username == incoming.Rpc.Username &&
@@ -933,6 +946,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				ConfigDirectory:   defaultConfigDirectory,
 				ChainSourceType:   ldk.ChainSourceBitcoind,
 				ElectrumServerURL: "",
+				EsploraServerURL:  "",
 				Rpc: ldk.RPCConfig{
 					Address:  "",
 					Username: "",

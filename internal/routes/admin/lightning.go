@@ -38,6 +38,7 @@ func getLDKFormValues(c *gin.Context, mint *m.Mint) templates.LDKFormValues {
 		Username:          "",
 		Password:          "",
 		ElectrumServerURL: "",
+		EsploraServerURL:  "",
 	}
 
 	persistedConfig, err := ldk.GetPersistedConfig(c.Request.Context(), mint.MintDB)
@@ -49,6 +50,7 @@ func getLDKFormValues(c *gin.Context, mint *m.Mint) templates.LDKFormValues {
 		}
 		formValues.Username = persistedConfig.Rpc.Username
 		formValues.ElectrumServerURL = persistedConfig.ElectrumServerURL
+		formValues.EsploraServerURL = persistedConfig.EsploraServerURL
 	}
 
 	if value := requestFormValue(c, "LDK_CHAIN_SOURCE_TYPE"); value != "" {
@@ -69,6 +71,9 @@ func getLDKFormValues(c *gin.Context, mint *m.Mint) templates.LDKFormValues {
 	if value := requestFormValue(c, "ELECTRUM_SERVER_URL"); value != "" {
 		formValues.ElectrumServerURL = value
 	}
+	if value := requestFormValue(c, "ESPLORA_SERVER_URL"); value != "" {
+		formValues.EsploraServerURL = value
+	}
 
 	return formValues
 }
@@ -78,6 +83,9 @@ func requestFormValue(c *gin.Context, key string) string {
 }
 
 func normalizeLDKChainSourceType(chainSourceType string) string {
+	if strings.EqualFold(strings.TrimSpace(chainSourceType), string(ldk.ChainSourceEsplora)) {
+		return string(ldk.ChainSourceEsplora)
+	}
 	if strings.EqualFold(strings.TrimSpace(chainSourceType), string(ldk.ChainSourceElectrum)) {
 		return string(ldk.ChainSourceElectrum)
 	}

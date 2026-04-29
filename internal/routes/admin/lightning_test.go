@@ -21,6 +21,7 @@ func TestGetLDKFormValuesUsesPersistedConfigWithoutActiveBackend(t *testing.T) {
 		ldk.ChainSourceElectrum,
 		ldk.RPCConfig{Address: "127.0.0.1", Port: 18443, Username: "user", Password: "pass"},
 		"ssl://electrum.example:50002",
+		"",
 		configDirectory,
 	)
 	if err != nil {
@@ -87,5 +88,42 @@ func TestGetLDKFormValuesPrefersRequestValues(t *testing.T) {
 	}
 	if formValues.ElectrumServerURL != "ssl://override.example:50002" {
 		t.Fatalf("unexpected overridden electrum url: %q", formValues.ElectrumServerURL)
+	}
+}
+
+func TestGetLDKFormValuesSupportsEsploraValues(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	configDirectory := t.TempDir()
+	db := &mockdb.MockDB{}
+	persistedConfig, err := ldk.NewPersistedConfig(ldk.RPCConfig{
+		Address:  "127.0.0.1",
+		Port:     18443,
+		Username: "user",
+		Password: "pass",
+	}, configDirectory)
+	if err != nil {
+		t.Fatalf("ldk.NewPersistedConfig(...): %v", err)
+	}
+	if err := ldk.SaveConfig(context.Background(), db, persistedConfig); err != nil {
+		t.Fatalf("ldk.SaveConfig(...): %v", err)
+	}
+
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceEsplora))
+	values.Set("ESPLORA_SERVER_URL", "https://mempool.space/api")
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	req := httptest.NewRequest(http.MethodPost, "/admin/lightningdata", nil)
+	req.PostForm = values
+	req.Form = values
+	c.Request = req
+
+	formValues := getLDKFormValues(c, &m.Mint{MintDB: db})
+	if formValues.ChainSourceType != string(ldk.ChainSourceEsplora) {
+		t.Fatalf("unexpected chain source type: %q", formValues.ChainSourceType)
+	}
+	if formValues.EsploraServerURL != "https://mempool.space/api" {
+		t.Fatalf("unexpected overridden esplora url: %q", formValues.EsploraServerURL)
 	}
 }

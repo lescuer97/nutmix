@@ -100,6 +100,8 @@ func (l *LDK) InitNode(ctx context.Context) error {
 	switch config.ChainSourceType {
 	case ChainSourceElectrum:
 		builder.SetChainSourceElectrum(config.ElectrumServerURL, nil)
+	case ChainSourceEsplora:
+		builder.SetChainSourceEsplora(config.EsploraServerURL, forcedEsploraSyncConfig())
 	case ChainSourceBitcoind:
 		builder.SetChainSourceBitcoindRpc(
 			config.Rpc.Address,
@@ -123,6 +125,23 @@ func (l *LDK) InitNode(ctx context.Context) error {
 
 	l.node = node
 	return nil
+}
+
+func forcedEsploraSyncConfig() *ldk_node.EsploraSyncConfig {
+	return &ldk_node.EsploraSyncConfig{
+		BackgroundSyncConfig: &ldk_node.BackgroundSyncConfig{
+			OnchainWalletSyncIntervalSecs:   80,
+			LightningWalletSyncIntervalSecs: 30,
+			FeeRateCacheUpdateIntervalSecs:  600,
+		},
+		TimeoutsConfig: ldk_node.SyncTimeoutsConfig{
+			OnchainWalletSyncTimeoutSecs:   60,
+			LightningWalletSyncTimeoutSecs: 30,
+			FeeRateCacheUpdateTimeoutSecs:  10,
+			TxBroadcastTimeoutSecs:         10,
+			PerRequestTimeoutSecs:          10,
+		},
+	}
 }
 
 func (l *LDK) SpinUp() error {

@@ -35,6 +35,24 @@ func mustElectrumPersistedConfig(t *testing.T, configDirectory string) Persisted
 		ChainSourceElectrum,
 		RPCConfig{},
 		"ssl://electrum.example:50002",
+		"",
+		configDirectory,
+	)
+	if err != nil {
+		t.Fatalf("NewPersistedConfigWithChainSource(...): %v", err)
+	}
+
+	return config
+}
+
+func mustEsploraPersistedConfig(t *testing.T, configDirectory string) PersistedConfig {
+	t.Helper()
+
+	config, err := NewPersistedConfigWithChainSource(
+		ChainSourceEsplora,
+		RPCConfig{},
+		"",
+		"https://blockstream.info/api",
 		configDirectory,
 	)
 	if err != nil {
@@ -172,6 +190,17 @@ func TestValidatePersistedConfigRequiresElectrumServerURL(t *testing.T) {
 	}
 }
 
+func TestValidatePersistedConfigRequiresEsploraServerURL(t *testing.T) {
+	configDirectory := t.TempDir()
+	err := validatePersistedConfig(PersistedConfig{
+		ChainSourceType: ChainSourceEsplora,
+		ConfigDirectory: configDirectory,
+	})
+	if err == nil {
+		t.Fatalf("expected error when esplora server url is empty")
+	}
+}
+
 func TestPrepareInitConfigReturnsElectrumConfig(t *testing.T) {
 	ctx := context.Background()
 	configDirectory := t.TempDir()
@@ -200,10 +229,80 @@ func TestPrepareInitConfigReturnsElectrumConfig(t *testing.T) {
 	}
 }
 
+func TestPrepareInitConfigReturnsEsploraConfig(t *testing.T) {
+	ctx := context.Background()
+	configDirectory := t.TempDir()
+	db := &mockdb.MockDB{}
+	err := SaveConfig(ctx, db, mustEsploraPersistedConfig(t, configDirectory))
+	if err != nil {
+		t.Fatalf("SaveConfig(...): %v", err)
+	}
+
+	backend := &LDK{node: nil, db: db, network: "testnet3"}
+	_, storageDir, network, config, err := backend.prepareInitConfig(ctx)
+	if err != nil {
+		t.Fatalf("backend.prepareInitConfig(ctx): %v", err)
+	}
+	if storageDir != configDirectory {
+		t.Fatalf("storageDir = %q, want %q", storageDir, configDirectory)
+	}
+	if network != ldk_node.NetworkTestnet {
+		t.Fatalf("expected testnet network, got %v", network)
+	}
+	if config.ChainSourceType != ChainSourceEsplora {
+		t.Fatalf("expected esplora chain source type, got %q", config.ChainSourceType)
+	}
+	if config.EsploraServerURL != "https://blockstream.info/api" {
+		t.Fatalf("unexpected esplora server url: %q", config.EsploraServerURL)
+	}
+}
+
 func TestNewPersistedConfigWithChainSourceRejectsInvalidElectrumURL(t *testing.T) {
-	_, err := NewPersistedConfigWithChainSource(ChainSourceElectrum, RPCConfig{}, "electrum.example:50002", t.TempDir())
+	_, err := NewPersistedConfigWithChainSource(ChainSourceElectrum, RPCConfig{}, "electrum.example:50002", "", t.TempDir())
 	if err == nil {
 		t.Fatal("expected invalid electrum url error")
+	}
+}
+
+func TestNewPersistedConfigWithChainSourceRejectsInvalidEsploraURL(t *testing.T) {
+	_, err := NewPersistedConfigWithChainSource(ChainSourceEsplora, RPCConfig{}, "", "esplora.example/api", t.TempDir())
+	if err == nil {
+		t.Fatal("expected invalid esplora url error")
+	}
+}
+
+func TestForcedEsploraSyncConfigUsesDocumentedDefaults(t *testing.T) {
+	config := forcedEsploraSyncConfig()
+	if config == nil {
+		t.Fatal("expected forced Esplora sync config")
+	}
+	if config.BackgroundSyncConfig == nil {
+		t.Fatal("expected background sync config")
+	}
+
+	if config.BackgroundSyncConfig.OnchainWalletSyncIntervalSecs != 80 {
+		t.Fatalf("unexpected onchain wallet sync interval: %d", config.BackgroundSyncConfig.OnchainWalletSyncIntervalSecs)
+	}
+	if config.BackgroundSyncConfig.LightningWalletSyncIntervalSecs != 30 {
+		t.Fatalf("unexpected lightning wallet sync interval: %d", config.BackgroundSyncConfig.LightningWalletSyncIntervalSecs)
+	}
+	if config.BackgroundSyncConfig.FeeRateCacheUpdateIntervalSecs != 600 {
+		t.Fatalf("unexpected fee rate cache update interval: %d", config.BackgroundSyncConfig.FeeRateCacheUpdateIntervalSecs)
+	}
+	if config.TimeoutsConfig.OnchainWalletSyncTimeoutSecs != 60 {
+		t.Fatalf("unexpected onchain wallet sync timeout: %d", config.TimeoutsConfig.OnchainWalletSyncTimeoutSecs)
+	}
+	if config.TimeoutsConfig.LightningWalletSyncTimeoutSecs != 30 {
+		t.Fatalf("unexpected lightning wallet sync timeout: %d", config.TimeoutsConfig.LightningWalletSyncTimeoutSecs)
+	}
+	if config.TimeoutsConfig.FeeRateCacheUpdateTimeoutSecs != 10 {
+		t.Fatalf("unexpected fee rate cache update timeout: %d", config.TimeoutsConfig.FeeRateCacheUpdateTimeoutSecs)
+	}
+	if config.TimeoutsConfig.TxBroadcastTimeoutSecs != 10 {
+		t.Fatalf("unexpected tx broadcast timeout: %d", config.TimeoutsConfig.TxBroadcastTimeoutSecs)
+	}
+	if config.TimeoutsConfig.PerRequestTimeoutSecs != 10 {
+		t.Fatalf("unexpected per request timeout: %d", config.TimeoutsConfig.PerRequestTimeoutSecs)
 	}
 }
 

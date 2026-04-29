@@ -645,6 +645,30 @@ func TestParseLDKPersistedConfigElectrum(t *testing.T) {
 	}
 }
 
+func TestParseLDKPersistedConfigEsplora(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceEsplora))
+	values.Set("ESPLORA_SERVER_URL", "https://blockstream.info/api")
+
+	c := newPostContext(values)
+	existingConfig := mustBitcoindPersistedConfigForAdminTest(t, configDirectory)
+
+	config, err := parseLDKPersistedConfig(c, existingConfig, configDirectory)
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(c): %v", err)
+	}
+	if config.ChainSourceType != ldk.ChainSourceEsplora {
+		t.Fatalf("unexpected chain source type: %q", config.ChainSourceType)
+	}
+	if config.EsploraServerURL != "https://blockstream.info/api" {
+		t.Fatalf("unexpected esplora server url: %q", config.EsploraServerURL)
+	}
+	if config.Rpc.Password != existingConfig.Rpc.Password {
+		t.Fatalf("expected inactive bitcoind config to be preserved")
+	}
+}
+
 func TestParseLDKPersistedConfigRejectsInvalidPort(t *testing.T) {
 	configDirectory := t.TempDir()
 	values := url.Values{}
@@ -673,6 +697,20 @@ func TestParseLDKPersistedConfigRejectsInvalidElectrumURL(t *testing.T) {
 	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
 	if err == nil {
 		t.Fatalf("expected invalid electrum url error")
+	}
+}
+
+func TestParseLDKPersistedConfigRejectsInvalidEsploraURL(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceEsplora))
+	values.Set("ESPLORA_SERVER_URL", "blockstream.info/api")
+
+	c := newPostContext(values)
+
+	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
+	if err == nil {
+		t.Fatalf("expected invalid esplora url error")
 	}
 }
 
@@ -717,6 +755,13 @@ func TestLDKConfigsEqual(t *testing.T) {
 	b = a
 	b.ChainSourceType = ldk.ChainSourceElectrum
 	b.ElectrumServerURL = "ssl://electrum.example:50002"
+	if ldkConfigsEqual(a, b) {
+		t.Fatalf("expected chain source types to differ")
+	}
+
+	b = a
+	b.ChainSourceType = ldk.ChainSourceEsplora
+	b.EsploraServerURL = "https://blockstream.info/api"
 	if ldkConfigsEqual(a, b) {
 		t.Fatalf("expected chain source types to differ")
 	}

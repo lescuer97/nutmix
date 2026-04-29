@@ -67,6 +67,7 @@ type LDKFormValues struct {
 	Username          string
 	Password          string
 	ElectrumServerURL string
+	EsploraServerURL  string
 }
 
 templ SetupForms(lightningBackend string, config utils.Config, resources LDKResourceSnapshot, ldkForm LDKFormValues) {
@@ -151,6 +152,19 @@ templ Ldk(form LDKFormValues, resources LDKResourceSnapshot) {
 						/>
 						<span>Electrum</span>
 					</label>
+					<label class={ "ldk-chain-source-option", templ.KV("is-selected", form.ChainSourceType == string(ldk.ChainSourceEsplora)) }>
+						<input
+							type="radio"
+							name="LDK_CHAIN_SOURCE_TYPE"
+							value={ string(ldk.ChainSourceEsplora) }
+							checked?={ form.ChainSourceType == string(ldk.ChainSourceEsplora) }
+							hx-post="/admin/lightningdata"
+							hx-target="#lightning-data"
+							hx-include="closest form"
+							hx-swap="innerHTML"
+						/>
+						<span>Esplora</span>
+					</label>
 				</div>
 			</div>
 			if form.ChainSourceType == string(ldk.ChainSourceElectrum) {
@@ -158,14 +172,28 @@ templ Ldk(form LDKFormValues, resources LDKResourceSnapshot) {
 				<input type="hidden" name="BITCOIN_NODE_RPC_PORT" value={ form.Port }/>
 				<input type="hidden" name="BITCOIN_NODE_RPC_USERNAME" value={ form.Username }/>
 				<input type="hidden" name="BITCOIN_NODE_RPC_PASSWORD" value={ form.Password }/>
+				<input type="hidden" name="ESPLORA_SERVER_URL" value={ form.EsploraServerURL }/>
 				<div style="display: flex; flex-wrap: wrap; gap: var(--space-4); width: 100%;">
 					<label for="ELECTRUM_SERVER_URL" class="settings-input" style="flex: 1 1 100%; min-width: 280px;">
 						Electrum Server URL
 						<input type="text" required name="ELECTRUM_SERVER_URL" value={ form.ElectrumServerURL } placeholder="ssl://electrum.blockstream.info:50002"/>
 					</label>
 				</div>
+			} else if form.ChainSourceType == string(ldk.ChainSourceEsplora) {
+				<input type="hidden" name="BITCOIN_NODE_RPC_ADDRESS" value={ form.Address }/>
+				<input type="hidden" name="BITCOIN_NODE_RPC_PORT" value={ form.Port }/>
+				<input type="hidden" name="BITCOIN_NODE_RPC_USERNAME" value={ form.Username }/>
+				<input type="hidden" name="BITCOIN_NODE_RPC_PASSWORD" value={ form.Password }/>
+				<input type="hidden" name="ELECTRUM_SERVER_URL" value={ form.ElectrumServerURL }/>
+				<div style="display: flex; flex-wrap: wrap; gap: var(--space-4); width: 100%;">
+					<label for="ESPLORA_SERVER_URL" class="settings-input" style="flex: 1 1 100%; min-width: 280px;">
+						Esplora Server URL
+						<input type="text" required name="ESPLORA_SERVER_URL" value={ form.EsploraServerURL } placeholder="https://blockstream.info/api"/>
+					</label>
+				</div>
 			} else {
 				<input type="hidden" name="ELECTRUM_SERVER_URL" value={ form.ElectrumServerURL }/>
+				<input type="hidden" name="ESPLORA_SERVER_URL" value={ form.EsploraServerURL }/>
 				<div style="display: flex; flex-wrap: wrap; gap: var(--space-4); width: 100%;">
 					<label for="BITCOIN_NODE_RPC_ADDRESS" class="settings-input" style="flex: 1 1 calc(50% - var(--space-4)); min-width: 280px;">
 						Bitcoin Core RPC Address

@@ -26,12 +26,14 @@ type ChainSourceType string
 const (
 	ChainSourceBitcoind ChainSourceType = "bitcoind"
 	ChainSourceElectrum ChainSourceType = "electrum"
+	ChainSourceEsplora  ChainSourceType = "esplora"
 )
 
 type PersistedConfig struct {
 	ConfigDirectory   string
 	ChainSourceType   ChainSourceType
 	ElectrumServerURL string
+	EsploraServerURL  string
 	Rpc               RPCConfig
 }
 
@@ -51,14 +53,15 @@ func DefaultConfigDirectory() (string, error) {
 }
 
 func NewPersistedConfig(rpc RPCConfig, configDirectory string) (PersistedConfig, error) {
-	return NewPersistedConfigWithChainSource(ChainSourceBitcoind, rpc, "", configDirectory)
+	return NewPersistedConfigWithChainSource(ChainSourceBitcoind, rpc, "", "", configDirectory)
 }
 
-func NewPersistedConfigWithChainSource(chainSourceType ChainSourceType, rpc RPCConfig, electrumServerURL string, configDirectory string) (PersistedConfig, error) {
+func NewPersistedConfigWithChainSource(chainSourceType ChainSourceType, rpc RPCConfig, electrumServerURL string, esploraServerURL string, configDirectory string) (PersistedConfig, error) {
 	return normalizePersistedConfig(PersistedConfig{
 		ConfigDirectory:   configDirectory,
 		ChainSourceType:   chainSourceType,
 		ElectrumServerURL: electrumServerURL,
+		EsploraServerURL:  esploraServerURL,
 		Rpc:               rpc,
 	})
 }
@@ -70,6 +73,7 @@ func normalizePersistedConfig(config PersistedConfig) (PersistedConfig, error) {
 	}
 	config.ChainSourceType = chainSourceType
 	config.ElectrumServerURL = strings.TrimSpace(config.ElectrumServerURL)
+	config.EsploraServerURL = strings.TrimSpace(config.EsploraServerURL)
 	config.Rpc.Address = strings.TrimSpace(config.Rpc.Address)
 	config.Rpc.Username = strings.TrimSpace(config.Rpc.Username)
 	config.Rpc.Password = strings.TrimSpace(config.Rpc.Password)
@@ -94,28 +98,36 @@ func normalizeChainSourceType(chainSourceType ChainSourceType) (ChainSourceType,
 	}
 
 	switch normalizedChainSourceType {
-	case ChainSourceBitcoind, ChainSourceElectrum:
+	case ChainSourceBitcoind, ChainSourceElectrum, ChainSourceEsplora:
 		return normalizedChainSourceType, nil
 	default:
 		return "", fmt.Errorf("unknown chain source type %q", chainSourceType)
 	}
 }
 
-func ValidateElectrumServerURL(electrumServerURL string) error {
-	trimmedElectrumServerURL := strings.TrimSpace(electrumServerURL)
-	if trimmedElectrumServerURL == "" {
-		return fmt.Errorf("electrum server url is required")
+func validateServerURL(serverType string, serverURL string) error {
+	trimmedServerURL := strings.TrimSpace(serverURL)
+	if trimmedServerURL == "" {
+		return fmt.Errorf("%s server url is required", serverType)
 	}
 
-	parsedURL, err := url.Parse(trimmedElectrumServerURL)
+	parsedURL, err := url.Parse(trimmedServerURL)
 	if err != nil {
-		return fmt.Errorf("electrum server url is invalid: %w", err)
+		return fmt.Errorf("%s server url is invalid: %w", serverType, err)
 	}
 	if parsedURL.Scheme == "" || parsedURL.Host == "" {
-		return fmt.Errorf("electrum server url must include a scheme and host")
+		return fmt.Errorf("%s server url must include a scheme and host", serverType)
 	}
 
 	return nil
+}
+
+func ValidateElectrumServerURL(electrumServerURL string) error {
+	return validateServerURL("electrum", electrumServerURL)
+}
+
+func ValidateEsploraServerURL(esploraServerURL string) error {
+	return validateServerURL("esplora", esploraServerURL)
 }
 
 func normalizeConfigDirectory(configDirectory string) (string, error) {
@@ -163,6 +175,7 @@ func GetPersistedConfig(ctx context.Context, db database.MintDB) (PersistedConfi
 		ConfigDirectory:   config.ConfigDirectory,
 		ChainSourceType:   ChainSourceType(config.ChainSourceType),
 		ElectrumServerURL: config.ElectrumServerURL,
+		EsploraServerURL:  config.EsploraServerURL,
 		Rpc:               RPCConfig(config.Rpc),
 	})
 	if err != nil {
@@ -187,6 +200,7 @@ func SaveConfig(ctx context.Context, db database.MintDB, config PersistedConfig)
 		ConfigDirectory:   normalizedConfig.ConfigDirectory,
 		ChainSourceType:   database.LDKChainSourceType(normalizedConfig.ChainSourceType),
 		ElectrumServerURL: normalizedConfig.ElectrumServerURL,
+		EsploraServerURL:  normalizedConfig.EsploraServerURL,
 		Rpc:               database.LDKRPCConfig(normalizedConfig.Rpc),
 	}); err != nil {
 		return fmt.Errorf("db.SetLDKConfig(ctx, config): %w", err)

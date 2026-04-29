@@ -66,6 +66,10 @@ func validatePersistedConfig(config PersistedConfig) error {
 		if err := ValidateElectrumServerURL(config.ElectrumServerURL); err != nil {
 			return err
 		}
+	case ChainSourceEsplora:
+		if err := ValidateEsploraServerURL(config.EsploraServerURL); err != nil {
+			return err
+		}
 	case ChainSourceBitcoind:
 		if strings.TrimSpace(config.Rpc.Address) == "" {
 			return fmt.Errorf("rpc address is empty")

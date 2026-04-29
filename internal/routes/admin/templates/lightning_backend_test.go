@@ -43,7 +43,7 @@ func TestSetupFormsLDKIncludesChainSourceToggle(t *testing.T) {
 	}
 
 	out := b.String()
-	for _, field := range []string{"LDK_CHAIN_SOURCE_TYPE", "Bitcoin Core", "Electrum", "hx-post=\"/admin/lightningdata\""} {
+	for _, field := range []string{"LDK_CHAIN_SOURCE_TYPE", "Bitcoin Core", "Electrum", "Esplora", "hx-post=\"/admin/lightningdata\""} {
 		if !strings.Contains(out, field) {
 			t.Fatalf("expected field %s in LDK setup form", field)
 		}
@@ -108,6 +108,34 @@ func TestSetupFormsLDKIncludesElectrumFields(t *testing.T) {
 	for _, field := range []string{"Electrum Server URL", "ELECTRUM_SERVER_URL", "ssl://electrum.example:50002", "type=\"hidden\" name=\"BITCOIN_NODE_RPC_PASSWORD\" value=\"hidden-pass\""} {
 		if !strings.Contains(out, field) {
 			t.Fatalf("expected field %s in LDK electrum setup form", field)
+		}
+	}
+}
+
+func TestSetupFormsLDKIncludesEsploraFields(t *testing.T) {
+	var config utils.Config
+	config.Default()
+	resources := DefaultLDKResourceSnapshot()
+
+	var b bytes.Buffer
+	ldkForm := LDKFormValues{
+		ChainSourceType:   string(ldk.ChainSourceEsplora),
+		Address:           "127.0.0.1",
+		Port:              "18443",
+		Username:          "bitcoinrpc",
+		Password:          "hidden-pass",
+		EsploraServerURL:  "https://blockstream.info/api",
+		ElectrumServerURL: "ssl://electrum.example:50002",
+	}
+
+	if err := SetupForms(string(utils.LDK), config, resources, ldkForm).Render(context.Background(), &b); err != nil {
+		t.Fatalf("SetupForms(LDK, config).Render: %v", err)
+	}
+
+	out := b.String()
+	for _, field := range []string{"Esplora", "Esplora Server URL", "ESPLORA_SERVER_URL", "https://blockstream.info/api", "type=\"hidden\" name=\"ELECTRUM_SERVER_URL\" value=\"ssl://electrum.example:50002\""} {
+		if !strings.Contains(out, field) {
+			t.Fatalf("expected field %s in LDK esplora setup form", field)
 		}
 	}
 }

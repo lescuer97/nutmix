@@ -35,12 +35,14 @@ type LDKChainSourceType string
 const (
 	LDKChainSourceBitcoind LDKChainSourceType = "bitcoind"
 	LDKChainSourceElectrum LDKChainSourceType = "electrum"
+	LDKChainSourceEsplora  LDKChainSourceType = "esplora"
 )
 
 type LDKConfig struct {
 	ConfigDirectory   string
 	ChainSourceType   LDKChainSourceType
 	ElectrumServerURL string
+	EsploraServerURL  string
 	Rpc               LDKRPCConfig
 }
 
