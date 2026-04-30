@@ -191,11 +191,13 @@ func (l *LDK) Stop() error {
 
 	err := node.Stop()
 	if doneCh != nil {
-		if node.Status().IsRunning {
-			<-doneCh
-		} else {
-			l.finishRun(doneCh)
+		<-doneCh
+
+		l.mu.Lock()
+		if l.doneCh == nil && l.node == node {
+			l.node = nil
 		}
+		l.mu.Unlock()
 	}
 
 	return err
