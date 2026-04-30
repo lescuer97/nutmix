@@ -1,0 +1,515 @@
+package templates
+
+import "strconv"
+import "strings"
+
+templ LdkBalancesCard(totalOnchain string, availableOnchain string) {
+	<div id="ldk-balances-card" class="ldk-summary-grid">
+		@LdkSummaryMetricCard("ldk-total-onchain-balance", "Total On-chain", totalOnchain, "")
+		@LdkSummaryMetricCard("ldk-available-onchain-balance", "Available On-chain", availableOnchain, "")
+	</div>
+}
+
+templ LdkBalancesCardError(message string) {
+	<div id="ldk-balances-card" class="ldk-summary-grid">
+		<div class="card p-6 ldk-summary-card ldk-summary-card-error ldk-summary-card-full">
+			<p class="text-secondary text-sm uppercase">Balances unavailable</p>
+			<p class="ldk-summary-value ldk-balance-error-message">{ message }</p>
+		</div>
+	</div>
+}
+
+templ LdkNetworkSummaryCard(lightning string, totalPeers int, activePeers int, totalChannels int, activeChannels int) {
+	<div class="ldk-summary-grid">
+		@LdkSummaryMetricCard("ldk-lightning-balance", "Lightning balance", lightning, "")
+		@LdkSummaryMetricCard("ldk-connected-peers", "Connected Peers", strconv.Itoa(activePeers)+" / "+strconv.Itoa(totalPeers), "active / total")
+		@LdkSummaryMetricCard("ldk-channels-summary", "Channels", strconv.Itoa(activeChannels)+" / "+strconv.Itoa(totalChannels), "active / total")
+	</div>
+}
+
+templ LdkNetworkSummaryCardError(message string) {
+	<div class="ldk-summary-grid">
+		<div class="card p-6 ldk-summary-card ldk-summary-card-error ldk-summary-card-full">
+			<p class="text-secondary text-sm uppercase">Network summary unavailable</p>
+			<p class="ldk-summary-value ldk-balance-error-message">{ message }</p>
+		</div>
+	</div>
+}
+
+templ LdkSummaryMetricCard(id string, label string, value string, supportingText string) {
+	<div id={ id } class="card p-6 ldk-summary-card">
+		<p class="text-secondary text-sm uppercase">{ label }</p>
+		<div class="ldk-summary-value">
+			@LdkAmountValue(value, "ldk-amount-value-inline")
+		</div>
+		if supportingText != "" {
+			<p class="text-secondary text-sm ldk-summary-support">{ supportingText }</p>
+		} else {
+			<p class="text-secondary text-sm ldk-summary-support ldk-summary-support-placeholder" aria-hidden="true">-</p>
+		}
+	</div>
+}
+
+templ LdkAmountValue(value string, extraClass string) {
+	{{ amountText := value }}
+	{{ hasSatsSuffix := false }}
+	if strings.HasSuffix(value, " sats") {
+		{{ amountText = strings.TrimSuffix(value, " sats") }}
+		{{ hasSatsSuffix = true }}
+	}
+	<span class={ "ldk-amount-value " + extraClass }>
+		<span class="ldk-amount-number">{ amountText }</span>
+		if hasSatsSuffix {
+			<span class="ldk-amount-unit">sats</span>
+		}
+	</span>
+}
+
+templ LdkOnchainActionsCard() {
+	<div class="ldk-dashboard-actions">
+		<div class="ldk-action-buttons">
+			<button
+				type="button"
+				class="btn btn-secondary ldk-action-button"
+				hx-get="/admin/ldk/onchain/address"
+				hx-target="#ldk-action-panel"
+				hx-swap="outerHTML"
+			>
+				<span class="btn-label">Generate on-chain address</span>
+				<span class="ldk-action-button-indicator htmx-indicator"><span class="loading-spinner"></span></span>
+			</button>
+			<button
+				type="button"
+				class="btn btn-primary ldk-action-button"
+				hx-get="/admin/ldk/onchain/send-form"
+				hx-target="#ldk-action-panel"
+				hx-swap="outerHTML"
+			>
+				<span class="btn-label">Send on-chain</span>
+				<span class="ldk-action-button-indicator htmx-indicator"><span class="loading-spinner"></span></span>
+			</button>
+		</div>
+		<div id="ldk-action-panel"></div>
+	</div>
+}
+
+templ LdkLightningActionsCard() {
+	<div class="ldk-dashboard-actions">
+		<div class="ldk-action-buttons">
+			<button
+				type="button"
+				class="btn btn-primary ldk-action-button"
+				hx-get="/admin/ldk/lightning/channel-form"
+				hx-target="#ldk-action-panel"
+				hx-swap="outerHTML"
+			>
+				<span class="btn-label">Open channel</span>
+				<span class="ldk-action-button-indicator htmx-indicator"><span class="loading-spinner"></span></span>
+			</button>
+		</div>
+		<div id="ldk-action-panel"></div>
+	</div>
+}
+
+templ LdkActionPanelErrorCard(message string) {
+	<div class="card p-6 ldk-action-panel ldk-action-panel-error">
+		<h3>Action unavailable</h3>
+		<p class="text-secondary mt-3">{ message }</p>
+	</div>
+}
+
+templ LdkAddressPanel(address string, qrCode string) {
+	<div class="card p-6 ldk-action-panel ldk-address-panel">
+		<div class="ldk-address-panel-header">
+			<h3>On-chain address</h3>
+		</div>
+		<div class="ldk-address-qr">
+			@QRCode(qrCode)
+		</div>
+		<div class="mt-4 ldk-address-panel-body">
+			<p class="text-secondary text-sm mb-1">Address</p>
+			<div class="p-3 bg-secondary rounded font-mono text-xs break-all text-secondary">{ address }</div>
+		</div>
+		<button
+			type="button"
+			class="btn btn-secondary btn-sm mt-3 ldk-address-copy-btn"
+			data-copy-text={ address }
+			data-copy-default-text="Copy address"
+			data-copy-success-text="Copied"
+			onclick="copyLdkText(this)"
+		>
+			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align: text-bottom; margin-right: 4px;">
+				<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+				<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+			</svg>
+			Copy address
+		</button>
+	</div>
+}
+
+templ LdkOpenChannelPanel(maxSats uint64) {
+	<div class="card p-6 ldk-action-panel">
+		<h3>Open channel</h3>
+		<p class="text-secondary text-sm mt-2">Max allowed: { strconv.FormatUint(maxSats, 10) } sats (95% of on-chain balance)</p>
+		<form
+			class="form-group mt-4"
+			hx-post="/admin/ldk/lightning/channels/open"
+			hx-target="#ldk-channels-fragment"
+			hx-swap="outerHTML"
+		>
+			<label class="settings-input" for="peer_endpoint">
+				Peer endpoint
+				<input
+					id="peer_endpoint"
+					name="peer_endpoint"
+					required
+					type="text"
+					placeholder="0280da...f05@172.29.0.2:9735"
+				/>
+			</label>
+			<label class="settings-input mt-3" for="sats_amount">
+				Sats amount
+				<input
+					id="sats_amount"
+					name="sats_amount"
+					required
+					type="number"
+					min="1"
+					max={ strconv.FormatUint(maxSats, 10) }
+					placeholder="0"
+				/>
+			</label>
+			<div class="form-actions flex justify-end mt-4">
+				<button hx-disabled-elt="this" type="submit" class="btn btn-primary btn-submit-feedback">
+					<span class="btn-label">Open channel</span>
+					<span class="btn-loading-content"><span class="loading-spinner"></span> Opening...</span>
+				</button>
+			</div>
+		</form>
+	</div>
+}
+
+templ LdkOnchainSendPanel(availableSats uint64) {
+	<div class="card p-6 ldk-action-panel">
+		<h3>Send on-chain</h3>
+		<p class="text-secondary text-sm mt-2">Max available: { strconv.FormatUint(availableSats, 10) } sats</p>
+		<form
+			class="form-group mt-4"
+			hx-post="/admin/ldk/onchain/send"
+			hx-target="#ldk-action-panel"
+			hx-swap="outerHTML"
+		>
+			<label class="settings-input" for="bitcoin_address">
+				Bitcoin address
+				<input
+					id="bitcoin_address"
+					name="bitcoin_address"
+					required
+					type="text"
+					placeholder="bc1q..."
+				/>
+			</label>
+			<label class="settings-input mt-3" for="sats_amount">
+				Sats amount
+				<input
+					id="sats_amount"
+					name="sats_amount"
+					required
+					type="number"
+					min="1"
+					max={ strconv.FormatUint(availableSats, 10) }
+					placeholder="0"
+				/>
+			</label>
+			<p class="text-secondary text-sm mt-3">Enter a Bitcoin address on the active network and an amount up to { strconv.FormatUint(availableSats, 10) } sats.</p>
+			<div class="form-actions flex justify-end mt-4">
+				<button hx-disabled-elt="this" type="submit" class="btn btn-primary btn-submit-feedback">
+					<span class="btn-label">Send on-chain</span>
+					<span class="btn-loading-content"><span class="loading-spinner"></span> Sending...</span>
+				</button>
+			</div>
+		</form>
+	</div>
+}
+
+templ LdkOnchainSendSubmittedPanel() {
+	<div class="card p-6 ldk-action-panel">
+		<h3>Send on-chain</h3>
+		<p class="text-secondary text-sm mt-2">Payment submitted. Reopen this form to send another payment.</p>
+		<div class="form-actions flex justify-end mt-4">
+			<button type="button" class="btn btn-primary" disabled>
+				<span class="btn-label">Payment sent</span>
+			</button>
+		</div>
+	</div>
+}
+
+templ LdkChannelsCard(rows []LdkChannelRow) {
+	<div class="card p-6 ldk-channels-card">
+		<div class="flex items-center justify-between gap-4 flex-wrap">
+			<div>
+				<h3>Lightning channels</h3>
+			</div>
+		</div>
+		if len(rows) == 0 {
+			<div class="ldk-channels-empty mt-4">
+				<p class="text-secondary">No channels are currently open.</p>
+			</div>
+		} else {
+			<div class="ldk-channels-list mt-4">
+				for _, row := range rows {
+					@LdkChannelListItem(row)
+				}
+			</div>
+		}
+	</div>
+}
+
+templ LdkChannelsCardLoading() {
+	<div class="card p-6 ldk-channels-card">
+		<h3>Lightning channels</h3>
+		<p class="text-secondary mt-4">Loading channels...</p>
+	</div>
+}
+
+templ LdkChannelsCardError(message string) {
+	<div class="card p-6 ldk-channels-card ldk-channels-card-error">
+		<h3>Lightning channels</h3>
+		<p class="text-secondary mt-4">{ message }</p>
+	</div>
+}
+
+templ LdkChannelListItem(row LdkChannelRow) {
+	<div class="ldk-channel-row">
+		<div class="ldk-channel-row-header">
+			<div class="ldk-channel-row-identity">
+				<p class="font-mono text-sm"><strong>{ row.CounterpartyLabel }</strong> @LdkChannelStateBadge(row.StateLabel)
+</p>
+			</div>
+			<div class="ldk-channel-row-controls">
+				if row.CanForceClose {
+					<button
+						type="button"
+						class="btn btn-secondary btn-sm btn-submit-feedback ldk-channel-force-close-btn"
+						title="Force close channel"
+						hx-post="/admin/ldk/lightning/channels/force-close"
+						hx-vals={ templ.JSONString(map[string]string{"channel_id": row.ChannelID, "counterparty_pub": row.CounterpartyPub}) }
+						hx-confirm="Force close this offline channel? Only use this when a cooperative close is unavailable."
+						hx-target="#ldk-channels-fragment"
+						hx-swap="outerHTML"
+						hx-disabled-elt="this"
+					>
+						<span class="btn-label">Force close</span>
+						<span class="btn-loading-content"><span class="loading-spinner"></span> Closing...</span>
+					</button>
+				}
+				if row.CanClose {
+					<button
+						type="button"
+						class="btn-icon btn-submit-feedback ldk-channel-close-btn"
+						aria-label="Close channel"
+						title="Close channel"
+						hx-post="/admin/ldk/lightning/channels/close"
+						hx-vals={ templ.JSONString(map[string]string{"channel_id": row.ChannelID, "counterparty_pub": row.CounterpartyPub}) }
+						hx-confirm="Start a cooperative close for this channel? It may remain visible while the close is negotiated."
+						hx-target="#ldk-channels-fragment"
+						hx-swap="outerHTML"
+						hx-disabled-elt="this"
+					>
+						<span class="btn-label">
+							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<line x1="18" y1="6" x2="6" y2="18"></line>
+								<line x1="6" y1="6" x2="18" y2="18"></line>
+							</svg>
+						</span>
+						<span class="btn-loading-content"><span class="loading-spinner"></span></span>
+					</button>
+				}
+			</div>
+		</div>
+		<div class="ldk-channel-balance-layout">
+			<div class="ldk-channel-balance-side ldk-channel-balance-side-local">
+				<p class="text-secondary text-sm ldk-channel-balance-label">Local balance</p>
+				<div class="ldk-channel-balance-value">
+					@LdkAmountValue(row.LocalBalance, "ldk-channel-amount")
+				</div>
+			</div>
+			<div class="ldk-channel-balance-center">
+				@LdkChannelBalanceBar(row)
+				<div class="ldk-channel-balance-ratio text-secondary text-sm">
+					<span>{ strconv.FormatUint(uint64(row.LocalBalancePct), 10) }% local</span>
+					<span>{ strconv.FormatUint(uint64(row.RemoteBalancePct), 10) }% remote</span>
+				</div>
+			</div>
+			<div class="ldk-channel-balance-side ldk-channel-balance-side-remote">
+				<p class="text-secondary text-sm ldk-channel-balance-label">Remote balance</p>
+				<div class="ldk-channel-balance-value">
+					@LdkAmountValue(row.RemoteBalance, "ldk-channel-amount")
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ LdkChannelBalanceBar(row LdkChannelRow) {
+	<div class="ldk-channel-balance-bar" aria-label={ "Local " + strconv.FormatUint(uint64(row.LocalBalancePct), 10) + "% Remote " + strconv.FormatUint(uint64(row.RemoteBalancePct), 10) + "%" }>
+		if row.TotalBalanceSats == 0 {
+			<div class="ldk-channel-balance-empty"></div>
+		} else {
+			<div class="ldk-channel-balance-local" style={ ldkBalanceBarStyle(row.LocalBalancePct) }></div>
+			<div class="ldk-channel-balance-remote" style={ ldkBalanceBarStyle(row.RemoteBalancePct) }></div>
+		}
+	</div>
+}
+
+templ LdkChannelStateBadge(label string) {
+	{{ badgeClass := "ldk-channel-state-badge ldk-channel-state-pending" }}
+	if label == "Active" {
+		{{ badgeClass = "ldk-channel-state-badge ldk-channel-state-active" }}
+	}
+	if label == "Offline" {
+		{{ badgeClass = "ldk-channel-state-badge ldk-channel-state-offline" }}
+	}
+	if label == "Closing" {
+		{{ badgeClass = "ldk-channel-state-badge ldk-channel-state-closing" }}
+	}
+	<span style="margin-left: 5px;" class={ badgeClass }>{ label }</span>
+}
+
+templ LdkPaymentsCardLoading() {
+	<div class="card p-6 ldk-payments-card">
+		<p class="text-secondary text-sm uppercase">Payment history</p>
+		<p class="text-secondary mt-3">Loading payments...</p>
+	</div>
+}
+
+templ LdkPaymentsCard(page LdkPaymentsPage) {
+	<div class="card p-6 ldk-payments-card">
+		<div class="ldk-payments-header">
+			<div>
+				<p class="text-secondary text-sm uppercase">Payment history</p>
+				if page.ErrorMessage == "" {
+					<p class="text-secondary mt-3">Showing { strconv.Itoa(page.ShowingFrom) } to { strconv.Itoa(page.ShowingTo) } of { strconv.Itoa(page.TotalItems) } payments</p>
+				}
+			</div>
+			if page.ErrorMessage == "" {
+				<div class="ldk-payments-filters">
+					@LdkPaymentsFilterButton("All", LdkPaymentsFilterAll, page.ActiveFilter, page.SelectedShow)
+					@LdkPaymentsFilterButton("Incoming", LdkPaymentsFilterIncoming, page.ActiveFilter, page.SelectedShow)
+					@LdkPaymentsFilterButton("Outgoing", LdkPaymentsFilterOutgoing, page.ActiveFilter, page.SelectedShow)
+				</div>
+			}
+		</div>
+		if page.ErrorMessage != "" {
+			<div class="ldk-payments-empty mt-4">
+				<p class="text-secondary">{ page.ErrorMessage }</p>
+				<button
+					type="button"
+					class="btn btn-secondary btn-sm mt-4"
+					hx-get={ "/admin/ldk/payments/list" + page.RetryQuery }
+					hx-target="#ldk-payments-fragment"
+					hx-swap="outerHTML"
+				>
+					Retry
+				</button>
+			</div>
+		} else if len(page.Rows) == 0 {
+			<div class="ldk-payments-empty mt-4">
+				<p class="text-secondary">{ page.EmptyMessage }</p>
+			</div>
+		} else {
+			<div class="ldk-payments-list mt-4">
+				for _, row := range page.Rows {
+					@LdkPaymentListItem(row, page.CopyButtonClass, page.CopyButtonDefaultText)
+				}
+			</div>
+		}
+		if page.ErrorMessage == "" {
+			<div class="ldk-payments-footer">
+				<span class="text-secondary">Show:</span>
+				<div class="ldk-payments-show-options">
+					for _, option := range page.ShowOptions {
+						@LdkPaymentsShowOption(option)
+					}
+				</div>
+			</div>
+		}
+	</div>
+}
+
+templ LdkPaymentsFilterButton(label string, filter string, activeFilter string, selectedShow string) {
+	{{ className := "btn btn-secondary btn-sm ldk-payments-filter" }}
+	if filter == activeFilter {
+		{{ className += " ldk-payments-filter-active" }}
+	}
+	<button
+		type="button"
+		class={ className }
+		hx-get={ "/admin/ldk/payments/list" + LdkPaymentsQuery(filter, selectedShow) }
+		hx-target="#ldk-payments-fragment"
+		hx-swap="outerHTML"
+	>{ label }</button>
+}
+
+templ LdkPaymentsShowOption(option LdkPaymentsShowOptionData) {
+	{{ className := "btn btn-secondary btn-sm ldk-payments-show-option" }}
+	if option.Selected {
+		{{ className += " ldk-payments-show-option-active" }}
+	}
+	<button
+		type="button"
+		class={ className }
+		hx-get={ "/admin/ldk/payments/list" + option.Query }
+		hx-target="#ldk-payments-fragment"
+		hx-swap="outerHTML"
+	>{ option.Label }</button>
+}
+
+templ LdkPaymentListItem(row LdkPaymentRow, copyButtonClass string, defaultCopyText string) {
+	<div class={ "ldk-payment-row ldk-payment-row-" + row.DirectionKey }>
+		<div class="ldk-payment-row-header">
+			<div class="ldk-payment-row-title">
+				<p class="font-mono text-sm"><strong>{ row.DirectionLabel }</strong> <span class={ ldkPaymentKindBadgeClass(row.KindBadgeLabel) }>{ row.KindBadgeLabel }</span></p>
+			</div>
+			<span class={ "ldk-payment-status-badge ldk-payment-status-" + strings.ToLower(row.StatusLabel) }>{ row.StatusLabel }</span>
+		</div>
+		<div class="ldk-payment-amount mt-3">
+			@LdkAmountValue(row.Amount, "ldk-payment-amount-value")
+		</div>
+		<div class="ldk-payment-meta mt-4">
+			<div class="ldk-payment-meta-row">
+				<p class="text-secondary text-sm uppercase">{ row.IdentifierLabel }</p>
+				<div class="ldk-payment-identifier-group">
+					<p class="font-mono text-sm text-secondary">{ row.ShortIdentifierValue }</p>
+					if row.CanCopy {
+						<button
+							type="button"
+							class={ "btn btn-secondary btn-sm " + copyButtonClass }
+							data-copy-text={ row.CopyPayload }
+							data-copy-default-text={ defaultCopyText }
+							data-copy-success-text="Copied"
+							onclick="copyLdkText(this)"
+						>{ defaultCopyText }</button>
+					} else {
+						<button type="button" class={ "btn btn-secondary btn-sm " + copyButtonClass } disabled>{ defaultCopyText }</button>
+					}
+				</div>
+			</div>
+			<div class="ldk-payment-meta-row">
+				<p class="text-secondary text-sm uppercase">Last update</p>
+				<p class="font-mono text-sm text-secondary">{ row.FormattedLastUpdatedAt }</p>
+			</div>
+		</div>
+	</div>
+}
+
+func ldkPaymentKindBadgeClass(label string) string {
+	switch label {
+	case "LIGHTNING":
+		return "ldk-payment-kind-badge ldk-payment-kind-badge-lightning"
+	case "UNKNOWN":
+		return "ldk-payment-kind-badge ldk-payment-kind-badge-unknown"
+	default:
+		return "ldk-payment-kind-badge ldk-payment-kind-badge-onchain"
+	}
+}

@@ -29,7 +29,7 @@ run: build
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running {{APP_NAME}} v{{VERSION}} locally..."
-    ./{{BUILD_DIR}}/{{APP_NAME}} {{RUN_ARGS}}
+     ./{{BUILD_DIR}}/{{APP_NAME}} {{RUN_ARGS}}
 
 # Run recipe with local dev enviroment
 run-dev: build-dev
@@ -44,7 +44,8 @@ build: gen-proto gen-templ web-build-prod
     set -euo pipefail
     echo "Building {{APP_NAME}} v{{VERSION}}..."
     mkdir -p {{BUILD_DIR}}
-    go build -ldflags="-s -w \
+
+    CGO_ENABLED=1   go build -ldflags="-s -w \
         -X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
         -X '{{MODULE}}/internal/utils.BuildTime={{BUILD_TIME}}' \
         -X '{{MODULE}}/internal/utils.GitCommit={{COMMIT_HASH}}'" \
@@ -56,7 +57,7 @@ build-dev: gen-proto gen-templ web-build-dev
     set -euo pipefail
     echo "Building {{APP_NAME}} v{{VERSION}}..."
     mkdir -p {{BUILD_DIR}}
-    go build -ldflags="-s -w \
+    CGO_ENABLED=1  go build -ldflags="-s -w \
         -X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
         -X '{{MODULE}}/internal/utils.BuildTime={{BUILD_TIME}}' \
         -X '{{MODULE}}/internal/utils.GitCommit={{COMMIT_HASH}}'" \
@@ -162,11 +163,19 @@ gen-test-keys:
     echo "MINT_PRIVATE_KEY=$(openssl rand -hex 32)"
 
 # Test recipe
-test:
+# Examples:
+#   just test
+#   just test ./internal/utils/...
+#   just test ./internal/utils/... -run TestCheckChainParams
+test *args:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running tests..."
-    go test -v ./...
+    if [ -z "{{args}}" ]; then
+        CGO_ENABLED=1 go test -v ./...
+    else
+        CGO_ENABLED=1 go test -v {{args}}
+    fi
 
 # Lint prerequisites
 ensure-golangci-lint:

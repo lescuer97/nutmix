@@ -28,7 +28,7 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 		})
 
 		availableUnits = append(availableUnits, cashu.AUTH)
-		err := templates.KeysetsPage(availableUnits).Render(ctx, c.Writer)
+		err := templates.KeysetsPage(availableUnits, showLDKNodeLink(mint)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(fmt.Errorf("templates.KeysetsPage().Render(ctx, c.Writer). %w", err))

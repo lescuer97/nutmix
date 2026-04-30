@@ -2,11 +2,12 @@ package templates
 
 import (
 	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lescuer97/nutmix/internal/lightning/ldk"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-templ LightningBackendPage(config utils.Config) {
-	@Layout("lightning") {
+templ LightningBackendPage(config utils.Config, showLDKNodeLink bool) {
+	@Layout("lightning", showLDKNodeLink) {
 		<main class="bolt11">
 			@LightningConnectionSettings(config)
 		</main>
@@ -27,34 +28,26 @@ templ LightningConnectionSettings(config utils.Config) {
 			</label>
 			<label for="MINT_LIGHTNING_BACKEND" class="settings-input">
 				Lightning Node Backend
-				<select hx-trigger="change, load" hx-get="/admin/lightningdata" hx-target="#lightning-data" name="MINT_LIGHTNING_BACKEND">
-					<option value="FakeWallet" hx-trigger="selected" hx-get="/admin/lightningdata" hx-target="#lightning-data" selected?={ config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET }>Fake Wallet</option>
+				<select hx-trigger="change, load" hx-post="/admin/lightningdata" hx-target="#lightning-data" hx-include="closest form" name="MINT_LIGHTNING_BACKEND">
+					<option value="FakeWallet" selected?={ config.MINT_LIGHTNING_BACKEND == utils.FAKE_WALLET }>Fake Wallet</option>
+					<option
+						value="LDK"
+						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LDK }
+					>Embedded LDK Node</option>
 					<option
 						value="LndGrpcWallet"
-						hx-trigger="selected"
-						hx-get="/admin/lightningdata"
-						hx-target="#lightning-data"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNDGRPC }
 					>LND Grpc wallet</option>
 					<option
 						value="ClnGrpcWallet"
-						hx-trigger="selected"
-						hx-get="/admin/lightningdata"
-						hx-target="#lightning-data"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.CLNGRPC }
 					>Core-Lightning Grpc wallet</option>
 					<option
 						value="LNbitsWallet"
-						hx-trigger="selected"
-						hx-get="/admin/lightningdata"
-						hx-target="#lightning-data"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNBITS }
 					>LNBITS wallet (deprecated, will be removed in v0.8.0)</option>
 					<option
 						value="Strike"
-						hx-trigger="selected"
-						hx-get="/admin/lightningdata"
-						hx-target="#lightning-data"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.Strike }
 					>Strike (deprecated, will be removed in v0.7.0)</option>
 				</select>
@@ -67,7 +60,17 @@ templ LightningConnectionSettings(config utils.Config) {
 	</form>
 }
 
-templ SetupForms(lightningBackend string, config utils.Config) {
+type LDKFormValues struct {
+	ChainSourceType   string
+	Address           string
+	Port              string
+	Username          string
+	Password          string
+	ElectrumServerURL string
+	EsploraServerURL  string
+}
+
+templ SetupForms(lightningBackend string, config utils.Config, resources LDKResourceSnapshot, ldkForm LDKFormValues) {
 	switch lightningBackend {
 		case string(utils.LNDGRPC):
 			@LndGrpc(config.LND_GRPC_HOST, config.LND_TLS_CERT, config.LND_MACAROON)
@@ -77,9 +80,141 @@ templ SetupForms(lightningBackend string, config utils.Config) {
 			@Lnbits(config.MINT_LNBITS_ENDPOINT, config.MINT_LNBITS_KEY)
 		case string(utils.Strike):
 			@Strike(config.STRIKE_KEY, config.STRIKE_ENDPOINT)
+		case string(utils.LDK):
+			@Ldk(ldkForm, resources)
 		case string(utils.FAKE_WALLET):
 			@FakeFallet()
 	}
+}
+
+templ Ldk(form LDKFormValues, resources LDKResourceSnapshot) {
+	<div class="form-section mt-4">
+		<div style="display: flex; flex-direction: column; gap: var(--space-4); width: 100%;">
+			<h3 class="text-base font-semibold mb-2">LDK Chain Source</h3>
+			<div class="github-alert github-alert-note ldk-resource-alert" role="note" aria-label="LDK embedded node resource guidance">
+				<div class="github-alert-title">Embedded LDK Node</div>
+				<p>
+					This node runs embedded in the mint process. Compare the recommended baseline against current host resources:
+				</p>
+				<table class="github-alert-table ldk-resource-table">
+					<thead>
+						<tr>
+							<th>Resource</th>
+							<th>Recommended</th>
+							<th>Available</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>CPU</td>
+							<td>2 cores</td>
+							<td>{ resources.CPUAvailable }</td>
+						</tr>
+						<tr>
+							<td>Memory</td>
+							<td>2 GiB</td>
+							<td>{ resources.MemoryAvailable }</td>
+						</tr>
+						<tr>
+							<td>Disk (free)</td>
+							<td>30 GiB</td>
+							<td>{ resources.DiskAvailable }</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="ldk-chain-source-group">
+				<span class="ldk-chain-source-label">Connection Type</span>
+				<div class="ldk-chain-source-toggle">
+					<label class={ "ldk-chain-source-option", templ.KV("is-selected", form.ChainSourceType == string(ldk.ChainSourceBitcoind)) }>
+						<input
+							type="radio"
+							name="LDK_CHAIN_SOURCE_TYPE"
+							value={ string(ldk.ChainSourceBitcoind) }
+							checked?={ form.ChainSourceType == string(ldk.ChainSourceBitcoind) }
+							hx-post="/admin/lightningdata"
+							hx-target="#lightning-data"
+							hx-include="closest form"
+							hx-swap="innerHTML"
+						/>
+						<span>Bitcoin Core</span>
+					</label>
+					<label class={ "ldk-chain-source-option", templ.KV("is-selected", form.ChainSourceType == string(ldk.ChainSourceElectrum)) }>
+						<input
+							type="radio"
+							name="LDK_CHAIN_SOURCE_TYPE"
+							value={ string(ldk.ChainSourceElectrum) }
+							checked?={ form.ChainSourceType == string(ldk.ChainSourceElectrum) }
+							hx-post="/admin/lightningdata"
+							hx-target="#lightning-data"
+							hx-include="closest form"
+							hx-swap="innerHTML"
+						/>
+						<span>Electrum</span>
+					</label>
+					<label class={ "ldk-chain-source-option", templ.KV("is-selected", form.ChainSourceType == string(ldk.ChainSourceEsplora)) }>
+						<input
+							type="radio"
+							name="LDK_CHAIN_SOURCE_TYPE"
+							value={ string(ldk.ChainSourceEsplora) }
+							checked?={ form.ChainSourceType == string(ldk.ChainSourceEsplora) }
+							hx-post="/admin/lightningdata"
+							hx-target="#lightning-data"
+							hx-include="closest form"
+							hx-swap="innerHTML"
+						/>
+						<span>Esplora</span>
+					</label>
+				</div>
+			</div>
+			if form.ChainSourceType == string(ldk.ChainSourceElectrum) {
+				<input type="hidden" name="BITCOIN_NODE_RPC_ADDRESS" value={ form.Address }/>
+				<input type="hidden" name="BITCOIN_NODE_RPC_PORT" value={ form.Port }/>
+				<input type="hidden" name="BITCOIN_NODE_RPC_USERNAME" value={ form.Username }/>
+				<input type="hidden" name="BITCOIN_NODE_RPC_PASSWORD" value={ form.Password }/>
+				<input type="hidden" name="ESPLORA_SERVER_URL" value={ form.EsploraServerURL }/>
+				<div style="display: flex; flex-wrap: wrap; gap: var(--space-4); width: 100%;">
+					<label for="ELECTRUM_SERVER_URL" class="settings-input" style="flex: 1 1 100%; min-width: 280px;">
+						Electrum Server URL
+						<input type="text" required name="ELECTRUM_SERVER_URL" value={ form.ElectrumServerURL } placeholder="ssl://electrum.blockstream.info:50002"/>
+					</label>
+				</div>
+			} else if form.ChainSourceType == string(ldk.ChainSourceEsplora) {
+				<input type="hidden" name="BITCOIN_NODE_RPC_ADDRESS" value={ form.Address }/>
+				<input type="hidden" name="BITCOIN_NODE_RPC_PORT" value={ form.Port }/>
+				<input type="hidden" name="BITCOIN_NODE_RPC_USERNAME" value={ form.Username }/>
+				<input type="hidden" name="BITCOIN_NODE_RPC_PASSWORD" value={ form.Password }/>
+				<input type="hidden" name="ELECTRUM_SERVER_URL" value={ form.ElectrumServerURL }/>
+				<div style="display: flex; flex-wrap: wrap; gap: var(--space-4); width: 100%;">
+					<label for="ESPLORA_SERVER_URL" class="settings-input" style="flex: 1 1 100%; min-width: 280px;">
+						Esplora Server URL
+						<input type="text" required name="ESPLORA_SERVER_URL" value={ form.EsploraServerURL } placeholder="https://blockstream.info/api"/>
+					</label>
+				</div>
+			} else {
+				<input type="hidden" name="ELECTRUM_SERVER_URL" value={ form.ElectrumServerURL }/>
+				<input type="hidden" name="ESPLORA_SERVER_URL" value={ form.EsploraServerURL }/>
+				<div style="display: flex; flex-wrap: wrap; gap: var(--space-4); width: 100%;">
+					<label for="BITCOIN_NODE_RPC_ADDRESS" class="settings-input" style="flex: 1 1 calc(50% - var(--space-4)); min-width: 280px;">
+						Bitcoin Core RPC Address
+						<input type="text" required name="BITCOIN_NODE_RPC_ADDRESS" value={ form.Address } placeholder="127.0.0.1"/>
+					</label>
+					<label for="BITCOIN_NODE_RPC_PORT" class="settings-input" style="flex: 1 1 calc(50% - var(--space-4)); min-width: 280px;">
+						Bitcoin Core RPC Port
+						<input type="number" required min="1" max="65535" name="BITCOIN_NODE_RPC_PORT" value={ form.Port } placeholder="18443"/>
+					</label>
+					<label for="BITCOIN_NODE_RPC_USERNAME" class="settings-input" style="flex: 1 1 calc(50% - var(--space-4)); min-width: 280px;">
+						Bitcoin Core RPC Username
+						<input type="text" required name="BITCOIN_NODE_RPC_USERNAME" value={ form.Username } placeholder="bitcoinrpc"/>
+					</label>
+					<label for="BITCOIN_NODE_RPC_PASSWORD" class="settings-input" style="flex: 1 1 calc(50% - var(--space-4)); min-width: 280px;">
+						Bitcoin Core RPC Password
+						<input type="password" required name="BITCOIN_NODE_RPC_PASSWORD" value={ form.Password } placeholder="rpcpassword"/>
+					</label>
+				</div>
+			}
+		</div>
+	</div>
 }
 
 templ LndGrpc(host string, tls string, macaroon string) {

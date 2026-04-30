@@ -6,26 +6,20 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-const ConfigFileName string = "config.toml"
-const ConfigDirName string = "nutmix"
-const LogFileName string = "nutmix.log"
-
 func getConfigFile() ([]byte, error) {
-	dir, err := os.UserConfigDir()
-
+	pathToProjectDir, err := utils.GetConfigDirectory()
 	if err != nil {
-		return []byte{}, fmt.Errorf("os.UserHomeDir(), %w", err)
+		return []byte{}, fmt.Errorf("utils.GetConfigDirectory(): %w", err)
 	}
-
-	var pathToProjectDir = dir + "/" + ConfigDirName
-	var pathToProjectConfigFile = pathToProjectDir + "/" + ConfigFileName
-	err = utils.CreateDirectoryAndPath(pathToProjectDir, ConfigFileName)
+	pathToProjectConfigFile := filepath.Join(pathToProjectDir, utils.ConfigFileName)
+	err = utils.CreateDirectoryAndPath(pathToProjectDir, utils.ConfigFileName)
 
 	if err != nil {
 		return []byte{}, fmt.Errorf("utils.CreateDirectoryAndPath(pathToProjectDir, ConfigFileName), %w", err)

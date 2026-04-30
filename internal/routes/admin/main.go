@@ -178,6 +178,38 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		// nolint: contextcheck
 		adminRoute.GET("/settings", MintSettingsPage(mint))
 
+		ldkNodeRouter := adminRoute.Group("")
+		// nolint: contextcheck
+		ldkNodeRouter.Use(ldkNodeMiddleware(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk", LdkNodePage(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk/lightning", LdkLightningPage(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk/payments", LdkPaymentsPage(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk/payments/list", LdkPaymentsFragment(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk/onchain/address", LdkAddressFragment(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk/onchain/balances", LdkBalancesFragment(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk/onchain/send-form", LdkOnchainSendFormFragment(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.POST("/ldk/onchain/send", LdkSendOnchain(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk/lightning/channel-form", LdkOpenChannelFormFragment(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk/lightning/network-summary", LdkNetworkSummaryFragment(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.GET("/ldk/lightning/channels", LdkChannelsFragment(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.POST("/ldk/lightning/channels/open", LdkOpenChannel(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.POST("/ldk/lightning/channels/close", LdkCloseChannel(mint))
+		// nolint: contextcheck
+		ldkNodeRouter.POST("/ldk/lightning/channels/force-close", LdkForceCloseChannel(mint))
+
 		// change routes
 		// nolint: contextcheck
 		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
@@ -206,6 +238,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(&adminHandler))
 		// nolint: contextcheck
 		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
+		// nolint: contextcheck
+		adminRoute.POST("/lightningdata", LightningDataFormFields(mint))
 
 		liquidityMangerRouter := adminRoute.Group("")
 		// nolint: contextcheck
@@ -241,6 +275,18 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 	}
 
 }
+
+func ldkNodeMiddleware(mint *m.Mint) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if mint.Config.MINT_LIGHTNING_BACKEND != utils.LDK {
+			slog.Debug("LDK node page is not available", slog.String("backend", string(mint.Config.MINT_LIGHTNING_BACKEND)))
+			c.AbortWithStatus(404)
+			return
+		}
+		c.Next()
+	}
+}
+
 func liquidityManagerMiddleware(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {

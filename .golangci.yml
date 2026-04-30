@@ -112,6 +112,8 @@ linters:
           - gocyclo
           - dupl
           - funlen
+          - exhaustruct
+          - govet
 
 issues:
   max-issues-per-linter: 0

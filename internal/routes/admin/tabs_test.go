@@ -13,11 +13,39 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
+	"github.com/lescuer97/nutmix/internal/lightning/ldk"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
+
+func newPostContext(values url.Values) *gin.Context {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	req := httptest.NewRequest(http.MethodPost, "/admin/bolt11", nil)
+	req.PostForm = values
+	req.Form = values
+	c.Request = req
+	return c
+}
+
+func mustBitcoindPersistedConfigForAdminTest(t *testing.T, configDirectory string) ldk.PersistedConfig {
+	t.Helper()
+
+	config, err := ldk.NewPersistedConfig(ldk.RPCConfig{
+		Address:  "127.0.0.1",
+		Port:     18443,
+		Username: "user",
+		Password: "pass",
+	}, configDirectory)
+	if err != nil {
+		t.Fatalf("ldk.NewPersistedConfig(...): %v", err)
+	}
+
+	return config
+}
 
 func TestCheckIntegerFromStringSuccess(t *testing.T) {
 	text := "2"
@@ -544,5 +572,203 @@ func TestMintSettingsNotificationsDoesNotMutateConfigOnDBFailure(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(configDir, utils.NostrNotificationNsecFileName)); err != nil {
 		t.Fatalf("expected nostr notification nsec file to still be created before DB failure: %v", err)
+	}
+}
+
+func TestParseLDKPersistedConfig(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	c := newPostContext(values)
+
+	config, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(c): %v", err)
+	}
+	if config.ChainSourceType != ldk.ChainSourceBitcoind {
+		t.Fatalf("unexpected chain source type: %q", config.ChainSourceType)
+	}
+	if config.Rpc.Address != "127.0.0.1" || config.Rpc.Port != 18443 || config.Rpc.Username != "user" || config.Rpc.Password != "pass" {
+		t.Fatalf("unexpected parsed rpc config: %+v", config.Rpc)
+	}
+	if config.ConfigDirectory != configDirectory {
+		t.Fatalf("unexpected config directory: %q", config.ConfigDirectory)
+	}
+}
+
+func TestParseLDKPersistedConfigPreservesExistingBitcoindPassword(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+
+	c := newPostContext(values)
+	existingConfig := mustBitcoindPersistedConfigForAdminTest(t, configDirectory)
+
+	config, err := parseLDKPersistedConfig(c, existingConfig, configDirectory)
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(c): %v", err)
+	}
+	if config.Rpc.Password != existingConfig.Rpc.Password {
+		t.Fatalf("expected existing password to be preserved")
+	}
+}
+
+func TestParseLDKPersistedConfigElectrum(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceElectrum))
+	values.Set("ELECTRUM_SERVER_URL", "ssl://electrum.example:50002")
+
+	c := newPostContext(values)
+	existingConfig := mustBitcoindPersistedConfigForAdminTest(t, configDirectory)
+
+	config, err := parseLDKPersistedConfig(c, existingConfig, configDirectory)
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(c): %v", err)
+	}
+	if config.ChainSourceType != ldk.ChainSourceElectrum {
+		t.Fatalf("unexpected chain source type: %q", config.ChainSourceType)
+	}
+	if config.ElectrumServerURL != "ssl://electrum.example:50002" {
+		t.Fatalf("unexpected electrum server url: %q", config.ElectrumServerURL)
+	}
+	if config.Rpc.Password != existingConfig.Rpc.Password {
+		t.Fatalf("expected inactive bitcoind config to be preserved")
+	}
+}
+
+func TestParseLDKPersistedConfigEsplora(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceEsplora))
+	values.Set("ESPLORA_SERVER_URL", "https://blockstream.info/api")
+
+	c := newPostContext(values)
+	existingConfig := mustBitcoindPersistedConfigForAdminTest(t, configDirectory)
+
+	config, err := parseLDKPersistedConfig(c, existingConfig, configDirectory)
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(c): %v", err)
+	}
+	if config.ChainSourceType != ldk.ChainSourceEsplora {
+		t.Fatalf("unexpected chain source type: %q", config.ChainSourceType)
+	}
+	if config.EsploraServerURL != "https://blockstream.info/api" {
+		t.Fatalf("unexpected esplora server url: %q", config.EsploraServerURL)
+	}
+	if config.Rpc.Password != existingConfig.Rpc.Password {
+		t.Fatalf("expected inactive bitcoind config to be preserved")
+	}
+}
+
+func TestParseLDKPersistedConfigRejectsInvalidPort(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "70000")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	c := newPostContext(values)
+
+	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
+	if err == nil {
+		t.Fatalf("expected invalid port error")
+	}
+}
+
+func TestParseLDKPersistedConfigRejectsInvalidElectrumURL(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceElectrum))
+	values.Set("ELECTRUM_SERVER_URL", "electrum.example:50002")
+
+	c := newPostContext(values)
+
+	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
+	if err == nil {
+		t.Fatalf("expected invalid electrum url error")
+	}
+}
+
+func TestParseLDKPersistedConfigRejectsInvalidEsploraURL(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceEsplora))
+	values.Set("ESPLORA_SERVER_URL", "blockstream.info/api")
+
+	c := newPostContext(values)
+
+	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
+	if err == nil {
+		t.Fatalf("expected invalid esplora url error")
+	}
+}
+
+func TestParseLDKPersistedConfigRejectsInvalidConfigDirectory(t *testing.T) {
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	c := newPostContext(values)
+
+	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: "relative/ldk", ChainSourceType: ldk.ChainSourceBitcoind}, "relative/ldk")
+	if err == nil {
+		t.Fatalf("expected invalid config directory error")
+	}
+}
+
+func TestLDKConfigsEqual(t *testing.T) {
+	a := ldk.PersistedConfig{
+		ChainSourceType: ldk.ChainSourceBitcoind,
+		Rpc: ldk.RPCConfig{
+			Address:  "127.0.0.1",
+			Port:     18443,
+			Username: "user",
+			Password: "pass",
+		},
+		ConfigDirectory: "/tmp/ldk-a",
+	}
+	b := a
+
+	if !ldkConfigsEqual(a, b) {
+		t.Fatalf("expected configs to be equal")
+	}
+
+	b.Rpc.Port = 8332
+	if ldkConfigsEqual(a, b) {
+		t.Fatalf("expected configs to differ")
+	}
+
+	b = a
+	b.ChainSourceType = ldk.ChainSourceElectrum
+	b.ElectrumServerURL = "ssl://electrum.example:50002"
+	if ldkConfigsEqual(a, b) {
+		t.Fatalf("expected chain source types to differ")
+	}
+
+	b = a
+	b.ChainSourceType = ldk.ChainSourceEsplora
+	b.EsploraServerURL = "https://blockstream.info/api"
+	if ldkConfigsEqual(a, b) {
+		t.Fatalf("expected chain source types to differ")
+	}
+
+	b = a
+	b.ConfigDirectory = "/tmp/ldk-b"
+	if ldkConfigsEqual(a, b) {
+		t.Fatalf("expected config directories to differ")
 	}
 }
