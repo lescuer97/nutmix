@@ -146,7 +146,7 @@ func (env LDKLightningNetworkEnv) WaitForBobOutbound(ctx context.Context, minLoc
 		output, err := execContainerCommand(ctx, env.BobLnd, []string{
 			"lncli",
 			"--tlscertpath", "/home/lnd/.lnd/tls.cert",
-			"--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon",
+			"--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon",
 			"listchannels",
 		})
 		if err == nil {

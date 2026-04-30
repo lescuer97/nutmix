@@ -1102,19 +1102,19 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, router *gin.Engine, 
 
 	}
 
-	// needs to wait a second for the containers to catch up
+	// Give the payment a brief head start before polling for the mint-side state update.
 	time.Sleep(500 * time.Millisecond)
 	// Lnd BOB pays the invoice
-	_, _, err = bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "payinvoice", postMintQuoteResponse.Request, "--force"})
+	_, _, err = bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "payinvoice", postMintQuoteResponse.Request, "--force"})
 
 	if err != nil {
 		t.Fatalf("Error paying invoice %+v", err)
 	}
+	if err := waitForMintQuoteState(t, router, postMintQuoteResponse.Quote, cashu.PAID, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
 	// Minting with invalid signatures
-	w = httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
 	excesMintingBlindMessage, _, _, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("Error creating blinded messages: %v", err)
@@ -1675,6 +1675,28 @@ func waitForLDKMintReady(t *testing.T, backend *ldk.LDK, timeout time.Duration) 
 	}
 
 	return fmt.Errorf("timed out waiting for ldk mint readiness: state=%+v summaries=%+v lastErr=%v", lastState, lastSummaries, lastErr)
+}
+
+func waitForMintQuoteState(t *testing.T, router *gin.Engine, quote string, expected cashu.ACTION_STATE, timeout time.Duration) error {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		req := httptest.NewRequest("GET", "/v1/mint/quote/bolt11/"+quote, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code == 200 {
+			var quoteResp cashu.MintRequestDB
+			if err := json.Unmarshal(w.Body.Bytes(), &quoteResp); err == nil && quoteResp.State == expected {
+				return nil
+			}
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return fmt.Errorf("timed out waiting for mint quote %s state %s", quote, expected)
 }
 
 func TestWrongUnitOnMeltAndMint(t *testing.T) {
