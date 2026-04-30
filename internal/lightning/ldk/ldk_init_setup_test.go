@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	ldk_node "github.com/lescuer97/ldkgo/bindings/ldk_node_ffi"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
@@ -425,6 +426,58 @@ func TestBackendStopAndReopenReusesStorageDirWithoutReseeding(t *testing.T) {
 	}
 	if first.storageDir() != second.storageDir() {
 		t.Fatal("expected node storage dir reuse across restart")
+	}
+}
+
+func TestNewLdkStartsAndStops(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+	t.Cleanup(cancel)
+
+	tempDir := t.TempDir()
+	db := &mockdb.MockDB{}
+
+	env, err := utils.SetupLDKLightningNetwork(t, ctx, "ldk-start-stop")
+	if err != nil {
+		t.Fatalf("utils.SetupLDKLightningNetwork(...): %v", err)
+	}
+
+	config, err := NewPersistedConfig(RPCConfig{
+		Address:  env.BitcoindRPC.Address,
+		Port:     env.BitcoindRPC.Port,
+		Username: env.BitcoindRPC.Username,
+		Password: env.BitcoindRPC.Password,
+	}, tempDir)
+	if err != nil {
+		t.Fatalf("NewPersistedConfig(...): %v", err)
+	}
+	if err := SaveConfig(ctx, db, config); err != nil {
+		t.Fatalf("SaveConfig(...): %v", err)
+	}
+
+	backend, err := NewLdk(ctx, db, "regtest")
+	if err != nil {
+		t.Fatalf("NewLdk(...): %v", err)
+	}
+	t.Cleanup(func() {
+		if err := backend.Stop(); err != nil {
+			t.Errorf("backend.Stop() cleanup: %v", err)
+		}
+	})
+
+	if err := backend.Stop(); err != nil {
+		t.Fatalf("backend.Stop(): %v", err)
+	}
+	if backend.started {
+		t.Fatal("expected started to be false after Stop")
+	}
+	if backend.doneCh != nil {
+		t.Fatal("expected doneCh to be nil after Stop")
+	}
+	if backend.node != nil {
+		t.Fatal("expected node to be nil after Stop")
+	}
+	if err := backend.Stop(); err != nil {
+		t.Fatalf("second backend.Stop(): %v", err)
 	}
 }
 
