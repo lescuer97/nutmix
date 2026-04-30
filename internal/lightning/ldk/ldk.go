@@ -3,7 +3,6 @@ package ldk
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -45,12 +44,10 @@ func NewLdk(ctx context.Context, db database.MintDB, network string) (*LDK, erro
 func NewLdkWithOptions(ctx context.Context, db database.MintDB, network string, options Options) (*LDK, error) {
 	ldk := NewConfigBackendWithOptions(db, network, options)
 
-	log.Println("before init called")
 	err := ldk.InitNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("ldk.InitNode(). %w", err)
 	}
-	log.Println("after init called")
 	err = ldk.SpinUp()
 	if err != nil {
 		return nil, fmt.Errorf("could not start up ldk node . %w", err)
@@ -153,8 +150,6 @@ func (l *LDK) SpinUp() error {
 		return fmt.Errorf("ldk node is not spun up")
 	}
 
-	log.Println("spin up callld")
-
 	slog.Info("Starting to run ldk node")
 	if err := l.node.Start(); err != nil {
 		errStop := l.node.Stop()
@@ -170,7 +165,6 @@ func (l *LDK) SpinUp() error {
 }
 
 func (l *LDK) Stop() error {
-	log.Println("calling stop 1")
 	if l == nil {
 		return nil
 	}
@@ -179,14 +173,10 @@ func (l *LDK) Stop() error {
 		return nil
 	}
 
-	log.Println("calling stop 2")
 	err := l.node.Stop()
-	// if l.doneCh != nil {
-	// 	log.Println("before channel call")
-	// 	l.doneCh <- struct{}{}
-	// }
-	log.Println("after the channel call")
-	l.node = nil
+	if err != nil {
+		return fmt.Errorf("l.node.Stop(). %w", err)
+	}
 
 	return err
 }
@@ -194,18 +184,6 @@ func (l *LDK) Stop() error {
 func (l *LDK) run() {
 
 	for l.node.Status().IsRunning {
-		// select {
-		// case <-l.doneCh:
-		// 	log.Printf("inside channel call")
-		// 	err := l.node.Stop()
-		// 	if err != nil {
-		// 		slog.Error("something went wrong while stopping the ldk node. ", slog.Any("string", err))
-		// 		return
-		// 	}
-		// 	log.Printf("after channel call and stop")
-		// 	return
-		// default:
-		log.Println("inside default")
 
 		_ = l.node.NextEventAsync()
 
@@ -214,7 +192,6 @@ func (l *LDK) run() {
 				return
 			}
 			slog.Error("could not handle ldk event", slog.Any("error", err))
-			// }
 		}
 	}
 }
