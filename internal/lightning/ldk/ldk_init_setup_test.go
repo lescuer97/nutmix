@@ -467,12 +467,6 @@ func TestNewLdkStartsAndStops(t *testing.T) {
 	if err := backend.Stop(); err != nil {
 		t.Fatalf("backend.Stop(): %v", err)
 	}
-	if backend.started {
-		t.Fatal("expected started to be false after Stop")
-	}
-	if backend.doneCh != nil {
-		t.Fatal("expected doneCh to be nil after Stop")
-	}
 	if backend.node != nil {
 		t.Fatal("expected node to be nil after Stop")
 	}

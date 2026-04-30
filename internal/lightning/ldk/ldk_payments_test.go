@@ -196,22 +196,6 @@ func TestCheckReceivedPropagatesGetNodeError(t *testing.T) {
 	}
 }
 
-func TestLDKFinishRunClearsLifecycleState(t *testing.T) {
-	doneCh := make(chan struct{})
-	backend := &LDK{
-		started: true,
-		doneCh:  doneCh,
-	}
-
-	backend.finishRun(doneCh)
-
-	if backend.started {
-		t.Fatal("expected started to be false")
-	}
-	if backend.doneCh != nil {
-		t.Fatal("expected doneCh to be cleared")
-	}
-}
 
 func TestLDKStopIsSafeWhenNotStarted(t *testing.T) {
 	backend := &LDK{}

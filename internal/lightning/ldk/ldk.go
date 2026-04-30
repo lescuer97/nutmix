@@ -3,8 +3,8 @@ package ldk
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
-	"sync"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
@@ -34,12 +34,8 @@ const (
 type LDK struct {
 	node    *ldk_node.Node
 	db      database.MintDB
-	doneCh  chan struct{}
 	network string
 	options Options
-
-	mu      sync.Mutex
-	started bool
 }
 
 func NewLdk(ctx context.Context, db database.MintDB, network string) (*LDK, error) {
@@ -49,10 +45,12 @@ func NewLdk(ctx context.Context, db database.MintDB, network string) (*LDK, erro
 func NewLdkWithOptions(ctx context.Context, db database.MintDB, network string, options Options) (*LDK, error) {
 	ldk := NewConfigBackendWithOptions(db, network, options)
 
+	log.Println("before init called")
 	err := ldk.InitNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("ldk.InitNode(). %w", err)
 	}
+	log.Println("after init called")
 	err = ldk.SpinUp()
 	if err != nil {
 		return nil, fmt.Errorf("could not start up ldk node . %w", err)
@@ -69,11 +67,8 @@ func NewConfigBackendWithOptions(db database.MintDB, network string, options Opt
 	backend := &LDK{
 		node:    nil,
 		db:      db,
-		doneCh:  nil,
 		network: network,
 		options: options,
-		mu:      sync.Mutex{},
-		started: false,
 	}
 	return backend
 }
@@ -94,12 +89,21 @@ func (l *LDK) InitNode(ctx context.Context) error {
 
 	builder := ldk_node.NewBuilder()
 	builder.SetNetwork(network)
-	// if err := builder.SetListeningAddresses([]ldk_node.SocketAddress{"127.0.0.1:39735"}); err != nil {
-	// 	return fmt.Errorf("builder.SetListeningAddresses(...): %w", err)
-	// }
 	switch config.ChainSourceType {
 	case ChainSourceElectrum:
-		builder.SetChainSourceElectrum(config.ElectrumServerURL, nil)
+		builder.SetChainSourceElectrum(config.ElectrumServerURL, &ldk_node.ElectrumSyncConfig{
+			BackgroundSyncConfig: &ldk_node.BackgroundSyncConfig{
+				OnchainWalletSyncIntervalSecs:   80,
+				LightningWalletSyncIntervalSecs: 30,
+				FeeRateCacheUpdateIntervalSecs:  600,
+			},
+			TimeoutsConfig: ldk_node.SyncTimeoutsConfig{
+				OnchainWalletSyncTimeoutSecs:   60,
+				LightningWalletSyncTimeoutSecs: 30,
+				FeeRateCacheUpdateTimeoutSecs:  10,
+				TxBroadcastTimeoutSecs:         10,
+				PerRequestTimeoutSecs:          10,
+			}})
 	case ChainSourceEsplora:
 		builder.SetChainSourceEsplora(config.EsploraServerURL, forcedEsploraSyncConfig())
 	case ChainSourceBitcoind:
@@ -149,87 +153,70 @@ func (l *LDK) SpinUp() error {
 		return fmt.Errorf("ldk node is not spun up")
 	}
 
-	l.mu.Lock()
-	if l.started {
-		l.mu.Unlock()
-		return nil
-	}
-
-	l.doneCh = make(chan struct{})
-	l.started = true
-
-	node := l.node
-	doneCh := l.doneCh
-	l.mu.Unlock()
+	log.Println("spin up callld")
 
 	slog.Info("Starting to run ldk node")
-	if err := node.Start(); err != nil {
-		l.finishRun(doneCh)
-		close(doneCh)
+	if err := l.node.Start(); err != nil {
+		errStop := l.node.Stop()
+		if errStop != nil {
+			return fmt.Errorf("node.Stop(): %w", errStop)
+		}
 		return fmt.Errorf("node.Start(): %w", err)
 	}
 	slog.Info("ldk node started")
 
-	go l.run(node, doneCh)
+	go l.run()
 	return nil
 }
 
 func (l *LDK) Stop() error {
+	log.Println("calling stop 1")
 	if l == nil {
 		return nil
 	}
 
-	l.mu.Lock()
-	if !l.started || l.node == nil {
-		l.mu.Unlock()
+	if l.node == nil {
 		return nil
 	}
 
-	node := l.node
-	doneCh := l.doneCh
-	l.mu.Unlock()
-
-	err := node.Stop()
-	if doneCh != nil {
-		<-doneCh
-
-		l.mu.Lock()
-		if l.doneCh == nil && l.node == node {
-			l.node = nil
-		}
-		l.mu.Unlock()
-	}
+	log.Println("calling stop 2")
+	err := l.node.Stop()
+	// if l.doneCh != nil {
+	// 	log.Println("before channel call")
+	// 	l.doneCh <- struct{}{}
+	// }
+	log.Println("after the channel call")
+	l.node = nil
 
 	return err
 }
 
-func (l *LDK) run(node *ldk_node.Node, doneCh chan struct{}) {
-	defer close(doneCh)
-	defer l.finishRun(doneCh)
+func (l *LDK) run() {
 
-	defer node.Destroy()
-	defer slog.Info("ldk node stopped")
+	for l.node.Status().IsRunning {
+		// select {
+		// case <-l.doneCh:
+		// 	log.Printf("inside channel call")
+		// 	err := l.node.Stop()
+		// 	if err != nil {
+		// 		slog.Error("something went wrong while stopping the ldk node. ", slog.Any("string", err))
+		// 		return
+		// 	}
+		// 	log.Printf("after channel call and stop")
+		// 	return
+		// default:
+		log.Println("inside default")
 
-	for node.Status().IsRunning {
-		_ = node.NextEventAsync()
+		_ = l.node.NextEventAsync()
 
-		if err := node.EventHandled(); err != nil {
-			if !node.Status().IsRunning {
+		if err := l.node.EventHandled(); err != nil {
+			if !l.node.Status().IsRunning {
 				return
 			}
 			slog.Error("could not handle ldk event", slog.Any("error", err))
+			// }
 		}
 	}
-}
-
-func (l *LDK) finishRun(doneCh chan struct{}) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.doneCh != doneCh {
-		return
-	}
-	l.started = false
-	l.doneCh = nil
 }
 
 func convertChaninParamsToLdkNetwork(param chaincfg.Params) (ldk_node.Network, error) {
