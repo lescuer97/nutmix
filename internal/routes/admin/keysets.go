@@ -63,12 +63,11 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rotateRequest RotateRequest
 		if c.ContentType() == gin.MIMEJSON {
-			// Use Decode instead of BindJSON to have more control if needed,
-			// but BindJSON calls UnmarshalJSON which we defined.
-			err := c.BindJSON(&rotateRequest)
+			// JSON requests are decoded with strict unknown-field rejection.
+			err := utils.DecodeJSONV2(c, &rotateRequest)
 			if err != nil {
-				slog.Error("BindJSON error", slog.Any("error", err))
-				c.JSON(400, nil)
+				slog.Error("DecodeJSONV2 error", slog.Any("error", err))
+				utils.JSON(c, 400, nil)
 				return
 			}
 		} else {
@@ -138,7 +137,7 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 		}
 
 		if c.ContentType() == gin.MIMEJSON {
-			c.JSON(200, nil)
+			utils.JSON(c, 200, nil)
 		} else {
 			c.Header("HX-Trigger", "recharge-keyset")
 			err := RenderSuccess(c, "Key successfully rotated")
