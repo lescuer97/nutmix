@@ -3,6 +3,7 @@ package utils
 import (
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/render"
 	jsonv2 "github.com/go-json-experiment/json"
 )
@@ -26,3 +27,11 @@ func (r JSONV2) WriteContentType(w http.ResponseWriter) {
 }
 
 var _ render.Render = JSONV2{}
+
+func JSON(c *gin.Context, code int, data any) {
+	c.Render(code, JSONV2{Data: data})
+}
+
+func DecodeJSONV2(c *gin.Context, out any) error {
+	return jsonv2.UnmarshalRead(c.Request.Body, out, jsonv2.RejectUnknownMembers(true))
+}
