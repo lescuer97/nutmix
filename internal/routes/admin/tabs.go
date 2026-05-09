@@ -972,12 +972,6 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				}
 				return
 			}
-			if ldkConfigUnchanged(ctx, configBackend, mint.Config.NETWORK, chainparam.Name, ldkConfig) {
-				if err := RenderSuccess(c, "No changes detected"); err != nil {
-					slog.Warn("failed to render success", slog.Any("error", err))
-				}
-				return
-			}
 
 			if err := configBackend.SaveConfig(ctx, ldkConfig); err != nil {
 				slog.Warn("configBackend.SaveConfig", slog.String(utils.LogExtraInfo, err.Error()))
