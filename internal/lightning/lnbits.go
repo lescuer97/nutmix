@@ -57,6 +57,21 @@ type lnbitsFeeResponse struct {
 var ErrLnbitsFailedPayment = errors.New("failed payment")
 var ErrLnBitsNoRouteFound = errors.New("no route found")
 
+func lnbitsPaymentState(paymentStatus LNBitsPaymentStatus) PaymentStatus {
+	switch {
+	case paymentStatus.Paid:
+		return SETTLED
+	case paymentStatus.Pending:
+		return PENDING
+	case paymentStatus.Details.Status == "pending":
+		return PENDING
+	case paymentStatus.Details.Pending:
+		return PENDING
+	default:
+		return FAILED
+	}
+}
+
 func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{} //nolint:exhaustruct
 	jsonBytes, err := json.Marshal(reqBody)
@@ -161,7 +176,7 @@ func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zp
 	}
 
 	invoiceRes.PaymentRequest = lnbitsInvoice.PaymentRequest
-	invoiceRes.PaymentState = SETTLED
+	invoiceRes.PaymentState = lnbitsPaymentState(paymentStatus)
 	invoiceRes.Rhash = lnbitsInvoice.PaymentHash
 	invoiceRes.Preimage = paymentStatus.Preimage
 	// LNBits returns fee as int64, convert to Amount
@@ -183,20 +198,7 @@ func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checking
 
 	fee := cashu.Amount{Unit: cashu.Sat, Amount: uint64(paymentStatus.Details.Fee)}
 
-	switch {
-	case paymentStatus.Paid:
-		return SETTLED, paymentStatus.Preimage, fee, nil
-	case paymentStatus.Details.Status == "pending":
-		return PENDING, paymentStatus.Preimage, fee, nil
-	case paymentStatus.Details.Pending:
-		return PENDING, paymentStatus.Preimage, fee, nil
-	case !paymentStatus.Paid && paymentStatus.Details.Status == "failed":
-		return FAILED, paymentStatus.Preimage, fee, nil
-	case !paymentStatus.Paid && !paymentStatus.Details.Pending:
-		return FAILED, paymentStatus.Preimage, fee, nil
-	default:
-		return FAILED, paymentStatus.Preimage, fee, nil
-	}
+	return lnbitsPaymentState(paymentStatus), paymentStatus.Preimage, fee, nil
 }
 
 func (l LnbitsWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
@@ -209,16 +211,7 @@ func (l LnbitsWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.I
 		return FAILED, "", fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	switch {
-	case paymentStatus.Paid:
-		return SETTLED, paymentStatus.Preimage, nil
-	case paymentStatus.Details.Pending:
-		return PENDING, paymentStatus.Preimage, nil
-	case !paymentStatus.Paid && !paymentStatus.Details.Pending:
-		return FAILED, paymentStatus.Preimage, nil
-	default:
-		return FAILED, paymentStatus.Preimage, nil
-	}
+	return lnbitsPaymentState(paymentStatus), paymentStatus.Preimage, nil
 }
 
 func (l LnbitsWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {

@@ -62,7 +62,6 @@ func (m *Mint) createAndStoreBolt11MeltQuote(ctx context.Context, meltRequest ca
 		queryFee = feesResponse.Fees.Amount
 		amountToSend = feesResponse.AmountToSend
 	}
-	//FIXME: Add method
 	dbRequest := cashu.MeltRequestDB{
 		Amount:          amountToSend.Amount,
 		Quote:           quoteId,

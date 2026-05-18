@@ -112,7 +112,6 @@ func (m *Mint) createBolt11MintQuote(ctx context.Context, request cashu.PostMint
 	return mintRequestDB.PostMintQuoteBolt11Response(), nil
 }
 
-// FIXME: the method should be inside the MintRequestDB struct. this needs to change in the db and add a migration
 func (m *Mint) RefreshMintQuoteStatus(ctx context.Context, quoteId string, method METHOD) (cashu.PostMintQuoteBolt11Response, error) {
 	tx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
@@ -150,7 +149,6 @@ func (m *Mint) RefreshMintQuoteStatus(ctx context.Context, quoteId string, metho
 	}
 }
 
-// FIXME: the method should be inside the MintRequestDB struct. this needs to change in the db and add a migration
 func (m *Mint) reconcileBolt11MintQuoteState(ctx context.Context, request cashu.MintRequestDB, method METHOD) (cashu.MintRequestDB, error) {
 	if method != Bolt11 {
 		return cashu.MintRequestDB{}, fmt.Errorf("request method is not BOLT11")
@@ -286,7 +284,6 @@ func (m *Mint) loadAndValidateMintQuoteForIssuance(ctx context.Context, request 
 	return quote, nil
 }
 
-// FIXME: the method should be inside the MintRequestDB struct. this needs to change in the db and add a migration
 func (m *Mint) bolt11Mint(ctx context.Context, request cashu.PostMintBolt11Request, mintReq cashu.MintRequestDB, method METHOD) (cashu.PostMintBolt11Response, error) {
 	if method != Bolt11 {
 		return cashu.PostMintBolt11Response{}, fmt.Errorf("request method is not BOLT11")
