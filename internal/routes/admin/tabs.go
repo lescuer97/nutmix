@@ -165,19 +165,6 @@ func ldkConfigBackendForMint(mint *m.Mint, network string) (*ldk.LDK, error) {
 	return ldk, nil
 }
 
-func ldkConfigUnchanged(ctx context.Context, backend *ldk.LDK, currentNetwork string, nextNetwork string, config ldk.PersistedConfig) bool {
-	if backend == nil {
-		return false
-	}
-
-	existingConfig, err := backend.PersistedConfig(ctx)
-	if err != nil {
-		return false
-	}
-
-	return currentNetwork == nextNetwork && ldkConfigsEqual(existingConfig, config)
-}
-
 func decodeNpubToHex(npub string) (string, error) {
 	prefix, key, err := nip19.Decode(strings.TrimSpace(npub))
 	if err != nil {
