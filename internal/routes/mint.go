@@ -70,7 +70,6 @@ func registerV1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
-		go mint.Observer.SendProofsEvent(swapRequest.Inputs)
 		c.JSON(200, response)
 	})
 

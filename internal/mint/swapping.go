@@ -63,6 +63,8 @@ func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (
 		return cashu.PostSwapResponse{}, fmt.Errorf("m.signSwapOutputsAndMarkInputsSpent(ctx, proofs, request). %w", err)
 	}
 
+	proofs.SetProofsState(cashu.PROOF_SPENT)
+	go m.Observer.SendProofsEvent(proofs)
 	// mark as pending and sign
 	return cashu.PostSwapResponse{
 		Signatures: blindSignatures,

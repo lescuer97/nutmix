@@ -9,28 +9,78 @@ func TestLnbitsPaymentState(t *testing.T) {
 		wanted PaymentStatus
 	}{
 		{
-			name:   "paid status settles payment",
-			status: LNBitsPaymentStatus{Paid: true},
+			name: "paid status settles payment",
+			status: LNBitsPaymentStatus{
+				Preimage: "",
+				Details: LNBitsPaymentStatusDetail{
+					Memo:    "",
+					Status:  "",
+					Fee:     0,
+					Pending: false,
+				},
+				Paid:    true,
+				Pending: false,
+			},
 			wanted: SETTLED,
 		},
 		{
-			name:   "top level pending keeps payment pending",
-			status: LNBitsPaymentStatus{Pending: true},
+			name: "top level pending keeps payment pending",
+			status: LNBitsPaymentStatus{
+				Preimage: "",
+				Details: LNBitsPaymentStatusDetail{
+					Memo:    "",
+					Status:  "",
+					Fee:     0,
+					Pending: false,
+				},
+				Paid:    false,
+				Pending: true,
+			},
 			wanted: PENDING,
 		},
 		{
-			name:   "detail status pending keeps payment pending",
-			status: LNBitsPaymentStatus{Details: LNBitsPaymentStatusDetail{Status: "pending"}},
+			name: "detail status pending keeps payment pending",
+			status: LNBitsPaymentStatus{
+				Preimage: "",
+				Details: LNBitsPaymentStatusDetail{
+					Memo:    "",
+					Status:  "pending",
+					Fee:     0,
+					Pending: false,
+				},
+				Paid:    false,
+				Pending: false,
+			},
 			wanted: PENDING,
 		},
 		{
-			name:   "detail pending keeps payment pending",
-			status: LNBitsPaymentStatus{Details: LNBitsPaymentStatusDetail{Pending: true}},
+			name: "detail pending keeps payment pending",
+			status: LNBitsPaymentStatus{
+				Preimage: "",
+				Details: LNBitsPaymentStatusDetail{
+					Memo:    "",
+					Status:  "",
+					Fee:     0,
+					Pending: true,
+				},
+				Paid:    false,
+				Pending: false,
+			},
 			wanted: PENDING,
 		},
 		{
-			name:   "unpaid non pending fails payment",
-			status: LNBitsPaymentStatus{},
+			name: "unpaid non pending fails payment",
+			status: LNBitsPaymentStatus{
+				Preimage: "",
+				Details: LNBitsPaymentStatusDetail{
+					Memo:    "",
+					Status:  "",
+					Fee:     0,
+					Pending: false,
+				},
+				Paid:    false,
+				Pending: false,
+			},
 			wanted: FAILED,
 		},
 	}
