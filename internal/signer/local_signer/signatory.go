@@ -31,5 +31,4 @@ func unitNormalization(unit string) string {
 	unitStr = norm.NFC.String(unitStr)
 	//  Convert the normalized string to uppercase using Unicode-aware semantics
 	return strings.ToUpper(unitStr)
-
 }

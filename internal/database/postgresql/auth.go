@@ -40,15 +40,12 @@ func (pql Postgresql) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLogin
 }
 
 func (pql Postgresql) MakeAuthUser(tx pgx.Tx, auth database.AuthUser) error {
-
 	_, err := tx.Exec(context.Background(), "INSERT INTO user_auth (sub, aud , last_logged_in) VALUES ($1, $2, $3)", auth.Sub, auth.Aud, auth.LastLoggedIn)
 
 	if err != nil {
 		return databaseError(fmt.Errorf("inserting to auth user login: %w", err))
-
 	}
 	return nil
-
 }
 
 func (pql Postgresql) GetAuthUser(tx pgx.Tx, sub string) (database.AuthUser, error) {
@@ -72,7 +69,6 @@ func (pql Postgresql) UpdateLastLoggedIn(tx pgx.Tx, sub string, lastLoggedIn uin
 	_, err := tx.Exec(context.Background(), "UPDATE user_auth SET last_logged_in = $1 WHERE sub = $2", lastLoggedIn, sub)
 	if err != nil {
 		return databaseError(fmt.Errorf("update to seeds: %w", err))
-
 	}
 	return nil
 }

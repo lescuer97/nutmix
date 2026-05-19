@@ -51,7 +51,6 @@ var (
 )
 
 func TestMintBolt11FakeWallet(t *testing.T) {
-
 	const posgrespassword = "password"
 	const postgresuser = "user"
 	ctx := context.Background()
@@ -68,7 +67,8 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
 	if postgresContainer != nil {
 		t.Cleanup(func() {
-			if err := postgresContainer.Terminate(context.Background()); err != nil {
+			err := postgresContainer.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
@@ -120,7 +120,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if postMintQuoteResponse.State != cashu.UNPAID {
 		t.Errorf("Expected state to be UNPAID, got %v", postMintQuoteResponse.State)
-
 	}
 
 	if postMintQuoteResponse.Unit != "sat" {
@@ -145,7 +144,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if postMintQuoteResponse.State != cashu.UNPAID {
 		t.Errorf("Expected state to be UNPAID, got %v", postMintQuoteResponse.State)
-
 	}
 
 	if postMintQuoteResponseTwo.Unit != "sat" {
@@ -159,19 +157,19 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 		t.Fatalf("mint.Signer.GetKeysByUnit(cashu.Sat): %v", err)
 	}
 
-	// ASK FOR MINTING WITH TOO MANY BLINDED MESSAGES
+	// ASK FOR MINTING WITH OUTPUTS THAT EXCEED THE QUOTE AMOUNT
 	blindedMessages, _, _, err := CreateBlindedMessages(999999, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
 
-	mintRequestTooManyBlindMessages := cashu.PostMintBolt11Request{
+	amountMismatchMintRequest := cashu.PostMintBolt11Request{
 		Quote:     postMintQuoteResponse.Quote,
 		Outputs:   blindedMessages,
 		Signature: nil,
 	}
 
-	jsonRequestBody, _ = json.Marshal(mintRequestTooManyBlindMessages)
+	jsonRequestBody, _ = json.Marshal(amountMismatchMintRequest)
 
 	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
 
@@ -179,12 +177,60 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Fatalf("Expected status code 200, got %d", w.Code)
+	amountMismatchResponse := cashu.ErrorResponse{} //nolint:exhaustruct
+	err = json.Unmarshal(w.Body.Bytes(), &amountMismatchResponse)
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Amounts in outputs are not the same"` {
-		t.Errorf("Expected Amounts in outputs are not the same, got %s", w.Body.String())
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 400, got %d", w.Code)
+	}
+
+	if amountMismatchResponse.Code != cashu.AMOUNT_NOT_EQUAL_TO_INVOICE {
+		t.Errorf("Incorrect error code, got %v", amountMismatchResponse.Code)
+	}
+
+	if amountMismatchResponse.Error != cashu.AMOUNT_NOT_EQUAL_TO_INVOICE.String() {
+		t.Errorf("Incorrect error string, got %s", amountMismatchResponse.Error)
+	}
+
+	// ASK FOR MINTING WITH OUTPUTS THAT UNDERSHOOT THE QUOTE AMOUNT
+	blindedMessages, _, _, err = CreateBlindedMessages(9999, activeKeys)
+	if err != nil {
+		t.Fatalf("could not createBlind message: %v", err)
+	}
+
+	amountMismatchMintRequest = cashu.PostMintBolt11Request{
+		Quote:     postMintQuoteResponse.Quote,
+		Outputs:   blindedMessages,
+		Signature: nil,
+	}
+
+	jsonRequestBody, _ = json.Marshal(amountMismatchMintRequest)
+
+	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
+
+	w = httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	amountMismatchResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	err = json.Unmarshal(w.Body.Bytes(), &amountMismatchResponse)
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
+	}
+
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 400, got %d", w.Code)
+	}
+
+	if amountMismatchResponse.Code != cashu.AMOUNT_NOT_EQUAL_TO_INVOICE {
+		t.Errorf("Incorrect error code, got %v", amountMismatchResponse.Code)
+	}
+
+	if amountMismatchResponse.Error != cashu.AMOUNT_NOT_EQUAL_TO_INVOICE.String() {
+		t.Errorf("Incorrect error string, got %s", amountMismatchResponse.Error)
 	}
 
 	// ASK FOR SUCCESSFUL MINTING
@@ -279,11 +325,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if errorResponse.Code != 20002 {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Quote has already been issued" {
 		t.Fatalf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// Minting with invalid signatures
@@ -387,11 +431,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if errorResponse.Code != cashu.TRANSACTION_NOT_BALANCED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// TRY TO SWAP SUCCESSFULLY
@@ -484,11 +526,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Proof could not be verified" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	w.Flush()
@@ -526,11 +566,9 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if errorResponse.Code != cashu.TRANSACTION_NOT_BALANCED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	w.Flush()
@@ -579,7 +617,6 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("Error unmarshalling response: %v", err)
-
 	}
 
 	if postMeltQuoteResponse.State != cashu.UNPAID {
@@ -677,17 +714,13 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	if errorResponse.Code != 20006 {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Invoice already paid" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
-
 }
 
 func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
-
 	db, err := pq.DatabaseSetup(ctx, "../../migrations/")
 	if err != nil {
 		log.Fatal("Error conecting to db", err)
@@ -821,7 +854,6 @@ func CreateBlindedMessages(amount uint64, keyset signer.GetKeysResponse) ([]cash
 }
 
 func TestMintBolt11LndLigthning(t *testing.T) {
-
 	const posgrespassword = "password"
 	const postgresuser = "user"
 	postgresContainer, err := postgres.Run(t.Context(), "postgres:16.2",
@@ -836,7 +868,8 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
 	if postgresContainer != nil {
 		t.Cleanup(func() {
-			if err := postgresContainer.Terminate(context.Background()); err != nil {
+			err := postgresContainer.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
@@ -865,28 +898,32 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
 	if aliceLnd != nil {
 		t.Cleanup(func() {
-			if err := aliceLnd.Terminate(context.Background()); err != nil {
+			err := aliceLnd.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if bobLnd != nil {
 		t.Cleanup(func() {
-			if err := bobLnd.Terminate(context.Background()); err != nil {
+			err := bobLnd.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if btcD != nil {
 		t.Cleanup(func() {
-			if err := btcD.Terminate(context.Background()); err != nil {
+			err := btcD.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if lnbitsAlice != nil {
 		t.Cleanup(func() {
-			if err := lnbitsAlice.Terminate(context.Background()); err != nil {
+			err := lnbitsAlice.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
@@ -901,7 +938,6 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	}
 
 	LightningBolt11Test(t, ctx, bobLnd)
-
 }
 func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	const posgrespassword = "password"
@@ -941,28 +977,32 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
 	if aliceLnd != nil {
 		t.Cleanup(func() {
-			if err := aliceLnd.Terminate(context.Background()); err != nil {
+			err := aliceLnd.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if bobLnd != nil {
 		t.Cleanup(func() {
-			if err := bobLnd.Terminate(context.Background()); err != nil {
+			err := bobLnd.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if btcD != nil {
 		t.Cleanup(func() {
-			if err := btcD.Terminate(context.Background()); err != nil {
+			err := btcD.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
 	}
 	if lnbitsAlice != nil {
 		t.Cleanup(func() {
-			if err := lnbitsAlice.Terminate(context.Background()); err != nil {
+			err := lnbitsAlice.Terminate(context.Background())
+			if err != nil {
 				t.Fatalf("failed to terminate container: %s", err)
 			}
 		})
@@ -976,12 +1016,10 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 }
 
 func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResponse, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
-
 	// try to swap tokens
-	var proofs []cashu.Proof
+	var proofs = make([]cashu.Proof, len(signatures))
 	// unblid the signatures and make proofs
 	for i, output := range signatures {
-
 		pubkeyStr := keyset.Keysets[0].Keys[output.Amount]
 		pubkeyBytes, err := hex.DecodeString(pubkeyStr)
 		if err != nil {
@@ -994,7 +1032,7 @@ func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResp
 
 		C := crypto.UnblindSignature(output.C_.PublicKey, secretsKey[i], mintPublicKey)
 
-		proofs = append(proofs, cashu.Proof{
+		proofs[i] = cashu.Proof{
 			Id:      output.Id,
 			Amount:  output.Amount,
 			C:       cashu.WrappedPublicKey{PublicKey: C},
@@ -1004,7 +1042,7 @@ func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResp
 			Witness: "",
 			State:   "",
 			SeenAt:  0,
-		})
+		}
 	}
 
 	return proofs, nil
@@ -1110,11 +1148,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	if errorResponse.Code != 20001 {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Quote request is not paid" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// needs to wait a second for the containers to catch up
@@ -1166,19 +1202,19 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Code)
 	}
 
-	// ASK FOR MINTING WITH TOO MANY BLINDED MESSAGES
+	// ASK FOR MINTING WITH OUTPUTS THAT EXCEED THE QUOTE AMOUNT
 	blindedMessages, _, _, err := CreateBlindedMessages(999999, activeKeys)
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
 	}
 
-	mintRequestTooManyBlindMessages := cashu.PostMintBolt11Request{
+	amountMismatchMintRequest := cashu.PostMintBolt11Request{
 		Quote:     postMintQuoteResponse.Quote,
 		Outputs:   blindedMessages,
 		Signature: nil,
 	}
 
-	jsonRequestBody, _ = json.Marshal(mintRequestTooManyBlindMessages)
+	jsonRequestBody, _ = json.Marshal(amountMismatchMintRequest)
 
 	req = httptest.NewRequest("POST", "/v1/mint/bolt11", strings.NewReader(string(jsonRequestBody)))
 
@@ -1186,12 +1222,22 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 403 {
-		t.Fatalf("Expected status code 403, got %d", w.Code)
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
 	}
 
-	if w.Body.String() != `"Amounts in outputs are not the same"` {
-		t.Errorf("Expected Amounts in outputs are not the same, got %s", w.Body.String())
+	if w.Code != 400 {
+		t.Fatalf("Expected status code 400, got %d", w.Code)
+	}
+
+	if errorResponse.Code != cashu.AMOUNT_NOT_EQUAL_TO_INVOICE {
+		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
+	}
+
+	if errorResponse.Error != cashu.AMOUNT_NOT_EQUAL_TO_INVOICE.String() {
+		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
 	}
 
 	// MINT SUCCESSFULLY
@@ -1286,11 +1332,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	if errorResponse.Code != 20002 {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Quote has already been issued" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// MINTING TESTING ENDS
@@ -1331,11 +1375,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	if errorResponse.Code != cashu.TRANSACTION_NOT_BALANCED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// try to swap tokens
@@ -1428,11 +1470,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Proof could not be verified" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	w.Flush()
@@ -1470,11 +1510,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	if errorResponse.Code != cashu.TRANSACTION_NOT_BALANCED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Transaction is not balanced (inputs != outputs)" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	w.Flush()
@@ -1552,7 +1590,6 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	if postMeltQuoteResponse.State != cashu.UNPAID {
-
 		t.Errorf("Expected to not be paid have: %s ", postMintQuoteResponseTwo.State)
 	}
 
@@ -1644,11 +1681,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	if errorResponse.Code != 20006 {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Invoice already paid" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// MELTING TESTING ENDS
@@ -1715,11 +1750,9 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 
 	if errorResponse.Code != cashu.UNIT_NOT_SUPPORTED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Unit in request is not supported" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// melt quote with incorrect unit
@@ -1744,16 +1777,13 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 
 	if errorResponse.Code != cashu.UNIT_NOT_SUPPORTED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Unit in request is not supported" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 }
 
 func TestConfigMeltMintLimit(t *testing.T) {
-
 	const posgrespassword = "password"
 	const postgresuser = "user"
 	ctx := context.Background()
@@ -1810,10 +1840,21 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	if w.Code != 400 {
-		t.Errorf("Expected status code 200, got %d", w.Code)
+		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
-	if w.Body.String() != `"Mint amount over the limit"` {
-		t.Errorf(`Expected body message to be: "Mint amount over the limit". Got:  %s`, w.Body.String())
+	errorResponse := cashu.ErrorResponse{} //nolint:exhaustruct
+	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
+	if err != nil {
+		t.Fatalf("Could not parse error response %s", w.Body.String())
+	}
+	if errorResponse.Code != cashu.INSUFICIENT_OUTSIDE_LIMIT {
+		t.Errorf("Expected code to be Amount outside limit. Got: %v", errorResponse.Code)
+	}
+	if errorResponse.Error != "Amount outside limit" {
+		t.Errorf("Expected error to be Amount outside limit. Got: %s", errorResponse.Error)
+	}
+	if errorResponse.Detail == nil || *errorResponse.Detail != "amount is outside the limit" {
+		t.Errorf("Expected detail to be amount is outside the limit. Got: %v", errorResponse.Detail)
 	}
 
 	w = httptest.NewRecorder()
@@ -1825,9 +1866,9 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	if w.Code != 400 {
-		t.Errorf("Expected status code 200, got %d", w.Code)
+		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
-	errorResponse := cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {
@@ -1840,7 +1881,6 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	if errorResponse.Error != "Minting is disabled" {
 		t.Errorf(`Expected code be Minting disables. Got:  %s`, errorResponse.Error)
 	}
-
 }
 func TestFeeReturnAmount(t *testing.T) {
 	const posgrespassword = "password"
@@ -2003,6 +2043,5 @@ func TestFeeReturnAmount(t *testing.T) {
 
 	if changeAmount != 9000 {
 		t.Errorf("Change amount is incorrect %v", changeAmount)
-
 	}
 }

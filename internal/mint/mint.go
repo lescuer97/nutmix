@@ -32,8 +32,7 @@ var (
 	MINT_LIGHTNING_BACKEND_ENV = "MINT_LIGHTNING_BACKEND"
 )
 
-func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
-
+func checkProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
 	units := make(map[string]bool)
 
 	seenKeys := make(map[string]cashu.BasicKeysetResponse)
@@ -44,9 +43,11 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKe
 
 	for _, proof := range proofs {
 		val, exists := seenKeys[proof.Id]
-		if exists {
-			units[val.Unit] = true
+		if !exists {
+			return cashu.Sat, cashu.ErrKeysetNotKnow
 		}
+
+		units[val.Unit] = true
 		if len(units) > 1 {
 			return cashu.Sat, cashu.ErrNotSameUnits
 		}
@@ -67,7 +68,10 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKe
 	}
 
 	return returnedUnit, nil
+}
 
+func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
+	return checkProofsAreSameUnit(proofs, keys)
 }
 
 func CheckChainParams(network string) (chaincfg.Params, error) {
@@ -85,7 +89,6 @@ func CheckChainParams(network string) (chaincfg.Params, error) {
 	default:
 		return chaincfg.MainNetParams, fmt.Errorf("invalid network: %s", network)
 	}
-
 }
 
 func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig *utils.NostrNotificationConfig, db database.MintDB, sig signer.Signer) (*Mint, error) {
@@ -106,7 +109,6 @@ func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig
 	}
 
 	switch config.MINT_LIGHTNING_BACKEND {
-
 	case utils.FAKE_WALLET:
 		fake_wallet := lightning.FakeWallet{
 			Network:         chainparam,

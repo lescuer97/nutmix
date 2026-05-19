@@ -14,7 +14,6 @@ import (
 )
 
 func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB, invoice *zpay32.Invoice) (cashu.MintRequestDB, error) {
-
 	status, _, err := mint.LightningBackend.CheckReceived(quote, invoice)
 	if err != nil {
 		return quote, fmt.Errorf("mint.VerifyLightingPaymentHappened(pool). %w", err)
@@ -26,14 +25,11 @@ func CheckMintRequest(mint *Mint, quote cashu.MintRequestDB, invoice *zpay32.Inv
 	// 	quote.State = cashu.PENDING
 	case lightning.FAILED:
 		quote.State = cashu.UNPAID
-
 	}
 	return quote, nil
-
 }
 
 func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.PostMeltQuoteBolt11Response, error) {
-
 	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
 		return cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
@@ -41,7 +37,8 @@ func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.Po
 
 	defer func() {
 		if err != nil {
-			if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+			rollbackErr := mint.MintDB.Rollback(ctx, tx)
+			if rollbackErr != nil {
 				slog.Warn("rollback error", slog.Any("error", rollbackErr))
 			}
 		}
@@ -88,7 +85,6 @@ func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.Po
 		quote.State = cashu.PENDING
 	case lightning.FAILED:
 		quote.State = cashu.UNPAID
-
 	}
 
 	err = mint.MintDB.AddPreimageMeltRequest(tx, quote.Quote, preimage)
@@ -102,5 +98,4 @@ func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.Po
 	}
 
 	return quote.GetPostMeltQuoteResponse(), nil
-
 }

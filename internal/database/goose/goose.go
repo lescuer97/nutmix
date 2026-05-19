@@ -16,13 +16,14 @@ const POSTGRES DatabaseType = "postgres"
 var embedMigrations embed.FS //
 
 func RunMigration(db *sql.DB, databaseType DatabaseType) error {
-
 	goose.SetBaseFS(embedMigrations)
-	if err := goose.SetDialect(string(databaseType)); err != nil {
+	err := goose.SetDialect(string(databaseType))
+	if err != nil {
 		return fmt.Errorf(`goose.SetDialect(string(databaseType)). %w`, err)
 	}
 
-	if err := goose.Up(db, "migrations"); err != nil {
+	gooseErr := goose.Up(db, "migrations")
+	if gooseErr != nil {
 		return fmt.Errorf(`goose.Up(db, "migrations"). %w`, err)
 	}
 

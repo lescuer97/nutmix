@@ -36,7 +36,6 @@ func TestUseMinimumFeeOnInvoice(t *testing.T) {
 	}
 
 	if feeRes.Fees.Amount != 100 {
-
 		t.Errorf(`Fee is not being set to the correct value. %v`, feeRes.Fees.Amount)
 	}
 }
@@ -69,7 +68,6 @@ func TestUseFeeInvoice(t *testing.T) {
 	}
 
 	if feeRes.Fees.Amount != 150 {
-
 		t.Errorf(`Fee is not being set to the correct value. %v`, feeRes.Fees)
 	}
 }

@@ -182,7 +182,6 @@ func (tags *TagsInfo) MarshalJSON() ([]byte, error) {
 }
 
 func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
-
 	var arrayToCheck [][]string
 
 	err := json.Unmarshal(b, &arrayToCheck)
@@ -192,7 +191,6 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 	}
 
 	for _, tag := range arrayToCheck {
-
 		if len(tag) < 2 {
 			return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 		}
@@ -205,7 +203,6 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 
 		tagInfo := tag[1:]
 		switch tagName {
-
 		case Sigflag:
 			if len(tagInfo) != 1 {
 				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
@@ -241,7 +238,6 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 				case Refund:
 					tags.Refund = append(tags.Refund, parsedPubkey)
 				}
-
 			}
 
 		case NSigs:
@@ -280,7 +276,6 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 
 			tags.Locktime = uint(locktime)
 		}
-
 	}
 	tags.originalTag = string(b)
 	return nil
@@ -319,7 +314,6 @@ func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 	}
 
 	return nil
-
 }
 
 type Tags int
@@ -405,8 +399,8 @@ type Witness struct {
 
 func (wit *Witness) String() (string, error) {
 	var witness = struct {
-		Preimage   string
-		Signatures []string
+		Preimage   string   `json:"preimage,omitempty"`
+		Signatures []string `json:"signatures,omitempty"`
 	}{
 		Preimage:   "",
 		Signatures: []string{},
@@ -429,8 +423,8 @@ func (wit *Witness) String() (string, error) {
 
 func (wit *Witness) UnmarshalJSON(b []byte) error {
 	var sigs = struct {
-		Preimage   string
-		Signatures []string
+		Preimage   string   `json:"preimage,omitempty"`
+		Signatures []string `json:"signatures,omitempty"`
 	}{
 		Preimage:   "",
 		Signatures: []string{},
@@ -461,13 +455,11 @@ func (wit *Witness) UnmarshalJSON(b []byte) error {
 		}
 
 		witness.Signatures = append(witness.Signatures, signature)
-
 	}
 
 	*wit = witness
 
 	return nil
-
 }
 
 type SigflagValidation struct {

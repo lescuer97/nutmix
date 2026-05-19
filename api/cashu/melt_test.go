@@ -44,7 +44,6 @@ func TestMeltRequestMsg(t *testing.T) {
 	if hex.EncodeToString(hashMessage[:]) != "9efa1067cc7dc870f4074f695115829c3cd817a6866c3b84e9814adf3c3cf262" {
 		t.Errorf("hash message is wrong %v", msg)
 	}
-
 }
 
 func TestMeltRequestValidSignature(t *testing.T) {
@@ -110,6 +109,5 @@ func TestMeltRequestValidMultiSig(t *testing.T) {
 	err = meltRequest.ValidateSigflag()
 	if err != nil {
 		t.Errorf("there should not have been any error on multisig! %+v ", err)
-
 	}
 }

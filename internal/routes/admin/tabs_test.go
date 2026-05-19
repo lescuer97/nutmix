@@ -40,7 +40,6 @@ func TestCheckIntegerFromStringFailureBool(t *testing.T) {
 	if err == nil {
 		t.Error("Check limit should have failed. Because it should not allow float")
 	}
-
 }
 
 func mustNpub(t *testing.T) string {

@@ -37,6 +37,22 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrInvalidPreimage.Error()
 		return cashu.PROOF_VERIFICATION_FAILED, &message
 
+	case errors.Is(proofError, cashu.ErrAmountlessInvoiceNotSupported):
+		message := cashu.ErrAmountlessInvoiceNotSupported.Error()
+		return cashu.AMOUNT_LESS_INVOICE_NOT_SUPPORTED, &message
+
+	case errors.Is(proofError, cashu.ErrAmountOutsideLimit):
+		message := cashu.ErrAmountOutsideLimit.Error()
+		return cashu.INSUFICIENT_OUTSIDE_LIMIT, &message
+
+	case errors.Is(proofError, cashu.ErrMintintDisabled):
+		message := cashu.ErrMintintDisabled.Error()
+		return cashu.MINTING_DISABLED, &message
+
+	case errors.Is(proofError, cashu.ErrMintRequestAlreadyIssued):
+		message := cashu.ErrMintRequestAlreadyIssued.Error()
+		return cashu.QUOTE_ALREADY_ISSUED, &message
+
 	case errors.Is(proofError, cashu.ErrLocktimePassed):
 		message := cashu.ErrLocktimePassed.Error()
 		return cashu.UNKNOWN, &message
@@ -49,6 +65,9 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrProofSpent):
 		message := cashu.ErrProofSpent.Error()
 		return cashu.PROOF_ALREADY_SPENT, &message
+	case errors.Is(proofError, cashu.ErrProofPending):
+		message := cashu.ErrProofPending.Error()
+		return cashu.PROOFS_PENDING, &message
 
 	case errors.Is(proofError, cashu.ErrNotSameUnits):
 		message := cashu.ErrNotSameUnits.Error()
@@ -66,6 +85,18 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrRepeatedInput.Error()
 		return cashu.DUPLICATE_INPUTS, &message
 
+	case errors.Is(proofError, cashu.ErrAmountNotEqualToInvoice):
+		message := cashu.ErrAmountNotEqualToInvoice.Error()
+		return cashu.AMOUNT_NOT_EQUAL_TO_INVOICE, &message
+
+	case errors.Is(proofError, cashu.ErrRequestNotPaid):
+		message := cashu.ErrRequestNotPaid.Error()
+		return cashu.REQUEST_NOT_PAID, &message
+
+	case errors.Is(proofError, cashu.ErrQuoteIsPending):
+		message := cashu.ErrQuoteIsPending.Error()
+		return cashu.QUOTE_PENDING, &message
+
 	case errors.Is(proofError, cashu.ErrUnitNotSupported):
 		message := cashu.ErrUnitNotSupported.Error()
 		return cashu.UNIT_NOT_SUPPORTED, &message
@@ -81,6 +112,10 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrBlindMessageAlreadySigned):
 		message := cashu.ErrBlindMessageAlreadySigned.Error()
 		return cashu.OUTPUTS_ALREADY_SIGNED, &message
+
+	case errors.Is(proofError, cashu.ErrKeysetNotKnow):
+		message := cashu.ErrKeysetNotKnow.Error()
+		return cashu.KEYSET_NOT_KNOW, &message
 
 	case strings.Contains(proofError.Error(), "could not obtain lock"):
 		message := "Transaction is already pending"
@@ -104,8 +139,8 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	return cashu.UNKNOWN, nil
 }
 
-// Sets some values being used by the mint like seen, secretY, seen, and pending state
-func GetAndCalculateProofsValues(proofs *cashu.Proofs) (uint64, []cashu.WrappedPublicKey, error) {
+// Sets the y and seen at field in by references and returns the Y's array
+func GetAndCalculateProofsValues(proofs *cashu.Proofs) ([]cashu.WrappedPublicKey, error) {
 	now := time.Now().Unix()
 	var totalAmount uint64
 	secretsList := make([]cashu.WrappedPublicKey, len(*proofs))
@@ -115,14 +150,14 @@ func GetAndCalculateProofsValues(proofs *cashu.Proofs) (uint64, []cashu.WrappedP
 		p, err := proof.HashSecretToCurve()
 
 		if err != nil {
-			return 0, secretsList, fmt.Errorf("proof.HashSecretToCurve(). %w", err)
+			return nil, fmt.Errorf("proof.HashSecretToCurve(). %w", err)
 		}
 		secretsList[i] = p.Y
 		(*proofs)[i] = p
 		(*proofs)[i].SeenAt = now
 	}
 
-	return totalAmount, secretsList, nil
+	return secretsList, nil
 }
 func GetMessagesForChange(overpaidFees uint64, outputs []cashu.BlindedMessage) []cashu.BlindedMessage {
 	amounts := cashu.AmountSplit(overpaidFees)
@@ -140,7 +175,6 @@ func GetMessagesForChange(overpaidFees uint64, outputs []cashu.BlindedMessage) [
 		for i := range outputs {
 			outputs[i].Amount = amounts[i]
 		}
-
 	}
 	return outputs
 }

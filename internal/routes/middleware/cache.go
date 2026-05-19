@@ -31,7 +31,6 @@ var cachedPaths = map[string]bool{
 
 func CacheMiddleware(store *persistence.InMemoryStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		if !cachedPaths[c.Request.URL.Path] {
 			c.Next()
 			return
@@ -58,7 +57,8 @@ func CacheMiddleware(store *persistence.InMemoryStore) gin.HandlerFunc {
 		c.Writer = w
 		c.Next()
 		if c.Writer.Status() == http.StatusOK {
-			if err := store.Set(cacheKey, w.body.Bytes(), 45*time.Minute); err != nil {
+			err := store.Set(cacheKey, w.body.Bytes(), 45*time.Minute)
+			if err != nil {
 				slog.Warn("failed to set cache", slog.Any("error", err))
 			}
 		}

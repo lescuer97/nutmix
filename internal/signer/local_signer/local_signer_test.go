@@ -3,6 +3,7 @@ package localsigner
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"strconv"
 	"testing"
 	"time"
@@ -42,7 +43,6 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 	keys, err := localsigner.GetKeysets()
 	if err != nil {
 		t.Fatalf("localsigner.GetKeys() %+v", err)
-
 	}
 	if len(keys.Keysets) != 3 {
 		t.Errorf("Version should be 3. it's %v", len(keys.Keysets))
@@ -122,10 +122,8 @@ func TestRotateAuthSeedUnit(t *testing.T) {
 	keys, err := localsigner.GetAuthActiveKeys()
 	if err != nil {
 		t.Fatalf("localsigner.GetKeys() %+v", err)
-
 	}
 	if len(keys.Keysets) != 1 {
-
 		t.Errorf("There should only be one keyset for auth. there is: %v", len(keys.Keysets))
 	}
 
@@ -284,6 +282,57 @@ func TestMixedV1AndV2Keysets(t *testing.T) {
 	}
 }
 
+func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
+	db := mockdb.MockDB{} //nolint:exhaustruct
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+
+	_, _, err = localsigner.SignBlindMessages([]cashu.BlindedMessage{{
+		B_:      cashu.WrappedPublicKey{PublicKey: nil},
+		Id:      "missing-keyset",
+		Witness: "",
+		Amount:  1,
+	}})
+	if err == nil {
+		t.Fatal("expected missing keyset to fail")
+	}
+	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
+		t.Errorf("Error should be keyset not known. %v", err)
+	}
+}
+
+func TestVerifyProofsFailsForUnknownKeyset(t *testing.T) {
+	db := mockdb.MockDB{} //nolint:exhaustruct
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+
+	err = localsigner.VerifyProofs([]cashu.Proof{{
+		C:       cashu.WrappedPublicKey{PublicKey: nil},
+		Y:       cashu.WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "missing-keyset",
+		Secret:  "",
+		Witness: "",
+		State:   "",
+		Amount:  1,
+		SeenAt:  0,
+	}})
+	if err == nil {
+		t.Fatal("expected missing keyset to fail")
+	}
+	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
+		t.Errorf("Error should be keyset not known. %v", err)
+	}
+}
+
 // Test Vectors Remote signer
 func TestSatConvertToInteger(t *testing.T) {
 	intRef := parseUnitToIntegerReference(cashu.Sat.String())
@@ -324,7 +373,6 @@ func TestAuthConvertToInteger(t *testing.T) {
 	if intRef != 1222349093 {
 		t.Errorf("auth bytes are wrong %v", intRef)
 	}
-
 }
 
 func TestDeriveKeysetSat(t *testing.T) {
@@ -509,7 +557,6 @@ func TestDeriveKeysetAuth(t *testing.T) {
 	if id != "00e1cf6079abb988" {
 		t.Errorf("id was incorrect. %v", id)
 	}
-
 }
 
 func TestLoadLegacyAndNonLegacySeeds(t *testing.T) {

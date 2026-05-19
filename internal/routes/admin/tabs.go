@@ -330,7 +330,6 @@ func MintSettingsLightning(mint *m.Mint) gin.HandlerFunc {
 		pegoutOnly := c.Request.PostFormValue("PEG_OUT_ONLY")
 		if pegoutOnly == "on" {
 			mint.Config.PEG_OUT_ONLY = true
-
 		} else {
 			mint.Config.PEG_OUT_ONLY = false
 		}
@@ -746,7 +745,6 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		)
 
 		switch c.Request.PostFormValue("MINT_LIGHTNING_BACKEND") {
-
 		case string(utils.FAKE_WALLET):
 			newBackendType = utils.FAKE_WALLET
 			fakeWalletBackend := lightning.FakeWallet{
@@ -862,9 +860,10 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		// We use a dummy quote ID to avoid messing with real DB if possible.
 		testQuote := "verification-test-" + strconv.FormatInt(time.Now().Unix(), 10)
 		//nolint:exhaustruct
+		testDescription := testQuote
 		invoiceResp, err := newBackend.RequestInvoice(
-			cashu.MintRequestDB{Quote: testQuote},
 			cashu.NewAmount(cashu.Sat, 100),
+			&testDescription,
 		)
 		if err != nil {
 			slog.Warn("newBackend.RequestInvoice failed during verification", slog.String("err", err.Error()))

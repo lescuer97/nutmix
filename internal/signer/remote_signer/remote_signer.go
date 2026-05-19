@@ -83,7 +83,6 @@ func clientVersionInterceptor() grpc.UnaryClientInterceptor {
 
 // gets all active keys
 func (s *RemoteSigner) setupSignerPubkeys() error {
-
 	ctx := context.Background()
 	emptyRequest := sig.EmptyRequest{}
 
@@ -161,9 +160,11 @@ func (s *RemoteSigner) setupSignerPubkeys() error {
 
 // gets all active keys
 func (s *RemoteSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
-	var keys []MintPublicKeyset
+	keys := make([]MintPublicKeyset, len(s.activeKeysets))
+	indexActiveKeysets := 0
 	for _, keyset := range s.activeKeysets {
-		keys = append(keys, keyset)
+		keys[indexActiveKeysets] = keyset
+		indexActiveKeysets++
 	}
 	return OrderKeysetByUnit(keys), nil
 }
@@ -178,7 +179,6 @@ func (s *RemoteSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 
 // gets all keys from the signer
 func (s *RemoteSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
-
 	var response signer.GetKeysetsResponse
 	for _, seed := range s.keysets {
 		if seed.Unit != cashu.AUTH.String() {
@@ -196,7 +196,6 @@ func (s *RemoteSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 }
 
 func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours uint) error {
-
 	ctx := context.Background()
 
 	unitSig, err := ConvertCashuUnitToSignature(unit)
@@ -241,7 +240,6 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hour
 }
 
 func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
-
 	ctx := context.Background()
 	blindedMessageRequest := sig.BlindedMessages{
 		BlindedMessages: make([]*sig.BlindedMessage, len(messages)),
@@ -293,21 +291,18 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 			Dleq:      val.Dleq,
 			MeltQuote: "",
 		})
-
 	}
 
 	return blindSigs, recoverySigs, nil
 }
 
 func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {
-
 	ctx := context.Background()
 	// INFO: we verify locally if the proofs are locked and valid before sending to the crypto signer
 	proofsVericationRequest := sig.Proofs{
 		Proof: make([]*sig.Proof, len(proofs)),
 	}
 	for i, val := range proofs {
-
 		C := val.C.SerializeCompressed()
 
 		bytesId, err := hex.DecodeString(val.Id)
@@ -343,7 +338,6 @@ func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {
 }
 
 func (s *RemoteSigner) GetSignerPubkey() (string, error) {
-
 	return hex.EncodeToString(s.pubkey), nil
 }
 
@@ -364,7 +358,6 @@ func (l *RemoteSigner) GetAuthActiveKeys() (signer.GetKeysResponse, error) {
 }
 
 func (s *RemoteSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error) {
-
 	val, exists := s.keysets[id]
 	if exists {
 		if val.Unit == cashu.AUTH.String() {

@@ -15,7 +15,6 @@ import (
 
 func (m *MockDB) SaveNostrAuth(auth database.NostrLoginAuth) error {
 	return nil
-
 }
 
 func (m *MockDB) UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error {
@@ -25,28 +24,22 @@ func (m *MockDB) UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bo
 func (m *MockDB) GetNostrAuth(tx pgx.Tx, nonce string) (database.NostrLoginAuth, error) {
 	var seeds []database.NostrLoginAuth
 	for i := 0; i < len(m.NostrAuth); i++ {
-
 		if m.Seeds[i].Unit == nonce {
 			seeds = append(seeds, m.NostrAuth[i])
-
 		}
-
 	}
 	return seeds[0], nil
-
 }
 
 func (m *MockDB) AddLiquiditySwap(tx pgx.Tx, swap utils.LiquiditySwap) error {
 	m.LiquiditySwap = append(m.LiquiditySwap, swap)
 	return nil
-
 }
 func (m *MockDB) ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.SwapState) error {
 	for i := 0; i < len(m.LiquiditySwap); i++ {
 		if m.LiquiditySwap[i].Id == id {
 			m.LiquiditySwap[i].State = state
 		}
-
 	}
 
 	return nil
@@ -55,12 +48,9 @@ func (m *MockDB) ChangeLiquiditySwapState(tx pgx.Tx, id string, state utils.Swap
 func (m *MockDB) GetLiquiditySwapById(tx pgx.Tx, id string) (utils.LiquiditySwap, error) {
 	var liquiditySwaps []utils.LiquiditySwap
 	for i := 0; i < len(m.LiquiditySwap); i++ {
-
 		if m.LiquiditySwap[i].Id == id {
 			liquiditySwaps = append(liquiditySwaps, m.LiquiditySwap[i])
-
 		}
-
 	}
 
 	return liquiditySwaps[0], nil
@@ -76,11 +66,9 @@ func (m *MockDB) GetLiquiditySwapsByStates(tx pgx.Tx, states []utils.SwapState) 
 		if slices.Contains(states, m.LiquiditySwap[i].State) {
 			liquiditySwaps = append(liquiditySwaps, m.LiquiditySwap[i].Id)
 		}
-
 	}
 
 	return liquiditySwaps, nil
-
 }
 
 func cloneStringPtr(value *string) *string {

@@ -145,7 +145,6 @@ func TestUnblindSignature(t *testing.T) {
 		if CHex != test.expected {
 			t.Errorf("expected '%v' but got '%v' instead\n", test.expected, CHex)
 		}
-
 	}
 }
 
@@ -213,5 +212,4 @@ func TestHashE(t *testing.T) {
 	if hex.EncodeToString(hash[:]) != "a4dc034b74338c28c6bc3ea49731f2a24440fc7c4affc08b31a93fc9fbe6401e" {
 		t.Errorf("hash is not correct. got: \n\n %v", hex.EncodeToString(hash[:]))
 	}
-
 }

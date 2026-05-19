@@ -21,7 +21,8 @@ func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) ([]c
 		return blindSigs, errors.New("signer response is nil")
 	}
 
-	if err := signerValidator.Struct(sigs); err != nil {
+	err := signerValidator.Struct(sigs)
+	if err != nil {
 		return blindSigs, fmt.Errorf("signer response validation failed: %w", err)
 	}
 
@@ -32,7 +33,8 @@ func ConvertSigBlindSignaturesToCashuBlindSigs(sigs *sig.BlindSignResponse) ([]c
 			return blindSigs, fmt.Errorf("signer signature validation failed at index %d: %w", i, err)
 		}
 		if val.Dleq != nil {
-			if err := signerValidator.Struct(val.Dleq); err != nil {
+			err := signerValidator.Struct(val.Dleq)
+			if err != nil {
 				return blindSigs, fmt.Errorf("signer signature dleq validation failed at index %d: %w", i, err)
 			}
 		}
@@ -99,7 +101,8 @@ func ConvertSigUnitToCashuUnit(sigUnit *sig.CurrencyUnit) (cashu.Unit, error) {
 	if sigUnit == nil {
 		return cashu.Sat, errors.New("signer currency unit is nil")
 	}
-	if err := signerValidator.Struct(sigUnit); err != nil {
+	err := signerValidator.Struct(sigUnit)
+	if err != nil {
 		return cashu.Sat, fmt.Errorf("signer currency unit validation failed: %w", err)
 	}
 

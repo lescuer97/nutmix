@@ -134,7 +134,6 @@ func (l *CLNGRPCWallet) clnGrpcPayInvoice(invoice string, feeReserve cashu.Amoun
 	lightningResponse.PaidFee = feePaidMsat
 
 	return nil
-
 }
 func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 	_ *zpay32.Invoice,
@@ -192,7 +191,6 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 	lightningResponse.PaidFee = feePaidMsat
 
 	return nil
-
 }
 
 func (l CLNGRPCWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
@@ -250,9 +248,7 @@ func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkin
 			return PENDING, hex.EncodeToString(pay.PaymentHash), fee, nil
 		case cln_grpc.ListpaysPays_FAILED:
 			return FAILED, hex.EncodeToString(pay.PaymentHash), fee, nil
-
 		}
-
 	}
 	return PENDING, "", fee, nil
 }
@@ -279,9 +275,7 @@ func (l CLNGRPCWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 
 		case cln_grpc.ListinvoicesInvoices_UNPAID:
 			return PENDING, hex.EncodeToString(invoice.PaymentHash), nil
-
 		}
-
 	}
 	return PENDING, "", nil
 }
@@ -351,7 +345,7 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 	return feesResponse, nil
 }
 
-func (l CLNGRPCWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
+func (l CLNGRPCWallet) RequestInvoice(amount cashu.Amount, description *string) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	supported := l.VerifyUnitSupport(amount.Unit)
 	if !supported {
@@ -379,16 +373,14 @@ func (l CLNGRPCWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Am
 		return response, fmt.Errorf(`uuid.NewRandom() %w`, err)
 	}
 
-	//nolint:exhaustruct
-	req := cln_grpc.InvoiceRequest{
-		AmountMsat: &cln_grpc.AmountOrAny{
-			Value: &amountOrAllCln,
-		},
-		Label:       randUuid.String(),
-		Description: "",
+	amountOrAny := cln_grpc.AmountOrAny{
+		Value: &amountOrAllCln,
 	}
-	if quote.Description != nil {
-		req.Description = *quote.Description
+	var req cln_grpc.InvoiceRequest
+	req.AmountMsat = &amountOrAny
+	req.Label = randUuid.String()
+	if description != nil {
+		req.Description = *description
 	}
 
 	// Expiry time is 15 minutes
@@ -423,9 +415,7 @@ func (l CLNGRPCWallet) WalletBalance() (cashu.Amount, error) {
 	fundsMSat := uint64(0)
 
 	for _, channel := range balance.Channels {
-
 		fundsMSat += channel.OurAmountMsat.Msat
-
 	}
 
 	return cashu.NewAmount(cashu.Msat, fundsMSat), nil

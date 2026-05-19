@@ -121,15 +121,16 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 		defer func() {
 			if p := recover(); p != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				rollbackErr := mint.MintDB.Rollback(ctx, tx)
+				if rollbackErr != nil {
 					if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 						slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 					}
 				}
-
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
-				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				rollbackErr := mint.MintDB.Rollback(ctx, tx)
+				if rollbackErr != nil {
 					if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 						slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 					}
@@ -205,12 +206,10 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 }
 
 func makeJWTToken(secret []byte) (string, error) {
-
 	token := jwt.New(jwt.SigningMethodHS256)
 	string, err := token.SignedString(secret)
 	if err != nil {
 		return "", fmt.Errorf("token.SignedString(secret) %v", err)
-
 	}
 	return string, nil
 }

@@ -58,7 +58,6 @@ func TestGenerateDLEQ(t *testing.T) {
 	if !verify {
 		t.Errorf("DLEQ is not correct")
 	}
-
 }
 
 func TestCashuAmountChangeSatToMsat(t *testing.T) {
@@ -305,7 +304,6 @@ func TestNut20SuccessfulSignature(t *testing.T) {
 	if !valid {
 		t.Error("signature should be valid")
 	}
-
 }
 func TestNut20FailureSignature(t *testing.T) {
 	jsonStr := `{
@@ -375,5 +373,4 @@ func TestNut20FailureSignature(t *testing.T) {
 	if valid {
 		t.Error("signature should be valid")
 	}
-
 }

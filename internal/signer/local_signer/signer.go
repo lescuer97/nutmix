@@ -61,7 +61,6 @@ func SetupLocalSigner(db database.MintDB) (LocalSigner, error) {
 			return localsigner, fmt.Errorf("db.SaveNewSeeds([]cashu.Seed{newSeed}). %w", err)
 		}
 		seeds = append(seeds, newSeed)
-
 	}
 	keysets, activeKeysets, err := GetKeysetsFromSeeds(seeds, masterKey)
 	if err != nil {
@@ -96,7 +95,6 @@ func (l *LocalSigner) GetActiveKeys() (signer.GetKeysResponse, error) {
 }
 
 func (l *LocalSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
-
 	val, exists := l.keysets[id]
 	if exists {
 		var keys []cashu.MintKey
@@ -107,7 +105,6 @@ func (l *LocalSigner) GetKeysById(id string) (signer.GetKeysResponse, error) {
 		}
 
 		return signer.OrderKeysetByUnit(keys), nil
-
 	}
 	return signer.GetKeysResponse{}, signer.ErrNoKeysetFound
 }
@@ -186,11 +183,9 @@ func (l *LocalSigner) createNewSeed(mintPrivateKey *hdkeychain.ExtendedKey, unit
 	if final_expiry != nil {
 		timestamp := uint64(final_expiry.Unix())
 		newSeed.FinalExpiry = &timestamp
-
 	}
 
 	return newSeed, nil
-
 }
 
 func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours uint) error {
@@ -200,7 +195,8 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 		return fmt.Errorf("l.db.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if err := l.db.Rollback(ctx, tx); err != nil {
+		err := l.db.Rollback(ctx, tx)
+		if err != nil {
 			if !errors.Is(err, pgx.ErrTxClosed) {
 				slog.Warn("rotate keyset sql transaction error", slog.Any("error", err))
 			}
@@ -213,7 +209,6 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("database.GetSeedsByUnit(tx, unit). %w", err)
-
 		}
 	}
 
@@ -280,13 +275,21 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 }
 
 func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
-	var blindedSignatures []cashu.BlindSignature
-	var recoverSigDB []cashu.RecoverSigDB
+	var blindedSignatures = make([]cashu.BlindSignature, len(messages))
+	var recoverSigDB = make([]cashu.RecoverSigDB, len(messages))
 
-	for _, output := range messages {
-		correctKeyset := l.activeKeysets[output.Id][output.Amount]
+	for i, output := range messages {
+		keysetsByAmount, exists := l.activeKeysets[output.Id]
+		if !exists {
+			return nil, nil, cashu.ErrKeysetNotKnow
+		}
 
-		if correctKeyset.PrivKey == nil || !correctKeyset.Active {
+		correctKeyset, exists := keysetsByAmount[output.Amount]
+		if !exists || correctKeyset.PrivKey == nil {
+			return nil, nil, cashu.ErrKeysetNotKnow
+		}
+
+		if !correctKeyset.Active {
 			return nil, nil, cashu.ErrUsingInactiveKeyset
 		}
 
@@ -307,16 +310,13 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 			return nil, nil, err
 		}
 
-		blindedSignatures = append(blindedSignatures, blindSignature)
-		recoverSigDB = append(recoverSigDB, recoverySig)
-
+		blindedSignatures[i] = blindSignature
+		recoverSigDB[i] = recoverySig
 	}
 	return blindedSignatures, recoverSigDB, nil
-
 }
 
 func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof) error {
-
 	for _, proof := range proofs {
 		err := l.validateProof(proof)
 		if err != nil {
@@ -332,7 +332,7 @@ func (l *LocalSigner) validateProof(proof cashu.Proof) error {
 
 	keysets, exists := l.keysets[proof.Id]
 	if !exists {
-		return cashu.ErrKeysetForProofNotFound
+		return cashu.ErrKeysetNotKnow
 	}
 
 	for _, keyset := range keysets {
@@ -344,7 +344,7 @@ func (l *LocalSigner) validateProof(proof cashu.Proof) error {
 
 	// check if keysetToUse is not assigned
 	if keysetToUse.Id == "" {
-		return cashu.ErrKeysetForProofNotFound
+		return cashu.ErrKeysetNotKnow
 	}
 	verified := crypto.Verify(proof.Secret, keysetToUse.PrivKey, proof.C.PublicKey)
 	if !verified {
@@ -352,7 +352,6 @@ func (l *LocalSigner) validateProof(proof cashu.Proof) error {
 	}
 
 	return nil
-
 }
 func (l *LocalSigner) GetSignerPubkey() (string, error) {
 	return hex.EncodeToString(l.pubkey.SerializeCompressed()), nil
@@ -378,7 +377,6 @@ func (l *LocalSigner) GetAuthActiveKeys() (signer.GetKeysResponse, error) {
 }
 
 func (l *LocalSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error) {
-
 	val, exists := l.keysets[id]
 	if exists {
 		var keys []cashu.MintKey
@@ -389,7 +387,6 @@ func (l *LocalSigner) GetAuthKeysById(id string) (signer.GetKeysResponse, error)
 		}
 
 		return signer.OrderKeysetByUnit(keys), nil
-
 	}
 	return signer.GetKeysResponse{}, signer.ErrNoKeysetFound
 }

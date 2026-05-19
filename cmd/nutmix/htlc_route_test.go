@@ -210,11 +210,9 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 
 	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Proof could not be verified" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// TRY SWAPING with WRONG Preimage
@@ -260,7 +258,6 @@ func TestRoutesHTLCSwapMelt(t *testing.T) {
 	if *errorRes.Detail != `invalid preimage` {
 		t.Fatalf("Expected response Invalid preimage, got %s", w.Body.String())
 	}
-
 }
 
 func CreateHTLCBlindedMessages(amount uint64, keyset signer.GetKeysResponse, preimage string, nSigs uint, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime uint, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
@@ -310,7 +307,6 @@ func CreateHTLCBlindedMessages(amount uint64, keyset signer.GetKeysResponse, pre
 }
 
 func makeHTLCSpendCondition(preimage string, nSigs uint, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime uint, sigflag cashu.SigFlag) (cashu.SpendCondition, error) {
-
 	bytesPreimage, err := hex.DecodeString(preimage)
 	if err != nil {
 		return cashu.SpendCondition{}, err
@@ -340,10 +336,9 @@ func makeHTLCSpendCondition(preimage string, nSigs uint, pubkeys []*secp256k1.Pu
 
 func GenerateProofsHTLC(signatures []cashu.BlindSignature, preimage string, keyset signer.GetKeysResponse, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 	// try to swap tokens
-	var proofs []cashu.Proof
+	var proofs = make([]cashu.Proof, len(signatures))
 	// unblid the signatures and make proofs
 	for i, output := range signatures {
-
 		pubkeyStr := keyset.Keysets[0].Keys[output.Amount]
 		pubkeyBytes, err := hex.DecodeString(pubkeyStr)
 		if err != nil {
@@ -374,7 +369,7 @@ func GenerateProofsHTLC(signatures []cashu.BlindSignature, preimage string, keys
 			return nil, fmt.Errorf("Error signing proof: %w", err)
 		}
 
-		proofs = append(proofs, proof)
+		proofs[i] = proof
 	}
 
 	return proofs, nil
@@ -641,11 +636,9 @@ func TestHTLCMultisigSigning(t *testing.T) {
 
 	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Proof could not be verified" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// Try swapping with not enough signatures
@@ -683,11 +676,9 @@ func TestHTLCMultisigSigning(t *testing.T) {
 
 	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Proof could not be verified" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
 
 	// Try swapping with correct signatures but wrong preimage
@@ -762,5 +753,4 @@ func TestHTLCMultisigSigning(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("Expected status code 200, got %d", w.Code)
 	}
-
 }

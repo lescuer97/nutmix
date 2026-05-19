@@ -326,13 +326,11 @@ func (p Proof) IsProofSpendConditioned() (bool, *SpendCondition, error) {
 	spendCondition, err := p.parseSpendCondition()
 	if err != nil {
 		return false, nil, fmt.Errorf("p.parseSpendCondition(). %w", err)
-
 	}
 	return true, spendCondition, nil
 }
 
 func (p Proof) HashSecretToCurve() (Proof, error) {
-
 	// Get Hash to curve of secret
 	parsedProof := []byte(p.Secret)
 
@@ -379,7 +377,6 @@ func (p *Proof) Sign(privkey *secp256k1.PrivateKey) error {
 	return nil
 }
 func (p *Proof) AddPreimage(preimage string) error {
-
 	var witness Witness
 	if p.Witness == "" {
 		witness = Witness{
@@ -446,7 +443,6 @@ func VerifyProofsSpendConditions(proofs Proofs) error {
 			return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
 		}
 		if isLocked {
-
 			err = spendCondition.CheckValid()
 			if err != nil {
 				return fmt.Errorf("spendCondition.CheckValid(). %w", err)
@@ -469,7 +465,6 @@ func VerifyProofsSpendConditions(proofs Proofs) error {
 					return ErrInvalidSpendCondition
 				}
 			}
-
 		}
 		if !isLocked {
 			if len(proof.Secret) != 64 {

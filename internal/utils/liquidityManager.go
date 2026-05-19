@@ -46,13 +46,11 @@ const LiquidityOut SwapType = "LiquidityOut"
 const LiquidityIn SwapType = "LiquidityIn"
 
 func (s SwapType) ToString() string {
-
 	switch s {
 	case LiquidityOut:
 		return "Out"
 	case LiquidityIn:
 		return "In"
-
 	}
 	return ""
 }

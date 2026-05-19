@@ -18,7 +18,6 @@ var ErrUnitNotCorrect = errors.New("unit not correct")
 var ErrNoExpiryTime = errors.New("no expiry time provided")
 
 func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
-
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		availableUnits := []cashu.Unit{cashu.Sat, cashu.Msat, cashu.USD, cashu.EUR}
@@ -35,7 +34,6 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 			// c.HTML(400,"", nil)
 			return
 		}
-
 	}
 }
 func KeysetsLayoutPage(adminHandler *adminHandler) gin.HandlerFunc {
@@ -56,9 +54,9 @@ func KeysetsLayoutPage(adminHandler *adminHandler) gin.HandlerFunc {
 }
 
 type RotateRequest struct {
-	Fee              uint
-	Unit             cashu.Unit
-	ExpireLimitHours uint
+	Fee              uint       `json:"fee,omitempty"`
+	Unit             cashu.Unit `json:"unit,omitempty"`
+	ExpireLimitHours uint       `json:"expire_limit,omitempty"`
 }
 
 func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
@@ -142,7 +140,6 @@ func RotateSatsSeed(adminHandler *adminHandler) gin.HandlerFunc {
 		if c.ContentType() == gin.MIMEJSON {
 			c.JSON(200, nil)
 		} else {
-
 			c.Header("HX-Trigger", "recharge-keyset")
 			err := RenderSuccess(c, "Key successfully rotated")
 			if err != nil {

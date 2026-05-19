@@ -16,7 +16,7 @@ import (
 )
 
 func GenerateKeysets(versionKey *hdkeychain.ExtendedKey, seed cashu.Seed) ([]cashu.MintKey, error) {
-	var keysets []cashu.MintKey
+	var keysets = make([]cashu.MintKey, len(seed.Amounts))
 
 	// Get the current time
 	currentTime := time.Now()
@@ -49,7 +49,7 @@ func GenerateKeysets(versionKey *hdkeychain.ExtendedKey, seed cashu.Seed) ([]cas
 			FinalExpiry: nil,
 		}
 
-		keysets = append(keysets, keyset)
+		keysets[i] = keyset
 	}
 
 	return keysets, nil
@@ -90,7 +90,6 @@ func sortPubkeyMapToOrganizedArray(pubkeyMap map[uint64]*btcec.PublicKey) []pubk
 		return int(a.Amount) - int(b.Amount)
 	})
 	return arrayPubkeys
-
 }
 
 func generateKeysetV2Preimage(sortedPubkeyArray []pubkeyWithAmount, unit string, fee uint, finalExpiry *time.Time) string {
@@ -146,10 +145,8 @@ func getDerivationSteps(path string) ([]uint32, error) {
 	derivationPaths := make([]uint32, len(derivationPathSeparation))
 
 	for i := range derivationPathSeparation {
-
 		splitDer := strings.Split(derivationPathSeparation[i], "'")
 		if len(splitDer) == 2 {
-
 			derIndex, err := strconv.ParseUint(splitDer[0], 10, 32)
 			if err != nil {
 				return nil, fmt.Errorf("could not convert derivation path. %w", err)
@@ -165,15 +162,12 @@ func getDerivationSteps(path string) ([]uint32, error) {
 		}
 		derivationPaths[i] = uint32(derIndex)
 		continue
-
 	}
 
 	return derivationPaths, nil
-
 }
 
 func deriveSeed(seed cashu.Seed, mintKey *hdkeychain.ExtendedKey) ([]cashu.MintKey, error) {
-
 	if seed.Legacy {
 		legacyKey, err := legacyGetMintPrivateKey()
 		if err != nil {
@@ -223,7 +217,6 @@ func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *hdkeychain.ExtendedKey) (m
 			newSeedId = DeriveKeysetIdV2(pubkeysWithValues, seed.Unit, seed.InputFeePpk, finalExpiry)
 		default:
 			return nil, nil, fmt.Errorf("could not generate a seed id")
-
 		}
 
 		if newSeedId != seed.Id {
@@ -242,5 +235,4 @@ func GetKeysetsFromSeeds(seeds []cashu.Seed, mintKey *hdkeychain.ExtendedKey) (m
 		newKeysets[seed.Id] = mintkeyMap
 	}
 	return newKeysets, newActiveKeysets, nil
-
 }

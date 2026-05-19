@@ -71,7 +71,6 @@ func (h *NostrErrorNotifyHandler) Handle(ctx context.Context, record slog.Record
 		ctx, cancel := context.WithTimeout(parentCtx, 7*time.Second)
 		defer cancel()
 		for _, pubkey := range h.mint.NostrNotificationConfig.NOSTR_NOTIFICATION_NPUBS {
-
 			_ = h.SendPrivateNostrMessage(ctx, pubkey, payload)
 		}
 	}(ctx, message)

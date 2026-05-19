@@ -197,13 +197,10 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 
 	if errorResponse.Code != cashu.PROOF_VERIFICATION_FAILED {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
-
 	}
 	if errorResponse.Error != "Proof could not be verified" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
-
 }
 
 func CreateP2PKBlindedMessages(amount uint64, keyset signer.GetKeysResponse, pubkey *secp256k1.PublicKey, nSigs uint, pubkeys []*secp256k1.PublicKey, refundPubkey []*secp256k1.PublicKey, locktime uint, sigflag cashu.SigFlag) ([]cashu.BlindedMessage, []string, []*secp256k1.PrivateKey, error) {
@@ -274,10 +271,9 @@ func makeP2PKSpendCondition(pubkey *secp256k1.PublicKey, nSigs uint, pubkeys []*
 
 func GenerateProofsP2PK(signatures []cashu.BlindSignature, keyset signer.GetKeysResponse, secrets []string, secretsKey []*secp256k1.PrivateKey, privkeys []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
 	// try to swap tokens
-	var proofs []cashu.Proof
+	var proofs = make([]cashu.Proof, len(signatures))
 	// unblid the signatures and make proofs
 	for i, output := range signatures {
-
 		pubkeyStr := keyset.Keysets[0].Keys[output.Amount]
 		pubkeyBytes, err := hex.DecodeString(pubkeyStr)
 		if err != nil {
@@ -303,7 +299,7 @@ func GenerateProofsP2PK(signatures []cashu.BlindSignature, keyset signer.GetKeys
 			return nil, fmt.Errorf("Error signing proof: %w", err)
 		}
 
-		proofs = append(proofs, proof)
+		proofs[i] = proof
 	}
 
 	return proofs, nil
@@ -572,7 +568,5 @@ func TestP2PKMultisigSigning(t *testing.T) {
 	}
 	if errorResponse.Error != "Proof could not be verified" {
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
-
 	}
-
 }

@@ -38,7 +38,8 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err := conn.Close(); err != nil {
+			err := conn.Close()
+			if err != nil {
 				slog.Warn("failed to close websocket connection", slog.Any("error", err))
 			}
 		}()
@@ -157,7 +158,6 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 				return
 			}
 		}
-
 	})
 }
 
@@ -180,7 +180,6 @@ func handleWSRequest(request cashu.WsRequest, observer *m.Observer, proofChan ch
 			for _, filter := range request.Params.Filters {
 				observer.AddMeltWatch(filter, m.MeltQuoteChannel{Channel: meltChan, SubId: request.Params.SubId})
 			}
-
 		}
 
 	case cashu.Unsubcribe:
@@ -217,7 +216,6 @@ func ListenToIncommingMessage(subs *m.Observer, conn *websocket.Conn, listenChan
 }
 
 func CheckStatusOfSub(ctx context.Context, request cashu.WsRequest, mint *m.Mint, conn *websocket.Conn) error {
-
 	statusNotif := cashu.WsNotification{
 		JsonRpc: "2.0",
 		Method:  cashu.Subcribe,
@@ -240,7 +238,8 @@ func CheckStatusOfSub(ctx context.Context, request cashu.WsRequest, mint *m.Mint
 		}
 		defer func() {
 			if err != nil {
-				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+				rollbackErr := mint.MintDB.Rollback(ctx, tx)
+				if rollbackErr != nil {
 					slog.Warn("rollback error", slog.Any("error", rollbackErr))
 				}
 			}
@@ -354,7 +353,6 @@ func CheckStatusOfSub(ctx context.Context, request cashu.WsRequest, mint *m.Mint
 				}
 			}
 		}
-
 	}
 	return nil
 }

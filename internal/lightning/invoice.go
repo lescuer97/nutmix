@@ -20,14 +20,12 @@ import (
 // MPP invoice.
 func mockMppPaymentHashAndPreimage(d *invoicesrpc.AddInvoiceData) (*lntypes.Preimage,
 	lntypes.Hash, error) {
-
 	var (
 		paymentPreimage *lntypes.Preimage
 		paymentHash     lntypes.Hash
 	)
 
 	switch {
-
 	// Only either preimage or hash can be set.
 	case d.Preimage != nil && d.Hash != nil:
 		return nil, lntypes.Hash{},
@@ -60,7 +58,6 @@ func CreateMockInvoice(amountSats cashu.Amount, description string, network chai
 	err := amountSats.To(cashu.Msat)
 	if err != nil {
 		return "", fmt.Errorf("amountSats.To(cashu.Msat): %w", err)
-
 	}
 	milsats, err := lnrpc.UnmarshallAmt(0, int64(amountSats.Amount))
 	if err != nil {
@@ -102,7 +99,6 @@ func CreateMockInvoice(amountSats cashu.Amount, description string, network chai
 
 	if err != nil {
 		return "", err
-
 	}
 
 	payReqString, err := payReq.Encode(zpay32.MessageSigner{

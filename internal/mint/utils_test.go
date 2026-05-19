@@ -45,7 +45,7 @@ func TestIsInternalTransactionSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.Commit(ctx, tx): %+v ", err)
 	}
-	isInternal, err := mint.IsInternalTransaction(RegtestRequest)
+	isInternal, err := mint.IsInternalTransaction(ctx, RegtestRequest)
 	if err != nil {
 		t.Fatalf("mint.IsInternalTransaction(RegtestRequest): %+v ", err)
 	}
@@ -53,7 +53,6 @@ func TestIsInternalTransactionSuccess(t *testing.T) {
 	if !isInternal {
 		t.Error("should be internal transaction")
 	}
-
 }
 func TestIsInternalTransactionFail(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
@@ -88,7 +87,7 @@ func TestIsInternalTransactionFail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.MintDB.Commit(ctx, tx): %+v ", err)
 	}
-	isInternal, err := mint.IsInternalTransaction(RegtestRequest)
+	isInternal, err := mint.IsInternalTransaction(ctx, RegtestRequest)
 	if err != nil {
 		t.Fatalf("mint.IsInternalTransaction(RegtestRequest): %+v ", err)
 	}
@@ -96,7 +95,6 @@ func TestIsInternalTransactionFail(t *testing.T) {
 	if isInternal {
 		t.Error("should be external transaction")
 	}
-
 }
 
 func TestVerifyUnitOfProofFail(t *testing.T) {
@@ -210,7 +208,80 @@ func TestVerifyUnitOfProofPass(t *testing.T) {
 	if unit != cashu.Sat {
 		t.Errorf("Unit should be Sat. %v", err)
 	}
+}
 
+func TestVerifyUnitOfProofFailsForUnknownKeyset(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+
+	keysets, err := mint.Signer.GetKeysets()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
+	}
+
+	proofs := cashu.Proofs{
+		{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      keysets.Keysets[0].Id,
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
+		{
+			C:       cashu.WrappedPublicKey{PublicKey: nil},
+			Y:       cashu.WrappedPublicKey{PublicKey: nil},
+			Quote:   nil,
+			Id:      "missing-keyset",
+			Secret:  "",
+			Witness: "",
+			State:   "",
+			Amount:  0,
+			SeenAt:  0,
+		},
+	}
+
+	_, err = mint.CheckProofsAreSameUnit(proofs, keysets.Keysets)
+	if err == nil {
+		t.Fatal("expected missing keyset to fail")
+	}
+	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
+		t.Errorf("Error should be keyset not known. %v", err)
+	}
+}
+
+func TestVerifyOutputsFailsForUnknownKeyset(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+
+	keysets, err := mint.Signer.GetKeysets()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
+	}
+
+	outputs := []cashu.BlindedMessage{
+		{
+			B_:      cashu.WrappedPublicKey{PublicKey: nil},
+			Id:      keysets.Keysets[0].Id,
+			Witness: "",
+			Amount:  0,
+		},
+		{
+			B_:      cashu.WrappedPublicKey{PublicKey: nil},
+			Id:      "missing-keyset",
+			Witness: "",
+			Amount:  0,
+		},
+	}
+
+	_, err = mint.VerifyOutputs(outputs, keysets.Keysets)
+	if err == nil {
+		t.Fatal("expected missing keyset to fail")
+	}
+	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
+		t.Errorf("Error should be keyset not known. %v", err)
+	}
 }
 
 func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
@@ -221,10 +292,6 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 		t.Fatalf("mint.Signer.RotateKeyset(cashu.EUR, 0): %+v ", err)
 	}
 
-	keysets, err := mint.Signer.GetKeysets()
-	if err != nil {
-		t.Fatalf("mint.Signer.GetKeys(): %+v ", err)
-	}
 	b_bytes1, err := hex.DecodeString("02a9acc1e48c25eeeb9289b5031cc57da9fe72f3fe2861d264bdc074209b107ba2")
 	if err != nil {
 		t.Fatalf("Error decoding b_bytes1: %+v", err)
@@ -247,20 +314,15 @@ func TestVerifyOutputsFailRepeatedOutput(t *testing.T) {
 		{B_: cashu.WrappedPublicKey{PublicKey: B_2}, Id: "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52", Witness: "", Amount: 0},
 	}
 
-	tx, err := mint.MintDB.GetTx(context.Background())
+	tx, err := mint.MintDB.GetTx(t.Context())
 	if err != nil {
-		t.Fatalf("could not get transaction. %v", err)
-
+		t.Fatalf("could not get tx: %+v", err)
 	}
-	_, err = mint.VerifyOutputs(tx, outputs, keysets.Keysets)
+	err = mint.ValidateOutputsNotSpent(tx, outputs)
 	if err == nil {
 		t.Errorf("should have failed because of there are repeated outputs: %+v ", err)
 	}
 	if !errors.Is(err, cashu.ErrRepeatedOutput) {
 		t.Errorf("Error there should be a repeated output. %v", err)
-	}
-	err = tx.Commit(context.Background())
-	if err != nil {
-		t.Fatalf("Could not commit   tx: %+v ", err)
 	}
 }

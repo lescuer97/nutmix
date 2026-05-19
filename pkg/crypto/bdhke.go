@@ -51,7 +51,6 @@ func HashToCurve(message []byte) (*secp256k1.PublicKey, error) {
 // B_ = Y + rG
 func BlindMessage(secret string, r *secp256k1.PrivateKey) (*secp256k1.PublicKey,
 	*secp256k1.PrivateKey, error) {
-
 	var ypoint, rpoint, blindedMessage secp256k1.JacobianPoint
 	Y, err := HashToCurve([]byte(secret))
 	if err != nil {
@@ -85,7 +84,6 @@ func SignBlindedMessage(B_ *secp256k1.PublicKey, k *secp256k1.PrivateKey) *secp2
 // C = C_ - rK
 func UnblindSignature(C_ *secp256k1.PublicKey, r *secp256k1.PrivateKey,
 	K *secp256k1.PublicKey) *secp256k1.PublicKey {
-
 	var Kpoint, rKPoint, CPoint secp256k1.JacobianPoint
 	K.AsJacobian(&Kpoint)
 

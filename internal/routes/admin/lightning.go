@@ -10,7 +10,6 @@ import (
 
 func LightningDataFormFields(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		backend := c.Query(m.MINT_LIGHTNING_BACKEND_ENV)
 
 		ctx := c.Request.Context()

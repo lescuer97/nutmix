@@ -31,7 +31,6 @@ func init() {
 }
 
 func TestParseProofWithP2PK(t *testing.T) {
-
 	var proof Proof
 	err := json.Unmarshal([]byte(singleProofWithP2PK), &proof)
 
@@ -81,9 +80,7 @@ func TestParseProofWithP2PK(t *testing.T) {
 	}
 
 	if hex.EncodeToString(p2pkWitness.Signatures[0].Serialize()) != "83b585b5d719e95c1cef8514b14b3a027a2053fe174a1b693051c6e2dcbcf6478b4759e5a25a36a0fd67eae392b3a73afa6677b80d1edbbb6b0a9837ef8c413d" {
-
 		t.Errorf("Error in p2pkWitness[0] %+v", p2pkWitness.Signatures[0])
-
 	}
 }
 
@@ -254,7 +251,6 @@ func TestValidSignatureAndInvalidPreimageHTLC(t *testing.T) {
 // INFO: Testing test vectors for nut11
 
 func TestVectorValidProof(t *testing.T) {
-
 	var proof Proof
 	proofString := `{
   "amount": 1,
@@ -279,11 +275,8 @@ func TestVectorValidProof(t *testing.T) {
 	}
 
 	if valid != true {
-
 		t.Error("proof should be valid")
-
 	}
-
 }
 
 func TestVectorInvalidProofSignature(t *testing.T) {
@@ -342,9 +335,7 @@ func TestVectorValid2Signatures(t *testing.T) {
 	}
 
 	if valid != true {
-
 		t.Error("proof should be valid")
-
 	}
 }
 
@@ -404,9 +395,7 @@ func TestVectorRefundKeySpendable(t *testing.T) {
 	}
 
 	if valid != true {
-
 		t.Error("proof should be valid")
-
 	}
 }
 

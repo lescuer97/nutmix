@@ -69,18 +69,19 @@ func SetUpConfigDB(ctx context.Context, db database.MintDB) (utils.Config, *util
 			return config, nil, fmt.Errorf("getConfigFile(), %w", err)
 		}
 
+		//nolint:musttag // Config intentionally reuses db-tagged struct for bootstrap config file values.
 		err = toml.Unmarshal(file, &config)
 		if err != nil {
 			return config, nil, fmt.Errorf("toml.Unmarshal(buf,&config), %w", err)
 		}
 
+		//nolint:musttag // Bootstrap struct fields map directly to legacy uppercase config keys.
 		err = toml.Unmarshal(file, &fileNostrConfig)
 		if err != nil {
 			return config, nil, fmt.Errorf("toml.Unmarshal(buf,&fileNostrConfig): %w", err)
 		}
 
 		switch {
-
 		// if no config  set default to toml
 		case (len(config.NETWORK) == 0 && len(config.MINT_LIGHTNING_BACKEND) == 0):
 			config.Default()

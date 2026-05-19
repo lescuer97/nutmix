@@ -29,5 +29,10 @@ jobs:
           just gen-templ
           just web-install
           just web-build-prod
-      - name: golangci-lint
+      - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.6.1
+          install-only: true
+      - name: Run lint
+        run: just lint

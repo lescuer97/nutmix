@@ -13,7 +13,6 @@ import (
 
 func (m *Mint) GetChangeOutput(messages []cashu.BlindedMessage, overPaidFees uint64, unit string) ([]cashu.RecoverSigDB, error) {
 	if overPaidFees > 0 && len(messages) > 0 {
-
 		change := utils.GetMessagesForChange(overPaidFees, messages)
 
 		_, recoverySigsDb, err := m.Signer.SignBlindMessages(change)
@@ -23,7 +22,6 @@ func (m *Mint) GetChangeOutput(messages []cashu.BlindedMessage, overPaidFees uin
 		}
 
 		return recoverySigsDb, nil
-
 	}
 	return []cashu.RecoverSigDB{}, nil
 }
@@ -42,7 +40,7 @@ func (m *Mint) VerifyUnitSupport(unitStr string) error {
 	return nil
 }
 
-func (m *Mint) checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
+func checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
 	units := make(map[string]bool)
 
 	seenKeys := make(map[string]cashu.BasicKeysetResponse)
@@ -51,12 +49,12 @@ func (m *Mint) checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []
 		seenKeys[v.Id] = v
 	}
 	for _, proof := range messages {
-
 		val, exists := seenKeys[proof.Id]
-
-		if exists {
-			units[val.Unit] = true
+		if !exists {
+			return cashu.Sat, cashu.ErrKeysetNotKnow
 		}
+
+		units[val.Unit] = true
 		if len(units) > 1 {
 			return cashu.Sat, fmt.Errorf("proofs are not the same unit")
 		}
@@ -77,87 +75,20 @@ func (m *Mint) checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []
 	}
 
 	return returnedUnit, nil
-
 }
 
-func (m *Mint) VerifyOutputs(tx pgx.Tx, outputs []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
+func verifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
 	// check output have the correct unit
-	unit, err := m.checkMessagesAreSameUnit(outputs, keys)
+	unit, err := checkMessagesAreSameUnit(outputs, keys)
 	if err != nil {
 		return unit, fmt.Errorf("m.checkMessagesAreSameUnit(outputs, keysets.Keysets). %w", err)
 	}
 
-	outputsMap := make(map[string]bool)
-	blindingFactors := []cashu.WrappedPublicKey{}
-
-	// Check if there is a repeated output, if not add it to the blindingFactors
-	for _, output := range outputs {
-		outputKey := output.B_.String()
-		exists := outputsMap[outputKey]
-		if exists {
-			return unit, cashu.ErrRepeatedOutput
-		}
-		outputsMap[outputKey] = true
-
-		blindingFactors = append(blindingFactors, output.B_)
-	}
-
-	blindRecoverySigs, err := m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)
-	if err != nil {
-		return unit, fmt.Errorf("m.GetRestorySigsFromBlindFactor(blindingFactors). %w", err)
-	}
-
-	if len(blindRecoverySigs) != 0 {
-		return unit, fmt.Errorf("blind message already has been signed: %w", cashu.ErrBlindMessageAlreadySigned)
-	}
 	return unit, nil
 }
 
-func (m *Mint) VerifyInputsAndOutputs(tx pgx.Tx, proofs cashu.Proofs, outputs []cashu.BlindedMessage) error {
-	keysets, err := m.Signer.GetKeysets()
-	if err != nil {
-		return fmt.Errorf("m.Signer.GetKeys(). %w", err)
-	}
-
-	// get unit from proofs
-	proofUnit, err := m.CheckProofsAreSameUnit(proofs, keysets.Keysets)
-	if err != nil {
-		return fmt.Errorf("m.CheckProofsAreSameUnit(proofs, keysets.Keysets). %w", err)
-	}
-
-	outputUnit, err := m.VerifyOutputs(tx, outputs, keysets.Keysets)
-	if err != nil {
-		return fmt.Errorf("m.VerifyOutputs(outputs). %w", err)
-	}
-
-	if proofUnit != outputUnit {
-		return fmt.Errorf("proofUnit != messageUnit. %w", cashu.ErrNotSameUnits)
-	}
-
-	// check for needed amount of fees
-	fee, err := cashu.Fees(proofs, keysets.Keysets)
-	if err != nil {
-		return fmt.Errorf("cashu.Fees(proofs, keysets.Keysets). %w", err)
-	}
-
-	var AmountSignature uint64
-	// Check out amount signature
-	for _, output := range outputs {
-		AmountSignature += output.Amount
-	}
-
-	balance := (proofs.Amount() - (uint64(fee) + AmountSignature))
-	if balance != 0 {
-		return fmt.Errorf("(proofs.Amount() - (uint64(fee) + AmountSignature)). %w", cashu.ErrUnbalanced)
-	}
-
-	// Only verify BDHKE here since spend conditions are verified separately before calling this function
-	err = m.VerifyProofsBDHKE(proofs)
-	if err != nil {
-		return fmt.Errorf("m.VerifyProofsBDHKE(proofs). %w", err)
-	}
-
-	return nil
+func (m *Mint) VerifyOutputs(outputs []cashu.BlindedMessage, keys []cashu.BasicKeysetResponse) (cashu.Unit, error) {
+	return verifyOutputs(outputs, keys)
 }
 
 // VerifyProofsBDHKE verifies the BDHKE cryptographic signatures of the proofs.
@@ -170,14 +101,14 @@ func (m *Mint) VerifyProofsBDHKE(proofs cashu.Proofs) error {
 	return nil
 }
 
-func (m *Mint) IsInternalTransaction(request string) (bool, error) {
-	ctx := context.Background()
-	tx, err := m.MintDB.GetTx(context.Background())
+func (m *Mint) IsInternalTransaction(ctx context.Context, request string) (bool, error) {
+	tx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
-		return false, fmt.Errorf("m.MintDB.GetTx(context.Background()). %w", err)
+		return false, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if rollbackErr := m.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+		rollbackErr := m.MintDB.Rollback(ctx, tx)
+		if rollbackErr != nil {
 			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 				slog.Warn("rollback error", slog.Any("error", rollbackErr))
 			}

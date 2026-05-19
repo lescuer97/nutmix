@@ -83,7 +83,6 @@ func (f FakeWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId
 		return FAILED, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, nil
 	case slices.Contains(f.UnpurposeErrors, FailQueryPending):
 		return PENDING, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, nil
-
 	}
 
 	return SETTLED, mock_preimage, cashu.Amount{Unit: cashu.Sat, Amount: 10}, nil
@@ -97,7 +96,6 @@ func (f FakeWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Inv
 		return FAILED, "", nil
 	case slices.Contains(f.UnpurposeErrors, FailQueryPending):
 		return PENDING, "", nil
-
 	}
 
 	return SETTLED, mock_preimage, nil
@@ -115,7 +113,7 @@ func (f FakeWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp b
 	return feesResponse, nil
 }
 
-func (f FakeWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
+func (f FakeWallet) RequestInvoice(amount cashu.Amount, description *string) (InvoiceResponse, error) {
 	var response InvoiceResponse
 	supported := f.VerifyUnitSupport(amount.Unit)
 	if !supported {
@@ -124,11 +122,11 @@ func (f FakeWallet) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amoun
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
 
-	description := "mock invoice"
-	if quote.Description != nil {
-		description = *quote.Description
+	invoiceDescription := "mock invoice"
+	if description != nil {
+		invoiceDescription = *description
 	}
-	payReq, err := CreateMockInvoice(amount, description, f.Network, expireTime)
+	payReq, err := CreateMockInvoice(amount, invoiceDescription, f.Network, expireTime)
 	if err != nil {
 		return response, fmt.Errorf(`CreateMockInvoice(amount, "mock invoice", f.Network, expireTime). %w`, err)
 	}
