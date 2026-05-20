@@ -316,7 +316,7 @@ func paymentStatusFromLDK(status ldk_node.PaymentStatus) (PaymentStatus, error) 
 	}
 }
 
-func (l *LDK) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (InvoiceResponse, error) {
+func (l *LDK) RequestInvoice(amount cashu.Amount, description *string) (InvoiceResponse, error) {
 	ldkStorage := l.storageDir()
 	log.Printf("\n ldkStorage inside invoice req: %+v\n ", ldkStorage)
 	if !l.VerifyUnitSupport(amount.Unit) {
@@ -333,11 +333,11 @@ func (l *LDK) RequestInvoice(quote cashu.MintRequestDB, amount cashu.Amount) (In
 		return InvoiceResponse{}, err
 	}
 
-	description := ""
-	if quote.Description != nil {
-		description = *quote.Description
+	invoiceDescriptionText := ""
+	if description != nil {
+		invoiceDescriptionText = *description
 	}
-	invoiceDescription := ldk_node.Bolt11InvoiceDescriptionDirect{Description: description}
+	invoiceDescription := ldk_node.Bolt11InvoiceDescriptionDirect{Description: invoiceDescriptionText}
 	const expirySeconds = 36000
 
 	bolt11 := node.Bolt11Payment()
