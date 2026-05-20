@@ -2,6 +2,7 @@ package mint
 
 import (
 	"encoding/json"
+	"slices"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -69,66 +70,36 @@ func (o *Observer) AddMeltWatch(quote string, meltChan MeltQuoteChannel) {
 
 func (o *Observer) RemoveWatch(subId string) {
 	o.Lock()
-	proofChans := make(map[chan cashu.Proof]struct{})
-	mintRequestChans := make(map[chan cashu.MintRequestDB]struct{})
-	meltRequestChans := make(map[chan cashu.MeltRequestDB]struct{})
+	defer o.Unlock()
 
 	for key, proofWatchArray := range o.Proofs {
-		kept := proofWatchArray[:0]
-		for _, proofWatch := range proofWatchArray {
-			if proofWatch.SubId == subId {
-				proofChans[proofWatch.Channel] = struct{}{}
-				continue
+		o.Proofs[key] = slices.DeleteFunc(proofWatchArray, func(proofWatchChan ProofWatchChannel) bool {
+			if proofWatchChan.SubId == subId {
+				close(proofWatchChan.Channel)
+				return true
 			}
-			kept = append(kept, proofWatch)
-		}
-		if len(kept) == 0 {
-			delete(o.Proofs, key)
-			continue
-		}
-		o.Proofs[key] = kept
+			return false
+		})
 	}
 
 	for key, mintWatchArray := range o.MintQuote {
-		kept := mintWatchArray[:0]
-		for _, mintWatch := range mintWatchArray {
-			if mintWatch.SubId == subId {
-				mintRequestChans[mintWatch.Channel] = struct{}{}
-				continue
+		o.MintQuote[key] = slices.DeleteFunc(mintWatchArray, func(mintWatchChannel MintQuoteChannel) bool {
+			if mintWatchChannel.SubId == subId {
+				close(mintWatchChannel.Channel)
+				return true
 			}
-			kept = append(kept, mintWatch)
-		}
-		if len(kept) == 0 {
-			delete(o.MintQuote, key)
-			continue
-		}
-		o.MintQuote[key] = kept
+			return false
+		})
 	}
 
 	for key, meltWatchArray := range o.MeltQuote {
-		kept := meltWatchArray[:0]
-		for _, meltWatch := range meltWatchArray {
-			if meltWatch.SubId == subId {
-				meltRequestChans[meltWatch.Channel] = struct{}{}
-				continue
+		o.MeltQuote[key] = slices.DeleteFunc(meltWatchArray, func(meltWatchChannel MeltQuoteChannel) bool {
+			if meltWatchChannel.SubId == subId {
+				close(meltWatchChannel.Channel)
+				return true
 			}
-			kept = append(kept, meltWatch)
-		}
-		if len(kept) == 0 {
-			delete(o.MeltQuote, key)
-			continue
-		}
-		o.MeltQuote[key] = kept
-	}
-	o.Unlock()
-	for proofChan := range proofChans {
-		close(proofChan)
-	}
-	for mintRequestChan := range mintRequestChans {
-		close(mintRequestChan)
-	}
-	for meltRequestChan := range meltRequestChans {
-		close(meltRequestChan)
+			return false
+		})
 	}
 }
 
@@ -149,7 +120,7 @@ func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 func (o *Observer) SendMeltEvent(melt cashu.MeltRequestDB) {
 	o.Lock()
 	watchArray, exists := o.MeltQuote[melt.Quote]
-	o.Unlock()
+	defer o.Unlock()
 	if exists {
 		for _, v := range watchArray {
 			v.Channel <- melt
@@ -160,7 +131,7 @@ func (o *Observer) SendMeltEvent(melt cashu.MeltRequestDB) {
 func (o *Observer) SendMintEvent(mint cashu.MintRequestDB) {
 	o.Lock()
 	watchArray, exists := o.MintQuote[mint.Quote]
-	o.Unlock()
+	defer o.Unlock()
 	if exists {
 		for _, v := range watchArray {
 			v.Channel <- mint
