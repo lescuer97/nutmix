@@ -374,7 +374,7 @@ func ldkBobInfo(ctx context.Context, bobLnd testcontainers.Container) (ldkLndInf
 	output, err := execContainerCommand(ctx, bobLnd, []string{
 		"lncli",
 		"--tlscertpath", "/home/lnd/.lnd/tls.cert",
-		"--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon",
+		"--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon",
 		"getinfo",
 	})
 	if err != nil {
@@ -463,7 +463,10 @@ func execContainerCommandWithRetry(ctx context.Context, container testcontainers
 			return nil
 		}
 		lastErr = err
-		if !strings.Contains(err.Error(), "error code: -28") && !strings.Contains(err.Error(), "Verifying blocks") {
+		if !strings.Contains(err.Error(), "error code: -28") &&
+			!strings.Contains(err.Error(), "Verifying blocks") &&
+			!strings.Contains(err.Error(), "unable to read macaroon path") &&
+			!strings.Contains(err.Error(), "not yet ready to accept calls") {
 			return err
 		}
 		time.Sleep(500 * time.Millisecond)

@@ -937,7 +937,7 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
+				WithStartupTimeout(60*time.Second)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1505,7 +1505,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, router *gin.Engine, 
 	// SWAP TESTING ENDS
 
 	// MELTING TESTING STARTS
-	_, invoiceReader, err := bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "addinvoice", "--amt", "900", "--private"})
+	_, invoiceReader, err := bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "addinvoice", "--amt", "900", "--private"})
 
 	if err != nil {
 		t.Fatalf("Error adding invoice: %+v", err)
