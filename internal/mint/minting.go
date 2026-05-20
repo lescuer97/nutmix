@@ -331,7 +331,7 @@ func (m *Mint) bolt11Mint(ctx context.Context, request cashu.PostMintBolt11Reque
 		return cashu.PostMintBolt11Response{}, err
 	}
 
-	go m.Observer.SendMintEvent(mintReq)
+
 	return cashu.PostMintBolt11Response{Signatures: blindSigs}, nil
 }
 
