@@ -195,9 +195,7 @@ func (l *LDK) Status(_ context.Context) (lightning.NodeStatus, error) {
 }
 
 func (l *LDK) run() {
-
 	for l.node.Status().IsRunning {
-
 		_ = l.node.NextEventAsync()
 
 		if err := l.node.EventHandled(); err != nil {

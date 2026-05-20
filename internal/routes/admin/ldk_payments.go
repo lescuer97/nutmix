@@ -29,7 +29,6 @@ func LdkPaymentsFragment(m *mint.Mint) gin.HandlerFunc {
 			paymentType = ldk.Incoming
 		case "outgoing":
 			paymentType = ldk.Outgoing
-
 		}
 
 		payments, err := ldkBackend.Payments(paymentType)
