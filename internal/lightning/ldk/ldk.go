@@ -182,9 +182,7 @@ func (l *LDK) Stop() error {
 }
 
 func (l *LDK) run() {
-
 	for l.node.Status().IsRunning {
-
 		_ = l.node.NextEventAsync()
 
 		if err := l.node.EventHandled(); err != nil {

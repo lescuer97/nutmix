@@ -264,7 +264,6 @@ func LdkOpenChannelFormFragment(m *mint.Mint) gin.HandlerFunc {
 
 func LdkOpenChannel(m *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		peerEndpoint := c.PostForm("peer_endpoint")
 		pubkey, address, err := parseLdkPeerEndpoint(peerEndpoint)
 		if err != nil {
