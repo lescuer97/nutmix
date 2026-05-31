@@ -3,9 +3,9 @@ package utils
 import (
 	"net/http"
 
+	jsonv2 "encoding/json/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/render"
-	jsonv2 "github.com/go-json-experiment/json"
 )
 
 type JSONV2 struct {
