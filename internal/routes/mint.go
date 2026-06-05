@@ -1,13 +1,17 @@
 package routes
 
 import (
+	"context"
 	"log/slog"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
+
+const swapRequestTimeout = 15 * time.Second
 
 func registerV1MintRoutes(r *gin.Engine, mint *m.Mint) {
 	v1 := r.Group("/v1")
@@ -63,9 +67,12 @@ func registerV1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		response, err := mint.ExecuteSwap(c.Request.Context(), swapRequest)
+		swapCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), swapRequestTimeout)
+		defer cancel()
+
+		response, err := mint.ExecuteSwap(swapCtx, swapRequest)
 		if err != nil {
-			slog.Info("mint.ExecuteSwap(c.Request.Context(), swapRequest)", slog.Any("error", err))
+			slog.Info("mint.ExecuteSwap(swapCtx, swapRequest)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return

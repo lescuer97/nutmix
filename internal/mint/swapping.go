@@ -32,7 +32,10 @@ func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (
 		if err != nil {
 			rollbackErr := m.MintDB.Rollback(ctx, sizeCheckTx)
 			if rollbackErr != nil {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
+				return
 			}
 		}
 	}()
@@ -58,8 +61,15 @@ func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (
 		return cashu.PostSwapResponse{}, fmt.Errorf("sizeCheckTx.Commit(ctx). %w", err)
 	}
 
-	blindSignatures, err := m.signSwapOutputsAndMarkInputsSpent(ctx, proofs, request)
+	blindSignatures, shouldRemovePendingProofs, err := m.signSwapOutputsAndMarkInputsSpent(ctx, proofs, request)
 	if err != nil {
+		if shouldRemovePendingProofs {
+			cleanupErr := m.removePendingSwapProofs(ctx, proofs)
+			if cleanupErr != nil {
+				return cashu.PostSwapResponse{}, fmt.Errorf("m.signSwapOutputsAndMarkInputsSpent(ctx, proofs, request). %w; m.removePendingSwapProofs(proofs). %w", err, cleanupErr)
+			}
+		}
+
 		return cashu.PostSwapResponse{}, fmt.Errorf("m.signSwapOutputsAndMarkInputsSpent(ctx, proofs, request). %w", err)
 	}
 
@@ -71,38 +81,76 @@ func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (
 	}, nil
 }
 
-func (m *Mint) signSwapOutputsAndMarkInputsSpent(ctx context.Context, inputs cashu.Proofs, swapRequest cashu.PostSwapRequest) ([]cashu.BlindSignature, error) {
+func (m *Mint) signSwapOutputsAndMarkInputsSpent(ctx context.Context, inputs cashu.Proofs, swapRequest cashu.PostSwapRequest) (blindedSignatures []cashu.BlindSignature, shouldRemovePendingProofs bool, err error) {
 	// sign the outputs
 	blindedSignatures, recoverySigsDb, err := m.Signer.SignBlindMessages(swapRequest.Outputs)
 	if err != nil {
-		return nil, fmt.Errorf("m.Signer.SignBlindMessages(outputs). %w", err)
+		return nil, true, fmt.Errorf("m.Signer.SignBlindMessages(outputs). %w", err)
 	}
 
 	afterSigningTx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+		return nil, true, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
+
 	defer func() {
 		rollbackErr := m.MintDB.Rollback(ctx, afterSigningTx)
 		if rollbackErr != nil {
 			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 				slog.Warn("could not swap state", slog.Any("error", rollbackErr))
 			}
+			return
 		}
+
+		shouldRemovePendingProofs = true
 	}()
 	err = m.MintDB.SetProofsState(afterSigningTx, inputs, cashu.PROOF_SPENT)
 	if err != nil {
-		return nil, fmt.Errorf("m.MintDB.SetProofsState(afterSigningTx, inputs, cashu.PROOF_SPENT). %w", err)
+		return nil, false, fmt.Errorf("m.MintDB.SetProofsState(afterSigningTx, inputs, cashu.PROOF_SPENT). %w", err)
 	}
 	err = m.MintDB.SaveRestoreSigs(afterSigningTx, recoverySigsDb)
 	if err != nil {
-		return nil, fmt.Errorf("m.MintDB.SaveRestoreSigs(afterSigningTx, recoverySigsDb). %w", err)
+		return nil, false, fmt.Errorf("m.MintDB.SaveRestoreSigs(afterSigningTx, recoverySigsDb). %w", err)
 	}
 	err = m.MintDB.Commit(ctx, afterSigningTx)
 	if err != nil {
-		return nil, fmt.Errorf("m.MintDB.Commit(ctx, afterSigningTx). %w", err)
+		rollbackErr := m.MintDB.Rollback(ctx, afterSigningTx)
+		if rollbackErr == nil {
+			return nil, true, fmt.Errorf("m.MintDB.Commit(ctx, afterSigningTx). %w", err)
+		}
+		if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("could not rollback failed swap commit", slog.Any("error", rollbackErr))
+		}
+		return nil, false, fmt.Errorf("m.MintDB.Commit(ctx, afterSigningTx). %w", err)
 	}
-	return blindedSignatures, nil
+	return blindedSignatures, false, nil
+}
+
+func (m *Mint) removePendingSwapProofs(ctx context.Context, proofs cashu.Proofs) error {
+	tx, err := m.MintDB.GetTx(ctx)
+	if err != nil {
+		return fmt.Errorf("m.MintDB.GetTx(cleanupCtx). %w", err)
+	}
+	defer func() {
+		rollbackErr := m.MintDB.Rollback(ctx, tx)
+		if rollbackErr != nil {
+			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+				slog.Warn("rollback error", slog.Any("error", rollbackErr))
+			}
+		}
+	}()
+
+	err = m.MintDB.DeleteProofs(tx, proofs)
+	if err != nil {
+		return fmt.Errorf("m.MintDB.DeleteProofs(tx, proofs). %w", err)
+	}
+
+	err = m.MintDB.Commit(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("m.MintDB.Commit(cleanupCtx, tx). %w", err)
+	}
+
+	return nil
 }
 
 func (m *Mint) validateSwapProofsAndSpendConditions(request cashu.PostSwapRequest) error {

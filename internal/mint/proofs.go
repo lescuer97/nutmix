@@ -55,12 +55,12 @@ func CheckProofState(ctx context.Context, mint *Mint, Ys []cashu.WrappedPublicKe
 			if p.Witness != "" {
 				checkState.Witness = &p.Witness
 			}
+			checkState.State = p.State
 			if compare && pendingAndSpent {
 				proofsForRemoval = append(proofsForRemoval, p)
 			}
 			return compare
 		}):
-			checkState.State = cashu.PROOF_SPENT
 		}
 
 		states[i] = checkState
