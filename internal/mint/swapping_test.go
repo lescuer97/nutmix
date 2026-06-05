@@ -50,13 +50,13 @@ func (s failingSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 
 func TestExecuteSwapRemovesPendingProofsWhenSaveRestoreSigsFails(t *testing.T) {
 	runSwapCleanupFailureTest(t, "SaveRestoreSigs", func(mint *Mint) {
-		mint.MintDB = swapFailingDB{MintDB: mint.MintDB, saveRestoreSigsErr: errors.New("save restore sigs failed")}
+		mint.MintDB = swapFailingDB{MintDB: mint.MintDB, saveRestoreSigsErr: errors.New("save restore sigs failed"), setProofsStateErr: nil}
 	})
 }
 
 func TestExecuteSwapRemovesPendingProofsWhenSetProofsStateFails(t *testing.T) {
 	runSwapCleanupFailureTest(t, "SetProofsState", func(mint *Mint) {
-		mint.MintDB = swapFailingDB{MintDB: mint.MintDB, setProofsStateErr: errors.New("set proofs state failed")}
+		mint.MintDB = swapFailingDB{MintDB: mint.MintDB, saveRestoreSigsErr: nil, setProofsStateErr: errors.New("set proofs state failed")}
 	})
 }
 

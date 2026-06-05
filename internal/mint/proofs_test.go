@@ -9,14 +9,27 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 func TestCheckProofStateReturnsStoredState(t *testing.T) {
 	pendingProof := testProofWithState(t, cashu.PROOF_PENDING, "pending-witness")
 	spentProof := testProofWithState(t, cashu.PROOF_SPENT, "")
 	missingProof := testProofWithState(t, cashu.PROOF_UNSPENT, "")
+	mockDB := new(mockdb.MockDB)
+	mockDB.Proofs = []cashu.Proof{pendingProof, spentProof}
+	var config utils.Config
 
-	mint := &Mint{MintDB: &mockdb.MockDB{Proofs: []cashu.Proof{pendingProof, spentProof}}}
+	mint := &Mint{
+		LightningBackend:        nil,
+		MintDB:                  mockDB,
+		Signer:                  nil,
+		OICDClient:              nil,
+		Observer:                nil,
+		NostrNotificationConfig: nil,
+		MintPubkey:              "",
+		Config:                  config,
+	}
 
 	states, err := CheckProofState(context.Background(), mint, []cashu.WrappedPublicKey{pendingProof.Y, spentProof.Y, missingProof.Y})
 	if err != nil {
@@ -41,8 +54,20 @@ func TestCheckProofStatePrefersSpentOverPendingForDuplicateRows(t *testing.T) {
 	pendingProof := testProofWithState(t, cashu.PROOF_PENDING, "")
 	spentProof := pendingProof
 	spentProof.State = cashu.PROOF_SPENT
+	mockDB := new(mockdb.MockDB)
+	mockDB.Proofs = []cashu.Proof{pendingProof, spentProof}
+	var config utils.Config
 
-	mint := &Mint{MintDB: &mockdb.MockDB{Proofs: []cashu.Proof{pendingProof, spentProof}}}
+	mint := &Mint{
+		LightningBackend:        nil,
+		MintDB:                  mockDB,
+		Signer:                  nil,
+		OICDClient:              nil,
+		Observer:                nil,
+		NostrNotificationConfig: nil,
+		MintPubkey:              "",
+		Config:                  config,
+	}
 
 	states, err := CheckProofState(context.Background(), mint, []cashu.WrappedPublicKey{pendingProof.Y})
 	if err != nil {
