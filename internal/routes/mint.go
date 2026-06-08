@@ -11,7 +11,18 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-const swapRequestTimeout = 15 * time.Second
+const (
+	routeRequestTimeout = 15 * time.Second
+	meltRequestTimeout  = 2 * time.Minute
+)
+
+func requestContext(c *gin.Context) (context.Context, context.CancelFunc) {
+	return requestContextWithTimeout(c, routeRequestTimeout)
+}
+
+func requestContextWithTimeout(c *gin.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(c.Request.Context()), timeout)
+}
 
 func registerV1MintRoutes(r *gin.Engine, mint *m.Mint) {
 	v1 := r.Group("/v1")
@@ -67,7 +78,7 @@ func registerV1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		swapCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), swapRequestTimeout)
+		swapCtx, cancel := requestContext(c)
 		defer cancel()
 
 		response, err := mint.ExecuteSwap(swapCtx, swapRequest)
@@ -93,7 +104,10 @@ func registerV1MintRoutes(r *gin.Engine, mint *m.Mint) {
 			States: make([]cashu.CheckState, 0),
 		}
 
-		states, err := m.CheckProofState(c.Request.Context(), mint, checkStateRequest.Ys)
+		checkStateCtx, cancel := requestContext(c)
+		defer cancel()
+
+		states, err := m.CheckProofState(checkStateCtx, mint, checkStateRequest.Ys)
 		if err != nil {
 			slog.Info("could not check proofs state", slog.Any("error", err))
 			c.JSON(400, "could not validate proofs state")

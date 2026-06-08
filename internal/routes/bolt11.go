@@ -22,7 +22,10 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		response, err := mint.CreateMintQuote(c.Request.Context(), mintRequest, m.Bolt11)
+		mintQuoteCtx, cancel := requestContext(c)
+		defer cancel()
+
+		response, err := mint.CreateMintQuote(mintQuoteCtx, mintRequest, m.Bolt11)
 		if err != nil {
 			slog.Info("mint.CreateMintQuote(c.Request.Context(), mintRequest, m.Bolt11)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -55,7 +58,11 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
-		response, err := mint.IssueTokens(c.Request.Context(), mintRequest, m.Bolt11)
+
+		mintCtx, cancel := requestContext(c)
+		defer cancel()
+
+		response, err := mint.IssueTokens(mintCtx, mintRequest, m.Bolt11)
 		if err != nil {
 			slog.Info("mint.IssueTokens(c.Request.Context(), mintRequest, m.Bolt11)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -75,7 +82,10 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		dbRequest, err := mint.CreateMeltQuote(c.Request.Context(), meltRequest, m.Bolt11)
+		meltQuoteCtx, cancel := requestContextWithTimeout(c, meltRequestTimeout)
+		defer cancel()
+
+		dbRequest, err := mint.CreateMeltQuote(meltQuoteCtx, meltRequest, m.Bolt11)
 		if err != nil {
 			slog.Warn("mint.CreateMeltQuote", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -109,7 +119,10 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		quote, err := mint.ExecuteMelt(c.Request.Context(), meltRequest, m.Bolt11)
+		meltCtx, cancel := requestContextWithTimeout(c, meltRequestTimeout)
+		defer cancel()
+
+		quote, err := mint.ExecuteMelt(meltCtx, meltRequest, m.Bolt11)
 		if err != nil {
 			slog.Warn("mint.ExecuteMelt(ctx, meltRequest)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
