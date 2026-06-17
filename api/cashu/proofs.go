@@ -176,7 +176,7 @@ func (p Proof) verifyHtlcSpendCondition(spendCondition *SpendCondition, witness 
 func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 	witness, err := p.parseWitness()
 	if err != nil {
-		return false, fmt.Errorf("p.parseWitness(). %+v", err)
+		return false, fmt.Errorf("p.parseWitness(). %w", err)
 	}
 
 	valid := false
@@ -351,7 +351,7 @@ func (p Proof) HashSecretToCurve() (Proof, error) {
 	y, err := crypto.HashToCurve(parsedProof)
 
 	if err != nil {
-		return p, fmt.Errorf("crypto.HashToCurve: %+v", err)
+		return p, fmt.Errorf("crypto.HashToCurve: %w", err)
 	}
 
 	p.Y = WrappedPublicKey{y}
@@ -452,7 +452,7 @@ func (p *Proof) UnmarshalJSON(data []byte) error {
 func VerifyProofCondition(proof Proof) error {
 	isLocked, spendCondition, err := proof.IsProofSpendConditioned()
 	if err != nil {
-		return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
+		return fmt.Errorf("proof.IsProofSpendConditioned(). %w", err)
 	}
 	if isLocked {
 		err = spendCondition.CheckValid()

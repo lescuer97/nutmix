@@ -31,7 +31,7 @@ func getTlsConfig(clientCert string, clientKey string, caCert string) (*tls.Conf
 	if clientCert != "" && clientKey != "" {
 		cert, err := tls.X509KeyPair([]byte(clientCert), []byte(clientKey))
 		if err != nil {
-			return tlsConfig, fmt.Errorf("\n error loading X.509 key pair: %v", err)
+			return tlsConfig, fmt.Errorf("\n error loading X.509 key pair: %w", err)
 		}
 		tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
 	}
@@ -61,7 +61,7 @@ func (l *CLNGRPCWallet) SetupGrpc(host string, caCert string, clientCert string,
 
 	tlsConfig, err := getTlsConfig(clientCert, clientKey, caCert)
 	if err != nil {
-		return fmt.Errorf("getTlsConfig(clientCert, clientKey, tlsCrt) %v", err)
+		return fmt.Errorf("getTlsConfig(clientCert, clientKey, tlsCrt) %w", err)
 	}
 
 	certFile := credentials.NewTLS(tlsConfig)

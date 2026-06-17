@@ -120,7 +120,12 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 
 		defer func() {
 			if p := recover(); p != nil {
-				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
+				recoveredErr, ok := p.(error)
+				if ok {
+					_ = c.Error(fmt.Errorf("rolling back because of failure: %w", recoveredErr))
+				} else {
+					_ = c.Error(fmt.Errorf("rolling back because of failure: %v", p))
+				}
 				rollbackErr := mint.MintDB.Rollback(ctx, tx)
 				if rollbackErr != nil {
 					if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
@@ -128,7 +133,7 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 					}
 				}
 			} else if err != nil {
-				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure: %w", err))
 				rollbackErr := mint.MintDB.Rollback(ctx, tx)
 				if rollbackErr != nil {
 					if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
@@ -138,7 +143,7 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 			} else {
 				err = mint.MintDB.Commit(ctx, tx)
 				if err != nil {
-					_ = c.Error(fmt.Errorf("failed to commit transaction: %+v", err))
+					_ = c.Error(fmt.Errorf("failed to commit transaction: %w", err))
 				}
 			}
 		}()
@@ -209,7 +214,7 @@ func makeJWTToken(secret []byte) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	string, err := token.SignedString(secret)
 	if err != nil {
-		return "", fmt.Errorf("token.SignedString(secret) %v", err)
+		return "", fmt.Errorf("token.SignedString(secret) %w", err)
 	}
 	return string, nil
 }

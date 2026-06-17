@@ -42,7 +42,7 @@ func TestAddAndRequestMintRequestValidPubkey(t *testing.T) {
 
 	connUri, err := postgresContainer.ConnectionString(ctx)
 	if err != nil {
-		t.Fatal(fmt.Errorf("failed to get connection string: %v", err))
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
 	t.Setenv("DATABASE_URL", connUri)
@@ -149,7 +149,7 @@ func TestAddAndRequestMintRequestNilPubkey(t *testing.T) {
 
 	connUri, err := postgresContainer.ConnectionString(ctx)
 	if err != nil {
-		t.Fatal(fmt.Errorf("failed to get connection string: %v", err))
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
 	t.Setenv("DATABASE_URL", connUri)
@@ -678,7 +678,7 @@ func setupTestDB(t *testing.T) (Postgresql, context.Context) {
 
 	connUri, err := postgresContainer.ConnectionString(ctx)
 	if err != nil {
-		t.Fatal(fmt.Errorf("failed to get connection string: %v", err))
+		t.Fatal(fmt.Errorf("failed to get connection string: %w", err))
 	}
 
 	t.Setenv("DATABASE_URL", connUri)

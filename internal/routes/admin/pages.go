@@ -281,12 +281,17 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 
 		defer func() {
 			if p := recover(); p != nil {
-				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
+				recoveredErr, ok := p.(error)
+				if ok {
+					_ = c.Error(fmt.Errorf("rolling back because of failure: %w", recoveredErr))
+				} else {
+					_ = c.Error(fmt.Errorf("rolling back because of failure: %v", p))
+				}
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
 			} else if err != nil {
-				_ = c.Error(fmt.Errorf("rolling back because of failure %+v", err))
+				_ = c.Error(fmt.Errorf("rolling back because of failure: %w", err))
 				if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
 					slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 				}
