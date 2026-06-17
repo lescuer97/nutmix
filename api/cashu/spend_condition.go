@@ -365,8 +365,8 @@ func TagFromString(s string) (Tags, error) {
 type SigFlag int
 
 const (
-	SigAll    SigFlag = iota + 1 // 1
-	SigInputs SigFlag = iota + 2 // 2
+	SigAll SigFlag = iota + 1 // 1
+	SigInputs
 )
 
 func (sf SigFlag) String() string {

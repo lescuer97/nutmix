@@ -241,7 +241,7 @@ func TestCheckP2PKProofInvalidLocktimeRefundKey(t *testing.T) {
 	}
 
 	valid, err := proof.VerifyP2PK(spendCondition)
-	if !errors.Is(err, ErrNoValidSignatures) {
+	if !errors.Is(err, ErrNotEnoughSignatures) {
 		t.Errorf("Error should be about no valid signatures. %+v", err)
 	}
 	if valid {

@@ -423,7 +423,7 @@ func TestVectorRefundSigInvalidFromFuture(t *testing.T) {
 	if valid != false {
 		t.Error("proof should be valid")
 	}
-	if !errors.Is(err, ErrNoValidSignatures) {
+	if !errors.Is(err, ErrNotEnoughSignatures) {
 		t.Errorf("Error should be ErrNotEnoughSignatures. %+v", err)
 	}
 }

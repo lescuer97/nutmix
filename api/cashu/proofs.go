@@ -113,10 +113,7 @@ func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 	}
 	valid, err = p.verifyP2PKSpendCondition(spendCondition, witness)
 	if err != nil {
-		if errors.Is(err, ErrNoValidSignatures) || errors.Is(err, ErrNotEnoughSignatures) {
-		} else {
-			return false, fmt.Errorf("p.verifyP2PKSpendCondition(spendCondition, witness). %w", err)
-		}
+		return false, fmt.Errorf("p.verifyP2PKSpendCondition(spendCondition, witness). %w", err)
 	}
 	return valid, nil
 }
@@ -190,10 +187,7 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 
 	valid, err = p.verifyHtlcSpendCondition(spendCondition, witness)
 	if err != nil {
-		if errors.Is(err, ErrNoValidSignatures) || errors.Is(err, ErrNotEnoughSignatures) {
-		} else {
-			return false, fmt.Errorf("p.verifyP2PKSpendCondition(spendCondition, witness). %w", err)
-		}
+		return false, fmt.Errorf("p.verifyHtlcSpendCondition(spendCondition, witness). %w", err)
 	}
 	if valid {
 		return true, nil
