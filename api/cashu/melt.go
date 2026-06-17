@@ -74,8 +74,8 @@ type PostMeltQuoteBolt11Response struct {
 }
 
 type PostMeltBolt11Request struct {
-	Quote   string           `json:"quote"`
-	Inputs  Proofs           `json:"inputs"`
+	Quote   string          `json:"quote"`
+	Inputs  Proofs          `json:"inputs"`
 	Outputs BlindedMessages `json:"outputs"`
 }
 
@@ -86,25 +86,9 @@ func (p *PostMeltBolt11Request) ValidateSigflag() error {
 	}
 	if sigAllCheck.sigFlag == SigAll {
 		firstProof := p.Inputs[0]
-		firstSpendCondition, err := firstProof.parseSpendCondition()
-		if err != nil {
-			return fmt.Errorf("p.Inputs[0].parseSpendCondition(). %w", err)
-		}
-		firstWitness, err := firstProof.parseWitness()
-		if err != nil {
-			return fmt.Errorf("p.Inputs[0].parseWitness(). %w", err)
-		}
-
-		if firstSpendCondition == nil || firstWitness == nil {
-			return ErrInvalidSpendCondition
-		}
-
-		if firstWitness.Signatures == nil {
-			return ErrNoValidSignatures
-		}
 
 		// check the conditions are met
-		err = p.verifyConditions()
+		err = p.verifySigAllRepetition()
 		if err != nil {
 			return fmt.Errorf("p.verifyConditions(). %w", err)
 		}
@@ -112,34 +96,19 @@ func (p *PostMeltBolt11Request) ValidateSigflag() error {
 		// makes message
 		msg := p.makeSigAllMsg()
 
-		signatures, err := checkValidSignature(msg, sigAllCheck.pubkeys, firstWitness.Signatures)
+		err = checkSigAllProofValid(msg, sigAllCheck, firstProof)
 		if err != nil {
-			return fmt.Errorf("checkValidSignature(msg, pubkeys, firstWitness.Signatures). %w", err)
+			return fmt.Errorf("checkSigAllProofValid(msg, sigAllCheck, firstProof). %w", err)
 		}
-		if signatures >= sigAllCheck.signaturesRequired {
-			return nil
-		}
-
-		if firstProof.timelockPassed(firstSpendCondition) {
-			signatures, err := checkValidSignature(msg, sigAllCheck.refundPubkeys, firstWitness.Signatures)
-			if err != nil {
-				return fmt.Errorf("checkValidSignature(msg, refundPubkeys, firstWitness.Signatures). %w", err)
-			}
-			if signatures >= sigAllCheck.signaturesRequiredRefund {
-				return nil
-			}
-		}
-
-		return ErrNotEnoughSignatures
 	}
 	return nil
 }
 
-func (p *PostMeltBolt11Request) verifyConditions() error {
+func (p *PostMeltBolt11Request) verifySigAllRepetition() error {
 	firstProof := p.Inputs[0]
 	firstSpendCondition, err := firstProof.parseSpendCondition()
 	if err != nil {
-		return nil
+		return fmt.Errorf("firstProof.parseSpendCondition(). %w", err)
 	}
 
 	for _, proof := range p.Inputs {

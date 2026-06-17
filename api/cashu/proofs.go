@@ -102,22 +102,23 @@ func (p Proof) verifyP2PKSpendCondition(spendCondition *SpendCondition, witness 
 func (p Proof) VerifyP2PK(spendCondition *SpendCondition) (bool, error) {
 	witness, err := p.parseWitness()
 	if err != nil {
-		return false, fmt.Errorf("p.parseWitness(). %+v", err)
+		return false, fmt.Errorf("p.parseWitness(). %w", err)
 	}
-	valid, err := p.verifyP2PKSpendCondition(spendCondition, witness)
+	valid := false
+	if timelockPassed(spendCondition) {
+		valid, _ = p.verifyTimelockPassedSpendCondition(spendCondition, witness)
+		if valid {
+			return valid, nil
+		}
+	}
+	valid, err = p.verifyP2PKSpendCondition(spendCondition, witness)
 	if err != nil {
 		if errors.Is(err, ErrNoValidSignatures) || errors.Is(err, ErrNotEnoughSignatures) {
 		} else {
 			return false, fmt.Errorf("p.verifyP2PKSpendCondition(spendCondition, witness). %w", err)
 		}
 	}
-	if valid {
-		return true, nil
-	}
-	if p.timelockPassed(spendCondition) {
-		valid, err = p.verifyTimelockPassedSpendCondition(spendCondition, witness)
-	}
-	return valid, err
+	return valid, nil
 }
 
 func (p Proof) verifyHtlcSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {
@@ -127,7 +128,7 @@ func (p Proof) verifyHtlcSpendCondition(spendCondition *SpendCondition, witness 
 	}
 
 	if len(spendCondition.Data.Tags.Pubkeys) == 0 {
-		return false, ErrInvalidPreimage
+		return true, nil
 	}
 
 	pubkeys, err := p.pubkeysForVerification(spendCondition)
@@ -178,7 +179,16 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 		return false, fmt.Errorf("p.parseWitness(). %+v", err)
 	}
 
-	valid, err := p.verifyHtlcSpendCondition(spendCondition, witness)
+	valid := false
+	if timelockPassed(spendCondition) {
+		valid, _ = p.verifyTimelockPassedSpendCondition(spendCondition, witness)
+
+		if valid {
+			return valid, nil
+		}
+	}
+
+	valid, err = p.verifyHtlcSpendCondition(spendCondition, witness)
 	if err != nil {
 		if errors.Is(err, ErrNoValidSignatures) || errors.Is(err, ErrNotEnoughSignatures) {
 		} else {
@@ -188,13 +198,10 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 	if valid {
 		return true, nil
 	}
-	if p.timelockPassed(spendCondition) {
-		valid, err = p.verifyTimelockPassedSpendCondition(spendCondition, witness)
-	}
 	return valid, err
 }
 
-func (p Proof) timelockPassed(spendCondition *SpendCondition) bool {
+func timelockPassed(spendCondition *SpendCondition) bool {
 	currentTime := time.Now().Unix()
 	return spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime)
 }
@@ -227,6 +234,8 @@ func (p Proof) verifyTimelockPassedSpendCondition(spendCondition *SpendCondition
 		}
 	}
 	switch {
+	case nsigToCheck == 0:
+		return true, nil
 	case amountValidSigs == 0:
 		return false, ErrNoValidSignatures
 	case nsigToCheck > 0 && amountValidSigs < nsigToCheck:
@@ -289,15 +298,20 @@ func (p Proof) parseSpendCondition() (*SpendCondition, error) {
 	err := json.Unmarshal([]byte(p.Secret), &spendCondition)
 
 	if err != nil {
-		return nil, fmt.Errorf("json.Unmarshal([]byte(p.Secret), &spendCondition)  %w, %w", ErrCouldNotParseSpendCondition, err)
+		return nil, errors.Join(ErrCouldNotParseSpendCondition, err)
 	}
 	return &spendCondition, nil
 }
 func (p Proof) parseWitness() (*Witness, error) {
 	var witness Witness
+	if len(p.Witness) == 0 {
+		witness.Preimage = ""
+		witness.Signatures = nil
+		return &witness, nil
+	}
 	err := json.Unmarshal([]byte(p.Witness), &witness)
 	if err != nil {
-		return nil, fmt.Errorf("json.Unmarshal([]byte(p.Witness), &witness)  %w, %w", ErrCouldNotParseWitness, err)
+		return nil, errors.Join(ErrCouldNotParseWitness, err)
 	}
 
 	return &witness, nil
@@ -435,41 +449,49 @@ func (p *Proof) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func VerifyProofCondition(proof Proof) error {
+	isLocked, spendCondition, err := proof.IsProofSpendConditioned()
+	if err != nil {
+		return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
+	}
+	if isLocked {
+		err = spendCondition.CheckValid()
+		if err != nil {
+			return fmt.Errorf("spendCondition.CheckValid(). %w", err)
+		}
+		switch spendCondition.Type {
+		case P2PK:
+			valid, err := proof.VerifyP2PK(spendCondition)
+			if err != nil {
+				return fmt.Errorf("proof.VerifyP2PK(spendCondition). %w", err)
+			}
+			if !valid {
+				return ErrInvalidSpendCondition
+			}
+		case HTLC:
+			valid, err := proof.VerifyHTLC(spendCondition)
+			if err != nil {
+				return fmt.Errorf("proof.VerifyHTLC(spendCondition). %w", err)
+			}
+			if !valid {
+				return ErrInvalidSpendCondition
+			}
+		}
+	}
+	if !isLocked {
+		if len(proof.Secret) != 64 {
+			return ErrCommonSecretNotCorrectSize
+		}
+	}
+	return nil
+}
+
 // VerifyProofsSpendConditions verifies P2PK and HTLC conditions for each proof individually.
 func VerifyProofsSpendConditions(proofs Proofs) error {
 	for _, proof := range proofs {
-		isLocked, spendCondition, err := proof.IsProofSpendConditioned()
+		err := VerifyProofCondition(proof)
 		if err != nil {
-			return fmt.Errorf("proof.IsProofSpendConditioned(). %+v", err)
-		}
-		if isLocked {
-			err = spendCondition.CheckValid()
-			if err != nil {
-				return fmt.Errorf("spendCondition.CheckValid(). %w", err)
-			}
-			switch spendCondition.Type {
-			case P2PK:
-				valid, err := proof.VerifyP2PK(spendCondition)
-				if err != nil {
-					return fmt.Errorf("proof.VerifyP2PK(spendCondition). %w", err)
-				}
-				if !valid {
-					return ErrInvalidSpendCondition
-				}
-			case HTLC:
-				valid, err := proof.VerifyHTLC(spendCondition)
-				if err != nil {
-					return fmt.Errorf("proof.VerifyHTLC(spendCondition). %w", err)
-				}
-				if !valid {
-					return ErrInvalidSpendCondition
-				}
-			}
-		}
-		if !isLocked {
-			if len(proof.Secret) != 64 {
-				return ErrCommonSecretNotCorrectSize
-			}
+			return fmt.Errorf("VerifyProofCondition(proof). %w", err)
 		}
 	}
 	return nil
