@@ -14,11 +14,11 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 
 	v1.POST("/mint/quote/bolt11", func(c *gin.Context) {
 		var mintRequest cashu.PostMintQuoteBolt11Request
-		err := c.BindJSON(&mintRequest)
+		err := utils.DecodeJSONV2(c, &mintRequest)
 
 		if err != nil {
 			slog.Info("Incorrect body", slog.Any("error", err))
-			c.JSON(400, "Malformed body request")
+			utils.JSON(c, 400, "Malformed body request")
 			return
 		}
 
@@ -29,11 +29,11 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		if err != nil {
 			slog.Info("mint.CreateMintQuote(c.Request.Context(), mintRequest, m.Bolt11)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			utils.JSON(c, 400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
-		c.JSON(200, response)
+		utils.JSON(c, 200, response)
 	})
 
 	v1.GET("/mint/quote/bolt11/:quote", func(c *gin.Context) {
@@ -42,20 +42,20 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		if err != nil {
 			slog.Info("mint.RefreshMintQuoteStatus(c.Request.Context(), quoteId, m.Bolt11)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			utils.JSON(c, 400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
-		c.JSON(200, response)
+		utils.JSON(c, 200, response)
 	})
 
 	v1.POST("/mint/bolt11", func(c *gin.Context) {
 		var mintRequest cashu.PostMintBolt11Request
 
-		err := c.BindJSON(&mintRequest)
+		err := utils.DecodeJSONV2(c, &mintRequest)
 		if err != nil {
 			slog.Info("Incorrect body", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			utils.JSON(c, 400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -66,19 +66,19 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		if err != nil {
 			slog.Info("mint.IssueTokens(c.Request.Context(), mintRequest, m.Bolt11)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			utils.JSON(c, 400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
-		c.JSON(200, response)
+		utils.JSON(c, 200, response)
 	})
 
 	v1.POST("/melt/quote/bolt11", func(c *gin.Context) {
 		var meltRequest cashu.PostMeltQuoteBolt11Request
-		err := c.BindJSON(&meltRequest)
+		err := utils.DecodeJSONV2(c, &meltRequest)
 
 		if err != nil {
 			slog.Info("Incorrect body", slog.Any("error", err))
-			c.JSON(400, "Malformed body request")
+			utils.JSON(c, 400, "Malformed body request")
 			return
 		}
 
@@ -89,10 +89,10 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		if err != nil {
 			slog.Warn("mint.CreateMeltQuote", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			utils.JSON(c, 400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
-		c.JSON(200, dbRequest.GetPostMeltQuoteResponse())
+		utils.JSON(c, 200, dbRequest.GetPostMeltQuoteResponse())
 	})
 
 	v1.GET("/melt/quote/bolt11/:quote", func(c *gin.Context) {
@@ -102,20 +102,20 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		if err != nil {
 			slog.Warn("mint.RefreshMeltQuoteState(quoteId)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			utils.JSON(c, 400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
-		c.JSON(200, quote.GetPostMeltQuoteResponse())
+		utils.JSON(c, 200, quote.GetPostMeltQuoteResponse())
 	})
 
 	v1.POST("/melt/bolt11", func(c *gin.Context) {
 		var meltRequest cashu.PostMeltBolt11Request
-		err := c.BindJSON(&meltRequest)
+		err := utils.DecodeJSONV2(c, &meltRequest)
 		if err != nil {
 			slog.Info("Incorrect body", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			utils.JSON(c, 400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
@@ -126,10 +126,10 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		if err != nil {
 			slog.Warn("mint.ExecuteMelt(ctx, meltRequest)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
-			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
+			utils.JSON(c, 400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
 		}
 
-		c.JSON(200, quote)
+		utils.JSON(c, 200, quote)
 	})
 }
