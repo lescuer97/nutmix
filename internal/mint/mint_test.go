@@ -103,12 +103,12 @@ func SetupDataOnDB(mint *Mint) error {
 
 	c1Priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
-		return fmt.Errorf("secp256k1.GeneratePrivateKey: %+v ", err)
+		return fmt.Errorf("secp256k1.GeneratePrivateKey: %w", err)
 	}
 	c1 := c1Priv.PubKey()
 	c2Priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
-		return fmt.Errorf("secp256k1.GeneratePrivateKey: %+v ", err)
+		return fmt.Errorf("secp256k1.GeneratePrivateKey: %w", err)
 	}
 
 	c2 := c2Priv.PubKey()
@@ -150,7 +150,7 @@ func SetupDataOnDB(mint *Mint) error {
 
 	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
-		return fmt.Errorf("mint.MintDB.GetTx(ctx): %+v ", err)
+		return fmt.Errorf("mint.MintDB.GetTx(ctx): %w", err)
 	}
 	defer func() {
 		_ = mint.MintDB.Rollback(ctx, tx)
@@ -158,17 +158,17 @@ func SetupDataOnDB(mint *Mint) error {
 
 	err = mint.MintDB.SaveMeltRequest(tx, melt_quote)
 	if err != nil {
-		return fmt.Errorf("mint.MintDB.SaveMeltRequest(tx, melt_quote): %+v ", err)
+		return fmt.Errorf("mint.MintDB.SaveMeltRequest(tx, melt_quote): %w", err)
 	}
 
 	err = mint.MintDB.SaveProof(tx, proofs)
 	if err != nil {
-		return fmt.Errorf("mint.MintDB.SaveProof(tx, proofs): %+v ", err)
+		return fmt.Errorf("mint.MintDB.SaveProof(tx, proofs): %w", err)
 	}
 	//
 	err = mint.MintDB.Commit(ctx, tx)
 	if err != nil {
-		return fmt.Errorf("mint.MintDB.Commit(ctx, tx): %+v ", err)
+		return fmt.Errorf("mint.MintDB.Commit(ctx, tx): %w", err)
 	}
 
 	return nil

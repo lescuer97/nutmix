@@ -44,7 +44,7 @@ func (a AuthProof) Y() (WrappedPublicKey, error) {
 	y, err := gonutsCrypto.HashToCurve(parsedSecret)
 
 	if err != nil {
-		return WrappedPublicKey{}, fmt.Errorf("crypto.HashToCurve: %+v", err)
+		return WrappedPublicKey{}, fmt.Errorf("crypto.HashToCurve: %w", err)
 	}
 
 	return WrappedPublicKey{y}, nil
@@ -106,14 +106,14 @@ func DecodeAuthToken(tokenstr string) (AuthProof, error) {
 	if err != nil {
 		tokenBytes, err = base64.RawURLEncoding.DecodeString(base64Token)
 		if err != nil {
-			return AuthProof{}, fmt.Errorf("error decoding token: %v", err)
+			return AuthProof{}, fmt.Errorf("error decoding token: %w", err)
 		}
 	}
 
 	var authProof AuthProof
 	err = json.Unmarshal(tokenBytes, &authProof)
 	if err != nil {
-		return AuthProof{}, fmt.Errorf("cbor.Unmarshal: %v", err)
+		return AuthProof{}, fmt.Errorf("cbor.Unmarshal: %w", err)
 	}
 
 	return authProof, nil

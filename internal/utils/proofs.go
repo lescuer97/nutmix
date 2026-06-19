@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -18,7 +19,7 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrEmptyWitness):
 
 		message := "Empty Witness"
-		return cashu.UNKNOWN, &message
+		return cashu.PROOF_VERIFICATION_FAILED, &message
 
 	case errors.Is(proofError, cashu.ErrPaymentNoRoute):
 		message := "No route found for payment"
@@ -53,9 +54,6 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrMintRequestAlreadyIssued.Error()
 		return cashu.QUOTE_ALREADY_ISSUED, &message
 
-	case errors.Is(proofError, cashu.ErrLocktimePassed):
-		message := cashu.ErrLocktimePassed.Error()
-		return cashu.UNKNOWN, &message
 	case errors.Is(proofError, cashu.ErrUsingInactiveKeyset):
 		return cashu.INACTIVE_KEYSET, nil
 	case errors.Is(proofError, cashu.ErrMeltAlreadyPaid):
@@ -136,6 +134,7 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		return cashu.PROOF_VERIFICATION_FAILED, &message
 	}
 
+	slog.Error("UNKNOWN error detected. This should have not happened", slog.Any("error", proofError))
 	return cashu.UNKNOWN, nil
 }
 

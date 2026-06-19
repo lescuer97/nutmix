@@ -30,43 +30,24 @@ func (p *PostSwapRequest) ValidateSigflag() error {
 			return ErrInvalidSpendCondition
 		}
 
-		if firstWitness.Signatures == nil {
-			return ErrNoValidSignatures
-		}
-
 		// check the conditions are met
-		err = p.verifyConditions()
+		err = p.verifySigAllRepetition()
 		if err != nil {
-			return fmt.Errorf("p.verifyConditions(). %w", err)
+			return fmt.Errorf("p.verifySigAllRepetition(). %w", err)
 		}
 
 		// makes message
 		msg := p.makeSigAllMsg()
 
-		signatures, err := checkValidSignature(msg, sigAllCheck.pubkeys, firstWitness.Signatures)
+		err = checkSigAllProofValid(msg, sigAllCheck, firstProof)
 		if err != nil {
-			return fmt.Errorf("checkValidSignature(msg, pubkeys, firstWitness.Signatures). %w", err)
+			return fmt.Errorf("checkSigAllProofValid(msg, sigAllCheck, firstProof). %w", err)
 		}
-		if signatures >= sigAllCheck.signaturesRequired {
-			return nil
-		}
-
-		if firstProof.timelockPassed(firstSpendCondition) {
-			signatures, err := checkValidSignature(msg, sigAllCheck.refundPubkeys, firstWitness.Signatures)
-			if err != nil {
-				return fmt.Errorf("checkValidSignature(msg, refundPubkeys, firstWitness.Signatures). %w", err)
-			}
-			if signatures >= sigAllCheck.signaturesRequiredRefund {
-				return nil
-			}
-		}
-
-		return ErrNotEnoughSignatures
 	}
 	return nil
 }
 
-func (p *PostSwapRequest) verifyConditions() error {
+func (p *PostSwapRequest) verifySigAllRepetition() error {
 	firstProof := p.Inputs[0]
 	firstSpendCondition, err := firstProof.parseSpendCondition()
 	if err != nil {

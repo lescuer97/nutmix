@@ -180,10 +180,21 @@ func main() {
 	srv.ReadTimeout = 3 * time.Second
 	srv.WriteTimeout = 4 * time.Second
 	srv.IdleTimeout = 3 * time.Minute
-	// Start the server
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		slog.Error("server failed", slog.Any("error", err))
-		os.Exit(1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server failed", slog.Any("error", err))
+			os.Exit(1)
+		}
+	}()
+
+	<-appCtx.Done()
+	slog.Info("Shutting down server...")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("server forced to shutdown", slog.Any("error", err))
 	}
 }
 
@@ -196,20 +207,20 @@ func GetSignerFromValue(signerType string, db database.MintDB) (signer.Signer, e
 	case MemorySigner:
 		signer, err := localsigner.SetupLocalSigner(db)
 		if err != nil {
-			return &signer, fmt.Errorf("localsigner.SetupLocalSigner(db): %+v ", err)
+			return &signer, fmt.Errorf("localsigner.SetupLocalSigner(db): %w", err)
 		}
 		return &signer, nil
 	case AbstractSocketSigner:
 		signer, err := remoteSigner.SetupRemoteSigner(false, os.Getenv("NETWORK_SIGNER_ADDRESS"))
 		if err != nil {
-			return &signer, fmt.Errorf("socketremotesigner.SetupSocketSigner(): %+v ", err)
+			return &signer, fmt.Errorf("socketremotesigner.SetupSocketSigner(): %w", err)
 		}
 		return &signer, nil
 
 	case NetworkSigner:
 		signer, err := remoteSigner.SetupRemoteSigner(true, os.Getenv("NETWORK_SIGNER_ADDRESS"))
 		if err != nil {
-			return &signer, fmt.Errorf("socketremotesigner.SetupSocketSigner(): %+v ", err)
+			return &signer, fmt.Errorf("socketremotesigner.SetupSocketSigner(): %w", err)
 		}
 		return &signer, nil
 

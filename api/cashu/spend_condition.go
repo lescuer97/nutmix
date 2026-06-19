@@ -302,13 +302,11 @@ func (scd *SpendConditionData) MarshalJSON() ([]byte, error) {
 
 func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 	preImageBytes, err := hex.DecodeString(witness.Preimage)
-
 	if err != nil {
 		return errors.Join(ErrInvalidHexPreimage, err)
 	}
 
 	parsedPreimage := sha256.Sum256(preImageBytes)
-
 	if hex.EncodeToString(parsedPreimage[:]) != sc.Data.Data {
 		return ErrInvalidPreimage
 	}
@@ -367,8 +365,8 @@ func TagFromString(s string) (Tags, error) {
 type SigFlag int
 
 const (
-	SigAll    SigFlag = iota + 1 // 1
-	SigInputs                    // 2
+	SigAll SigFlag = iota + 1 // 1
+	SigInputs
 )
 
 func (sf SigFlag) String() string {
@@ -466,6 +464,7 @@ type SigflagValidation struct {
 	pubkeys                  map[string]struct{}
 	refundPubkeys            map[string]struct{}
 	sigFlag                  SigFlag
+	proofType                SpendConditionType
 	signaturesRequired       uint
 	signaturesRequiredRefund uint
 }
@@ -473,8 +472,9 @@ type SigflagValidation struct {
 func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 	sigflagValidation := SigflagValidation{
 		sigFlag:                  SigInputs,
-		signaturesRequired:       1,
+		signaturesRequired:       0,
 		signaturesRequiredRefund: 0,
+		proofType:                AnyOneCanSpend,
 		pubkeys:                  make(map[string]struct{}),
 		refundPubkeys:            make(map[string]struct{}),
 	}
@@ -486,12 +486,19 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 		if isLocked && spendCondition != nil {
 			if spendCondition.Data.Tags.Sigflag == SigAll {
 				sigflagValidation.sigFlag = SigAll
+				sigflagValidation.proofType = spendCondition.Type
+				if spendCondition.Type == P2PK {
+					sigflagValidation.signaturesRequired = 1
+				}
 				if spendCondition.Data.Tags.NSigs > 1 {
 					sigflagValidation.signaturesRequired = spendCondition.Data.Tags.NSigs
 				}
 				pubkeys, err := proof.pubkeysForVerification(spendCondition)
 				if err != nil {
 					return SigflagValidation{}, fmt.Errorf("proof.pubkeysForVerification(spendCondition). %w", err)
+				}
+				if len(pubkeys) > 0 && sigflagValidation.signaturesRequired == 0 {
+					sigflagValidation.signaturesRequired = 1
 				}
 
 				sigflagValidation.pubkeys = pubkeys
@@ -524,7 +531,53 @@ func ProofsHaveSigAll(proofs Proofs) (bool, error) {
 	return false, nil
 }
 
-func checkValidSignature(msg string, pubkeys map[string]struct{}, signatures []*schnorr.Signature) (uint, error) {
+func checkSigAllProofValid(sigAllMsg string, sigAllValidation SigflagValidation, firstProof Proof) error {
+	if sigAllValidation.sigFlag != SigAll {
+		return fmt.Errorf("sigAllValidation has flag that is not SIG_ALL")
+	}
+
+	spendCondition, err := firstProof.parseSpendCondition()
+	if err != nil {
+		return fmt.Errorf("firstProof.parseSpendCondition(). %w", err)
+	}
+	witness, err := firstProof.parseWitness()
+	if err != nil {
+		return fmt.Errorf("firstProof.parseWitness(). %w", err)
+	}
+
+	if spendCondition == nil || witness == nil {
+		return ErrInvalidSpendCondition
+	}
+
+	if timelockPassed(spendCondition) {
+		signatures, err := checkSigAllValidSignature(sigAllMsg, sigAllValidation.refundPubkeys, witness.Signatures)
+		if err != nil {
+			return fmt.Errorf("checkSigAllValidSignature(msg, refundPubkeys, firstWitness.Signatures). %w", err)
+		}
+		if signatures >= sigAllValidation.signaturesRequiredRefund {
+			return nil
+		}
+	}
+	if sigAllValidation.proofType == HTLC {
+		err := spendCondition.VerifyPreimage(witness)
+		if err != nil {
+			return fmt.Errorf("spendCondition.VerifyPreimage(witness). %w", err)
+		}
+	}
+
+	signatures, err := checkSigAllValidSignature(sigAllMsg, sigAllValidation.pubkeys, witness.Signatures)
+	if err != nil {
+		return fmt.Errorf("checkSigAllValidSignature(msg, pubkeys, firstWitness.Signatures). %w", err)
+	}
+
+	if signatures < sigAllValidation.signaturesRequired {
+		return ErrNotEnoughSignatures
+	}
+
+	return nil
+}
+
+func checkSigAllValidSignature(msg string, pubkeys map[string]struct{}, signatures []*schnorr.Signature) (uint, error) {
 	hashMessage := sha256.Sum256([]byte(msg))
 	amountValidSigs := uint(0)
 
