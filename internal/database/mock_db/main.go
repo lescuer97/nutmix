@@ -17,10 +17,13 @@ var ErrDB = errors.New("ERROR DATABASE")
 
 var DATABASE_URL_ENV = "DATABASE_URL"
 
+//nolint:govet // test helper keeps grouped in-memory fixtures readable
 type MockDB struct {
 	GetConfigErr                     error
 	UpdateNostrNotificationConfigErr error
 	NostrNotificationConfig          *utils.NostrNotificationConfig
+	ErrorToReturn                    error
+	LDKConfig                        *database.LDKConfig
 	LastLightningSearch              *string
 	MeltChange                       []cashu.MeltChange
 	Proofs                           []cashu.Proof
@@ -41,6 +44,10 @@ type MockDB struct {
 	LastSearchLimit                  int
 }
 
+func (m MockDB) Pool() *pgxpool.Pool {
+	return nil
+}
+
 func databaseError(err error) error {
 	return errors.Join(ErrDB, err)
 }
@@ -48,6 +55,22 @@ func databaseError(err error) error {
 func (m *MockDB) GetAllSeeds() ([]cashu.Seed, error) {
 	return m.Seeds, nil
 }
+
+func (m *MockDB) GetLDKConfig(ctx context.Context) (database.LDKConfig, error) {
+	_ = ctx
+	if m.LDKConfig == nil {
+		return database.LDKConfig{}, pgx.ErrNoRows
+	}
+	return *m.LDKConfig, nil
+}
+
+func (m *MockDB) SetLDKConfig(ctx context.Context, config database.LDKConfig) error {
+	_ = ctx
+	copyConfig := config
+	m.LDKConfig = &copyConfig
+	return nil
+}
+
 func (m *MockDB) GetTx(ctx context.Context) (pgx.Tx, error) {
 	return &pgxpool.Tx{}, nil
 }
