@@ -95,6 +95,7 @@ func TestFindPaymentDetailsPrefersCheckingID(t *testing.T) {
 	got := findPaymentDetails([]ldk_node.PaymentDetails{newerHashMatch}, exactByID, ldk_node.PaymentDirectionOutbound, hash)
 	if got == nil {
 		t.Fatal("findPaymentDetails(...) returned nil")
+		return
 	}
 	if got.Id != "exact-id" {
 		t.Fatalf("findPaymentDetails(...).Id = %q, want %q", got.Id, "exact-id")

@@ -91,6 +91,8 @@ func (l *LDK) InitNode(ctx context.Context) error {
 	switch config.ChainSourceType {
 	case ChainSourceElectrum:
 		builder.SetChainSourceElectrum(config.ElectrumServerURL, &ldk_node.ElectrumSyncConfig{
+			FullScanStopGap:     20,
+			ForceWalletFullScan: false,
 			BackgroundSyncConfig: &ldk_node.BackgroundSyncConfig{
 				OnchainWalletSyncIntervalSecs:   80,
 				LightningWalletSyncIntervalSecs: 30,
@@ -133,6 +135,8 @@ func (l *LDK) InitNode(ctx context.Context) error {
 
 func forcedEsploraSyncConfig() *ldk_node.EsploraSyncConfig {
 	return &ldk_node.EsploraSyncConfig{
+		FullScanStopGap:     20,
+		ForceWalletFullScan: false,
 		BackgroundSyncConfig: &ldk_node.BackgroundSyncConfig{
 			OnchainWalletSyncIntervalSecs:   80,
 			LightningWalletSyncIntervalSecs: 30,

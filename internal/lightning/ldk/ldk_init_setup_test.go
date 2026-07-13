@@ -276,9 +276,16 @@ func TestForcedEsploraSyncConfigUsesDocumentedDefaults(t *testing.T) {
 	config := forcedEsploraSyncConfig()
 	if config == nil {
 		t.Fatal("expected forced Esplora sync config")
+		return
 	}
 	if config.BackgroundSyncConfig == nil {
 		t.Fatal("expected background sync config")
+	}
+	if config.FullScanStopGap != 20 {
+		t.Fatalf("unexpected full scan stop gap: %d", config.FullScanStopGap)
+	}
+	if config.ForceWalletFullScan {
+		t.Fatal("expected wallet full scan not to be forced")
 	}
 
 	if config.BackgroundSyncConfig.OnchainWalletSyncIntervalSecs != 80 {
