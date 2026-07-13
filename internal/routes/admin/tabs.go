@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -163,6 +164,116 @@ func ldkConfigBackendForMint(mint *m.Mint, network string) (*ldk.LDK, error) {
 	}
 
 	return ldk, nil
+}
+
+type ldkBackendPreparation struct {
+	backend          *ldk.LDK
+	unchanged        bool
+	activeLDKStopped bool
+}
+
+func loadLDKConfig(ctx context.Context, c *gin.Context, mint *m.Mint) (ldk.PersistedConfig, ldk.PersistedConfig, error) {
+	defaultConfigDirectory, err := ldk.DefaultConfigDirectory()
+	if err != nil {
+		return ldk.PersistedConfig{}, ldk.PersistedConfig{}, fmt.Errorf("ldk.DefaultConfigDirectory(): %w", err)
+	}
+
+	existingConfig := ldk.PersistedConfig{
+		ConfigDirectory: defaultConfigDirectory,
+		ChainSourceType: ldk.ChainSourceBitcoind,
+		Rpc:             ldk.RPCConfig{},
+	}
+	if persistedConfig, err := ldk.GetPersistedConfig(ctx, mint.MintDB); err == nil {
+		existingConfig = persistedConfig
+	}
+
+	incomingConfig, err := parseLDKPersistedConfig(c, existingConfig, defaultConfigDirectory)
+	if err != nil {
+		return ldk.PersistedConfig{}, ldk.PersistedConfig{}, fmt.Errorf("parseLDKPersistedConfig(...): %w", err)
+	}
+
+	return existingConfig, incomingConfig, nil
+}
+
+func prepareLDKBackend(ctx context.Context, mint *m.Mint, network string, existingConfig ldk.PersistedConfig, incomingConfig ldk.PersistedConfig) (ldkBackendPreparation, error) {
+	currentLDK, activeLDK := mint.LightningBackend.(*ldk.LDK)
+	activeLDK = activeLDK && mint.Config.MINT_LIGHTNING_BACKEND == utils.LDK
+	if activeLDK && mint.Config.NETWORK == network && ldkConfigsEqual(existingConfig, incomingConfig) {
+		return ldkBackendPreparation{backend: currentLDK, unchanged: true}, nil
+	}
+
+	if activeLDK {
+		if err := currentLDK.Stop(); err != nil {
+			return ldkBackendPreparation{}, fmt.Errorf("currentLDK.Stop(): %w", err)
+		}
+		mint.LightningBackend = nil
+
+		if err := currentLDK.SaveConfig(ctx, incomingConfig); err != nil {
+			return ldkBackendPreparation{activeLDKStopped: true}, fmt.Errorf("currentLDK.SaveConfig(...): %w", err)
+		}
+
+		backend, err := ldk.NewLdk(ctx, mint.MintDB, network)
+		if err != nil {
+			return ldkBackendPreparation{activeLDKStopped: true}, fmt.Errorf("ldk.NewLdk(...): %w", err)
+		}
+
+		return ldkBackendPreparation{backend: backend, activeLDKStopped: true}, nil
+	}
+
+	configBackend, err := ldkConfigBackendForMint(mint, network)
+	if err != nil {
+		return ldkBackendPreparation{}, fmt.Errorf("ldkConfigBackendForMint(...): %w", err)
+	}
+	if err := configBackend.SaveConfig(ctx, incomingConfig); err != nil {
+		return ldkBackendPreparation{}, fmt.Errorf("configBackend.SaveConfig(...): %w", err)
+	}
+
+	backend, err := ldk.NewLdk(ctx, mint.MintDB, network)
+	if err != nil {
+		return ldkBackendPreparation{}, fmt.Errorf("ldk.NewLdk(...): %w", err)
+	}
+
+	return ldkBackendPreparation{backend: backend}, nil
+}
+
+type lightningBackendVerificationError struct {
+	message string
+	err     error
+}
+
+func (e *lightningBackendVerificationError) Error() string {
+	return e.err.Error()
+}
+
+func verifyLightningBackend(backend lightning.LightningBackend, chainparam chaincfg.Params) *lightningBackendVerificationError {
+	if _, err := backend.WalletBalance(); err != nil {
+		return &lightningBackendVerificationError{
+			message: "Could not check established connection with Node (WalletBalance failed)",
+			err:     fmt.Errorf("WalletBalance(): %w", err),
+		}
+	}
+
+	testDescription := "verification-test-" + strconv.FormatInt(time.Now().Unix(), 10)
+	invoiceResp, err := backend.RequestInvoice(cashu.NewAmount(cashu.Sat, 100), &testDescription)
+	if err != nil {
+		return &lightningBackendVerificationError{
+			message: "Could not generate a test invoice with the new backend",
+			err:     fmt.Errorf("RequestInvoice(...): %w", err),
+		}
+	}
+
+	decodedInvoice, err := zpay32.Decode(invoiceResp.PaymentRequest, &chainparam)
+	if err != nil {
+		return &lightningBackendVerificationError{
+			message: "Lightning backend network does not match selected network configuration",
+			err:     fmt.Errorf("zpay32.Decode(...): %w", err),
+		}
+	}
+	if decodedInvoice.MilliSat == nil || int64(decodedInvoice.MilliSat.ToSatoshis()) != 100 {
+		slog.Warn("Decoded invoice amount mismatch")
+	}
+
+	return nil
 }
 
 func decodeNpubToHex(npub string) (string, error) {
@@ -818,10 +929,11 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		ctx := c.Request.Context()
 		oldConfig := mint.Config
 		oldBackend := mint.LightningBackend
+		oldLDKStopped := false
 
 		var newBackend lightning.LightningBackend
 		var newBackendType utils.LightningBackend
-		var ldkConfig ldk.PersistedConfig
+		var newLDK *ldk.LDK
 
 		var (
 			lndHost     = mint.Config.LND_GRPC_HOST
@@ -898,31 +1010,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 		case string(utils.LDK):
 			newBackendType = utils.LDK
-			defaultConfigDirectory, err := ldk.DefaultConfigDirectory()
-			if err != nil {
-				if renderErr := RenderError(c, "Could not determine LDK storage directory"); renderErr != nil {
-					slog.Warn("failed to render error", slog.Any("error", renderErr))
-				}
-				return
-			}
-
-			existingLDKConfig := ldk.PersistedConfig{
-				ConfigDirectory:   defaultConfigDirectory,
-				ChainSourceType:   ldk.ChainSourceBitcoind,
-				ElectrumServerURL: "",
-				EsploraServerURL:  "",
-				Rpc: ldk.RPCConfig{
-					Address:  "",
-					Username: "",
-					Password: "",
-					Port:     0,
-				},
-			}
-			if persistedConfig, getConfigErr := ldk.GetPersistedConfig(ctx, mint.MintDB); getConfigErr == nil {
-				existingLDKConfig = persistedConfig
-			}
-
-			ldkConfig, err = parseLDKPersistedConfig(c, existingLDKConfig, defaultConfigDirectory)
+			existingLDKConfig, ldkConfig, err := loadLDKConfig(ctx, c, mint)
 			if err != nil {
 				if renderErr := RenderError(c, err.Error()); renderErr != nil {
 					slog.Warn("failed to render error", slog.Any("error", renderErr))
@@ -930,30 +1018,27 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				return
 			}
 
-			configBackend, err := ldkConfigBackendForMint(mint, chainparam.Name)
+			ldkPreparation, err := prepareLDKBackend(ctx, mint, chainparam.Name, existingLDKConfig, ldkConfig)
 			if err != nil {
-				if renderErr := RenderError(c, err.Error()); renderErr != nil {
+				slog.Warn("prepareLDKBackend", slog.String(utils.LogExtraInfo, err.Error()))
+				message := "Something went wrong setting up LDK communications"
+				if ldkPreparation.activeLDKStopped {
+					message = "LDK is offline: could not apply the new configuration"
+				}
+				if renderErr := RenderError(c, message); renderErr != nil {
 					slog.Warn("failed to render error", slog.Any("error", renderErr))
 				}
 				return
 			}
-
-			if err := configBackend.SaveConfig(ctx, ldkConfig); err != nil {
-				slog.Warn("configBackend.SaveConfig", slog.String(utils.LogExtraInfo, err.Error()))
-				if renderErr := RenderError(c, "Could not persist LDK configuration"); renderErr != nil {
-					slog.Warn("failed to render error", slog.Any("error", renderErr))
+			if ldkPreparation.unchanged {
+				if err := RenderSuccess(c, "LDK settings are unchanged"); err != nil {
+					slog.Warn("failed to render success", slog.Any("error", err))
 				}
 				return
 			}
-
-			newBackend, err = ldk.NewLdk(ctx, mint.MintDB, chainparam.Name)
-			if err != nil {
-				slog.Warn("ldk.NewLdk(ctx, mint.MintDB)", slog.String(utils.LogExtraInfo, err.Error()))
-				if renderErr := RenderError(c, "Something went wrong setting up LDK communications"); renderErr != nil {
-					slog.Warn("failed to render error", slog.Any("error", renderErr))
-				}
-				return
-			}
+			oldLDKStopped = ldkPreparation.activeLDKStopped
+			newLDK = ldkPreparation.backend
+			newBackend = newLDK
 
 		default:
 			if renderErr := RenderError(c, "Invalid backend selection"); renderErr != nil {
@@ -962,41 +1047,15 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			return
 		}
 
-		_, err = newBackend.WalletBalance()
-		if err != nil {
-			slog.Warn("Could not get lightning balance", slog.String(utils.LogExtraInfo, err.Error()))
-			if renderErr := RenderError(c, "Could not check established connection with Node (WalletBalance failed)"); renderErr != nil {
+		if verificationErr := verifyLightningBackend(newBackend, chainparam); verificationErr != nil {
+			if stopErr := newLDK.Stop(); stopErr != nil {
+				slog.Warn("newLDK.Stop", slog.String(utils.LogExtraInfo, stopErr.Error()))
+			}
+			slog.Warn("verifyLightningBackend", slog.String(utils.LogExtraInfo, verificationErr.Error()))
+			if renderErr := RenderError(c, verificationErr.message); renderErr != nil {
 				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
-		}
-
-		testQuote := "verification-test-" + strconv.FormatInt(time.Now().Unix(), 10)
-		//nolint:exhaustruct
-		testDescription := testQuote
-		invoiceResp, err := newBackend.RequestInvoice(
-			cashu.NewAmount(cashu.Sat, 100),
-			&testDescription,
-		)
-		if err != nil {
-			slog.Warn("newBackend.RequestInvoice failed during verification", slog.String("err", err.Error()))
-			if renderErr := RenderError(c, "Could not generate a test invoice with the new backend"); renderErr != nil {
-				slog.Warn("failed to render error", slog.Any("error", renderErr))
-			}
-			return
-		}
-
-		decodedInvoice, err := zpay32.Decode(invoiceResp.PaymentRequest, &chainparam)
-		if err != nil {
-			slog.Warn("zpay32.Decode failed during verification", slog.String("err", err.Error()))
-			if renderErr := RenderError(c, "Lightning backend network does not match selected network configuration"); renderErr != nil {
-				slog.Warn("failed to render error", slog.Any("error", renderErr))
-			}
-			return
-		}
-
-		if decodedInvoice.MilliSat == nil || int64(decodedInvoice.MilliSat.ToSatoshis()) != 100 {
-			slog.Warn("Decoded invoice amount mismatch")
 		}
 
 		mint.Config.NETWORK = chainparam.Name
@@ -1020,7 +1079,14 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 		if err = persistConfigTx(c.Request.Context(), mint, mint.Config); err != nil {
 			mint.Config = oldConfig
-			mint.LightningBackend = oldBackend
+			if oldLDKStopped {
+				mint.LightningBackend = nil
+				if stopErr := newLDK.Stop(); stopErr != nil {
+					slog.Warn("newLDK.Stop", slog.String(utils.LogExtraInfo, stopErr.Error()))
+				}
+			} else {
+				mint.LightningBackend = oldBackend
+			}
 			slog.Warn("persistConfigTx(c.Request.Context(), mint, mint.Config)", slog.String(utils.LogExtraInfo, err.Error()))
 			if renderErr := RenderError(c, "Settings applied but failed to save to database"); renderErr != nil {
 				slog.Warn("failed to render error", slog.Any("error", renderErr))

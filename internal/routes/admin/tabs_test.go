@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -22,6 +23,11 @@ import (
 )
 
 func newPostContext(values url.Values) *gin.Context {
+	c, _ := newPostContextWithRecorder(values)
+	return c
+}
+
+func newPostContextWithRecorder(values url.Values) (*gin.Context, *httptest.ResponseRecorder) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -29,7 +35,7 @@ func newPostContext(values url.Values) *gin.Context {
 	req.PostForm = values
 	req.Form = values
 	c.Request = req
-	return c
+	return c, rec
 }
 
 func mustBitcoindPersistedConfigForAdminTest(t *testing.T, configDirectory string) ldk.PersistedConfig {
@@ -826,5 +832,105 @@ func TestLDKConfigsEqual(t *testing.T) {
 	b.ConfigDirectory = "/tmp/ldk-b"
 	if ldkConfigsEqual(a, b) {
 		t.Fatalf("expected config directories to differ")
+	}
+}
+
+func TestBolt11PostReusesUnchangedActiveLDKConfig(t *testing.T) {
+	configDir := filepath.Join(setTempConfigDir(t), "ldk")
+	ldkConfig, err := ldk.NewPersistedConfig(ldk.RPCConfig{
+		Address:  "127.0.0.1",
+		Port:     18443,
+		Username: "user",
+		Password: "pass",
+	}, configDir)
+	if err != nil {
+		t.Fatalf("ldk.NewPersistedConfig(...): %v", err)
+	}
+
+	var config utils.Config
+	config.Default()
+	config.NETWORK = "regtest"
+	config.MINT_LIGHTNING_BACKEND = utils.LDK
+
+	mockDatabase := &mockdb.MockDB{Config: config}
+	if err := ldk.SaveConfig(context.Background(), mockDatabase, ldkConfig); err != nil {
+		t.Fatalf("ldk.SaveConfig(...): %v", err)
+	}
+	activeBackend, err := ldk.NewConfigBackend(mockDatabase, "regtest")
+	if err != nil {
+		t.Fatalf("ldk.NewConfigBackend(...): %v", err)
+	}
+	mintInstance := &mint.Mint{
+		Config:           config,
+		MintDB:           mockDatabase,
+		LightningBackend: activeBackend,
+	}
+
+	values := url.Values{}
+	values.Set("NETWORK", "regtest")
+	values.Set("MINT_LIGHTNING_BACKEND", string(utils.LDK))
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	mockDatabase.SetLDKConfigCalls = 0
+	Bolt11Post(mintInstance)(newPostContext(values))
+
+	if mintInstance.LightningBackend != activeBackend {
+		t.Fatal("expected active LDK backend to remain in use")
+	}
+	if mockDatabase.SetLDKConfigCalls != 0 {
+		t.Fatalf("expected unchanged LDK config not to be saved, got %d saves", mockDatabase.SetLDKConfigCalls)
+	}
+	if mockDatabase.LDKConfig == nil || mockDatabase.LDKConfig.Rpc.Address != "127.0.0.1" {
+		t.Fatalf("expected persisted LDK config to remain unchanged, got %+v", mockDatabase.LDKConfig)
+	}
+}
+
+func TestBolt11PostLeavesMintOfflineWhenActiveLDKReplacementFails(t *testing.T) {
+	configDir := filepath.Join(setTempConfigDir(t), "ldk")
+	ldkConfig := mustBitcoindPersistedConfigForAdminTest(t, configDir)
+
+	var config utils.Config
+	config.Default()
+	config.NETWORK = "regtest"
+	config.MINT_LIGHTNING_BACKEND = utils.LDK
+
+	mockDatabase := &mockdb.MockDB{Config: config}
+	if err := ldk.SaveConfig(context.Background(), mockDatabase, ldkConfig); err != nil {
+		t.Fatalf("ldk.SaveConfig(...): %v", err)
+	}
+	activeBackend, err := ldk.NewConfigBackend(mockDatabase, "regtest")
+	if err != nil {
+		t.Fatalf("ldk.NewConfigBackend(...): %v", err)
+	}
+	mintInstance := &mint.Mint{
+		Config:           config,
+		MintDB:           mockDatabase,
+		LightningBackend: activeBackend,
+	}
+
+	values := url.Values{}
+	values.Set("NETWORK", "regtest")
+	values.Set("MINT_LIGHTNING_BACKEND", string(utils.LDK))
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.2")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	c, recorder := newPostContextWithRecorder(values)
+	Bolt11Post(mintInstance)(c)
+
+	if mintInstance.LightningBackend != nil {
+		t.Fatal("expected mint to be offline after replacement startup failure")
+	}
+	if mockDatabase.LDKConfig == nil || mockDatabase.LDKConfig.Rpc.Address != "127.0.0.2" {
+		t.Fatalf("expected replacement config to be saved, got %+v", mockDatabase.LDKConfig)
+	}
+	if !strings.Contains(recorder.Body.String(), "LDK is offline") {
+		t.Fatalf("expected offline error response, got %q", recorder.Body.String())
 	}
 }

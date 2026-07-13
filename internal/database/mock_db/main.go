@@ -43,6 +43,7 @@ type MockDB struct {
 	ReturnError                      int64
 	LastSearchSince                  int64
 	LastSearchLimit                  int
+	SetLDKConfigCalls                int
 }
 
 func (m MockDB) Pool() *pgxpool.Pool {
@@ -67,6 +68,7 @@ func (m *MockDB) GetLDKConfig(ctx context.Context) (database.LDKConfig, error) {
 
 func (m *MockDB) SetLDKConfig(ctx context.Context, config database.LDKConfig) error {
 	_ = ctx
+	m.SetLDKConfigCalls++
 	copyConfig := config
 	m.LDKConfig = &copyConfig
 	return nil
