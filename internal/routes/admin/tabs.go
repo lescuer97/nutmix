@@ -179,9 +179,16 @@ func loadLDKConfig(ctx context.Context, c *gin.Context, mint *m.Mint) (ldk.Persi
 	}
 
 	existingConfig := ldk.PersistedConfig{
-		ConfigDirectory: defaultConfigDirectory,
-		ChainSourceType: ldk.ChainSourceBitcoind,
-		Rpc:             ldk.RPCConfig{},
+		ConfigDirectory:   defaultConfigDirectory,
+		ChainSourceType:   ldk.ChainSourceBitcoind,
+		ElectrumServerURL: "",
+		EsploraServerURL:  "",
+		Rpc: ldk.RPCConfig{
+			Address:  "",
+			Username: "",
+			Password: "",
+			Port:     0,
+		},
 	}
 	if persistedConfig, err := ldk.GetPersistedConfig(ctx, mint.MintDB); err == nil {
 		existingConfig = persistedConfig
@@ -199,7 +206,7 @@ func prepareLDKBackend(ctx context.Context, mint *m.Mint, network string, existi
 	currentLDK, activeLDK := mint.LightningBackend.(*ldk.LDK)
 	activeLDK = activeLDK && mint.Config.MINT_LIGHTNING_BACKEND == utils.LDK
 	if activeLDK && mint.Config.NETWORK == network && ldkConfigsEqual(existingConfig, incomingConfig) {
-		return ldkBackendPreparation{backend: currentLDK, unchanged: true}, nil
+		return ldkBackendPreparation{backend: currentLDK, unchanged: true, activeLDKStopped: false}, nil
 	}
 
 	if activeLDK {
@@ -209,15 +216,15 @@ func prepareLDKBackend(ctx context.Context, mint *m.Mint, network string, existi
 		mint.LightningBackend = nil
 
 		if err := currentLDK.SaveConfig(ctx, incomingConfig); err != nil {
-			return ldkBackendPreparation{activeLDKStopped: true}, fmt.Errorf("currentLDK.SaveConfig(...): %w", err)
+			return ldkBackendPreparation{backend: nil, unchanged: false, activeLDKStopped: true}, fmt.Errorf("currentLDK.SaveConfig(...): %w", err)
 		}
 
 		backend, err := ldk.NewLdk(ctx, mint.MintDB, network)
 		if err != nil {
-			return ldkBackendPreparation{activeLDKStopped: true}, fmt.Errorf("ldk.NewLdk(...): %w", err)
+			return ldkBackendPreparation{backend: nil, unchanged: false, activeLDKStopped: true}, fmt.Errorf("ldk.NewLdk(...): %w", err)
 		}
 
-		return ldkBackendPreparation{backend: backend, activeLDKStopped: true}, nil
+		return ldkBackendPreparation{backend: backend, unchanged: false, activeLDKStopped: true}, nil
 	}
 
 	configBackend, err := ldkConfigBackendForMint(mint, network)
@@ -233,12 +240,12 @@ func prepareLDKBackend(ctx context.Context, mint *m.Mint, network string, existi
 		return ldkBackendPreparation{}, fmt.Errorf("ldk.NewLdk(...): %w", err)
 	}
 
-	return ldkBackendPreparation{backend: backend}, nil
+	return ldkBackendPreparation{backend: backend, unchanged: false, activeLDKStopped: false}, nil
 }
 
 type lightningBackendVerificationError struct {
-	message string
 	err     error
+	message string
 }
 
 func (e *lightningBackendVerificationError) Error() string {
