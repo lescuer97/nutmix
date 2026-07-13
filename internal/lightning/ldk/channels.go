@@ -151,9 +151,6 @@ func (l *LDK) PeerSummaries() ([]LDKPeerSummary, error) {
 func mapPeerSummaries(peers []ldk_node.PeerDetails) []LDKPeerSummary {
 	summaries := make([]LDKPeerSummary, 0, len(peers))
 	for _, peer := range peers {
-		if !peer.IsConnected {
-			continue
-		}
 		summaries = append(summaries, LDKPeerSummary{
 			NodePub:     peer.NodeId,
 			Address:     peer.Address,

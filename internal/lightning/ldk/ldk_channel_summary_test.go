@@ -97,6 +97,34 @@ func TestMapChannelSummariesRawStates(t *testing.T) {
 	}
 }
 
+func TestMapPeerSummariesIncludesDisconnectedPeersAndSorts(t *testing.T) {
+	peers := []ldk_node.PeerDetails{
+		{
+			NodeId:      "03ff",
+			Address:     "peer-b:9735",
+			IsPersisted: true,
+			IsConnected: false,
+		},
+		{
+			NodeId:      "02aa",
+			Address:     "peer-a:9735",
+			IsPersisted: true,
+			IsConnected: true,
+		},
+	}
+
+	got := mapPeerSummaries(peers)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 summaries, got %d", len(got))
+	}
+	if got[0].NodePub != "02aa" || !got[0].IsConnected {
+		t.Fatalf("expected connected peer first, got %+v", got[0])
+	}
+	if got[1].NodePub != "03ff" || got[1].IsConnected {
+		t.Fatalf("expected disconnected peer second, got %+v", got[1])
+	}
+}
+
 func newTestChannelDetails(pub string, channelID string, outboundMsat uint64, inboundMsat uint64, ready bool, usable bool) ldk_node.ChannelDetails {
 	var details ldk_node.ChannelDetails
 	details.UserChannelId = channelID
