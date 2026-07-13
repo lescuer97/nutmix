@@ -219,6 +219,27 @@ func TestMapLdkPaymentRow(t *testing.T) {
 			wantCanCopy:         true,
 		},
 		{
+			name: "jit bolt11",
+			payment: ldk_node.PaymentDetails{
+				Id: "fallback",
+				Kind: ldk_node.PaymentKindBolt11{
+					Hash:                       "jit-hash",
+					CounterpartySkimmedFeeMsat: uint64Ptr(100),
+				},
+				Direction:             ldk_node.PaymentDirectionInbound,
+				Status:                ldk_node.PaymentStatusSucceeded,
+				LatestUpdateTimestamp: timestamp,
+			},
+			wantDirectionLabel:  "Inbound Payment",
+			wantDirectionKey:    "inbound",
+			wantKind:            "LIGHTNING",
+			wantStatus:          "Succeeded",
+			wantIdentifierLabel: "PAYMENT HASH",
+			wantIdentifierValue: "jit-hash",
+			wantAmount:          ldkPaymentsUnknownValue,
+			wantCanCopy:         true,
+		},
+		{
 			name:                "bolt12 fallback to payment id",
 			payment:             ldk_node.PaymentDetails{Id: "payment-id-123456789", Kind: ldk_node.PaymentKindBolt12Offer{}, Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusPending, LatestUpdateTimestamp: timestamp},
 			wantDirectionLabel:  "Outbound Payment",

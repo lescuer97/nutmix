@@ -140,6 +140,41 @@ func TestPaymentStatusFromDetailsNilFeePaidMsat(t *testing.T) {
 	}
 }
 
+func TestJitBolt11PaymentBehavior(t *testing.T) {
+	preimage := "jit-preimage"
+	skimmedFee := uint64(100)
+	payment := ldk_node.PaymentDetails{
+		Id:        "jit-payment",
+		Direction: ldk_node.PaymentDirectionInbound,
+		Status:    ldk_node.PaymentStatusSucceeded,
+		Kind: ldk_node.PaymentKindBolt11{
+			Hash:                       "jit-hash",
+			Preimage:                   &preimage,
+			CounterpartySkimmedFeeMsat: &skimmedFee,
+		},
+	}
+
+	if !paymentMatches(&payment, ldk_node.PaymentDirectionInbound, "jit-hash") {
+		t.Fatal("paymentMatches(...) did not match JIT BOLT 11 payment hash")
+	}
+
+	_, gotPreimage, _, err := paymentStatusFromDetails(&payment)
+	if err != nil {
+		t.Fatalf("paymentStatusFromDetails(...) error = %v", err)
+	}
+	if gotPreimage != preimage {
+		t.Fatalf("paymentStatusFromDetails(...) preimage = %q, want %q", gotPreimage, preimage)
+	}
+
+	filtered, err := filterPaymentsByType([]ldk_node.PaymentDetails{payment}, Incoming)
+	if err != nil {
+		t.Fatalf("filterPaymentsByType(...) error = %v", err)
+	}
+	if len(filtered) != 1 || filtered[0].Id != payment.Id {
+		t.Fatalf("filterPaymentsByType(...) = %+v, want JIT payment", filtered)
+	}
+}
+
 func TestPaymentStatusFromDetailsRejectsUnknownStatus(t *testing.T) {
 	_, _, _, err := paymentStatusFromDetails(&ldk_node.PaymentDetails{
 		Status: ldk_node.PaymentStatus(999),
@@ -195,7 +230,6 @@ func TestCheckReceivedPropagatesGetNodeError(t *testing.T) {
 		t.Fatalf("status = %v, want %v", status, UNKNOWN)
 	}
 }
-
 
 func TestLDKStopIsSafeWhenNotStarted(t *testing.T) {
 	backend := &LDK{}

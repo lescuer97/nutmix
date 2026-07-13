@@ -396,11 +396,26 @@ func TestPrepareInitConfigFailsForExplicitStorageFilePath(t *testing.T) {
 }
 
 func TestBackendStopAndReopenReusesStorageDirWithoutReseeding(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+	t.Cleanup(cancel)
+
+	env, err := utils.SetupLDKLightningNetwork(t, ctx, "ldk-reopen")
+	if err != nil {
+		t.Fatalf("utils.SetupLDKLightningNetwork(...): %v", err)
+	}
+
 	tempDir := t.TempDir()
 	db := &mockdb.MockDB{}
-	err := SaveConfig(ctx, db, mustPersistedConfig(t, tempDir))
+	config, err := NewPersistedConfig(RPCConfig{
+		Address:  env.BitcoindRPC.Address,
+		Port:     env.BitcoindRPC.Port,
+		Username: env.BitcoindRPC.Username,
+		Password: env.BitcoindRPC.Password,
+	}, tempDir)
 	if err != nil {
+		t.Fatalf("NewPersistedConfig(...): %v", err)
+	}
+	if err := SaveConfig(ctx, db, config); err != nil {
 		t.Fatalf("SaveConfig(...): %v", err)
 	}
 
@@ -417,6 +432,7 @@ func TestBackendStopAndReopenReusesStorageDirWithoutReseeding(t *testing.T) {
 	if err := second.InitNode(ctx); err != nil {
 		t.Fatalf("second.InitNode(ctx): %v", err)
 	}
+	t.Cleanup(func() { _ = second.Stop() })
 	seedAfter, err := os.ReadFile(filepath.Join(tempDir, seedFileName))
 	if err != nil {
 		t.Fatalf("os.ReadFile(...): %v", err)

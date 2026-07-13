@@ -111,6 +111,7 @@ func (l *LDK) InitNode(ctx context.Context) error {
 			config.Rpc.Port,
 			config.Rpc.Username,
 			config.Rpc.Password,
+			nil,
 		)
 	default:
 		return fmt.Errorf("unsupported chain source type %q", config.ChainSourceType)

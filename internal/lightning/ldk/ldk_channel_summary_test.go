@@ -100,7 +100,7 @@ func TestMapChannelSummariesRawStates(t *testing.T) {
 func newTestChannelDetails(pub string, channelID string, outboundMsat uint64, inboundMsat uint64, ready bool, usable bool) ldk_node.ChannelDetails {
 	var details ldk_node.ChannelDetails
 	details.UserChannelId = channelID
-	details.CounterpartyNodeId = pub
+	details.Counterparty.NodeId = pub
 	details.OutboundCapacityMsat = outboundMsat
 	details.InboundCapacityMsat = inboundMsat
 	details.IsChannelReady = ready

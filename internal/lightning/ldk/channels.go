@@ -105,14 +105,14 @@ func mapChannelSummaries(channels []ldk_node.ChannelDetails, isPeerConnected fun
 	for _, channel := range channels {
 		peerConnected := false
 		if isPeerConnected != nil {
-			peerConnected = isPeerConnected(channel.CounterpartyNodeId)
+			peerConnected = isPeerConnected(channel.Counterparty.NodeId)
 		}
 		summaries = append(summaries, LDKChannelSummary{
 			ChannelID:         channel.UserChannelId,
 			State:             deriveChannelState(channel, peerConnected),
 			PeerConnected:     peerConnected,
-			CounterpartyLabel: channel.CounterpartyNodeId,
-			CounterpartyPub:   channel.CounterpartyNodeId,
+			CounterpartyLabel: channel.Counterparty.NodeId,
+			CounterpartyPub:   channel.Counterparty.NodeId,
 			LocalBalanceSats:  channel.OutboundCapacityMsat / 1000,
 			RemoteBalanceSats: channel.InboundCapacityMsat / 1000,
 		})

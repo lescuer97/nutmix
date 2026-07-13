@@ -239,13 +239,6 @@ func mapLdkPaymentIdentifier(payment ldk_node.PaymentDetails) (string, string, s
 			break
 		}
 		return "LIGHTNING", "PAYMENT HASH", preferredLdkPaymentIdentifier(kind.Hash, payment.Id)
-	case ldk_node.PaymentKindBolt11Jit:
-		return "LIGHTNING", "PAYMENT HASH", preferredLdkPaymentIdentifier(kind.Hash, payment.Id)
-	case *ldk_node.PaymentKindBolt11Jit:
-		if kind == nil {
-			break
-		}
-		return "LIGHTNING", "PAYMENT HASH", preferredLdkPaymentIdentifier(kind.Hash, payment.Id)
 	case ldk_node.PaymentKindBolt12Offer:
 		if kind.Hash != nil && *kind.Hash != "" {
 			return "LIGHTNING", "PAYMENT HASH", preferredLdkPaymentIdentifier(*kind.Hash, payment.Id)

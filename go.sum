@@ -388,6 +388,8 @@ github.com/lescuer97/ldkgo v0.0.0-20260330203248-24a480b3b011 h1:EkRTHTdOSOX0ct/
 github.com/lescuer97/ldkgo v0.0.0-20260330203248-24a480b3b011/go.mod h1:PxJ8nGMydqqGOHwZ5n4b7E9Qjn0OgXyEBaLgJIX9PJM=
 github.com/lescuer97/ldkgo v0.0.0-20260331112310-c791450b8bc0 h1:19PwuldW5Brzdo7gCc1MAbpHy0PEqOlKos2A9k73wxc=
 github.com/lescuer97/ldkgo v0.0.0-20260331112310-c791450b8bc0/go.mod h1:PxJ8nGMydqqGOHwZ5n4b7E9Qjn0OgXyEBaLgJIX9PJM=
+github.com/lescuer97/ldkgo v0.0.0-20260713075220-08111e600be5 h1:xHKpvXa3ehco4YdxuNC8C6jBcbAVHnJ1/fw5uLT89Fw=
+github.com/lescuer97/ldkgo v0.0.0-20260713075220-08111e600be5/go.mod h1:PxJ8nGMydqqGOHwZ5n4b7E9Qjn0OgXyEBaLgJIX9PJM=
 github.com/lib/pq v1.0.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
 github.com/lib/pq v1.1.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
 github.com/lib/pq v1.2.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=

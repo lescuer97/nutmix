@@ -248,13 +248,6 @@ func bolt11PaymentHash(kind ldk_node.PaymentKind) (string, bool) {
 			return "", false
 		}
 		return payment.Hash, true
-	case ldk_node.PaymentKindBolt11Jit:
-		return payment.Hash, true
-	case *ldk_node.PaymentKindBolt11Jit:
-		if payment == nil {
-			return "", false
-		}
-		return payment.Hash, true
 	default:
 		return "", false
 	}
@@ -276,17 +269,6 @@ func paymentStatusFromDetails(details *ldk_node.PaymentDetails) (PaymentStatus, 
 			preimage = *payment.Preimage
 		}
 	case *ldk_node.PaymentKindBolt11:
-		if payment == nil {
-			break
-		}
-		if payment.Preimage != nil {
-			preimage = *payment.Preimage
-		}
-	case ldk_node.PaymentKindBolt11Jit:
-		if payment.Preimage != nil {
-			preimage = *payment.Preimage
-		}
-	case *ldk_node.PaymentKindBolt11Jit:
 		if payment == nil {
 			break
 		}
@@ -404,10 +386,7 @@ func filterPaymentsByType(payments []ldk_node.PaymentDetails, paymentType Paymen
 	filteredPayments := make([]ldk_node.PaymentDetails, 0, len(payments))
 	for _, payment := range payments {
 		switch payment.Kind.(type) {
-		case *ldk_node.PaymentKindBolt11,
-			ldk_node.PaymentKindBolt11Jit,
-			*ldk_node.PaymentKindBolt11Jit,
-			ldk_node.PaymentKindBolt11:
+		case *ldk_node.PaymentKindBolt11, ldk_node.PaymentKindBolt11:
 			if payment.Status == ldk_node.PaymentStatusPending {
 				continue
 			}
