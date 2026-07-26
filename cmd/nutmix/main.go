@@ -42,14 +42,21 @@ var (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Printf("nutmix stopped: %v", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	logsdir, err := utils.GetLogsDirectory()
 	if err != nil {
-		log.Panicln("Could not get Logs directory")
+		return fmt.Errorf("get logs directory: %w", err)
 	}
 
 	err = utils.CreateDirectoryAndPath(logsdir, utils.LogFileName)
 	if err != nil {
-		log.Panicf("utils.CreateDirectoryAndPath(pathToProjectDir, logFileName ) %+v", err)
+		return fmt.Errorf("create log directory and file: %w", err)
 	}
 
 	pathToConfigFile := logsdir + "/" + utils.LogFileName
@@ -57,7 +64,7 @@ func main() {
 	// Manipulate Config file
 	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
-		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
+		return fmt.Errorf("open log file: %w", err)
 	}
 	defer func() {
 		err := logFile.Close()
@@ -93,28 +100,48 @@ func main() {
 
 	db, err := postgresql.DatabaseSetup(startupCtx, "migrations")
 	if err != nil {
-		slog.Error("Error conecting to db", slog.Any("error", err))
-		log.Panic()
+		return fmt.Errorf("set up database: %w", err)
 	}
 	defer db.Close()
 
 	config, nostrNotificationConfig, err := mint.SetUpConfigDB(startupCtx, db)
 	if err != nil {
-		log.Fatalf("mint.SetUpConfigDB(ctx, db): %+v ", err)
+		return fmt.Errorf("set up mint config: %w", err)
 	}
 
 	signer, err := GetSignerFromValue(os.Getenv("SIGNER_TYPE"), db)
 	if err != nil {
-		log.Fatalf("signer.GetSignerFromValue(os.Getenv(), db): %+v ", err)
+		return fmt.Errorf("set up signer: %w", err)
 	}
 
 	// remove mint private key from variable
 	mint, err := mint.SetUpMint(startupCtx, config, nostrNotificationConfig, db, signer)
 
 	if err != nil {
-		slog.Warn("SetUpMint", slog.Any("error", err))
-		return
+		return fmt.Errorf("set up mint: %w", err)
 	}
+
+	var srv *http.Server
+	var statsWG sync.WaitGroup
+	var shutdownOnce sync.Once
+	shutdown := func() {
+		shutdownOnce.Do(func() {
+			slog.Info("shutdown started")
+
+			// Stop background work before its database dependency is closed.
+			stop()
+
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutdownCancel()
+
+			if err := shutdownServerAndBackend(shutdownCtx, srv, mint); err != nil {
+				slog.Warn("shutdown finished with errors", slog.Any("error", err))
+			}
+
+			statsWG.Wait()
+		})
+	}
+	defer shutdown()
 
 	logger := slog.New(admin.NewNostrErrorNotifyHandler(baseJSONHandler, mint))
 	slog.SetDefault(logger)
@@ -138,8 +165,7 @@ func main() {
 
 	err = mint.ReconcilePendingMeltQuotes()
 	if err != nil {
-		slog.Error("SetUpMint", slog.Any("error", err))
-		return
+		return fmt.Errorf("reconcile pending melt quotes: %w", err)
 	}
 
 	statsService := stats.Service{
@@ -158,8 +184,6 @@ func main() {
 			return uint64(invoice.MilliSat.ToSatoshis()), nil
 		},
 	}
-	go statsService.Run(appCtx, 15*time.Minute)
-
 	routes.V1Routes(r, mint)
 
 	// Admin session cookies are Secure by default; ADMIN_INSECURE_COOKIE=true
@@ -171,48 +195,37 @@ func main() {
 	if PORTStr != "" {
 		portInt, err := strconv.ParseUint(PORTStr, 10, 64)
 		if err != nil {
-			slog.Error("Your picked port is not correct", slog.Any("error", err))
-			return
+			return fmt.Errorf("parse port: %w", err)
 		}
 		PORT = fmt.Sprintf(":%v", portInt)
 	}
 
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
-	signalCtx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stopSignals()
 
-	// Define a custom http.Server
-	srv := new(http.Server)
-	srv.Addr = PORT
-	srv.Handler = r
-	srv.ReadTimeout = 3 * time.Second
-	srv.WriteTimeout = 4 * time.Second
-	srv.IdleTimeout = 3 * time.Minute
-
-	var shutdownOnce sync.Once
-	shutdown := func() {
-		shutdownOnce.Do(func() {
-			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer shutdownCancel()
-
-			if err := shutdownServerAndBackend(shutdownCtx, srv, mint); err != nil {
-				slog.Warn("shutdown finished with errors", slog.Any("error", err))
-			}
-		})
+	srv = &http.Server{
+		Addr:         PORT,
+		Handler:      r,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 4 * time.Second,
+		IdleTimeout:  3 * time.Minute,
 	}
 
+	statsWG.Add(1)
 	go func() {
-		<-signalCtx.Done()
-		slog.Info("shutdown signal received")
+		defer statsWG.Done()
+		statsService.Run(appCtx, 15*time.Minute)
+	}()
+
+	go func() {
+		<-appCtx.Done()
 		shutdown()
 	}()
 	// Start the server
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		slog.Error("server failed", slog.Any("error", err))
-		os.Exit(1)
+		return fmt.Errorf("server failed: %w", err)
 	}
 
-	shutdown()
+	return nil
 }
 
 func shutdownServerAndBackend(ctx context.Context, srv *http.Server, mintInstance *mint.Mint) error {
