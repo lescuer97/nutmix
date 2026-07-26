@@ -1,6 +1,27 @@
 // Chart.js module for time-series visualization
 import 'chartjs-adapter-date-fns';
-import Chart from 'chart.js/auto'
+import {
+  Chart,
+  Filler,
+  Legend,
+  LineController,
+  LineElement,
+  LinearScale,
+  PointElement,
+  TimeScale,
+  Tooltip,
+} from 'chart.js';
+
+Chart.register(
+  Filler,
+  Legend,
+  LineController,
+  LineElement,
+  LinearScale,
+  PointElement,
+  TimeScale,
+  Tooltip,
+);
 
 
 // Color scheme matching the design system
