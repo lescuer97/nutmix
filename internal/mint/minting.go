@@ -135,7 +135,7 @@ func (m *Mint) RefreshMintQuoteStatus(ctx context.Context, quoteId string, metho
 	}
 	switch method {
 	case Bolt11:
-		if quote.State == cashu.PAID || quote.State == cashu.ISSUED {
+		if quote.State == cashu.PAID || quote.State == cashu.PENDING || quote.State == cashu.ISSUED {
 			return quote.PostMintQuoteBolt11Response(), nil
 		}
 		bolt11Quote, err := m.reconcileBolt11MintQuoteState(ctx, quote, method)
@@ -174,23 +174,33 @@ func (m *Mint) reconcileBolt11MintQuoteState(ctx context.Context, request cashu.
 			}
 		}
 	}()
+	current, err := m.MintDB.GetMintRequestById(stateChangeTX, request.Quote)
+	if err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.GetMintRequestById(stateChangeTX, request.Quote). %w", err)
+	}
+	if current.Minted || current.State == cashu.PENDING || current.State == cashu.ISSUED {
+		if err = m.MintDB.Commit(ctx, stateChangeTX); err != nil {
+			return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.Commit(ctx, stateChangeTX). %w", err)
+		}
+		return current, nil
+	}
 
 	switch status {
 	case lightning.SETTLED:
-		err = m.MintDB.ChangeMintRequestState(stateChangeTX, request.Quote, cashu.PAID, request.Minted)
+		err = m.MintDB.ChangeMintRequestState(stateChangeTX, current.Quote, cashu.PAID, current.Minted)
 		if err != nil {
-			return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.ChangeMintRequestState(stateChangeTX, request.Quote, cashu.PAID, request.Minted). %w", err)
+			return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.ChangeMintRequestState(stateChangeTX, current.Quote, cashu.PAID, current.Minted). %w", err)
 		}
 	case lightning.PENDING:
 		// quote.State = cashu.PENDING
 	case lightning.FAILED:
-		err = m.MintDB.ChangeMintRequestState(stateChangeTX, request.Quote, cashu.UNPAID, request.Minted)
+		err = m.MintDB.ChangeMintRequestState(stateChangeTX, current.Quote, cashu.UNPAID, current.Minted)
 		if err != nil {
-			return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.ChangeMintRequestState(stateChangeTX, request.Quote, cashu.UNPAID, request.Minted). %w", err)
+			return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.ChangeMintRequestState(stateChangeTX, current.Quote, cashu.UNPAID, current.Minted). %w", err)
 		}
 	}
 
-	quote, err := m.MintDB.GetMintRequestById(stateChangeTX, request.Quote)
+	quote, err := m.MintDB.GetMintRequestById(stateChangeTX, current.Quote)
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.GetMintRequestById(stateChangeTX, request.Quote). %w", err)
 	}
@@ -260,27 +270,6 @@ func (m *Mint) loadAndValidateMintQuoteForIssuance(ctx context.Context, request 
 		return cashu.MintRequestDB{}, cashu.ErrDifferentInputOutputUnit
 	}
 
-	// check if proofs are spent and if outputs are spent
-	sizeCheckTx, err := m.MintDB.GetTx(ctx)
-	if err != nil {
-		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
-	}
-	defer func() {
-		if err != nil {
-			rollbackErr := m.MintDB.Rollback(ctx, sizeCheckTx)
-			if rollbackErr != nil {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
-		}
-	}()
-	err = m.ValidateOutputsNotSpent(sizeCheckTx, request.Outputs)
-	if err != nil {
-		return cashu.MintRequestDB{}, fmt.Errorf("m.ValidateOutputsNotSpent(sizeCheckTx, request.Outputs). %w", err)
-	}
-	err = m.MintDB.Commit(ctx, sizeCheckTx)
-	if err != nil {
-		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.Commit(ctx, sizeCheckTx). %w", err)
-	}
 	return quote, nil
 }
 
@@ -325,14 +314,53 @@ func (m *Mint) bolt11Mint(ctx context.Context, request cashu.PostMintBolt11Reque
 	if mintReq.State != cashu.PAID {
 		return cashu.PostMintBolt11Response{}, cashu.ErrRequestNotPaid
 	}
+	mintReq, err = m.reserveMintQuoteForIssuance(ctx, request)
+	if err != nil {
+		return cashu.PostMintBolt11Response{}, fmt.Errorf("m.reserveMintQuoteForIssuance(ctx, request). %w", err)
+	}
 
 	blindSigs, err := m.signMintOutputsAndMarkIssued(ctx, request, mintReq)
 	if err != nil {
 		return cashu.PostMintBolt11Response{}, err
 	}
 
-
 	return cashu.PostMintBolt11Response{Signatures: blindSigs}, nil
+}
+
+func (m *Mint) reserveMintQuoteForIssuance(ctx context.Context, request cashu.PostMintBolt11Request) (cashu.MintRequestDB, error) {
+	tx, err := m.MintDB.GetTx(ctx)
+	if err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+	}
+	defer func() {
+		rollbackErr := m.MintDB.Rollback(ctx, tx)
+		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("rollback error", slog.Any("error", rollbackErr))
+		}
+	}()
+
+	quote, err := m.MintDB.GetMintRequestById(tx, request.Quote)
+	if err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.GetMintRequestById(tx, request.Quote). %w", err)
+	}
+	if err = m.validateMintIssuanceAuth(request, quote); err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("m.validateMintIssuanceAuth(request, quote). %w", err)
+	}
+	if quote.State != cashu.PAID {
+		return cashu.MintRequestDB{}, cashu.ErrRequestNotPaid
+	}
+	if err = m.ValidateOutputsNotSpent(tx, request.Outputs); err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("m.ValidateOutputsNotSpent(tx, request.Outputs). %w", err)
+	}
+
+	quote.State = cashu.PENDING
+	if err = m.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.State, quote.Minted); err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.ChangeMintRequestState(tx, quote.Quote, quote.State, quote.Minted). %w", err)
+	}
+	if err = m.MintDB.Commit(ctx, tx); err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.Commit(ctx, tx). %w", err)
+	}
+	return quote, nil
 }
 
 func (m *Mint) signMintOutputsAndMarkIssued(ctx context.Context, request cashu.PostMintBolt11Request, mintRequestDB cashu.MintRequestDB) ([]cashu.BlindSignature, error) {
@@ -340,8 +368,6 @@ func (m *Mint) signMintOutputsAndMarkIssued(ctx context.Context, request cashu.P
 	if err != nil {
 		return nil, fmt.Errorf("m.Signer.SignBlindMessages(request.Outputs) %w", err)
 	}
-	mintRequestDB.State = cashu.ISSUED
-	mintRequestDB.Minted = true
 	afterMintingTx, err := m.MintDB.GetTx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf(" m.MintDB.GetTx(ctx). %w", err)
@@ -354,6 +380,18 @@ func (m *Mint) signMintOutputsAndMarkIssued(ctx context.Context, request cashu.P
 			}
 		}
 	}()
+	mintRequestDB, err = m.MintDB.GetMintRequestById(afterMintingTx, mintRequestDB.Quote)
+	if err != nil {
+		return nil, fmt.Errorf("m.MintDB.GetMintRequestById(afterMintingTx, mintRequestDB.Quote). %w", err)
+	}
+	if mintRequestDB.Minted {
+		return nil, cashu.ErrMintRequestAlreadyIssued
+	}
+	if mintRequestDB.State != cashu.PENDING {
+		return nil, cashu.ErrRequestNotPaid
+	}
+	mintRequestDB.State = cashu.ISSUED
+	mintRequestDB.Minted = true
 	err = m.MintDB.ChangeMintRequestState(afterMintingTx, mintRequestDB.Quote, mintRequestDB.State, mintRequestDB.Minted)
 	if err != nil {
 		return nil, fmt.Errorf("m.MintDB.ChangeMintRequestState. %w", err)
@@ -375,6 +413,9 @@ func (m *Mint) signMintOutputsAndMarkIssued(ctx context.Context, request cashu.P
 func (m *Mint) validateMintIssuanceAuth(request cashu.PostMintBolt11Request, mintRequestDB cashu.MintRequestDB) error {
 	if mintRequestDB.Minted {
 		return cashu.ErrMintRequestAlreadyIssued
+	}
+	if mintRequestDB.State == cashu.PENDING {
+		return cashu.ErrQuoteIsPending
 	}
 
 	if mintRequestDB.Pubkey.PublicKey != nil {
