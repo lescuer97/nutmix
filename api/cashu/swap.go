@@ -57,7 +57,7 @@ func (p *PostSwapRequest) verifySigAllRepetition() error {
 	for _, proof := range p.Inputs {
 		spendCondition, err := proof.parseSpendCondition()
 		if err != nil {
-			return nil
+			return fmt.Errorf("could not parseSpendCondition. This should not happen as we are inside sig all. %w", err)
 		}
 
 		if spendCondition.Data.Data != firstSpendCondition.Data.Data {
