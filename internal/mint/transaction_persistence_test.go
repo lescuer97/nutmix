@@ -280,10 +280,11 @@ func TestIssueTokensClaimsQuoteBeforeSigning(t *testing.T) {
 		Signer:  mint.Signer,
 		started: make(chan struct{}),
 		release: make(chan struct{}),
+		calls:   atomic.Int32{},
 	}
 	mint.Signer = blockingSigner
-	firstRequest := cashu.PostMintBolt11Request{Quote: mintRequest.Quote, Outputs: createMintTestBlindedMessages(t, amount, activeKeys)}
-	secondRequest := cashu.PostMintBolt11Request{Quote: mintRequest.Quote, Outputs: createMintTestBlindedMessages(t, amount, activeKeys)}
+	firstRequest := cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: createMintTestBlindedMessages(t, amount, activeKeys)}
+	secondRequest := cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: createMintTestBlindedMessages(t, amount, activeKeys)}
 	firstErr := make(chan error, 1)
 
 	go func() {
@@ -367,7 +368,7 @@ func TestReserveMintQuoteKeepsPaidWhenOutputAlreadySigned(t *testing.T) {
 		t.Fatalf("mint.MintDB.Commit(ctx, tx): %v", err)
 	}
 
-	_, err = mint.reserveMintQuoteForIssuance(ctx, cashu.PostMintBolt11Request{Quote: mintRequest.Quote, Outputs: outputs})
+	_, err = mint.reserveMintQuoteForIssuance(ctx, cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: outputs})
 	if !errors.Is(err, cashu.ErrBlindMessageAlreadySigned) {
 		t.Fatalf("expected ErrBlindMessageAlreadySigned, got %v", err)
 	}
@@ -423,7 +424,7 @@ func TestIssueTokensLeavesQuotePendingWhenSigningFails(t *testing.T) {
 	}
 
 	mint.Signer = failingSigner{Signer: mint.Signer, signBlindMessagesErr: errors.New("sign outputs failed")}
-	_, err = mint.IssueTokens(ctx, cashu.PostMintBolt11Request{Quote: mintRequest.Quote, Outputs: outputs}, Bolt11)
+	_, err = mint.IssueTokens(ctx, cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: outputs}, Bolt11)
 	if err == nil {
 		t.Fatal("expected signing failure")
 	}

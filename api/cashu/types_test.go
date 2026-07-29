@@ -79,7 +79,19 @@ func TestCashuAmountChangeSatToMsat(t *testing.T) {
 }
 
 func TestPendingMintQuoteIsReportedAsPaid(t *testing.T) {
-	quote := MintRequestDB{State: PENDING}
+	quote := MintRequestDB{
+		Amount:      nil,
+		Pubkey:      WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       "",
+		Request:     "",
+		Unit:        "",
+		State:       PENDING,
+		CheckingId:  "",
+		Expiry:      0,
+		SeenAt:      0,
+		Minted:      false,
+	}
 
 	response := quote.PostMintQuoteBolt11Response()
 
