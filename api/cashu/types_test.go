@@ -78,6 +78,28 @@ func TestCashuAmountChangeSatToMsat(t *testing.T) {
 	}
 }
 
+func TestPendingMintQuoteIsReportedAsPaid(t *testing.T) {
+	quote := MintRequestDB{
+		Amount:      nil,
+		Pubkey:      WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       "",
+		Request:     "",
+		Unit:        "",
+		State:       PENDING,
+		CheckingId:  "",
+		Expiry:      0,
+		SeenAt:      0,
+		Minted:      false,
+	}
+
+	response := quote.PostMintQuoteBolt11Response()
+
+	if response.State != PAID {
+		t.Fatalf("expected internal PENDING state to be reported as PAID, got %v", response.State)
+	}
+}
+
 func TestCashuAmountChangeMsatToSat(t *testing.T) {
 	amount := Amount{
 		Amount: 1000,

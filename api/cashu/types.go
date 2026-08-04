@@ -306,13 +306,17 @@ type MintRequestDB struct {
 }
 
 func (m *MintRequestDB) PostMintQuoteBolt11Response() PostMintQuoteBolt11Response {
+	state := m.State
+	if state == PENDING {
+		state = PAID
+	}
 	res := PostMintQuoteBolt11Response{
 		Quote:   m.Quote,
 		Request: m.Request,
 		Expiry:  m.Expiry,
 		Unit:    m.Unit,
 		Minted:  m.Minted,
-		State:   m.State,
+		State:   state,
 		Pubkey:  m.Pubkey,
 		Amount:  m.Amount,
 	}

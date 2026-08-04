@@ -4,6 +4,8 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/hex"
+	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +21,21 @@ import (
 type quoteAmountBackend struct {
 	lightning.FakeWallet
 	feesResponse lightning.FeesResponse
+}
+
+type firstCallBlockingSigner struct {
+	signer.Signer
+	started chan struct{}
+	release chan struct{}
+	calls   atomic.Int32
+}
+
+func (s *firstCallBlockingSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
+	if s.calls.Add(1) == 1 {
+		close(s.started)
+		<-s.release
+	}
+	return s.Signer.SignBlindMessages(messages)
 }
 
 func (b quoteAmountBackend) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (lightning.FeesResponse, error) {
@@ -167,7 +184,7 @@ func TestSignMintOutputsAndMarkIssuedPersistsIssuedState(t *testing.T) {
 		Quote:       "sign-save-quote",
 		Request:     RegtestRequest,
 		Unit:        cashu.Sat.String(),
-		State:       cashu.PAID,
+		State:       cashu.PENDING,
 		CheckingId:  "check-sign-save",
 		Expiry:      time.Now().Add(time.Minute).Unix(),
 		SeenAt:      time.Now().Unix(),
@@ -220,6 +237,250 @@ func TestSignMintOutputsAndMarkIssuedPersistsIssuedState(t *testing.T) {
 	err = mint.MintDB.Commit(ctx, tx)
 	if err != nil {
 		t.Fatalf("mint.MintDB.Commit(ctx, tx): %v", err)
+	}
+}
+
+func TestIssueTokensClaimsQuoteBeforeSigning(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+	ctx := context.Background()
+
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
+	}
+
+	amount := uint64(1000)
+	mintRequest := cashu.MintRequestDB{
+		Amount:      &amount,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       "concurrent-mint-quote",
+		Request:     RegtestRequest,
+		Unit:        cashu.Sat.String(),
+		State:       cashu.PAID,
+		CheckingId:  "concurrent-mint-check",
+		Expiry:      time.Now().Add(time.Minute).Unix(),
+		SeenAt:      time.Now().Unix(),
+		Minted:      false,
+	}
+
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %v", err)
+	}
+	if err = mint.MintDB.SaveMintRequest(tx, mintRequest); err != nil {
+		_ = mint.MintDB.Rollback(ctx, tx)
+		t.Fatalf("mint.MintDB.SaveMintRequest(tx, mintRequest): %v", err)
+	}
+	if err = mint.MintDB.Commit(ctx, tx); err != nil {
+		t.Fatalf("mint.MintDB.Commit(ctx, tx): %v", err)
+	}
+
+	blockingSigner := &firstCallBlockingSigner{
+		Signer:  mint.Signer,
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		calls:   atomic.Int32{},
+	}
+	mint.Signer = blockingSigner
+	firstRequest := cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: createMintTestBlindedMessages(t, amount, activeKeys)}
+	secondRequest := cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: createMintTestBlindedMessages(t, amount, activeKeys)}
+	firstErr := make(chan error, 1)
+
+	go func() {
+		_, issueErr := mint.IssueTokens(ctx, firstRequest, Bolt11)
+		firstErr <- issueErr
+	}()
+
+	select {
+	case <-blockingSigner.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for first request to reach signer")
+	}
+
+	_, secondErr := mint.IssueTokens(ctx, secondRequest, Bolt11)
+	close(blockingSigner.release)
+	if err = <-firstErr; err != nil {
+		t.Fatalf("first IssueTokens call failed: %v", err)
+	}
+	if !errors.Is(secondErr, cashu.ErrQuoteIsPending) {
+		t.Fatalf("expected second IssueTokens call to return ErrQuoteIsPending, got %v", secondErr)
+	}
+	if blockingSigner.calls.Load() != 1 {
+		t.Fatalf("expected signer to be called once, got %d", blockingSigner.calls.Load())
+	}
+
+	tx, err = mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %v", err)
+	}
+	defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
+	savedMintRequest, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %v", err)
+	}
+	if savedMintRequest.State != cashu.ISSUED || !savedMintRequest.Minted {
+		t.Fatalf("expected quote to be ISSUED and minted, got state=%v minted=%v", savedMintRequest.State, savedMintRequest.Minted)
+	}
+}
+
+func TestReserveMintQuoteKeepsPaidWhenOutputAlreadySigned(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+	ctx := context.Background()
+
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
+	}
+	amount := uint64(2)
+	outputs := createMintTestBlindedMessages(t, amount, activeKeys)
+	_, recoverySigs, err := mint.Signer.SignBlindMessages(outputs)
+	if err != nil {
+		t.Fatalf("mint.Signer.SignBlindMessages(outputs): %v", err)
+	}
+	mintRequest := cashu.MintRequestDB{
+		Amount:      &amount,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       "used-output-mint-quote",
+		Request:     RegtestRequest,
+		Unit:        cashu.Sat.String(),
+		State:       cashu.PAID,
+		CheckingId:  "used-output-mint-check",
+		Expiry:      time.Now().Add(time.Minute).Unix(),
+		SeenAt:      time.Now().Unix(),
+		Minted:      false,
+	}
+
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %v", err)
+	}
+	if err = mint.MintDB.SaveMintRequest(tx, mintRequest); err != nil {
+		_ = mint.MintDB.Rollback(ctx, tx)
+		t.Fatalf("mint.MintDB.SaveMintRequest(tx, mintRequest): %v", err)
+	}
+	if err = mint.MintDB.SaveRestoreSigs(tx, recoverySigs); err != nil {
+		_ = mint.MintDB.Rollback(ctx, tx)
+		t.Fatalf("mint.MintDB.SaveRestoreSigs(tx, recoverySigs): %v", err)
+	}
+	if err = mint.MintDB.Commit(ctx, tx); err != nil {
+		t.Fatalf("mint.MintDB.Commit(ctx, tx): %v", err)
+	}
+
+	_, err = mint.reserveMintQuoteForIssuance(ctx, cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: outputs})
+	if !errors.Is(err, cashu.ErrBlindMessageAlreadySigned) {
+		t.Fatalf("expected ErrBlindMessageAlreadySigned, got %v", err)
+	}
+
+	tx, err = mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %v", err)
+	}
+	defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
+	savedMintRequest, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %v", err)
+	}
+	if savedMintRequest.State != cashu.PAID || savedMintRequest.Minted {
+		t.Fatalf("expected failed reservation to remain PAID and unminted, got state=%v minted=%v", savedMintRequest.State, savedMintRequest.Minted)
+	}
+}
+
+func TestIssueTokensLeavesQuotePendingWhenSigningFails(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+	ctx := context.Background()
+
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
+	}
+	amount := uint64(1000)
+	outputs := createMintTestBlindedMessages(t, amount, activeKeys)
+	mintRequest := cashu.MintRequestDB{
+		Amount:      &amount,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       "failed-signing-mint-quote",
+		Request:     RegtestRequest,
+		Unit:        cashu.Sat.String(),
+		State:       cashu.PAID,
+		CheckingId:  "failed-signing-mint-check",
+		Expiry:      time.Now().Add(time.Minute).Unix(),
+		SeenAt:      time.Now().Unix(),
+		Minted:      false,
+	}
+
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %v", err)
+	}
+	if err = mint.MintDB.SaveMintRequest(tx, mintRequest); err != nil {
+		_ = mint.MintDB.Rollback(ctx, tx)
+		t.Fatalf("mint.MintDB.SaveMintRequest(tx, mintRequest): %v", err)
+	}
+	if err = mint.MintDB.Commit(ctx, tx); err != nil {
+		t.Fatalf("mint.MintDB.Commit(ctx, tx): %v", err)
+	}
+
+	mint.Signer = failingSigner{Signer: mint.Signer, signBlindMessagesErr: errors.New("sign outputs failed")}
+	_, err = mint.IssueTokens(ctx, cashu.PostMintBolt11Request{Signature: nil, Quote: mintRequest.Quote, Outputs: outputs}, Bolt11)
+	if err == nil {
+		t.Fatal("expected signing failure")
+	}
+
+	tx, err = mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %v", err)
+	}
+	defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
+	savedMintRequest, err := mint.MintDB.GetMintRequestById(tx, mintRequest.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMintRequestById(tx, mintRequest.Quote): %v", err)
+	}
+	if savedMintRequest.State != cashu.PENDING || savedMintRequest.Minted {
+		t.Fatalf("expected signing failure to leave quote PENDING and unminted, got state=%v minted=%v", savedMintRequest.State, savedMintRequest.Minted)
+	}
+}
+
+func TestReconcileMintQuoteDoesNotRegressPendingState(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+	ctx := context.Background()
+	amount := uint64(2)
+	current := cashu.MintRequestDB{
+		Amount:      &amount,
+		Pubkey:      cashu.WrappedPublicKey{PublicKey: nil},
+		Description: nil,
+		Quote:       "pending-reconciliation-quote",
+		Request:     RegtestRequest,
+		Unit:        cashu.Sat.String(),
+		State:       cashu.PENDING,
+		CheckingId:  "pending-reconciliation-check",
+		Expiry:      time.Now().Add(time.Minute).Unix(),
+		SeenAt:      time.Now().Unix(),
+		Minted:      false,
+	}
+
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx(ctx): %v", err)
+	}
+	if err = mint.MintDB.SaveMintRequest(tx, current); err != nil {
+		_ = mint.MintDB.Rollback(ctx, tx)
+		t.Fatalf("mint.MintDB.SaveMintRequest(tx, current): %v", err)
+	}
+	if err = mint.MintDB.Commit(ctx, tx); err != nil {
+		t.Fatalf("mint.MintDB.Commit(ctx, tx): %v", err)
+	}
+
+	stale := current
+	stale.State = cashu.UNPAID
+	quote, err := mint.reconcileBolt11MintQuoteState(ctx, stale, Bolt11)
+	if err != nil {
+		t.Fatalf("mint.reconcileBolt11MintQuoteState(ctx, stale, Bolt11): %v", err)
+	}
+	if quote.State != cashu.PENDING || quote.Minted {
+		t.Fatalf("expected reconciliation to preserve PENDING state, got state=%v minted=%v", quote.State, quote.Minted)
 	}
 }
 
@@ -462,7 +723,7 @@ func TestSignMintOutputsAndMarkIssuedSendsMintEvent(t *testing.T) {
 		Quote:       "mint-event-quote",
 		Request:     RegtestRequest,
 		Unit:        cashu.Sat.String(),
-		State:       cashu.PAID,
+		State:       cashu.PENDING,
 		CheckingId:  "mint-event-check",
 		Expiry:      time.Now().Add(time.Minute).Unix(),
 		SeenAt:      time.Now().Unix(),
