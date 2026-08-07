@@ -31,6 +31,11 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrInvalidProof):
 		message := cashu.ErrInvalidProof.Error()
 		return cashu.PROOF_VERIFICATION_FAILED, &message
+	case errors.Is(proofError, cashu.ErrInvalidSpendCondition),
+		errors.Is(proofError, cashu.ErrCouldNotParseSpendCondition),
+		errors.Is(proofError, cashu.ErrCouldNotParseWitness),
+		errors.Is(proofError, cashu.ErrCommonSecretNotCorrectSize):
+		return cashu.PROOF_VERIFICATION_FAILED, nil
 	case errors.Is(proofError, cashu.ErrInvalidBlindMessage):
 		message := cashu.ErrInvalidBlindMessage.Error()
 		return cashu.PROOF_VERIFICATION_FAILED, &message

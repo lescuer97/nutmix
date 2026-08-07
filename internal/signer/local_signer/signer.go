@@ -279,6 +279,10 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 	var recoverSigDB = make([]cashu.RecoverSigDB, len(messages))
 
 	for i, output := range messages {
+		if output.B_.PublicKey == nil {
+			return nil, nil, cashu.ErrInvalidBlindMessage
+		}
+
 		keysetsByAmount, exists := l.activeKeysets[output.Id]
 		if !exists {
 			return nil, nil, cashu.ErrKeysetNotKnow
