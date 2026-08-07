@@ -77,6 +77,46 @@ func (sc *SpendCondition) CheckValid() error {
 		return ErrInvalidSpendCondition
 	}
 
+	// NUT-11: a key may appear at most once per pathway (compared by
+	// x-coordinate). A duplicate makes the secret malformed.
+	dedup := make(map[string]struct{}, len(sc.Data.Tags.Pubkeys))
+	seenX := make(map[string]struct{}, len(sc.Data.Tags.Pubkeys))
+	for _, pubkey := range sc.Data.Tags.Pubkeys {
+		if pubkey == nil {
+			continue
+		}
+		if err := addCanonicalKey(dedup, seenX, pubkey); err != nil {
+			return err
+		}
+	}
+	dedup = make(map[string]struct{}, len(sc.Data.Tags.Refund))
+	seenX = make(map[string]struct{}, len(sc.Data.Tags.Refund))
+	for _, pubkey := range sc.Data.Tags.Refund {
+		if pubkey == nil {
+			continue
+		}
+		if err := addCanonicalKey(dedup, seenX, pubkey); err != nil {
+			return err
+		}
+	}
+
+	// NUT-11: n_sigs must not exceed the total number of keys in the pathway.
+	if sc.Type.IsSpendConditioned() {
+		maxSignatures := len(sc.Data.Tags.Pubkeys)
+		if sc.Type == P2PK {
+			// P2PK data is part of its verification set.
+			maxSignatures++
+		}
+
+		if sc.Data.Tags.NSigs > uint(maxSignatures) {
+			return fmt.Errorf("n_sigs exceeds available pubkeys: %w", ErrInvalidSpendCondition)
+		}
+	}
+
+	if len(sc.Data.Tags.Refund) > 0 && sc.Data.Tags.NSigRefund > uint(len(sc.Data.Tags.Refund)) {
+		return fmt.Errorf("n_sigs_refund exceeds available refund pubkeys: %w", ErrInvalidSpendCondition)
+	}
+
 	return nil
 }
 
@@ -507,7 +547,11 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 					if spendCondition.Data.Tags.NSigRefund > 1 {
 						sigflagValidation.signaturesRequiredRefund = spendCondition.Data.Tags.NSigRefund
 					}
-					sigflagValidation.refundPubkeys = proof.pubkeysForRefund(spendCondition)
+					refundPubkeys, err := proof.pubkeysForRefund(spendCondition)
+					if err != nil {
+						return SigflagValidation{}, fmt.Errorf("proof.pubkeysForRefund(spendCondition). %w", err)
+					}
+					sigflagValidation.refundPubkeys = refundPubkeys
 				}
 				return sigflagValidation, nil
 			}
@@ -583,9 +627,13 @@ func checkSigAllValidSignature(msg string, pubkeys map[string]struct{}, signatur
 
 	for _, sig := range signatures {
 		for pubkey := range pubkeys {
-			parsedPubkey, err := btcec.ParsePubKey([]byte(pubkey))
+			pubkeyBytes, err := hex.DecodeString(pubkey)
 			if err != nil {
-				return 0, fmt.Errorf("btcec.ParsePubKey([]byte(pubkey)). %w", err)
+				return 0, fmt.Errorf("hex.DecodeString(pubkey). %w", err)
+			}
+			parsedPubkey, err := btcec.ParsePubKey(pubkeyBytes)
+			if err != nil {
+				return 0, fmt.Errorf("btcec.ParsePubKey(pubkeyBytes). %w", err)
 			}
 			if sig.Verify(hashMessage[:], parsedPubkey) {
 				amountValidSigs += 1

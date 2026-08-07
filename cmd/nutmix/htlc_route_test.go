@@ -415,6 +415,8 @@ func TestHTLCMultisigSigning(t *testing.T) {
 
 	lockingPrivKeyTwo := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x05})
 
+	lockingPrivKeyThree := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x07})
+
 	wrongPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x08})
 
 	// MINTING TESTING STARTS
@@ -488,7 +490,7 @@ func TestHTLCMultisigSigning(t *testing.T) {
 
 	refundPrivKey := secp256k1.PrivKeyFromBytes([]byte{0x01, 0x02, 0x03, 0x06})
 
-	swapBlindedMessagesHTLC, swapSecretsHTLC, swapSecretKeyHTLC, err := CreateHTLCBlindedMessages(1000, activeKeys, correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey(), lockingPrivKeyOne.PubKey(), lockingPrivKeyTwo.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
+	swapBlindedMessagesHTLC, swapSecretsHTLC, swapSecretKeyHTLC, err := CreateHTLCBlindedMessages(1000, activeKeys, correctPreimage, 2, []*secp256k1.PublicKey{lockingPrivKeyTwo.PubKey(), lockingPrivKeyOne.PubKey(), lockingPrivKeyThree.PubKey()}, []*secp256k1.PublicKey{refundPrivKey.PubKey()}, 100, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
