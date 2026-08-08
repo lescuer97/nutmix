@@ -18,6 +18,7 @@ var (
 	ErrInvalidTagName                = errors.New("invalid tag name")
 	ErrConvertTagToString            = errors.New("failed to convert tag to string")
 	ErrInvalidTagValue               = errors.New("invalid tag value")
+	ErrDuplicateTag                  = errors.New("duplicate tag")
 	ErrInvalidSigFlag                = errors.New("invalid sig flag")
 	ErrConvertSigFlagToString        = errors.New("failed to convert sigu flag to string")
 	ErrMalformedTag                  = errors.New("malformed tag")
@@ -230,15 +231,29 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("json.Unmarshal(b, &arrayToCheck): %w", err)
 	}
 
+	seenTags := make(map[Tags]struct{}, len(arrayToCheck))
 	for _, tag := range arrayToCheck {
-		if len(tag) < 2 {
+		if len(tag) == 0 {
 			return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 		}
 
 		tagName, err := TagFromString(tag[0])
 
 		if err != nil {
-			return fmt.Errorf("%w: %s", ErrInvalidTagName, tag[0])
+			// NUT-10: tags are a feature-extension point. Unknown tags are
+			// ignored for forward compatibility.
+			continue
+		}
+
+		// NUT-11: each tag may appear exactly ONCE. A duplicate tag makes the
+		// secret malformed and the proof MUST be rejected as unspendable.
+		if _, seen := seenTags[tagName]; seen {
+			return fmt.Errorf("%w: %s", ErrDuplicateTag, tag[0])
+		}
+		seenTags[tagName] = struct{}{}
+
+		if len(tag) < 2 {
+			return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 		}
 
 		tagInfo := tag[1:]

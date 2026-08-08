@@ -480,3 +480,46 @@ func TestCheckP2PKProofRefundParityDuplicateKeysRejected(t *testing.T) {
 		t.Errorf("parity-duplicated refund keys should be rejected as invalid spend condition, got: %v", err)
 	}
 }
+
+// NOTE: Regression tests for SECURITY_AUDIT.md findings 4.1 and 4.2.
+
+// 4.1: a P2PK secret with a duplicated tag is malformed and must be rejected
+// as unspendable even with an otherwise valid signature (fail closed, not
+// downgraded to anyone-can-spend).
+func TestCheckP2PKProofDuplicateTagRejected(t *testing.T) {
+	priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+
+	secret := fmt.Sprintf(`["P2PK",{"nonce":"abc","data":"%s","tags":[["sigflag","SIG_ALL"],["sigflag","SIG_INPUTS"]]}]`,
+		hex.EncodeToString(priv.PubKey().SerializeCompressed()))
+
+	err = VerifyProofCondition(Proof{
+		Secret:  secret,
+		Witness: signSecret(t, priv, secret),
+	})
+	if !errors.Is(err, ErrDuplicateTag) {
+		t.Errorf("duplicated tag should be rejected with ErrDuplicateTag, got: %v", err)
+	}
+}
+
+// 4.2: unknown tags are a NUT-10 extension point and must be ignored; a
+// secret using a future tag stays spendable.
+func TestCheckP2PKProofUnknownTagIgnored(t *testing.T) {
+	priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+
+	secret := fmt.Sprintf(`["P2PK",{"nonce":"abc","data":"%s","tags":[["future_tag","value"],["sigflag","SIG_INPUTS"]]}]`,
+		hex.EncodeToString(priv.PubKey().SerializeCompressed()))
+
+	err = VerifyProofCondition(Proof{
+		Secret:  secret,
+		Witness: signSecret(t, priv, secret),
+	})
+	if err != nil {
+		t.Errorf("secret with unknown tag should be spendable, got: %v", err)
+	}
+}
