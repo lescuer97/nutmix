@@ -28,9 +28,16 @@ type MeltRequestDB struct {
 	SeenAt          int64        `json:"seen_at"`
 	Melted          bool         `json:"melted"`
 	Mpp             bool         `json:"mpp"`
+	// Change carries signed change (NUT-08) only when a PENDING quote settles
+	// during RefreshMeltQuoteState. Never persisted or serialized directly.
+	Change []BlindSignature `json:"-" db:"-"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
+	change := meltRequest.Change
+	if change == nil {
+		change = []BlindSignature{}
+	}
 	return PostMeltQuoteBolt11Response{
 		Quote:           meltRequest.Quote,
 		Amount:          meltRequest.Amount,
@@ -40,7 +47,7 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		PaymentPreimage: meltRequest.PaymentPreimage,
 		Request:         meltRequest.Request,
 		Unit:            meltRequest.Unit,
-		Change:          []BlindSignature{},
+		Change:          change,
 	}
 }
 
