@@ -26,6 +26,13 @@ func showLDKNodeLink(m *mint.Mint) bool {
 	return m.Config.MINT_LIGHTNING_BACKEND == utils.LDK
 }
 
+func ldkAlertMessage(m *mint.Mint) string {
+	if m.Config.MINT_LIGHTNING_BACKEND != utils.LDK {
+		return ""
+	}
+	return m.LDKSetupError
+}
+
 func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// generate nonce for login nostr
@@ -74,6 +81,7 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 			selectedRange,
 			lightning.IsBackendEndOfLife(mint.LightningBackend),
 			showLDKNodeLink(mint),
+			ldkAlertMessage(mint),
 		).Render(ctx, c.Writer)
 
 		if err != nil {
@@ -260,7 +268,7 @@ func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		err := templates.LiquidityDashboard(lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint)).Render(ctx, c.Writer)
+		err := templates.LiquidityDashboard(lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint), ldkAlertMessage(mint)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)
@@ -330,7 +338,7 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 			component = templates.LightningSendSummary(amount, swap.LightningInvoice, swap.Id)
 		}
 
-		err = templates.SwapStatusPage(component, lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint)).Render(ctx, c.Writer)
+		err = templates.SwapStatusPage(component, lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint), ldkAlertMessage(mint)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)
@@ -348,7 +356,7 @@ func LnPage(mint *mint.Mint) gin.HandlerFunc {
 		selectedRange := c.DefaultQuery("since", "1w")
 		searchQuery := strings.TrimSpace(c.Query("search"))
 
-		err := templates.LightningActivityLayout(mint.Config, selectedRange, searchQuery, lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint)).Render(ctx, c.Writer)
+		err := templates.LightningActivityLayout(mint.Config, selectedRange, searchQuery, lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint), ldkAlertMessage(mint)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)

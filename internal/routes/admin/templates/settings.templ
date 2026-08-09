@@ -5,8 +5,8 @@ import (
 	"strconv"
 )
 
-templ MintSettings(config utils.Config, nostrConfig utils.NostrNotificationConfig, backendEndOfLife bool, showLDKNodeLink bool) {
-	@Layout("settings", backendEndOfLife, showLDKNodeLink) {
+templ MintSettings(config utils.Config, nostrConfig utils.NostrNotificationConfig, backendEndOfLife bool, showLDKNodeLink bool, layoutErrorToShow string) {
+	@Layout("settings", backendEndOfLife, showLDKNodeLink, layoutErrorToShow) {
 		<main class="main-content">
 			<div class="content-header">
 				<h2>Mint Settings</h2>

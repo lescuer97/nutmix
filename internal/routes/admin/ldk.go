@@ -59,7 +59,7 @@ func LdkPaymentsPage(m *mint.Mint) gin.HandlerFunc {
 }
 
 func renderLdkPage(c *gin.Context, m *mint.Mint, section templates.LdkSection) error {
-	return templates.LdkPageShell(showLDKNodeLink(m), section, ldkPageContent(section)).Render(c.Request.Context(), c.Writer)
+	return templates.LdkPageShell(showLDKNodeLink(m), ldkAlertMessage(m), section, ldkPageContent(section)).Render(c.Request.Context(), c.Writer)
 }
 
 func ldkPageContent(section templates.LdkSection) templ.Component {

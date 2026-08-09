@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-templ LightningBackendPage(config utils.Config, backendEndOfLife bool, showLDKNodeLink bool) {
-	@Layout("lightning", backendEndOfLife, showLDKNodeLink) {
+templ LightningBackendPage(config utils.Config, backendEndOfLife bool, showLDKNodeLink bool, layoutErrorToShow string) {
+	@Layout("lightning", backendEndOfLife, showLDKNodeLink, layoutErrorToShow) {
 		<main class="bolt11">
 			@LightningBackendStatusLoader()
 			@LightningConnectionSettings(config)

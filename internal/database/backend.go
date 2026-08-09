@@ -43,9 +43,9 @@ type LDKConfig struct {
 	ChainSourceType   LDKChainSourceType
 	ElectrumServerURL string
 	EsploraServerURL  string
-	TorOnly           bool
 	TorProxyAddress   *string
 	Rpc               LDKRPCConfig
+	TorOnly           bool
 }
 
 var ErrDB = errors.New("ERROR DATABASE")

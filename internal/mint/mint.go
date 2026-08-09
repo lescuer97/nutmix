@@ -25,6 +25,7 @@ type Mint struct {
 	Observer                *Observer
 	NostrNotificationConfig *utils.NostrNotificationConfig
 	MintPubkey              string
+	LDKSetupError           string
 	Config                  utils.Config
 }
 
@@ -89,6 +90,7 @@ func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig
 		LightningBackend:        nil,
 		OICDClient:              nil,
 		Observer:                nil,
+		LDKSetupError:           "",
 	}
 
 	chainparam, err := CheckChainParams(config.NETWORK)
@@ -146,9 +148,11 @@ func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig
 	case utils.LDK:
 		ldkNode, err := ldk.NewLdk(ctx, db, config.NETWORK)
 		if err != nil {
-			return &mint, fmt.Errorf("ldk.NewLdk(db) %w", err)
+			slog.Error("ldk backend failed to start; mint running without lightning backend", slog.Any("error", err))
+			mint.LDKSetupError = err.Error()
+		} else {
+			mint.LightningBackend = ldkNode
 		}
-		mint.LightningBackend = ldkNode
 
 	default:
 		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)

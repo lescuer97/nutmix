@@ -9,7 +9,7 @@ import (
 
 func TestLdkPageShellRendersOnchainSection(t *testing.T) {
 	var b bytes.Buffer
-	if err := LdkPageShell(true, LdkSectionOnchain, LdkOnchainPageContent()).Render(context.Background(), &b); err != nil {
+	if err := LdkPageShell(true, "", LdkSectionOnchain, LdkOnchainPageContent()).Render(context.Background(), &b); err != nil {
 		t.Fatalf("LdkPageShell(...).Render: %v", err)
 	}
 
@@ -55,7 +55,7 @@ func TestLdkPageShellRendersOnchainSection(t *testing.T) {
 
 func TestLdkPageShellRendersLightningSection(t *testing.T) {
 	var b bytes.Buffer
-	if err := LdkPageShell(true, LdkSectionLightning, LdkLightningPageContent()).Render(context.Background(), &b); err != nil {
+	if err := LdkPageShell(true, "", LdkSectionLightning, LdkLightningPageContent()).Render(context.Background(), &b); err != nil {
 		t.Fatalf("LdkPageShell(...).Render: %v", err)
 	}
 
@@ -92,7 +92,7 @@ func TestLdkPageShellRendersLightningSection(t *testing.T) {
 
 func TestLdkPageShellRendersPaymentsSection(t *testing.T) {
 	var b bytes.Buffer
-	if err := LdkPageShell(true, LdkSectionPayments, LdkPaymentsPageContent()).Render(context.Background(), &b); err != nil {
+	if err := LdkPageShell(true, "", LdkSectionPayments, LdkPaymentsPageContent()).Render(context.Background(), &b); err != nil {
 		t.Fatalf("LdkPageShell(...).Render: %v", err)
 	}
 

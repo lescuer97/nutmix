@@ -202,7 +202,7 @@ func run() error {
 
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
-	srv = &http.Server{
+	srv = &http.Server{ //nolint:exhaustruct // zero values are fine for the remaining server fields
 		Addr:         PORT,
 		Handler:      r,
 		ReadTimeout:  3 * time.Second,

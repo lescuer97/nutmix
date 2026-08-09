@@ -16,8 +16,8 @@ templ LiquidityButton() {
 	</a>
 }
 
-templ LiquidityDashboard(backendEndOfLife bool, showLDKNodeLink bool) {
-	@Layout("liquidity", backendEndOfLife, showLDKNodeLink) {
+templ LiquidityDashboard(backendEndOfLife bool, showLDKNodeLink bool, layoutErrorToShow string) {
+	@Layout("liquidity", backendEndOfLife, showLDKNodeLink, layoutErrorToShow) {
 		<main class="liquidity-dashboard main-content">
 			<div class="content-header">
 				<h2>Liquidity Management</h2>
@@ -110,8 +110,8 @@ templ SwapOutPostForm(nodeBalance string) {
 	</form>
 }
 
-templ LnSendPage(nodeBalance string, backendEndOfLife bool, showLDKNodeLink bool) {
-	@Layout("liquidity", backendEndOfLife, showLDKNodeLink) {
+templ LnSendPage(nodeBalance string, backendEndOfLife bool, showLDKNodeLink bool, layoutErrorToShow string) {
+	@Layout("liquidity", backendEndOfLife, showLDKNodeLink, layoutErrorToShow) {
 		<main class="main-content">
 			<div class="content-header">
 				<h2>Send Funds</h2>
@@ -151,8 +151,8 @@ templ LnSendPage(nodeBalance string, backendEndOfLife bool, showLDKNodeLink bool
 	}
 }
 
-templ LnReceivePage(backendEndOfLife bool, showLDKNodeLink bool) {
-	@Layout("liquidity", backendEndOfLife, showLDKNodeLink) {
+templ LnReceivePage(backendEndOfLife bool, showLDKNodeLink bool, layoutErrorToShow string) {
+	@Layout("liquidity", backendEndOfLife, showLDKNodeLink, layoutErrorToShow) {
 		<main class="main-content">
 			<div class="content-header">
 				<h2>Receive Funds</h2>
@@ -284,8 +284,8 @@ templ SwapState(state utils.SwapState, swapId string) {
 	</div>
 }
 
-templ SwapStatusPage(summary templ.Component, backendEndOfLife bool, showLDKNodeLink bool) {
-	@Layout("liquidity", backendEndOfLife, showLDKNodeLink) {
+templ SwapStatusPage(summary templ.Component, backendEndOfLife bool, showLDKNodeLink bool, layoutErrorToShow string) {
+	@Layout("liquidity", backendEndOfLife, showLDKNodeLink, layoutErrorToShow) {
 		<main class="liquidity-dashboard main-content">
 			<div class="actions-container" style="max-width: 600px; margin: 0 auto;">
 				@summary

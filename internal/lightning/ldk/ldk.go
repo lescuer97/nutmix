@@ -70,6 +70,7 @@ func NewConfigBackendWithOptions(db database.MintDB, network string, options Opt
 		db:      db,
 		network: network,
 		options: options,
+		torOnly: false,
 	}
 	return backend
 }

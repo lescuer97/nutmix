@@ -996,3 +996,42 @@
 .warning-icon-container:focus .warning-tooltip {
   display: block;
 }
+
+/* LDK outage banner — shown on every admin page when the LDK node is down */
+.ldk-outage-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--accent-red);
+  color: #fff;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-base);
+  font-weight: 600;
+  border-bottom: 2px solid #b91c1c;
+}
+
+.ldk-outage-banner-icon {
+  font-size: var(--text-xl);
+}
+
+.ldk-outage-banner-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.ldk-outage-banner-detail {
+  font-weight: 400;
+  font-size: var(--text-sm);
+  opacity: 0.9;
+  word-break: break-word;
+}
+
+.ldk-outage-banner-link {
+  color: #fff;
+  text-decoration: underline;
+  white-space: nowrap;
+}

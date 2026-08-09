@@ -10,12 +10,26 @@ templ head() {
 	</head>
 }
 
-templ Layout(route string, backendEndOfLife bool, showLDKNodeLink bool) {
+templ LayoutErrorToShow(message string) {
+	if message != "" {
+		<div class="ldk-outage-banner" role="alert">
+			<span class="ldk-outage-banner-icon">⚠</span>
+			<div class="ldk-outage-banner-content">
+				<strong>LDK node is not running — minting and melting are offline.</strong>
+				<span class="ldk-outage-banner-detail">{ message }</span>
+			</div>
+			<a href="/admin/settings" class="ldk-outage-banner-link">Fix in settings →</a>
+		</div>
+	}
+}
+
+templ Layout(route string, backendEndOfLife bool, showLDKNodeLink bool, layoutErrorToShow string) {
 	<!DOCTYPE html>
 	<html lang="en">
 		@head()
 		@Header(showLDKNodeLink)
 		<body data-route={ route }>
+			@LayoutErrorToShow(layoutErrorToShow)
 			<div hx-ext="remove-me" id="notifications"></div>
 			if backendEndOfLife {
 				<aside id="backend-end-of-life-alert" class="deprecation-notice main-content" role="alert" aria-labelledby="backend-end-of-life-title">

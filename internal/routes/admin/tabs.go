@@ -43,6 +43,7 @@ func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
 			nostrNotificationConfigValue(mint.NostrNotificationConfig),
 			lightning.IsBackendEndOfLife(mint.LightningBackend),
 			showLDKNodeLink(mint),
+			ldkAlertMessage(mint),
 		).Render(ctx, c.Writer)
 		if err != nil {
 			_ = c.Error(err)
@@ -218,12 +219,14 @@ func loadLDKConfig(ctx context.Context, c *gin.Context, mint *m.Mint) (ldk.Persi
 		ChainSourceType:   ldk.ChainSourceBitcoind,
 		ElectrumServerURL: "",
 		EsploraServerURL:  "",
+		TorProxyAddress:   nil,
 		Rpc: ldk.RPCConfig{
 			Address:  "",
 			Username: "",
 			Password: "",
 			Port:     0,
 		},
+		TorOnly: false,
 	}
 	if persistedConfig, err := ldk.GetPersistedConfig(ctx, mint.MintDB); err == nil {
 		existingConfig = persistedConfig
@@ -946,10 +949,10 @@ func persistNostrNotificationConfigTx(ctx context.Context, mint *m.Mint, config 
 func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		err := templates.LightningBackendPage(mint.Config, lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint)).Render(ctx, c.Writer)
+		err := templates.LightningBackendPage(mint.Config, lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint), ldkAlertMessage(mint)).Render(ctx, c.Writer)
 
 		if err != nil {
-			_ = c.Error(fmt.Errorf("templates.LightningBackendPage(mint.Config, showLDKNodeLink(mint)).Render(ctx, c.Writer). %w", err))
+			_ = c.Error(fmt.Errorf("templates.LightningBackendPage(mint.Config, showLDKNodeLink(mint), ldkAlertMessage(mint)).Render(ctx, c.Writer). %w", err))
 			return
 		}
 	}
@@ -1062,6 +1065,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 			ldkPreparation, err := prepareLDKBackend(ctx, mint, chainparam.Name, existingLDKConfig, ldkConfig)
 			if err != nil {
+				mint.LDKSetupError = err.Error()
 				slog.Warn("prepareLDKBackend", slog.String(utils.LogExtraInfo, err.Error()))
 				message := "Something went wrong setting up LDK communications"
 				if ldkPreparation.activeLDKStopped {
@@ -1090,6 +1094,9 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		}
 
 		if verificationErr := verifyLightningBackend(newBackend, chainparam); verificationErr != nil {
+			if newLDK != nil {
+				mint.LDKSetupError = verificationErr.err.Error()
+			}
 			if stopErr := newLDK.Stop(); stopErr != nil {
 				slog.Warn("newLDK.Stop", slog.String(utils.LogExtraInfo, stopErr.Error()))
 			}
@@ -1138,6 +1145,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 		mint.LightningBackend = newBackend
 		c.Header("HX-Trigger", "lightning-status-changed")
+		mint.LDKSetupError = ""
 
 		if err := RenderSuccess(c, "Lightning node settings changed and verified successfully"); err != nil {
 			slog.Warn("failed to render success", slog.Any("error", err))

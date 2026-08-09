@@ -2,8 +2,8 @@ package templates
 
 import "strconv"
 
-templ LdkPageShell(showLDKNodeLink bool, activeSection LdkSection, content templ.Component) {
-	@Layout("ldk", showLDKNodeLink) {
+templ LdkPageShell(showLDKNodeLink bool, layoutErrorToShow string, activeSection LdkSection, content templ.Component) {
+	@Layout("ldk", false, showLDKNodeLink, layoutErrorToShow) {
 		<main class="main-content">
 			<div class="ldk-page-layout">
 				@LdkSectionNav(activeSection)

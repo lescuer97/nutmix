@@ -38,9 +38,9 @@ type PersistedConfig struct {
 	ChainSourceType   ChainSourceType
 	ElectrumServerURL string
 	EsploraServerURL  string
-	TorOnly           bool
 	TorProxyAddress   *string
 	Rpc               RPCConfig
+	TorOnly           bool
 }
 
 func DefaultConfigDirectory() (string, error) {
@@ -68,7 +68,9 @@ func NewPersistedConfigWithChainSource(chainSourceType ChainSourceType, rpc RPCC
 		ChainSourceType:   chainSourceType,
 		ElectrumServerURL: electrumServerURL,
 		EsploraServerURL:  esploraServerURL,
+		TorProxyAddress:   nil,
 		Rpc:               rpc,
+		TorOnly:           false,
 	})
 }
 

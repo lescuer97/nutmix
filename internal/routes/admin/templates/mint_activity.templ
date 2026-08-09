@@ -154,8 +154,8 @@ templ MintMeltEventList(eventList []MintMeltRequestVisual) {
 	</div>
 }
 
-templ MintActivityLayout(liquidityManagerAvailable bool, selectedRange string, backendEndOfLife bool, showLDKNodeLink bool) {
-	@Layout("stats", backendEndOfLife, showLDKNodeLink) {
+templ MintActivityLayout(liquidityManagerAvailable bool, selectedRange string, backendEndOfLife bool, showLDKNodeLink bool, layoutErrorToShow string) {
+	@Layout("stats", backendEndOfLife, showLDKNodeLink, layoutErrorToShow) {
 		<main class="main-content">
 			@TimeRangeSelector(selectedRange)
 			<div
