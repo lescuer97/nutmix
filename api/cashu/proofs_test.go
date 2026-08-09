@@ -435,8 +435,15 @@ func TestCheckHTLCProofNSigsWithoutPubkeysRejected(t *testing.T) {
 	for _, sigflag := range []string{"SIG_INPUTS", "SIG_ALL"} {
 		t.Run(sigflag, func(t *testing.T) {
 			proof := Proof{
+				C:       WrappedPublicKey{PublicKey: nil},
+				Y:       WrappedPublicKey{PublicKey: nil},
+				Quote:   nil,
+				Id:      "",
 				Secret:  fmt.Sprintf(`["HTLC",{"nonce":"abc","data":"%x","tags":[["n_sigs","1"],["sigflag","%s"]]}]`, hash, sigflag),
 				Witness: fmt.Sprintf(`{"preimage":"%x"}`, preimage),
+				State:   "",
+				Amount:  0,
+				SeenAt:  0,
 			}
 
 			err := VerifyProofCondition(proof)
@@ -496,8 +503,15 @@ func TestCheckP2PKProofDuplicateTagRejected(t *testing.T) {
 		hex.EncodeToString(priv.PubKey().SerializeCompressed()))
 
 	err = VerifyProofCondition(Proof{
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "",
 		Secret:  secret,
 		Witness: signSecret(t, priv, secret),
+		State:   "",
+		Amount:  0,
+		SeenAt:  0,
 	})
 	if !errors.Is(err, ErrDuplicateTag) {
 		t.Errorf("duplicated tag should be rejected with ErrDuplicateTag, got: %v", err)
@@ -516,8 +530,15 @@ func TestCheckP2PKProofUnknownTagIgnored(t *testing.T) {
 		hex.EncodeToString(priv.PubKey().SerializeCompressed()))
 
 	err = VerifyProofCondition(Proof{
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "",
 		Secret:  secret,
 		Witness: signSecret(t, priv, secret),
+		State:   "",
+		Amount:  0,
+		SeenAt:  0,
 	})
 	if err != nil {
 		t.Errorf("secret with unknown tag should be spendable, got: %v", err)

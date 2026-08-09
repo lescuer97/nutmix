@@ -8,9 +8,9 @@ import (
 )
 
 func TestRejectsNilBlindedMessage(t *testing.T) {
-	messages := []cashu.BlindedMessage{{}}
+	messages := []cashu.BlindedMessage{{B_: cashu.WrappedPublicKey{PublicKey: nil}, Id: "", Witness: "", Amount: 0}}
 
-	_, _, err := (&RemoteSigner{}).SignBlindMessages(messages)
+	_, _, err := (&RemoteSigner{grpcClient: nil, activeKeysets: nil, keysets: nil, pubkey: nil}).SignBlindMessages(messages)
 	if !errors.Is(err, cashu.ErrInvalidBlindMessage) {
 		t.Errorf("SignBlindMessages error = %v, want ErrInvalidBlindMessage", err)
 	}

@@ -762,6 +762,7 @@ func TestSearchLightningRequestsAppliesSinceLimitAndEscapesWildcards(t *testing.
 			FeePaid:         0,
 			Melted:          false,
 			Mpp:             false,
+			Change:          nil,
 		},
 		{
 			PaymentPreimage: "",
@@ -777,6 +778,7 @@ func TestSearchLightningRequestsAppliesSinceLimitAndEscapesWildcards(t *testing.
 			FeePaid:         0,
 			Melted:          false,
 			Mpp:             false,
+			Change:          nil,
 		},
 	} {
 		if err := db.SaveMeltRequest(tx, request); err != nil {

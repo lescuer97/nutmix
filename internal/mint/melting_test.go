@@ -47,11 +47,14 @@ func makeAmountlessRegtestInvoice(t *testing.T) string {
 }
 
 func TestValidateBolt11MeltQuoteRejectsAmountlessInvoice(t *testing.T) {
-	mint := Mint{LightningBackend: lightning.FakeWallet{Network: chaincfg.RegressionNetParams}}
+	mint := Mint{ //nolint:exhaustruct // test only needs the LightningBackend; Config has 30+ fields
+		LightningBackend: lightning.FakeWallet{UnpurposeErrors: nil, Network: chaincfg.RegressionNetParams, InvoiceFee: 0},
+	}
 
 	invoice := makeAmountlessRegtestInvoice(t)
 
 	_, err := mint.validateBolt11MeltQuoteRequest(context.Background(), cashu.PostMeltQuoteBolt11Request{
+		Options: cashu.PostMeltQuoteBolt11Options{Mpp: nil},
 		Request: invoice,
 		Unit:    cashu.Sat.String(),
 	})
@@ -84,6 +87,7 @@ func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, quoteA
 		SeenAt:          now,
 		Melted:          false,
 		Mpp:             false,
+		Change:          nil,
 	}
 
 	proofs := cashu.Proofs{}
@@ -120,7 +124,7 @@ func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, quoteA
 			t.Fatalf("secp256k1.GeneratePrivateKey: %v", err)
 		}
 		b := cashu.WrappedPublicKey{PublicKey: bPriv.PubKey()}
-		blanks = append(blanks, cashu.BlindedMessage{Id: testSatKeysetId, B_: b, Amount: 0})
+		blanks = append(blanks, cashu.BlindedMessage{Id: testSatKeysetId, B_: b, Witness: "", Amount: 0})
 		blankKeys = append(blankKeys, b)
 	}
 

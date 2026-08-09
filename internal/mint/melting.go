@@ -76,6 +76,7 @@ func (m *Mint) createAndStoreBolt11MeltQuote(ctx context.Context, meltRequest ca
 		CheckingId:      checkingId,
 		FeePaid:         0,
 		Melted:          false,
+		Change:          nil,
 	}
 
 	tx, err := m.MintDB.GetTx(ctx)

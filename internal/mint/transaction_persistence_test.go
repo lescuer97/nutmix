@@ -516,6 +516,7 @@ func TestSettleIfInternalMeltPersistsMintRequestState(t *testing.T) {
 		FeePaid:         0,
 		Melted:          false,
 		CheckingId:      "internal-melt-check",
+		Change:          nil,
 	}
 
 	tx, err := mint.MintDB.GetTx(ctx)
@@ -607,6 +608,7 @@ func TestReserveMeltInputsAndMarkPendingPersistsProofQuoteReference(t *testing.T
 		CheckingId:      "pending-proof-check",
 		FeePaid:         0,
 		Melted:          false,
+		Change:          nil,
 	}
 
 	tx, err := mint.MintDB.GetTx(ctx)
@@ -816,6 +818,7 @@ func TestBolt11MeltSendsSuccessEvents(t *testing.T) {
 		FeePaid:         0,
 		Melted:          false,
 		CheckingId:      "success-event-melt-check",
+		Change:          nil,
 	}
 
 	tx, err := mint.MintDB.GetTx(ctx)
