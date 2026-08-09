@@ -760,7 +760,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 	routes.V1Routes(r, mint)
 
 	if adminRoute {
-		admin.AdminRoutes(ctx, r, mint)
+		admin.AdminRoutes(ctx, r, mint, false)
 	}
 
 	return r, mint
@@ -802,7 +802,7 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 	routes.V1Routes(r, mint)
 
 	if adminRoute {
-		admin.AdminRoutes(ctx, r, mint)
+		admin.AdminRoutes(ctx, r, mint, false)
 	}
 
 	return r, mint

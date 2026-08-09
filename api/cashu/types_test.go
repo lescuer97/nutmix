@@ -3,6 +3,7 @@ package cashu
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -252,6 +253,22 @@ func TestBlindedMessageUnmarshalJSON(t *testing.T) {
 	err = json.Unmarshal([]byte(invalidJsonInput), &msg)
 	if err == nil {
 		t.Errorf("Expected error for invalid hex string, but got none")
+	}
+}
+
+// NOTE: Regression test for SECURITY_AUDIT.md finding 3.2 — a blinded message
+// without a valid B_ must be rejected at unmarshaling (nil B_ panics the signer).
+func TestBlindedMessageUnmarshalJSONRejectsNullB(t *testing.T) {
+	for _, jsonInput := range []string{
+		`{"amount": 100, "id": "example-keyset-id", "B_": null}`,
+		`{"amount": 100, "id": "example-keyset-id", "B_": ""}`,
+		`{"amount": 100, "id": "example-keyset-id"}`,
+	} {
+		var msg BlindedMessage
+		err := json.Unmarshal([]byte(jsonInput), &msg)
+		if !errors.Is(err, ErrInvalidBlindMessage) {
+			t.Errorf("expected ErrInvalidBlindMessage for %s, got: %v", jsonInput, err)
+		}
 	}
 }
 

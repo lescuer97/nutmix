@@ -246,6 +246,9 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 	}
 
 	for i := range messages {
+		if messages[i].B_.PublicKey == nil {
+			return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, cashu.ErrInvalidBlindMessage
+		}
 		B_ := messages[i].B_.SerializeCompressed()
 
 		bytesId, err := hex.DecodeString(messages[i].Id)

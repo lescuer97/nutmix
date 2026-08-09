@@ -766,16 +766,45 @@ func TestInvalidSpendConditionTypeString(t *testing.T) {
 	}
 }
 
-// TestInvalidTagName tests unmarshalling with invalid tag name
-func TestInvalidTagName(t *testing.T) {
-	invalidTagsJSON := `[["invalid_tag","value"]]`
+// NOTE: Regression test for SECURITY_AUDIT.md finding 4.2
+// (NUT-10: tags are a feature-extension point; unknown tags must be ignored
+// so that secrets using future tags remain spendable).
+
+// TestUnknownTagIgnored tests that unknown tag names are ignored, not rejected
+func TestUnknownTagIgnored(t *testing.T) {
+	unknownTagsJSON := `[["sigflag","SIG_ALL"],["future_tag","value","another"],["future_empty"]]`
 	var tags TagsInfo
-	err := json.Unmarshal([]byte(invalidTagsJSON), &tags)
-	if err == nil {
-		t.Error("expected error for invalid tag name, got nil")
+	err := json.Unmarshal([]byte(unknownTagsJSON), &tags)
+	if err != nil {
+		t.Fatalf("unknown tags should be ignored, got error: %v", err)
 	}
-	if !errors.Is(err, ErrInvalidTagName) {
-		t.Errorf("expected ErrInvalidTagName, got %v", err)
+	if tags.Sigflag != SigAll {
+		t.Errorf("known tag after unknown tags should still parse, got sigflag %v", tags.Sigflag)
+	}
+}
+
+// NOTE: Regression test for SECURITY_AUDIT.md finding 4.1
+// (NUT-11: each tag may appear exactly ONCE; a duplicate tag makes the
+// secret malformed and the proof MUST be rejected as unspendable).
+func TestDuplicateTagRejected(t *testing.T) {
+	testCases := []struct {
+		name string
+		json string
+	}{
+		{"scalar tag overwritten before fix", `[["sigflag","SIG_ALL"],["sigflag","SIG_INPUTS"]]`},
+		{"duplicate n_sigs", `[["n_sigs","1"],["n_sigs","2"]]`},
+		{"duplicate locktime", `[["locktime","1"],["locktime","2"]]`},
+		{"duplicate n_sigs_refund", `[["n_sigs_refund","1"],["n_sigs_refund","2"]]`},
+		{"list tag appended before fix", `[["pubkeys","02698c4e2b5f9534cd0687d87513c759790cf829aa5739184a3e3735471fbda904"],["pubkeys","023192200a0cfd3867e48eb63b03ff599c7e46c8f4e41146b2d281173ca6c50c54"]]`},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var tags TagsInfo
+			err := json.Unmarshal([]byte(tc.json), &tags)
+			if !errors.Is(err, ErrDuplicateTag) {
+				t.Errorf("expected ErrDuplicateTag, got %v", err)
+			}
+		})
 	}
 }
 

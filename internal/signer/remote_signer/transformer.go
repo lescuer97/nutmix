@@ -63,6 +63,9 @@ func ConvertBlindedMessagedToGRPC(messages []cashu.BlindedMessage) (*sig.Blinded
 	}
 
 	for i, val := range messages {
+		if val.B_.PublicKey == nil {
+			return &messagesGrpc, cashu.ErrInvalidBlindMessage
+		}
 		B_ := val.B_.SerializeCompressed()
 
 		idBytes, err := hex.DecodeString(val.Id)

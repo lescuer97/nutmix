@@ -81,6 +81,28 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 	}
 }
 
+// 4.4: a DB error from GetSeedsByUnit must abort rotation instead of falling
+// through and creating a duplicate v0 seed.
+func TestRotateKeysetPropagatesDBError(t *testing.T) {
+	db := mockdb.MockDB{} //nolint:exhaustruct
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+
+	seedsBefore := len(db.Seeds)
+	db.GetSeedsByUnitErr = mockdb.ErrDB
+
+	err = localsigner.RotateKeyset(cashu.Sat, uint(100), 240)
+	if !errors.Is(err, mockdb.ErrDB) {
+		t.Fatalf("expected ErrDB, got: %v", err)
+	}
+	if len(db.Seeds) != seedsBefore {
+		t.Errorf("no seed should be saved on DB error: before %v, after %v", seedsBefore, len(db.Seeds))
+	}
+}
+
 func TestCreateNewSeed(t *testing.T) {
 	db := mockdb.MockDB{} //nolint:exhaustruct
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
@@ -291,8 +313,13 @@ func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
 		t.Fatalf("SetupLocalSigner(&db) %+v", err)
 	}
 
+	blindedKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey() %+v", err)
+	}
+
 	_, _, err = localsigner.SignBlindMessages([]cashu.BlindedMessage{{
-		B_:      cashu.WrappedPublicKey{PublicKey: nil},
+		B_:      cashu.WrappedPublicKey{PublicKey: blindedKey.PubKey()},
 		Id:      "missing-keyset",
 		Witness: "",
 		Amount:  1,
@@ -302,6 +329,36 @@ func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
 	}
 	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
 		t.Errorf("Error should be keyset not known. %v", err)
+	}
+}
+
+// NOTE: Regression test for SECURITY_AUDIT.md finding 3.2 — a nil B_ with a
+// valid active keyset must return ErrInvalidBlindMessage instead of panicking.
+func TestSignBlindMessagesRejectsNilB(t *testing.T) {
+	db := mockdb.MockDB{} //nolint:exhaustruct
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+
+	activeKeys, err := localsigner.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("localsigner.GetActiveKeys() %+v", err)
+	}
+	if len(activeKeys.Keysets) == 0 {
+		t.Fatal("expected at least one active keyset")
+	}
+
+	_, _, err = localsigner.SignBlindMessages([]cashu.BlindedMessage{{
+		B_:      cashu.WrappedPublicKey{PublicKey: nil},
+		Id:      activeKeys.Keysets[0].Id,
+		Witness: "",
+		Amount:  1,
+	}})
+	if !errors.Is(err, cashu.ErrInvalidBlindMessage) {
+		t.Errorf("Error should be invalid blind message. %v", err)
 	}
 }
 

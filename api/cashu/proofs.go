@@ -74,9 +74,13 @@ func (p Proof) verifyP2PKSpendCondition(spendCondition *SpendCondition, witness 
 	hashMessage := sha256.Sum256([]byte(p.Secret))
 	for _, sig := range witness.Signatures {
 		for pubkey := range pubkeys {
-			parsedPubkey, err := btcec.ParsePubKey([]byte(pubkey))
+			pubkeyBytes, err := hex.DecodeString(pubkey)
 			if err != nil {
-				return false, fmt.Errorf("btcec.ParsePubKey([]byte(pubkey)). %w", err)
+				return false, fmt.Errorf("hex.DecodeString(pubkey). %w", err)
+			}
+			parsedPubkey, err := btcec.ParsePubKey(pubkeyBytes)
+			if err != nil {
+				return false, fmt.Errorf("btcec.ParsePubKey(pubkeyBytes). %w", err)
 			}
 			if sig.Verify(hashMessage[:], parsedPubkey) {
 				amountValidSigs += 1
@@ -144,9 +148,13 @@ func (p Proof) verifyHtlcSpendCondition(spendCondition *SpendCondition, witness 
 	amountValidSigs := uint(0)
 	for _, sig := range witness.Signatures {
 		for pubkey := range pubkeys {
-			parsedPubkey, err := btcec.ParsePubKey([]byte(pubkey))
+			pubkeyBytes, err := hex.DecodeString(pubkey)
 			if err != nil {
-				return false, fmt.Errorf("btcec.ParsePubKey([]byte(pubkey)). %w", err)
+				return false, fmt.Errorf("hex.DecodeString(pubkey). %w", err)
+			}
+			parsedPubkey, err := btcec.ParsePubKey(pubkeyBytes)
+			if err != nil {
+				return false, fmt.Errorf("btcec.ParsePubKey(pubkeyBytes). %w", err)
 			}
 			if sig.Verify(hashMessage[:], parsedPubkey) {
 				amountValidSigs += 1
@@ -201,7 +209,10 @@ func timelockPassed(spendCondition *SpendCondition) bool {
 }
 
 func (p Proof) verifyTimelockPassedSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {
-	pubkeys := p.pubkeysForRefund(spendCondition)
+	pubkeys, err := p.pubkeysForRefund(spendCondition)
+	if err != nil {
+		return false, fmt.Errorf("p.pubkeysForRefund(spendCondition). %w", err)
+	}
 
 	nsigToCheck := uint(0)
 	if len(spendCondition.Data.Tags.Refund) > 0 {
@@ -216,9 +227,13 @@ func (p Proof) verifyTimelockPassedSpendCondition(spendCondition *SpendCondition
 	hashMessage := sha256.Sum256([]byte(p.Secret))
 	for _, sig := range witness.Signatures {
 		for pubkey := range pubkeys {
-			parsedPubkey, err := btcec.ParsePubKey([]byte(pubkey))
+			pubkeyBytes, err := hex.DecodeString(pubkey)
 			if err != nil {
-				return false, fmt.Errorf("btcec.ParsePubKey([]byte(pubkey)). %w", err)
+				return false, fmt.Errorf("hex.DecodeString(pubkey). %w", err)
+			}
+			parsedPubkey, err := btcec.ParsePubKey(pubkeyBytes)
+			if err != nil {
+				return false, fmt.Errorf("btcec.ParsePubKey(pubkeyBytes). %w", err)
 			}
 			if sig.Verify(hashMessage[:], parsedPubkey) {
 				amountValidSigs += 1
@@ -243,8 +258,23 @@ func (p Proof) verifyTimelockPassedSpendCondition(spendCondition *SpendCondition
 	}
 }
 
+// addCanonicalKey inserts pubkey into pubkeysMap keyed by its compressed bytes.
+// NUT-11 key canonicalisation: keys are compared by x-coordinate, so a key whose
+// x-coordinate was already seen (exact or parity-flipped duplicate) makes the
+// secret malformed and it MUST be rejected as unspendable.
+func addCanonicalKey(pubkeysMap map[string]struct{}, seenX map[string]struct{}, pubkey *btcec.PublicKey) error {
+	xCoord := hex.EncodeToString(schnorr.SerializePubKey(pubkey))
+	if _, exists := seenX[xCoord]; exists {
+		return fmt.Errorf("duplicate public key in spend condition: %w", ErrInvalidSpendCondition)
+	}
+	seenX[xCoord] = struct{}{}
+	pubkeysMap[hex.EncodeToString(pubkey.SerializeCompressed())] = struct{}{}
+	return nil
+}
+
 func (p Proof) pubkeysForVerification(spendCondition *SpendCondition) (map[string]struct{}, error) {
 	pubkeysMap := make(map[string]struct{}, 0)
+	seenX := make(map[string]struct{}, 0)
 	switch spendCondition.Type {
 	case P2PK:
 		spendConditionDataBytes, err := hex.DecodeString(spendCondition.Data.Data)
@@ -257,11 +287,15 @@ func (p Proof) pubkeysForVerification(spendCondition *SpendCondition) (map[strin
 			return nil, fmt.Errorf("btcec.ParsePubKey(spendConditionDataBytes). %w", err)
 		}
 
-		pubkeysMap[string(dataPubkey.SerializeCompressed())] = struct{}{}
+		if err := addCanonicalKey(pubkeysMap, seenX, dataPubkey); err != nil {
+			return nil, err
+		}
 		if spendCondition.Data.Tags.Pubkeys != nil {
 			for i := range spendCondition.Data.Tags.Pubkeys {
 				if spendCondition.Data.Tags.Pubkeys[i] != nil {
-					pubkeysMap[string(spendCondition.Data.Tags.Pubkeys[i].SerializeCompressed())] = struct{}{}
+					if err := addCanonicalKey(pubkeysMap, seenX, spendCondition.Data.Tags.Pubkeys[i]); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -269,7 +303,9 @@ func (p Proof) pubkeysForVerification(spendCondition *SpendCondition) (map[strin
 		if spendCondition.Data.Tags.Pubkeys != nil {
 			for i := range spendCondition.Data.Tags.Pubkeys {
 				if spendCondition.Data.Tags.Pubkeys[i] != nil {
-					pubkeysMap[string(spendCondition.Data.Tags.Pubkeys[i].SerializeCompressed())] = struct{}{}
+					if err := addCanonicalKey(pubkeysMap, seenX, spendCondition.Data.Tags.Pubkeys[i]); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -277,14 +313,17 @@ func (p Proof) pubkeysForVerification(spendCondition *SpendCondition) (map[strin
 	return pubkeysMap, nil
 }
 
-func (p Proof) pubkeysForRefund(spendCondition *SpendCondition) map[string]struct{} {
+func (p Proof) pubkeysForRefund(spendCondition *SpendCondition) (map[string]struct{}, error) {
 	pubkeysMap := make(map[string]struct{}, 0)
+	seenX := make(map[string]struct{}, 0)
 	for i := range spendCondition.Data.Tags.Refund {
 		if spendCondition.Data.Tags.Refund[i] != nil {
-			pubkeysMap[string(spendCondition.Data.Tags.Refund[i].SerializeCompressed())] = struct{}{}
+			if err := addCanonicalKey(pubkeysMap, seenX, spendCondition.Data.Tags.Refund[i]); err != nil {
+				return nil, err
+			}
 		}
 	}
-	return pubkeysMap
+	return pubkeysMap, nil
 }
 
 func (p Proof) parseSpendCondition() (*SpendCondition, error) {

@@ -99,6 +99,7 @@ func SetupDataOnDB(mint *Mint) error {
 		SeenAt:          time.Now().Unix(),
 		Melted:          false,
 		Mpp:             false,
+		Change:          nil,
 	}
 
 	c1Priv, err := secp256k1.GeneratePrivateKey()

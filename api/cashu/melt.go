@@ -21,16 +21,23 @@ type MeltRequestDB struct {
 	State           ACTION_STATE `json:"state"`
 	Quote           string       `json:"quote"`
 	CheckingId      string       `json:"checking_id"`
-	Expiry          int64        `json:"expiry"`
-	Amount          uint64       `json:"amount"`
-	FeeReserve      uint64       `json:"fee_reserve" db:"fee_reserve"`
-	FeePaid         uint64       `json:"paid_fee" db:"fee_paid"`
-	SeenAt          int64        `json:"seen_at"`
-	Melted          bool         `json:"melted"`
-	Mpp             bool         `json:"mpp"`
+	// Change carries signed change (NUT-08) only when a PENDING quote settles
+	// during RefreshMeltQuoteState. Never persisted or serialized directly.
+	Change     []BlindSignature `json:"-" db:"-"`
+	Expiry     int64            `json:"expiry"`
+	SeenAt     int64            `json:"seen_at"`
+	Amount     uint64           `json:"amount"`
+	FeeReserve uint64           `json:"fee_reserve" db:"fee_reserve"`
+	FeePaid    uint64           `json:"paid_fee" db:"fee_paid"`
+	Melted     bool             `json:"melted"`
+	Mpp        bool             `json:"mpp"`
 }
 
 func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11Response {
+	change := meltRequest.Change
+	if change == nil {
+		change = []BlindSignature{}
+	}
 	return PostMeltQuoteBolt11Response{
 		Quote:           meltRequest.Quote,
 		Amount:          meltRequest.Amount,
@@ -40,7 +47,7 @@ func (meltRequest *MeltRequestDB) GetPostMeltQuoteResponse() PostMeltQuoteBolt11
 		PaymentPreimage: meltRequest.PaymentPreimage,
 		Request:         meltRequest.Request,
 		Unit:            meltRequest.Unit,
-		Change:          []BlindSignature{},
+		Change:          change,
 	}
 }
 

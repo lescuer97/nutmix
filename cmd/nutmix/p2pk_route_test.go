@@ -92,7 +92,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 	}
 
 	// ask for minting
-	p2pkBlindedMessages, p2pkMintingSecrets, P2PKMintingSecretKeys, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	p2pkBlindedMessages, p2pkMintingSecrets, P2PKMintingSecretKeys, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKey.PubKey(), 1, nil, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -130,7 +130,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PK, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	swapBlindedMessagesP2PK, swapSecretsP2PK, swapSecretKeyP2PK, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKey.PubKey(), 1, nil, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)
@@ -168,7 +168,7 @@ func TestRoutesP2PKSwapMelt(t *testing.T) {
 		t.Fatalf("Error generating proofs: %v", err)
 	}
 
-	swapBlindedMessagesP2PKWrongSigs, _, _, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKey.PubKey(), 1, []*secp256k1.PublicKey{lockingPrivKey.PubKey()}, nil, 0, cashu.SigInputs)
+	swapBlindedMessagesP2PKWrongSigs, _, _, err := CreateP2PKBlindedMessages(1000, activeKeys, lockingPrivKey.PubKey(), 1, nil, nil, 0, cashu.SigInputs)
 
 	if err != nil {
 		t.Fatalf("could not createBlind message: %v", err)

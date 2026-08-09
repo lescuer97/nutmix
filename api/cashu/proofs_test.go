@@ -1,9 +1,15 @@
 package cashu
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
+
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 func TestChangeProofsStateToPending(t *testing.T) {
@@ -308,5 +314,233 @@ func TestCheckP2PKProofValidRefundMultisig(t *testing.T) {
 	}
 	if !valid {
 		t.Errorf("proof should have been valid")
+	}
+}
+
+// NOTE: Regression tests for SECURITY_AUDIT.md finding 3.1
+// (NUT-11 public key canonicalisation: keys compare by x-coordinate, a
+// duplicate key in the same pathway makes the secret malformed).
+
+// parityFlipped returns the compressed encoding of pub with the opposite
+// y-parity prefix (02 <-> 03). Same x-coordinate, same BIP340 identity.
+func parityFlipped(t *testing.T, pub *secp256k1.PublicKey) string {
+	t.Helper()
+	flipped := pub.SerializeCompressed()
+	if flipped[0] == 0x02 {
+		flipped[0] = 0x03
+	} else {
+		flipped[0] = 0x02
+	}
+	return hex.EncodeToString(flipped)
+}
+
+func signSecret(t *testing.T, priv *secp256k1.PrivateKey, secret string) string {
+	t.Helper()
+	hash := sha256.Sum256([]byte(secret))
+	sig, err := schnorr.Sign(priv, hash[:])
+	if err != nil {
+		t.Fatalf("schnorr.Sign: %+v", err)
+	}
+	return fmt.Sprintf(`{"signatures":["%s"]}`, hex.EncodeToString(sig.Serialize()))
+}
+
+// data = 02A, pubkeys = [03A] (same x), n_sigs=2, ONE signature.
+// Before the fix this satisfied a 2-of-2 multisig with a single key.
+func TestCheckP2PKProofParityDuplicateKeysRejected(t *testing.T) {
+	priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+
+	secret := fmt.Sprintf(`["P2PK",{"nonce":"abc123","data":"%s","tags":[["pubkeys","%s"],["n_sigs","2"]]}]`,
+		hex.EncodeToString(priv.PubKey().SerializeCompressed()), parityFlipped(t, priv.PubKey()))
+
+	err = VerifyProofCondition(Proof{
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "",
+		Secret:  secret,
+		Witness: signSecret(t, priv, secret),
+		State:   "",
+		Amount:  0,
+		SeenAt:  0,
+	})
+	if !errors.Is(err, ErrInvalidSpendCondition) {
+		t.Errorf("parity-duplicated keys should be rejected as invalid spend condition, got: %v", err)
+	}
+}
+
+// data = A, pubkeys = [A, A] (exact duplicates) -> malformed, unspendable.
+func TestCheckP2PKProofExactDuplicateKeysRejected(t *testing.T) {
+	priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+	pub := hex.EncodeToString(priv.PubKey().SerializeCompressed())
+
+	secret := fmt.Sprintf(`["P2PK",{"nonce":"abc","data":"%s","tags":[["pubkeys","%s","%s"],["n_sigs","2"]]}]`, pub, pub, pub)
+
+	err = VerifyProofCondition(Proof{
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "",
+		Secret:  secret,
+		Witness: signSecret(t, priv, secret),
+		State:   "",
+		Amount:  0,
+		SeenAt:  0,
+	})
+	if !errors.Is(err, ErrInvalidSpendCondition) {
+		t.Errorf("exact duplicate keys should be rejected as invalid spend condition, got: %v", err)
+	}
+}
+
+// n_sigs=3 with only 2 keys in the pathway (data + 1 tag key) -> malformed.
+func TestCheckP2PKProofNSigsExceedsKeysRejected(t *testing.T) {
+	priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+	other, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+
+	secret := fmt.Sprintf(`["P2PK",{"nonce":"abc","data":"%s","tags":[["pubkeys","%s"],["n_sigs","3"]]}]`,
+		hex.EncodeToString(priv.PubKey().SerializeCompressed()),
+		hex.EncodeToString(other.PubKey().SerializeCompressed()))
+
+	err = VerifyProofCondition(Proof{
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "",
+		Secret:  secret,
+		Witness: signSecret(t, priv, secret),
+		State:   "",
+		Amount:  0,
+		SeenAt:  0,
+	})
+	if !errors.Is(err, ErrInvalidSpendCondition) {
+		t.Errorf("n_sigs > total keys should be rejected as invalid spend condition, got: %v", err)
+	}
+}
+
+func TestCheckHTLCProofNSigsWithoutPubkeysRejected(t *testing.T) {
+	preimage := "test preimage"
+	hash := sha256.Sum256([]byte(preimage))
+
+	for _, sigflag := range []string{"SIG_INPUTS", "SIG_ALL"} {
+		t.Run(sigflag, func(t *testing.T) {
+			proof := Proof{
+				C:       WrappedPublicKey{PublicKey: nil},
+				Y:       WrappedPublicKey{PublicKey: nil},
+				Quote:   nil,
+				Id:      "",
+				Secret:  fmt.Sprintf(`["HTLC",{"nonce":"abc","data":"%x","tags":[["n_sigs","1"],["sigflag","%s"]]}]`, hash, sigflag),
+				Witness: fmt.Sprintf(`{"preimage":"%x"}`, preimage),
+				State:   "",
+				Amount:  0,
+				SeenAt:  0,
+			}
+
+			err := VerifyProofCondition(proof)
+			if !errors.Is(err, ErrInvalidSpendCondition) {
+				t.Errorf("HTLC n_sigs without pubkeys should be rejected as invalid spend condition, got: %v", err)
+			}
+		})
+	}
+}
+
+// Expired locktime, refund = [A, 03A-flipped], n_sigs_refund=2, ONE refund
+// signature. Before the fix this satisfied a 2-of-2 refund multisig with a
+// single key. The proof must be unspendable.
+func TestCheckP2PKProofRefundParityDuplicateKeysRejected(t *testing.T) {
+	refundPriv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+	dataPriv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+
+	secret := fmt.Sprintf(`["P2PK",{"nonce":"abc","data":"%s","tags":[["locktime","1"],["refund","%s","%s"],["n_sigs_refund","2"]]}]`,
+		hex.EncodeToString(dataPriv.PubKey().SerializeCompressed()),
+		hex.EncodeToString(refundPriv.PubKey().SerializeCompressed()),
+		parityFlipped(t, refundPriv.PubKey()))
+
+	err = VerifyProofCondition(Proof{
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "",
+		Secret:  secret,
+		Witness: signSecret(t, refundPriv, secret),
+		State:   "",
+		Amount:  0,
+		SeenAt:  0,
+	})
+	if !errors.Is(err, ErrInvalidSpendCondition) {
+		t.Errorf("parity-duplicated refund keys should be rejected as invalid spend condition, got: %v", err)
+	}
+}
+
+// NOTE: Regression tests for SECURITY_AUDIT.md findings 4.1 and 4.2.
+
+// 4.1: a P2PK secret with a duplicated tag is malformed and must be rejected
+// as unspendable even with an otherwise valid signature (fail closed, not
+// downgraded to anyone-can-spend).
+func TestCheckP2PKProofDuplicateTagRejected(t *testing.T) {
+	priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+
+	secret := fmt.Sprintf(`["P2PK",{"nonce":"abc","data":"%s","tags":[["sigflag","SIG_ALL"],["sigflag","SIG_INPUTS"]]}]`,
+		hex.EncodeToString(priv.PubKey().SerializeCompressed()))
+
+	err = VerifyProofCondition(Proof{
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "",
+		Secret:  secret,
+		Witness: signSecret(t, priv, secret),
+		State:   "",
+		Amount:  0,
+		SeenAt:  0,
+	})
+	if !errors.Is(err, ErrDuplicateTag) {
+		t.Errorf("duplicated tag should be rejected with ErrDuplicateTag, got: %v", err)
+	}
+}
+
+// 4.2: unknown tags are a NUT-10 extension point and must be ignored; a
+// secret using a future tag stays spendable.
+func TestCheckP2PKProofUnknownTagIgnored(t *testing.T) {
+	priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %+v", err)
+	}
+
+	secret := fmt.Sprintf(`["P2PK",{"nonce":"abc","data":"%s","tags":[["future_tag","value"],["sigflag","SIG_INPUTS"]]}]`,
+		hex.EncodeToString(priv.PubKey().SerializeCompressed()))
+
+	err = VerifyProofCondition(Proof{
+		C:       WrappedPublicKey{PublicKey: nil},
+		Y:       WrappedPublicKey{PublicKey: nil},
+		Quote:   nil,
+		Id:      "",
+		Secret:  secret,
+		Witness: signSecret(t, priv, secret),
+		State:   "",
+		Amount:  0,
+		SeenAt:  0,
+	})
+	if err != nil {
+		t.Errorf("secret with unknown tag should be spendable, got: %v", err)
 	}
 }

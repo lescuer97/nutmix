@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -76,6 +76,7 @@ func (m *Mint) createAndStoreBolt11MeltQuote(ctx context.Context, meltRequest ca
 		CheckingId:      checkingId,
 		FeePaid:         0,
 		Melted:          false,
+		Change:          nil,
 	}
 
 	tx, err := m.MintDB.GetTx(ctx)
@@ -126,7 +127,7 @@ func (m *Mint) validateBolt11MeltQuoteRequest(ctx context.Context, meltRequest c
 		return bolt11MeltReqData{}, fmt.Errorf(" zpay32.Decode. %w ", err)
 	}
 
-	if uint64(*invoice.MilliSat) == 0 {
+	if invoice.MilliSat == nil || uint64(*invoice.MilliSat) == 0 {
 		return bolt11MeltReqData{}, cashu.ErrAmountlessInvoiceNotSupported
 	}
 
@@ -307,17 +308,17 @@ func (m *Mint) RefreshMeltQuoteState(ctx context.Context, quoteId string) (cashu
 
 			totalExpent := quote.Amount + quote.FeePaid + uint64(fee)
 
-			overpaidFees := pending_proofs.Amount() - totalExpent
-
-			if len(changeMessages) > 0 && overpaidFees > 0 {
+			if len(changeMessages) > 0 && pending_proofs.Amount() > totalExpent {
+				overpaidFees := pending_proofs.Amount() - totalExpent
 				var blindMessages []cashu.BlindedMessage
 				for _, v := range changeMessages {
 					blindMessages = append(blindMessages, cashu.BlindedMessage{Id: v.Id, B_: v.B_, Witness: "", Amount: 0})
 				}
-				sigs, err := m.GetChangeOutput(blindMessages, overpaidFees, quote.Unit)
+				blindSigs, sigs, err := m.GetChangeOutput(blindMessages, overpaidFees, quote.Unit)
 				if err != nil {
 					return quote, fmt.Errorf("m.GetChangeOutput(changeMessages, quote.Unit ). %w", err)
 				}
+				quote.Change = blindSigs
 
 				err = m.MintDB.SaveRestoreSigs(settleTx, sigs)
 				if err != nil {

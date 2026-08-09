@@ -40,6 +40,7 @@ var (
 	ErrCouldNotParseAmountToString = errors.New("could not parse amount to string")
 	ErrUnbalanced                  = errors.New("unbalanced transactions")
 	ErrNotSameUnits                = errors.New("not same units")
+	ErrMultipleUnits               = errors.New("inputs/outputs of multiple units")
 	ErrRepeatedOutput              = errors.New("duplicate outputs provided")
 	ErrRepeatedInput               = errors.New("duplicate inputs provided")
 	ErrPaymentFailed               = errors.New("lightning payment failed")
@@ -107,6 +108,20 @@ type BlindedMessage struct {
 	Id      string           `json:"id"`
 	Witness string           `json:"witness,omitempty" db:"witness"`
 	Amount  uint64           `json:"amount"`
+}
+
+// UnmarshalJSON rejects blinded messages without a valid B_ (missing, null or
+// empty). A nil B_ would otherwise reach the signer and panic.
+func (b *BlindedMessage) UnmarshalJSON(data []byte) error {
+	// Define an alias to avoid infinite recursion
+	type Alias BlindedMessage
+	if err := json.Unmarshal(data, (*Alias)(b)); err != nil {
+		return errors.Join(ErrInvalidBlindMessage, err)
+	}
+	if b.B_.PublicKey == nil {
+		return ErrInvalidBlindMessage
+	}
+	return nil
 }
 
 func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSignature, error) {
