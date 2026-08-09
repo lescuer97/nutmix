@@ -218,7 +218,7 @@ func (m *Mint) validateSwapBalanceAndUnits(request cashu.PostSwapRequest) error 
 	}
 
 	if proofUnit != outputUnit {
-		return fmt.Errorf("proofUnit != messageUnit. %w", cashu.ErrNotSameUnits)
+		return fmt.Errorf("proofUnit != messageUnit. %w", cashu.ErrDifferentInputOutputUnit)
 	}
 
 	return nil

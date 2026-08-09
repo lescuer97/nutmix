@@ -49,7 +49,7 @@ func checkProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKeysetRespon
 
 		units[val.Unit] = true
 		if len(units) > 1 {
-			return cashu.Sat, cashu.ErrNotSameUnits
+			return cashu.Sat, cashu.ErrMultipleUnits
 		}
 	}
 

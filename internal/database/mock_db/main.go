@@ -19,6 +19,7 @@ var DATABASE_URL_ENV = "DATABASE_URL"
 
 type MockDB struct {
 	GetConfigErr                     error
+	GetSeedsByUnitErr                error
 	UpdateNostrNotificationConfigErr error
 	NostrNotificationConfig          *utils.NostrNotificationConfig
 	LastLightningSearch              *string
@@ -59,6 +60,9 @@ func (m *MockDB) Rollback(ctx context.Context, tx pgx.Tx) error {
 }
 
 func (m *MockDB) GetSeedsByUnit(tx pgx.Tx, unit cashu.Unit) ([]cashu.Seed, error) {
+	if m.GetSeedsByUnitErr != nil {
+		return nil, m.GetSeedsByUnitErr
+	}
 	seeds := []cashu.Seed{}
 	for i := 0; i < len(m.Seeds); i++ {
 		if m.Seeds[i].Unit == unit.String() {

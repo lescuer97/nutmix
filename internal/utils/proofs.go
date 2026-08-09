@@ -4,13 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
 func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
+	var pgErr *pgconn.PgError
 	switch {
 	case errors.Is(proofError, cashu.ErrBlindMessageAlreadySigned):
 		message := cashu.ErrBlindMessageAlreadySigned.Error()
@@ -76,6 +77,9 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrNotSameUnits):
 		message := cashu.ErrNotSameUnits.Error()
 		return cashu.TRANSACTION_NOT_BALANCED, &message
+	case errors.Is(proofError, cashu.ErrMultipleUnits):
+		message := cashu.ErrMultipleUnits.Error()
+		return cashu.MULTIPLE_UNITS_OUTPUT_INPUT, &message
 	case errors.Is(proofError, cashu.ErrNotEnoughtProofs):
 		message := cashu.ErrNotEnoughtProofs.Error()
 		return cashu.TRANSACTION_NOT_BALANCED, &message
@@ -121,9 +125,9 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 		message := cashu.ErrKeysetNotKnow.Error()
 		return cashu.KEYSET_NOT_KNOW, &message
 
-	case strings.Contains(proofError.Error(), "could not obtain lock"):
+	case errors.As(proofError, &pgErr) && pgErr.Code == "55P03":
 		message := "Transaction is already pending"
-		return cashu.QUOTE_PENDING, &message
+		return cashu.PROOFS_PENDING, &message
 
 	case errors.Is(proofError, cashu.ErrPaymentFailed):
 		message := cashu.ErrNotEnoughtProofs.Error()

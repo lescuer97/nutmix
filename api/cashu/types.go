@@ -40,6 +40,7 @@ var (
 	ErrCouldNotParseAmountToString = errors.New("could not parse amount to string")
 	ErrUnbalanced                  = errors.New("unbalanced transactions")
 	ErrNotSameUnits                = errors.New("not same units")
+	ErrMultipleUnits               = errors.New("inputs/outputs of multiple units")
 	ErrRepeatedOutput              = errors.New("duplicate outputs provided")
 	ErrRepeatedInput               = errors.New("duplicate inputs provided")
 	ErrPaymentFailed               = errors.New("lightning payment failed")

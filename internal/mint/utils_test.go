@@ -12,6 +12,40 @@ import (
 
 const RegtestRequest string = "lnbcrt10u1pnxrpvhpp535rl7p9ze2dpgn9mm0tljyxsm980quy8kz2eydj7p4awra453u9qdqqcqzzsxqyz5vqsp55mdr2l90rhluaz9v3cmrt0qgjusy2dxsempmees6spapqjuj9m5q9qyyssq863hqzs6lcptdt7z5w82m4lg09l2d27al2wtlade6n4xu05u0gaxfjxspns84a73tl04u3t0pv4lveya8j0eaf9w7y5pstu70grpxtcqla7sxq"
 
+// 10.4: multi-unit inputs/outputs must surface ErrMultipleUnits (→ 11009).
+func multiUnitKeysets() []cashu.BasicKeysetResponse {
+	return []cashu.BasicKeysetResponse{
+		{FinalExpiry: nil, Id: "00aaaaaaaaaaaaaa01", Unit: "sat", InputFeePpk: 0, Version: 0, Active: true},
+		{FinalExpiry: nil, Id: "00aaaaaaaaaaaaaa02", Unit: "msat", InputFeePpk: 0, Version: 0, Active: true},
+	}
+}
+
+func TestCheckProofsAreSameUnitRejectsMultipleUnits(t *testing.T) {
+	keysets := multiUnitKeysets()
+	proofs := []cashu.Proof{
+		{C: cashu.WrappedPublicKey{PublicKey: nil}, Y: cashu.WrappedPublicKey{PublicKey: nil}, Quote: nil, Id: keysets[0].Id, Secret: "a", Witness: "", State: cashu.PROOF_UNSPENT, Amount: 1, SeenAt: 0},
+		{C: cashu.WrappedPublicKey{PublicKey: nil}, Y: cashu.WrappedPublicKey{PublicKey: nil}, Quote: nil, Id: keysets[1].Id, Secret: "b", Witness: "", State: cashu.PROOF_UNSPENT, Amount: 1, SeenAt: 0},
+	}
+
+	_, err := checkProofsAreSameUnit(proofs, keysets)
+	if !errors.Is(err, cashu.ErrMultipleUnits) {
+		t.Errorf("expected ErrMultipleUnits, got: %v", err)
+	}
+}
+
+func TestCheckMessagesAreSameUnitRejectsMultipleUnits(t *testing.T) {
+	keysets := multiUnitKeysets()
+	messages := []cashu.BlindedMessage{
+		{B_: cashu.WrappedPublicKey{PublicKey: nil}, Id: keysets[0].Id, Witness: "", Amount: 1},
+		{B_: cashu.WrappedPublicKey{PublicKey: nil}, Id: keysets[1].Id, Witness: "", Amount: 1},
+	}
+
+	_, err := checkMessagesAreSameUnit(messages, keysets)
+	if !errors.Is(err, cashu.ErrMultipleUnits) {
+		t.Errorf("expected ErrMultipleUnits, got: %v", err)
+	}
+}
+
 func TestIsInternalTransactionSuccess(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	ctx := context.Background()
@@ -149,8 +183,8 @@ func TestVerifyUnitOfProofFail(t *testing.T) {
 	if err == nil {
 		t.Errorf("should have failed because of there are different units: %+v ", err)
 	}
-	if !errors.Is(err, cashu.ErrNotSameUnits) {
-		t.Errorf("Error should be Not Same units. %v", err)
+	if !errors.Is(err, cashu.ErrMultipleUnits) {
+		t.Errorf("Error should be Multiple units (11009). %v", err)
 	}
 }
 func TestVerifyUnitOfProofPass(t *testing.T) {

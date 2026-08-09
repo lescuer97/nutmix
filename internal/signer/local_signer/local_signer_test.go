@@ -81,6 +81,28 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 	}
 }
 
+// 4.4: a DB error from GetSeedsByUnit must abort rotation instead of falling
+// through and creating a duplicate v0 seed.
+func TestRotateKeysetPropagatesDBError(t *testing.T) {
+	db := mockdb.MockDB{} //nolint:exhaustruct
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+
+	seedsBefore := len(db.Seeds)
+	db.GetSeedsByUnitErr = mockdb.ErrDB
+
+	err = localsigner.RotateKeyset(cashu.Sat, uint(100), 240)
+	if !errors.Is(err, mockdb.ErrDB) {
+		t.Fatalf("expected ErrDB, got: %v", err)
+	}
+	if len(db.Seeds) != seedsBefore {
+		t.Errorf("no seed should be saved on DB error: before %v, after %v", seedsBefore, len(db.Seeds))
+	}
+}
+
 func TestCreateNewSeed(t *testing.T) {
 	db := mockdb.MockDB{} //nolint:exhaustruct
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)

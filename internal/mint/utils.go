@@ -56,7 +56,7 @@ func checkMessagesAreSameUnit(messages []cashu.BlindedMessage, keys []cashu.Basi
 
 		units[val.Unit] = true
 		if len(units) > 1 {
-			return cashu.Sat, fmt.Errorf("proofs are not the same unit")
+			return cashu.Sat, cashu.ErrMultipleUnits
 		}
 	}
 

@@ -207,9 +207,7 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 	highestSeedVersion := uint32(0)
 	seeds, err := l.db.GetSeedsByUnit(tx, unit)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("database.GetSeedsByUnit(tx, unit). %w", err)
-		}
+		return fmt.Errorf("database.GetSeedsByUnit(tx, unit). %w", err)
 	}
 
 	// get current highest seed version

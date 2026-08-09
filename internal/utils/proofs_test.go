@@ -1,10 +1,42 @@
 package utils
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lescuer97/nutmix/api/cashu"
 )
+
+// 10.3: a Postgres row-lock conflict (SQLSTATE 55P03) on the swap path must
+// map to PROOFS_PENDING (11002), not QUOTE_PENDING (20005).
+func TestParseErrorLockConflictMapsToProofsPending(t *testing.T) {
+	pgErr := &pgconn.PgError{Code: "55P03"} //nolint:exhaustruct
+	err := fmt.Errorf("m.MintDB.SetProofsPending(tx, proofs). %w", pgErr)
+
+	code, _ := ParseErrorToCashuErrorCode(err)
+	if code != cashu.PROOFS_PENDING {
+		t.Errorf("expected PROOFS_PENDING (11002), got %v", uint(code))
+	}
+}
+
+// 10.4: unit-mismatch sentinels map to the precise codes 11009/11010.
+func TestParseErrorUnitMismatchCodes(t *testing.T) {
+	code, _ := ParseErrorToCashuErrorCode(fmt.Errorf("wrap. %w", cashu.ErrMultipleUnits))
+	if code != cashu.MULTIPLE_UNITS_OUTPUT_INPUT {
+		t.Errorf("expected MULTIPLE_UNITS_OUTPUT_INPUT (11009), got %v", uint(code))
+	}
+
+	code, _ = ParseErrorToCashuErrorCode(fmt.Errorf("wrap. %w", cashu.ErrDifferentInputOutputUnit))
+	if code != cashu.INPUT_OUTPUT_NOT_SAME_UNIT {
+		t.Errorf("expected INPUT_OUTPUT_NOT_SAME_UNIT (11010), got %v", uint(code))
+	}
+
+	if !errors.Is(fmt.Errorf("wrap. %w", cashu.ErrMultipleUnits), cashu.ErrMultipleUnits) {
+		t.Error("ErrMultipleUnits should survive wrapping")
+	}
+}
 
 func setListofEmptyBlindMessages(amounts int) []cashu.BlindedMessage {
 	var messages []cashu.BlindedMessage
