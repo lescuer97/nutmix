@@ -42,6 +42,9 @@ func TestGetLDKFormValuesUsesPersistedConfigWithoutActiveBackend(t *testing.T) {
 	if formValues.ElectrumServerURL != "ssl://electrum.example:50002" {
 		t.Fatalf("unexpected electrum server url: %q", formValues.ElectrumServerURL)
 	}
+	if formValues.TorOnly {
+		t.Fatal("expected tor only to default to false")
+	}
 	if formValues.Password != "" {
 		t.Fatalf("expected persisted password to stay hidden")
 	}
@@ -71,6 +74,8 @@ func TestGetLDKFormValuesPrefersRequestValues(t *testing.T) {
 	values.Set("BITCOIN_NODE_RPC_USERNAME", "override-user")
 	values.Set("BITCOIN_NODE_RPC_PASSWORD", "override-pass")
 	values.Set("ELECTRUM_SERVER_URL", "ssl://override.example:50002")
+	values.Set("TOR_ONLY", "true")
+	values.Set("TOR_PROXY_ADDRESS", "127.0.0.1:9050")
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -88,6 +93,12 @@ func TestGetLDKFormValuesPrefersRequestValues(t *testing.T) {
 	}
 	if formValues.ElectrumServerURL != "ssl://override.example:50002" {
 		t.Fatalf("unexpected overridden electrum url: %q", formValues.ElectrumServerURL)
+	}
+	if !formValues.TorOnly {
+		t.Fatal("expected overridden tor only value")
+	}
+	if formValues.TorProxyAddress != "127.0.0.1:9050" {
+		t.Fatalf("unexpected tor proxy address: %q", formValues.TorProxyAddress)
 	}
 }
 
@@ -125,5 +136,33 @@ func TestGetLDKFormValuesSupportsEsploraValues(t *testing.T) {
 	}
 	if formValues.EsploraServerURL != "https://mempool.space/api" {
 		t.Fatalf("unexpected overridden esplora url: %q", formValues.EsploraServerURL)
+	}
+}
+
+func TestGetLDKFormValuesClearsUncheckedTorOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := &mockdb.MockDB{}
+	persistedConfig, err := ldk.NewPersistedConfig(ldk.RPCConfig{
+		Address:  "127.0.0.1",
+		Port:     18443,
+		Username: "user",
+		Password: "pass",
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("ldk.NewPersistedConfig(...): %v", err)
+	}
+	persistedConfig.TorOnly = true
+	proxyAddress := "127.0.0.1:9050"
+	persistedConfig.TorProxyAddress = &proxyAddress
+	if err := ldk.SaveConfig(context.Background(), db, persistedConfig); err != nil {
+		t.Fatalf("ldk.SaveConfig(...): %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/admin/lightningdata", nil)
+
+	if getLDKFormValues(c, &m.Mint{MintDB: db}).TorOnly {
+		t.Fatal("expected unchecked tor only field to clear persisted value")
 	}
 }

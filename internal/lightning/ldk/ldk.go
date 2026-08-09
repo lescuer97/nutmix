@@ -3,6 +3,7 @@ package ldk
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -37,6 +38,7 @@ type LDK struct {
 	db      database.MintDB
 	network string
 	options Options
+	torOnly bool
 }
 
 func NewLdk(ctx context.Context, db database.MintDB, network string) (*LDK, error) {
@@ -119,6 +121,11 @@ func (l *LDK) InitNode(ctx context.Context) error {
 		return fmt.Errorf("unsupported chain source type %q", config.ChainSourceType)
 	}
 	builder.SetGossipSourceP2p()
+	if config.TorProxyAddress != nil {
+		if err := builder.SetTorConfig(ldk_node.TorConfig{ProxyAddress: *config.TorProxyAddress}); err != nil {
+			return fmt.Errorf("set tor config: %w", err)
+		}
+	}
 
 	nodeEntropy := ldk_node.NodeEntropyFromBip39Mnemonic(seedMnemonic, nil)
 	slog.Debug("building ldk node")
@@ -128,8 +135,18 @@ func (l *LDK) InitNode(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not Create ldk-node. %w", err)
 	}
+	if config.TorOnly {
+		listeningAddresses := node.ListeningAddresses()
+		log.Printf("listeningAddresses: %+v", listeningAddresses)
+		if listeningAddresses != nil {
+			if err := validateTorOnlyListeningAddresses(*listeningAddresses); err != nil {
+				return fmt.Errorf("validate tor-only listening addresses: %w", err)
+			}
+		}
+	}
 
 	l.node = node
+	l.torOnly = config.TorOnly
 	return nil
 }
 

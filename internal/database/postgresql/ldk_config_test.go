@@ -8,12 +8,15 @@ import (
 
 func TestSetAndGetLDKConfigRoundTripEsplora(t *testing.T) {
 	db, ctx := setupTestDB(t)
+	torProxyAddress := "127.0.0.1:9050"
 
 	want := database.LDKConfig{
 		ConfigDirectory:   "/tmp/ldk-test",
 		ChainSourceType:   database.LDKChainSourceEsplora,
 		ElectrumServerURL: "ssl://electrum.example:50002",
 		EsploraServerURL:  "https://blockstream.info/api",
+		TorOnly:           true,
+		TorProxyAddress:   &torProxyAddress,
 		Rpc: database.LDKRPCConfig{
 			Address:  "127.0.0.1",
 			Username: "rpc-user",
@@ -43,6 +46,12 @@ func TestSetAndGetLDKConfigRoundTripEsplora(t *testing.T) {
 	if got.EsploraServerURL != want.EsploraServerURL {
 		t.Fatalf("esplora server url mismatch: got %q want %q", got.EsploraServerURL, want.EsploraServerURL)
 	}
+	if got.TorOnly != want.TorOnly {
+		t.Fatalf("tor only mismatch: got %v want %v", got.TorOnly, want.TorOnly)
+	}
+	if got.TorProxyAddress == nil || *got.TorProxyAddress != *want.TorProxyAddress {
+		t.Fatalf("tor proxy address mismatch: got %v want %v", got.TorProxyAddress, want.TorProxyAddress)
+	}
 	if got.Rpc.Address != want.Rpc.Address {
 		t.Fatalf("rpc address mismatch: got %q want %q", got.Rpc.Address, want.Rpc.Address)
 	}
@@ -54,5 +63,17 @@ func TestSetAndGetLDKConfigRoundTripEsplora(t *testing.T) {
 	}
 	if got.Rpc.Port != want.Rpc.Port {
 		t.Fatalf("rpc port mismatch: got %d want %d", got.Rpc.Port, want.Rpc.Port)
+	}
+
+	want.TorProxyAddress = nil
+	if err := db.SetLDKConfig(ctx, want); err != nil {
+		t.Fatalf("db.SetLDKConfig(ctx, want without proxy): %v", err)
+	}
+	got, err = db.GetLDKConfig(ctx)
+	if err != nil {
+		t.Fatalf("db.GetLDKConfig(ctx): %v", err)
+	}
+	if got.TorProxyAddress != nil {
+		t.Fatalf("expected nil tor proxy address, got %q", *got.TorProxyAddress)
 	}
 }

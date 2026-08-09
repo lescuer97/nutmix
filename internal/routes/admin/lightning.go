@@ -84,6 +84,8 @@ func getLDKFormValues(c *gin.Context, mint *m.Mint) templates.LDKFormValues {
 		Password:          "",
 		ElectrumServerURL: "",
 		EsploraServerURL:  "",
+		TorOnly:           false,
+		TorProxyAddress:   "",
 	}
 
 	persistedConfig, err := ldk.GetPersistedConfig(c.Request.Context(), mint.MintDB)
@@ -96,6 +98,13 @@ func getLDKFormValues(c *gin.Context, mint *m.Mint) templates.LDKFormValues {
 		formValues.Username = persistedConfig.Rpc.Username
 		formValues.ElectrumServerURL = persistedConfig.ElectrumServerURL
 		formValues.EsploraServerURL = persistedConfig.EsploraServerURL
+		formValues.TorOnly = persistedConfig.TorOnly
+		if persistedConfig.TorProxyAddress != nil {
+			formValues.TorProxyAddress = *persistedConfig.TorProxyAddress
+		}
+	}
+	if c.Request.Method == "POST" {
+		formValues.TorOnly = requestFormValue(c, "TOR_ONLY") == "true"
 	}
 
 	if value := requestFormValue(c, "LDK_CHAIN_SOURCE_TYPE"); value != "" {
@@ -118,6 +127,9 @@ func getLDKFormValues(c *gin.Context, mint *m.Mint) templates.LDKFormValues {
 	}
 	if value := requestFormValue(c, "ESPLORA_SERVER_URL"); value != "" {
 		formValues.EsploraServerURL = value
+	}
+	if c.Request.Method == "POST" {
+		formValues.TorProxyAddress = requestFormValue(c, "TOR_PROXY_ADDRESS")
 	}
 
 	return formValues

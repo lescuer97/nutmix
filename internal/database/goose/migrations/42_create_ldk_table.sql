@@ -10,6 +10,8 @@ CREATE TABLE ldk (
     rpc_username TEXT NOT NULL,
     rpc_password TEXT NOT NULL,
     rpc_port INT4 NOT NULL,
+    tor_only BOOLEAN NOT NULL DEFAULT FALSE,
+    tor_proxy_address TEXT,
     config_directory TEXT NOT NULL,
     CONSTRAINT single_row CHECK (id = 1),
     CONSTRAINT ldk_id_pk PRIMARY KEY (id),

@@ -792,6 +792,52 @@ func TestParseLDKPersistedConfigRejectsInvalidConfigDirectory(t *testing.T) {
 	}
 }
 
+func TestParseLDKPersistedConfigTorOnly(t *testing.T) {
+	newTorOnlyValues := func(rpcAddress string) url.Values {
+		values := url.Values{}
+		values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+		values.Set("BITCOIN_NODE_RPC_ADDRESS", rpcAddress)
+		values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+		values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+		values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+		values.Set("TOR_ONLY", "true")
+		return values
+	}
+
+	// tor only without a proxy is valid; localhost is exempt from the onion requirement
+	config, err := parseLDKPersistedConfig(newPostContext(newTorOnlyValues("127.0.0.1")), ldk.PersistedConfig{ConfigDirectory: t.TempDir(), ChainSourceType: ldk.ChainSourceBitcoind}, t.TempDir())
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(tor only, localhost): %v", err)
+	}
+	if !config.TorOnly {
+		t.Fatal("expected tor only to be enabled")
+	}
+	if config.TorProxyAddress != nil {
+		t.Fatalf("expected no tor proxy address, got %q", *config.TorProxyAddress)
+	}
+
+	// tor only rejects clearnet chain source addresses at parse time
+	_, err = parseLDKPersistedConfig(newPostContext(newTorOnlyValues("8.8.8.8")), ldk.PersistedConfig{ConfigDirectory: t.TempDir(), ChainSourceType: ldk.ChainSourceBitcoind}, t.TempDir())
+	if err == nil {
+		t.Fatal("expected tor-only config with clearnet rpc address to be rejected")
+	}
+
+	// proxy address is accepted independently of tor only
+	values := newTorOnlyValues("127.0.0.1")
+	values.Del("TOR_ONLY")
+	values.Set("TOR_PROXY_ADDRESS", "127.0.0.1:9050")
+	config, err = parseLDKPersistedConfig(newPostContext(values), ldk.PersistedConfig{ConfigDirectory: t.TempDir(), ChainSourceType: ldk.ChainSourceBitcoind}, t.TempDir())
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(proxy without tor only): %v", err)
+	}
+	if config.TorOnly {
+		t.Fatal("expected tor only to be disabled")
+	}
+	if config.TorProxyAddress == nil || *config.TorProxyAddress != "127.0.0.1:9050" {
+		t.Fatalf("unexpected tor proxy address: %v", config.TorProxyAddress)
+	}
+}
+
 func TestLDKConfigsEqual(t *testing.T) {
 	a := ldk.PersistedConfig{
 		ChainSourceType: ldk.ChainSourceBitcoind,

@@ -36,6 +36,8 @@ func TestSetupFormsLDKIncludesChainSourceToggle(t *testing.T) {
 		Address:         "127.0.0.1",
 		Port:            "18443",
 		Username:        "bitcoinrpc",
+		TorOnly:         true,
+		TorProxyAddress: "127.0.0.1:9050",
 	}
 
 	if err := SetupForms(string(utils.LDK), config, resources, ldkForm).Render(context.Background(), &b); err != nil {
@@ -43,7 +45,7 @@ func TestSetupFormsLDKIncludesChainSourceToggle(t *testing.T) {
 	}
 
 	out := b.String()
-	for _, field := range []string{"LDK_CHAIN_SOURCE_TYPE", "Bitcoin Core", "Electrum", "Esplora", "hx-post=\"/admin/lightningdata\""} {
+	for _, field := range []string{"LDK_CHAIN_SOURCE_TYPE", "Bitcoin Core", "Electrum", "Esplora", "TOR_ONLY", "Tor only", "TOR_PROXY_ADDRESS", "Tor SOCKS Proxy Address", "127.0.0.1:9050", "checked", "hx-post=\"/admin/lightningdata\""} {
 		if !strings.Contains(out, field) {
 			t.Fatalf("expected field %s in LDK setup form", field)
 		}

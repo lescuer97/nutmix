@@ -29,6 +29,15 @@ func (l *LDK) OpenChannel(nodeID string, address string, sats uint64) error {
 }
 
 func (l *LDK) OpenChannelWithPush(nodeID string, address string, sats uint64, pushMsat uint64) error {
+	if l == nil {
+		return fmt.Errorf("ldk backend is nil")
+	}
+	if l.torOnly {
+		if err := validateTorOnlySocketAddress(address); err != nil {
+			return fmt.Errorf("channel peer address is not a valid tor-only address: %w", err)
+		}
+	}
+
 	node, err := l.getNode()
 	if err != nil {
 		return err

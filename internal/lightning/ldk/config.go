@@ -2,12 +2,16 @@ package ldk
 
 import (
 	"context"
+	"crypto/sha3"
+	"encoding/base32"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/lescuer97/nutmix/internal/database"
@@ -34,6 +38,8 @@ type PersistedConfig struct {
 	ChainSourceType   ChainSourceType
 	ElectrumServerURL string
 	EsploraServerURL  string
+	TorOnly           bool
+	TorProxyAddress   *string
 	Rpc               RPCConfig
 }
 
@@ -77,6 +83,14 @@ func normalizePersistedConfig(config PersistedConfig) (PersistedConfig, error) {
 	config.Rpc.Address = strings.TrimSpace(config.Rpc.Address)
 	config.Rpc.Username = strings.TrimSpace(config.Rpc.Username)
 	config.Rpc.Password = strings.TrimSpace(config.Rpc.Password)
+	if config.TorProxyAddress != nil {
+		proxyAddress := strings.TrimSpace(*config.TorProxyAddress)
+		if proxyAddress == "" {
+			config.TorProxyAddress = nil
+		} else {
+			config.TorProxyAddress = &proxyAddress
+		}
+	}
 
 	normalizedConfigDirectory, err := normalizeConfigDirectory(config.ConfigDirectory)
 	if err != nil {
@@ -130,6 +144,82 @@ func ValidateEsploraServerURL(esploraServerURL string) error {
 	return validateServerURL("esplora", esploraServerURL)
 }
 
+func validateTorV3SocketAddress(address string) error {
+	host, port, err := net.SplitHostPort(strings.TrimSpace(address))
+	if err != nil {
+		return fmt.Errorf("tor address must be in the format host:port")
+	}
+	portNumber, err := strconv.ParseUint(port, 10, 16)
+	if err != nil || portNumber == 0 {
+		return fmt.Errorf("tor address port is invalid")
+	}
+
+	return validateTorV3Host(host)
+}
+
+func validateTorV3Host(host string) error {
+	host = strings.TrimSpace(host)
+	if !strings.HasSuffix(strings.ToLower(host), ".onion") {
+		return fmt.Errorf("tor address must use an onion v3 hostname")
+	}
+	host = strings.ToUpper(host[:len(host)-len(".onion")])
+	if len(host) != 56 {
+		return fmt.Errorf("tor address must use an onion v3 hostname")
+	}
+
+	decoded, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(host)
+	if err != nil || len(decoded) != 35 {
+		return fmt.Errorf("tor onion v3 hostname is invalid")
+	}
+	if decoded[34] != 3 {
+		return fmt.Errorf("tor onion address version is invalid")
+	}
+
+	checksumInput := append([]byte(".onion checksum"), decoded[:32]...)
+	checksumInput = append(checksumInput, decoded[34])
+	checksum := sha3.Sum256(checksumInput)
+	if decoded[32] != checksum[0] || decoded[33] != checksum[1] {
+		return fmt.Errorf("tor onion v3 hostname checksum is invalid")
+	}
+
+	return nil
+}
+
+func isLoopbackHost(host string) bool {
+	host = strings.TrimSpace(host)
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
+}
+
+// validateTorOnlyHost accepts loopback hosts or valid tor v3 onion hosts.
+func validateTorOnlyHost(host string) error {
+	if isLoopbackHost(host) {
+		return nil
+	}
+	if err := validateTorV3Host(host); err != nil {
+		return fmt.Errorf("address must be a tor v3 onion address or localhost: %w", err)
+	}
+	return nil
+}
+
+func validateTorProxySocketAddress(address string) error {
+	host, port, err := net.SplitHostPort(strings.TrimSpace(address))
+	if err != nil || strings.TrimSpace(host) == "" {
+		return fmt.Errorf("tor proxy address must be in the format host:port")
+	}
+	portNumber, err := strconv.ParseUint(port, 10, 16)
+	if err != nil || portNumber == 0 {
+		return fmt.Errorf("tor proxy address port is invalid")
+	}
+
+	return nil
+}
+
 func normalizeConfigDirectory(configDirectory string) (string, error) {
 	trimmedConfigDirectory := strings.TrimSpace(configDirectory)
 	if trimmedConfigDirectory == "" {
@@ -176,6 +266,8 @@ func GetPersistedConfig(ctx context.Context, db database.MintDB) (PersistedConfi
 		ChainSourceType:   ChainSourceType(config.ChainSourceType),
 		ElectrumServerURL: config.ElectrumServerURL,
 		EsploraServerURL:  config.EsploraServerURL,
+		TorOnly:           config.TorOnly,
+		TorProxyAddress:   config.TorProxyAddress,
 		Rpc:               RPCConfig(config.Rpc),
 	})
 	if err != nil {
@@ -201,6 +293,8 @@ func SaveConfig(ctx context.Context, db database.MintDB, config PersistedConfig)
 		ChainSourceType:   database.LDKChainSourceType(normalizedConfig.ChainSourceType),
 		ElectrumServerURL: normalizedConfig.ElectrumServerURL,
 		EsploraServerURL:  normalizedConfig.EsploraServerURL,
+		TorOnly:           normalizedConfig.TorOnly,
+		TorProxyAddress:   normalizedConfig.TorProxyAddress,
 		Rpc:               database.LDKRPCConfig(normalizedConfig.Rpc),
 	}); err != nil {
 		return fmt.Errorf("db.SetLDKConfig(ctx, config): %w", err)
@@ -208,6 +302,10 @@ func SaveConfig(ctx context.Context, db database.MintDB, config PersistedConfig)
 	slog.Info("saved persisted ldk config to database")
 
 	return nil
+}
+
+func (config PersistedConfig) Validate() error {
+	return validatePersistedConfig(config)
 }
 
 func (l *LDK) PersistedConfig(ctx context.Context) (PersistedConfig, error) {

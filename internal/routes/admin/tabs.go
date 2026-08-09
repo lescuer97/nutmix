@@ -71,6 +71,18 @@ func checkLimitSat(text string) (*int, error) {
 
 func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig, configDirectory string) (ldk.PersistedConfig, error) {
 	chainSourceType := normalizeLDKChainSourceType(c.Request.PostFormValue("LDK_CHAIN_SOURCE_TYPE"))
+	torOnly := false
+	if torOnlyText := strings.TrimSpace(c.Request.PostFormValue("TOR_ONLY")); torOnlyText != "" {
+		parsedTorOnly, err := strconv.ParseBool(torOnlyText)
+		if err != nil {
+			return ldk.PersistedConfig{}, fmt.Errorf("tor only value is invalid")
+		}
+		torOnly = parsedTorOnly
+	}
+	var torProxyAddress *string
+	if value := strings.TrimSpace(c.Request.PostFormValue("TOR_PROXY_ADDRESS")); value != "" {
+		torProxyAddress = &value
+	}
 	config := existingConfig
 
 	switch ldk.ChainSourceType(chainSourceType) {
@@ -84,6 +96,11 @@ func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig,
 		if err != nil {
 			return ldk.PersistedConfig{}, fmt.Errorf("ldk.NewPersistedConfigWithChainSource(...): %w", err)
 		}
+		persistedConfig.TorOnly = torOnly
+		persistedConfig.TorProxyAddress = torProxyAddress
+		if err := persistedConfig.Validate(); err != nil {
+			return ldk.PersistedConfig{}, fmt.Errorf("persistedConfig.Validate(): %w", err)
+		}
 
 		return persistedConfig, nil
 	case ldk.ChainSourceEsplora:
@@ -95,6 +112,11 @@ func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig,
 		persistedConfig, err := ldk.NewPersistedConfigWithChainSource(ldk.ChainSourceEsplora, config.Rpc, config.ElectrumServerURL, esploraServerURL, configDirectory)
 		if err != nil {
 			return ldk.PersistedConfig{}, fmt.Errorf("ldk.NewPersistedConfigWithChainSource(...): %w", err)
+		}
+		persistedConfig.TorOnly = torOnly
+		persistedConfig.TorProxyAddress = torProxyAddress
+		if err := persistedConfig.Validate(); err != nil {
+			return ldk.PersistedConfig{}, fmt.Errorf("persistedConfig.Validate(): %w", err)
 		}
 
 		return persistedConfig, nil
@@ -136,6 +158,11 @@ func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig,
 		if err != nil {
 			return ldk.PersistedConfig{}, fmt.Errorf("ldk.NewPersistedConfigWithChainSource(...): %w", err)
 		}
+		persistedConfig.TorOnly = torOnly
+		persistedConfig.TorProxyAddress = torProxyAddress
+		if err := persistedConfig.Validate(); err != nil {
+			return ldk.PersistedConfig{}, fmt.Errorf("persistedConfig.Validate(): %w", err)
+		}
 
 		return persistedConfig, nil
 	default:
@@ -144,9 +171,17 @@ func parseLDKPersistedConfig(c *gin.Context, existingConfig ldk.PersistedConfig,
 }
 
 func ldkConfigsEqual(current ldk.PersistedConfig, incoming ldk.PersistedConfig) bool {
+	if (current.TorProxyAddress == nil) != (incoming.TorProxyAddress == nil) {
+		return false
+	}
+	if current.TorProxyAddress != nil && *current.TorProxyAddress != *incoming.TorProxyAddress {
+		return false
+	}
+
 	return current.ChainSourceType == incoming.ChainSourceType &&
 		current.ElectrumServerURL == incoming.ElectrumServerURL &&
 		current.EsploraServerURL == incoming.EsploraServerURL &&
+		current.TorOnly == incoming.TorOnly &&
 		current.Rpc.Address == incoming.Rpc.Address &&
 		current.Rpc.Port == incoming.Rpc.Port &&
 		current.Rpc.Username == incoming.Rpc.Username &&

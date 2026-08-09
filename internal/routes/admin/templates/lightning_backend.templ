@@ -146,6 +146,8 @@ type LDKFormValues struct {
 	Password          string
 	ElectrumServerURL string
 	EsploraServerURL  string
+	TorOnly           bool
+	TorProxyAddress   string
 }
 
 templ SetupForms(lightningBackend string, config utils.Config, resources LDKResourceSnapshot, ldkForm LDKFormValues) {
@@ -243,6 +245,15 @@ templ Ldk(form LDKFormValues, resources LDKResourceSnapshot) {
 					</label>
 				</div>
 			</div>
+			<label for="TOR_ONLY" class="settings-input-checkbox nostr-toggle-checkbox">
+				<input id="TOR_ONLY" type="checkbox" name="TOR_ONLY" value="true" checked?={ form.TorOnly }/>
+				Tor only
+				<small style="display: block; font-weight: normal;">Require all connections over Tor. Chain-source and peer addresses must be .onion v3 or localhost.</small>
+			</label>
+			<label for="TOR_PROXY_ADDRESS" class="settings-input" style="flex: 1 1 100%; min-width: 280px;">
+				Tor SOCKS Proxy Address (optional — used for .onion connections)
+				<input id="TOR_PROXY_ADDRESS" type="text" name="TOR_PROXY_ADDRESS" value={ form.TorProxyAddress } placeholder="127.0.0.1:9050"/>
+			</label>
 			if form.ChainSourceType == string(ldk.ChainSourceElectrum) {
 				<input type="hidden" name="BITCOIN_NODE_RPC_ADDRESS" value={ form.Address }/>
 				<input type="hidden" name="BITCOIN_NODE_RPC_PORT" value={ form.Port }/>
