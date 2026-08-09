@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -21,9 +22,13 @@ import (
 
 const AdminAuthKey = "admin-cookie"
 
-func handleUnauthorized(c *gin.Context) {
+// sessionTTL is the admin session lifetime, used for both the JWT exp claim
+// and the cookie maxAge so browser and server agree.
+const sessionTTL = time.Hour
+
+func handleUnauthorized(c *gin.Context, secure bool) {
 	slog.Debug("Handling unauthorized request", slog.String("path", c.Request.URL.Path), slog.String("method", c.Request.Method))
-	c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
+	c.SetCookie(AdminAuthKey, "", -1, "/", "", secure, true)
 	if c.GetHeader("HX-Request") == "true" {
 		c.Header("HX-Redirect", "/admin/login")
 		c.Status(http.StatusOK) // HTMX expects 200 for redirects
@@ -33,7 +38,7 @@ func handleUnauthorized(c *gin.Context) {
 	c.Abort()
 }
 
-func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
+func AuthMiddleware(secret []byte, blacklist *TokenBlacklist, secure bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cookie, err := c.Cookie(AdminAuthKey)
 		if err != nil {
@@ -41,14 +46,14 @@ func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 			if c.Request.URL.Path == "/admin/login" {
 				return
 			}
-			handleUnauthorized(c)
+			handleUnauthorized(c, secure)
 			return
 		}
 
 		// Check if token is blacklisted first
 		if blacklist.IsTokenBlacklisted(cookie) {
 			slog.Debug("Token is blacklisted")
-			handleUnauthorized(c)
+			handleUnauthorized(c, secure)
 			return
 		}
 
@@ -66,13 +71,13 @@ func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 				"jwt.Parse(cookie)",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)
-			handleUnauthorized(c)
+			handleUnauthorized(c, secure)
 			return
 		}
 
 		if !token.Valid {
 			slog.Debug("token is not valid", slog.Any("token", token))
-			handleUnauthorized(c)
+			handleUnauthorized(c, secure)
 			return
 		}
 
@@ -91,7 +96,7 @@ func AuthMiddleware(secret []byte, blacklist *TokenBlacklist) gin.HandlerFunc {
 
 var ErrIncorrectNpub = errors.New("incorrect npub used in signature")
 
-func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey *btcec.PublicKey) gin.HandlerFunc {
+func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey *btcec.PublicKey, secure bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if adminNostrPubkey == nil {
 			slog.Error("adminNostrPubkey is nil. this should have never happened")
@@ -204,14 +209,18 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 			return
 		}
 
-		c.SetCookie(AdminAuthKey, token, 3600, "/", "", false, true)
+		c.SetCookie(AdminAuthKey, token, int(sessionTTL.Seconds()), "/", "", secure, true)
 		c.Header("HX-Redirect", "/admin")
 		c.JSON(200, nil)
 	}
 }
 
 func makeJWTToken(secret []byte) (string, error) {
-	token := jwt.New(jwt.SigningMethodHS256)
+	now := time.Now()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{ //nolint:exhaustruct // only iat/exp are meaningful for an admin session
+		IssuedAt:  jwt.NewNumericDate(now),
+		ExpiresAt: jwt.NewNumericDate(now.Add(sessionTTL)),
+	})
 	string, err := token.SignedString(secret)
 	if err != nil {
 		return "", fmt.Errorf("token.SignedString(secret) %w", err)

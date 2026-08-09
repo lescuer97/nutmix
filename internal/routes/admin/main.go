@@ -79,7 +79,7 @@ func RenderSuccess(c *gin.Context, message string) error {
 //go:embed static/dist/js/*.js static/dist/js/modules/*.js static/dist/css/*.css
 var staticEmbed embed.FS
 
-func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
+func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, secureCookie bool) {
 	// Create a file server for the embedded static files
 	// The embed contains files at: static/dist/js/*.js and static/dist/css/*.css
 	// We need to serve them at /js and /css routes
@@ -141,7 +141,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 
 	adminRoute.Use(ErrorHtmlMessageMiddleware())
 	// I use the first active keyset as secret for jwt token signing
-	adminRoute.Use(AuthMiddleware(loginKey.Serialize(), tokenBlacklist))
+	adminRoute.Use(AuthMiddleware(loginKey.Serialize(), tokenBlacklist, secureCookie))
 
 	adminHandler := newAdminHandler(mint)
 
@@ -179,7 +179,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 
 		// change routes
 		// nolint: contextcheck
-		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey))
+		adminRoute.POST("/login", LoginPost(mint, loginKey, nostrPubkey, secureCookie))
 		// nolint: contextcheck
 		adminRoute.POST("/mintsettings/general", MintSettingsGeneral(mint))
 		// nolint: contextcheck
@@ -198,7 +198,7 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint) {
 		// nolint: contextcheck
 		adminRoute.POST("/rotate/sats", RotateSatsSeed(&adminHandler))
 		// nolint: contextcheck
-		adminRoute.POST("/logout", LogoutHandler(tokenBlacklist))
+		adminRoute.POST("/logout", LogoutHandler(tokenBlacklist, secureCookie))
 
 		// fractional html components
 		// nolint: contextcheck

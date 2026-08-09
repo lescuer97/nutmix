@@ -9,7 +9,7 @@ import (
 )
 
 // LogoutHandler handles user logout requests
-func LogoutHandler(blacklist *TokenBlacklist) gin.HandlerFunc {
+func LogoutHandler(blacklist *TokenBlacklist, secure bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract token from cookie
 		tokenString, err := c.Cookie(AdminAuthKey)
@@ -44,7 +44,7 @@ func LogoutHandler(blacklist *TokenBlacklist) gin.HandlerFunc {
 		blacklist.AddToken(tokenString, expirationTime)
 
 		// Clear the cookie
-		c.SetCookie(AdminAuthKey, "", -1, "/", "", false, true)
+		c.SetCookie(AdminAuthKey, "", -1, "/", "", secure, true)
 
 		// Send redirect to login page
 		if c.GetHeader("HX-Request") == "true" {

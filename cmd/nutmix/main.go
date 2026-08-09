@@ -158,7 +158,9 @@ func main() {
 
 	routes.V1Routes(r, mint)
 
-	admin.AdminRoutes(appCtx, r, mint)
+	// Admin session cookies are Secure by default; ADMIN_INSECURE_COOKIE=true
+	// disables the flag for local development over plain HTTP.
+	admin.AdminRoutes(appCtx, r, mint, os.Getenv("ADMIN_INSECURE_COOKIE") != "true")
 
 	PORT = ":8081"
 	PORTStr := os.Getenv("PORT")
