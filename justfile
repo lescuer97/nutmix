@@ -56,11 +56,11 @@ build-dev: gen-proto gen-templ web-build-dev
     set -euo pipefail
     echo "Building {{APP_NAME}} v{{VERSION}}..."
     mkdir -p {{BUILD_DIR}}
-    go build -ldflags="-s -w \
-        -X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
+    go build -gcflags="all=-N -l" \
+        -ldflags="-X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
         -X '{{MODULE}}/internal/utils.BuildTime={{BUILD_TIME}}' \
         -X '{{MODULE}}/internal/utils.GitCommit={{COMMIT_HASH}}'" \
-        -trimpath -o {{BUILD_DIR}}/{{APP_NAME}} cmd/nutmix/*.go
+        -o {{BUILD_DIR}}/{{APP_NAME}} cmd/nutmix/*.go
 
 # Dependencies recipe
 install-deps:
