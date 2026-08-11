@@ -196,6 +196,7 @@ templ LdkOnchainSendPanel(availableSats uint64) {
 		<form
 			class="form-group mt-4"
 			hx-post="/admin/ldk/onchain/send"
+			hx-confirm="Send this on-chain payment? This action cannot be reversed."
 			hx-target="#ldk-action-panel"
 			hx-swap="outerHTML"
 		>

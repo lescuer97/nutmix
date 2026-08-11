@@ -4,17 +4,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"time"
 
 	ldk_node "github.com/lescuer97/ldkgo/bindings/ldk_node_ffi"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lightningnetwork/lnd/zpay32"
-)
-
-const (
-	outboundPaymentWaitTimeout  = 30 * time.Second
-	outboundPaymentPollInterval = 200 * time.Millisecond
 )
 
 func (l *LDK) PayInvoice(meltQuote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
@@ -77,7 +71,7 @@ func (l *LDK) PayInvoice(meltQuote cashu.MeltRequestDB, zpayInvoice *zpay32.Invo
 	}
 	response.Rhash = ldkInvoice.PaymentHash()
 
-	status, preimage, fee, err := l.waitForOutboundPayment(zpayInvoice, response.CheckingId, outboundPaymentWaitTimeout)
+	status, preimage, fee, err := l.checkOutboundPaymentStatus(zpayInvoice, response.CheckingId)
 	if err != nil {
 		return response, err
 	}
@@ -86,30 +80,6 @@ func (l *LDK) PayInvoice(meltQuote cashu.MeltRequestDB, zpayInvoice *zpay32.Invo
 	response.Preimage = preimage
 	response.PaidFee = fee
 	return response, nil
-}
-
-func (l *LDK) waitForOutboundPayment(invoice *zpay32.Invoice, checkingID string, timeout time.Duration) (PaymentStatus, string, cashu.Amount, error) {
-	status, preimage, fee, err := l.checkOutboundPaymentStatus(invoice, checkingID)
-	if err != nil {
-		return UNKNOWN, "", cashu.Amount{}, err
-	}
-	if status != PENDING || timeout <= 0 {
-		return status, preimage, fee, nil
-	}
-
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		time.Sleep(outboundPaymentPollInterval)
-		status, preimage, fee, err = l.checkOutboundPaymentStatus(invoice, checkingID)
-		if err != nil {
-			return UNKNOWN, "", cashu.Amount{}, err
-		}
-		if status != PENDING {
-			return status, preimage, fee, nil
-		}
-	}
-
-	return status, preimage, fee, nil
 }
 
 func (l *LDK) buildRouteParameters(node *ldk_node.Node, feeReserve cashu.Amount, mpp bool) (*ldk_node.RouteParametersConfig, error) {
@@ -149,7 +119,7 @@ func (l *LDK) buildRouteParameters(node *ldk_node.Node, feeReserve cashu.Amount,
 }
 
 func (l *LDK) CheckPayed(quote string, invoice *zpay32.Invoice, checkingID string) (PaymentStatus, string, cashu.Amount, error) {
-	return l.waitForOutboundPayment(invoice, checkingID, outboundPaymentWaitTimeout)
+	return l.checkOutboundPaymentStatus(invoice, checkingID)
 }
 
 func (l *LDK) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {

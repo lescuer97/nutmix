@@ -141,6 +141,16 @@ func TestPaymentStatusFromDetailsNilFeePaidMsat(t *testing.T) {
 	}
 }
 
+func TestPaymentStatusFromDetailsMissingIsPending(t *testing.T) {
+	status, preimage, fee, err := paymentStatusFromDetails(nil)
+	if err != nil {
+		t.Fatalf("paymentStatusFromDetails(nil) error = %v", err)
+	}
+	if status != PENDING || preimage != "" || fee.Amount != 0 || fee.Unit != cashu.Msat {
+		t.Fatalf("paymentStatusFromDetails(nil) = %v, %q, %+v; want pending with zero msat fee", status, preimage, fee)
+	}
+}
+
 func TestJitBolt11PaymentBehavior(t *testing.T) {
 	preimage := "jit-preimage"
 	skimmedFee := uint64(100)

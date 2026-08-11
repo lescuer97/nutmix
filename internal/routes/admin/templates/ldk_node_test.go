@@ -339,6 +339,7 @@ func TestLdkOnchainSendFormFragmentUsesActionPanelRoot(t *testing.T) {
 		"Send on-chain",
 		"Bitcoin address",
 		"/admin/ldk/onchain/send",
+		"hx-confirm=\"Send this on-chain payment? This action cannot be reversed.\"",
 		"hx-target=\"#ldk-action-panel\"",
 		"hx-disabled-elt=\"this\"",
 		"9500 sats",
