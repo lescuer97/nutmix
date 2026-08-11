@@ -23,6 +23,10 @@ type Postgresql struct {
 	pool *pgxpool.Pool
 }
 
+func (pql Postgresql) Pool() *pgxpool.Pool {
+	return pql.pool
+}
+
 func databaseError(err error) error {
 	return errors.Join(ErrDB, err)
 }

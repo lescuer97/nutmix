@@ -10,11 +10,11 @@ templ head() {
 	</head>
 }
 
-templ Layout(route string, backendEndOfLife bool) {
+templ Layout(route string, backendEndOfLife bool, showLDKNodeLink bool) {
 	<!DOCTYPE html>
 	<html lang="en">
 		@head()
-		@Header()
+		@Header(showLDKNodeLink)
 		<body data-route={ route }>
 			<div hx-ext="remove-me" id="notifications"></div>
 			if backendEndOfLife {

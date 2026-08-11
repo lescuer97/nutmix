@@ -1,11 +1,13 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM golang:alpine3.22 AS builder
+FROM --platform=$BUILDPLATFORM golang:bookworm AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
 
-# Install build dependencies
-RUN apk add --no-cache protobuf curl unzip bash git
+# Install build dependencies using apt-get
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    protobuf-compiler curl unzip bash git build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install just
 RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
