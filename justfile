@@ -8,7 +8,7 @@ BUILD_DIR := "build"
 RUN_ARGS := ""  # Additional arguments for running the app locally
 RELEASE_DIR := "release"
 
-PLATFORMS := "linux/amd64 linux/arm64 darwin/arm64"
+PLATFORMS := "linux/amd64"
 # Read current version from VERSION file
 MODULE := "github.com/lescuer97/nutmix"
 VERSION := `cat VERSION 2>/dev/null || echo "0.0.0"`
