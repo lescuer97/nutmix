@@ -132,7 +132,7 @@ require (
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/lescuer97/ldkgo v0.0.0-20260713075220-08111e600be5 // indirect
+	github.com/lescuer97/ldkgo v0.0.0-20260809213440-674bde65ffba // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/lightninglabs/gozmq v0.0.0-20191113021534-d20a764486bf // indirect
 	github.com/lightninglabs/neutrino v0.16.1 // indirect
