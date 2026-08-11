@@ -106,13 +106,13 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 		// parse data for login
 		slog.Debug("Attempting log in")
 		var nostrEvent nostr.Event
-		err := c.BindJSON(&nostrEvent)
+		err := utils.DecodeJSONV2(c, &nostrEvent)
 		if err != nil {
 			slog.Debug(
 				"Incorrect body",
 				slog.String(utils.LogExtraInfo, err.Error()),
 			)
-			c.JSON(400, "Malformed body request")
+			utils.JSON(c, 400, "Malformed body request")
 			return
 		}
 		ctx := c.Request.Context()
@@ -160,7 +160,7 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 		}
 
 		if nostrLogin.Activated {
-			c.JSON(403, "This login value was already used, please reload the page")
+			utils.JSON(c, 403, "This login value was already used, please reload the page")
 			return
 		}
 
@@ -211,7 +211,7 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 
 		c.SetCookie(AdminAuthKey, token, int(sessionTTL.Seconds()), "/", "", secure, true)
 		c.Header("HX-Redirect", "/admin")
-		c.JSON(200, nil)
+		utils.JSON(c, 200, nil)
 	}
 }
 

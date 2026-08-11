@@ -1,5 +1,6 @@
 # Environment variables
 export PATH := env_var("PATH") + ":" + `go env GOPATH` + "/bin"
+export GOEXPERIMENT := "jsonv2"
 
 # Variables
 APP_NAME := "nutmix"
