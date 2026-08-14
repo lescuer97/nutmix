@@ -3,13 +3,18 @@ package postgresql
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/internal/database"
 )
 
 func (pql Postgresql) SaveNostrAuth(auth database.NostrLoginAuth) error {
-	_, err := pql.pool.Exec(context.Background(), "INSERT INTO nostr_login (nonce, expiry , activated) VALUES ($1, $2, $3)", auth.Nonce, auth.Expiry, auth.Activated)
+	_, err := pql.pool.Exec(context.Background(), "DELETE FROM nostr_login WHERE expiry < $1", time.Now().Unix())
+	if err != nil {
+		return databaseError(fmt.Errorf("deleting expired nostr logins: %w", err))
+	}
+	_, err = pql.pool.Exec(context.Background(), "INSERT INTO nostr_login (nonce, expiry , activated) VALUES ($1, $2, $3)", auth.Nonce, auth.Expiry, auth.Activated)
 	if err != nil {
 		return databaseError(fmt.Errorf("inserting to nostr_login: %w", err))
 	}

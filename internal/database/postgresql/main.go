@@ -493,9 +493,14 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSig
 	tries := 0
 
 	for _, sig := range recover_sigs {
-		dleq_e_bytes := sig.Dleq.E.Key.Bytes()
-		dleq_s_bytes := sig.Dleq.S.Key.Bytes()
-		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, dleq_e_bytes[:], dleq_s_bytes[:]})
+		var dleq_e_bytes, dleq_s_bytes []byte
+		if sig.Dleq != nil {
+			dleq_e := sig.Dleq.E.Key.Bytes()
+			dleq_s := sig.Dleq.S.Key.Bytes()
+			dleq_e_bytes = dleq_e[:]
+			dleq_s_bytes = dleq_s[:]
+		}
+		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, dleq_e_bytes, dleq_s_bytes})
 	}
 
 	for {

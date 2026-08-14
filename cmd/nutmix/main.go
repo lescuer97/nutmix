@@ -127,7 +127,9 @@ func main() {
 
 	store := persistence.NewInMemoryStore(45 * time.Minute)
 
-	r.Use(middleware.CacheMiddleware(store))
+	r.Use(middleware.CacheMiddleware(store, func() bool {
+		return mint.Config.MINT_REQUIRE_AUTH
+	}))
 
 	// Add per-request timeout middleware (sets context deadline for handlers)
 	r.Use(middleware.TimeoutMiddleware(90 * time.Second))

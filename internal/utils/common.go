@@ -3,11 +3,11 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
-	"os"
 )
 
 const ConfigFileName string = "config.toml"
@@ -26,18 +26,20 @@ const CLNGRPC LightningBackend = "ClnGrpcWallet"
 // Deprecated: Strike backend will be removed in v0.7.0.
 const Strike LightningBackend = "Strike"
 
-func StringToLightningBackend(text string) LightningBackend {
+var ErrUnknownLnBackedn = errors.New("LN backend is not known")
+
+func StringToLightningBackend(text string) (LightningBackend, error) {
 	switch text {
 	case string(FAKE_WALLET):
-		return FAKE_WALLET
+		return FAKE_WALLET, nil
 	case string(LNDGRPC):
-		return LNDGRPC
+		return LNDGRPC, nil
 	case string(LNBITS):
-		return LNBITS
+		return LNBITS, nil
 	case string(Strike):
-		return Strike
+		return Strike, nil
 	default:
-		return FAKE_WALLET
+		return FAKE_WALLET, ErrUnknownLnBackedn
 	}
 }
 
@@ -119,27 +121,6 @@ func (c *Config) Default() {
 	c.STRIKE_KEY = ""
 }
 
-func (c *Config) UseEnviromentVars() {
-	c.NAME = os.Getenv("NAME")
-	c.DESCRIPTION = os.Getenv("DESCRIPTION")
-	c.IconUrl = nil
-	c.TosUrl = nil
-	c.DESCRIPTION_LONG = os.Getenv("DESCRIPTION_LONG")
-	c.MOTD = os.Getenv("MOTD")
-	c.EMAIL = os.Getenv("EMAIL")
-	c.NOSTR = os.Getenv("NOSTR")
-
-	c.NETWORK = os.Getenv("NETWORK")
-
-	c.MINT_LIGHTNING_BACKEND = StringToLightningBackend(os.Getenv("MINT_LIGHTNING_BACKEND"))
-
-	c.LND_GRPC_HOST = os.Getenv("LND_GRPC_HOST")
-	c.LND_TLS_CERT = os.Getenv("LND_TLS_CERT")
-	c.LND_MACAROON = os.Getenv("LND_MACAROON")
-
-	c.MINT_LNBITS_ENDPOINT = os.Getenv("MINT_LNBITS_ENDPOINT")
-	c.MINT_LNBITS_KEY = os.Getenv("MINT_LNBITS_KEY")
-}
 func RandomHash() (string, error) {
 	// Create a byte slice of 30 random bytes
 	randomBytes := make([]byte, 30)

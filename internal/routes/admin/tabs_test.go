@@ -2,6 +2,7 @@ package admin
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -226,6 +227,13 @@ func TestMintSettingsNotificationsTestRequiresEnabledNotifications(t *testing.T)
 
 func TestMintSettingsNotificationsTestWritesSuccessNotification(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	logHandler := &recordingSlogHandler{err: nil, records: nil}
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(logHandler))
+	t.Cleanup(func() {
+		slog.SetDefault(previousLogger)
+	})
+
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 
@@ -254,6 +262,21 @@ func TestMintSettingsNotificationsTestWritesSuccessNotification(t *testing.T) {
 	body := recorder.Body.String()
 	if !strings.Contains(body, "Test error log has been written") {
 		t.Fatalf("expected success notification in response, got %q", body)
+	}
+
+	if len(logHandler.records) != 1 {
+		t.Fatalf("expected one test notification log, got %d", len(logHandler.records))
+	}
+	record := logHandler.records[0]
+	if record.Level != slog.LevelError || record.Message != "nostr test notification trigger" {
+		t.Fatalf("unexpected test notification record: level=%v message=%q", record.Level, record.Message)
+	}
+	payload, ok := notificationPayload(record)
+	if !ok {
+		t.Fatal("expected test endpoint to emit an allow-listed notification event")
+	}
+	if !strings.Contains(payload, "event=test") {
+		t.Fatalf("unexpected test notification payload %q", payload)
 	}
 }
 

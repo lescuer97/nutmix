@@ -421,7 +421,7 @@ func TestSaveProofAndGetBySecretCurve_ValidPubkey(t *testing.T) {
 	}
 }
 
-func TestSaveRestoreSigsAndGet_ValidPubkeys(t *testing.T) {
+func TestSaveRestoreSigsAndGet_WithoutDLEQ(t *testing.T) {
 	db, ctx := setupTestDB(t)
 
 	// Create valid public keys for B_ and C_ fields (using different keys)
@@ -448,20 +448,12 @@ func TestSaveRestoreSigsAndGet_ValidPubkeys(t *testing.T) {
 	}
 	wrappedC := cashu.WrappedPublicKey{PublicKey: c_Pubkey}
 
-	// Create DLEQ with valid private keys (using dummy 32-byte values)
-	eBytes, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000001")
-	sBytes, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000002")
-	dleq := &cashu.BlindSignatureDLEQ{
-		E: secp256k1.PrivKeyFromBytes(eBytes),
-		S: secp256k1.PrivKeyFromBytes(sBytes),
-	}
-
 	now := time.Now().Unix()
 
 	recoverSig := cashu.RecoverSigDB{
 		B_:        wrappedB,
 		C_:        wrappedC,
-		Dleq:      dleq,
+		Dleq:      nil,
 		Id:        "test_keyset_id",
 		MeltQuote: "",
 		Amount:    100,
@@ -502,6 +494,9 @@ func TestSaveRestoreSigsAndGet_ValidPubkeys(t *testing.T) {
 	}
 
 	retrievedSig := sigs[0]
+	if retrievedSig.Dleq != nil {
+		t.Fatal("Dleq should be nil after retrieval")
+	}
 
 	// Verify the B_ (WrappedPublicKey) field matches
 	if retrievedSig.B_.PublicKey == nil {

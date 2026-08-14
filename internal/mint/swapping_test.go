@@ -3,6 +3,7 @@ package mint
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"testing"
 
@@ -12,6 +13,29 @@ import (
 	"github.com/lescuer97/nutmix/internal/signer"
 	internalutils "github.com/lescuer97/nutmix/internal/utils"
 )
+
+type fixedKeysetSigner struct {
+	signer.Signer
+	keysets signer.GetKeysetsResponse
+}
+
+func (s fixedKeysetSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
+	return s.keysets, nil
+}
+
+func TestValidateSwapBalanceRejectsModularBypass(t *testing.T) {
+	keyset := cashu.BasicKeysetResponse{Id: "keyset", Unit: cashu.Sat.String(), InputFeePpk: 1000}                            //nolint:exhaustruct // only balance fields matter
+	mint := Mint{Signer: fixedKeysetSigner{keysets: signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{keyset}}}} //nolint:exhaustruct // only signer is reached
+	request := cashu.PostSwapRequest{
+		Inputs:  cashu.Proofs{{Id: keyset.Id, Amount: 0}},                       //nolint:exhaustruct // only balance fields matter
+		Outputs: cashu.BlindedMessages{{Id: keyset.Id, Amount: math.MaxUint64}}, //nolint:exhaustruct // only balance fields matter
+	}
+
+	err := mint.validateSwapBalanceAndUnits(request)
+	if !errors.Is(err, cashu.ErrUnbalanced) || !errors.Is(err, cashu.ErrAmountOverflow) {
+		t.Fatalf("validateSwapBalanceAndUnits() error = %v, want unbalanced amount overflow", err)
+	}
+}
 
 type swapFailingDB struct {
 	database.MintDB

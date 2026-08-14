@@ -12,6 +12,8 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
 
+const maxSpendConditionTagKeys = 10
+
 var (
 	ErrInvalidSpendCondition         = errors.New("invalid spend condition")
 	ErrConvertSpendConditionToString = errors.New("failed to convert spend condition to string")
@@ -74,7 +76,7 @@ func (sc *SpendCondition) String() (string, error) {
 }
 
 func (sc *SpendCondition) CheckValid() error {
-	if len(sc.Data.Tags.Pubkeys)+len(sc.Data.Tags.Refund) > 10 {
+	if len(sc.Data.Tags.Pubkeys)+len(sc.Data.Tags.Refund) > maxSpendConditionTagKeys {
 		return ErrInvalidSpendCondition
 	}
 
@@ -171,7 +173,7 @@ type TagsInfo struct {
 	Refund      []*btcec.PublicKey
 	Sigflag     SigFlag
 	NSigs       uint
-	Locktime    uint
+	Locktime    uint64
 	NSigRefund  uint
 }
 
@@ -202,7 +204,7 @@ func (tags *TagsInfo) MarshalJSON() ([]byte, error) {
 
 	// Add locktime if set
 	if tags.Locktime > 0 {
-		result = append(result, []string{"locktime", strconv.FormatUint(uint64(tags.Locktime), 10)})
+		result = append(result, []string{"locktime", strconv.FormatUint(tags.Locktime, 10)})
 	}
 
 	// Add refund pubkeys if present
@@ -329,7 +331,7 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
 			}
 
-			tags.Locktime = uint(locktime)
+			tags.Locktime = locktime
 		}
 	}
 	tags.originalTag = string(b)
@@ -488,6 +490,9 @@ func (wit *Witness) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return fmt.Errorf("json.Unmarshal(b, &info): %w", err)
 	}
+	if len(sigs.Signatures) > maxSpendConditionTagKeys+1 {
+		return fmt.Errorf("too many witness signatures: %w", ErrInvalidSpendCondition)
+	}
 
 	witness := Witness{
 		Signatures: make([]*schnorr.Signature, 0),
@@ -540,6 +545,9 @@ func checkForSigAll(proofs Proofs) (SigflagValidation, error) {
 		}
 		if isLocked && spendCondition != nil {
 			if spendCondition.Data.Tags.Sigflag == SigAll {
+				if err := spendCondition.CheckValid(); err != nil {
+					return SigflagValidation{}, fmt.Errorf("spendCondition.CheckValid(). %w", err)
+				}
 				sigflagValidation.sigFlag = SigAll
 				sigflagValidation.proofType = spendCondition.Type
 				if spendCondition.Type == P2PK {

@@ -728,7 +728,10 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 
 	config, nostrNotificationConfig, err := mint.SetUpConfigDB(ctx, db)
 
-	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	config.MINT_LIGHTNING_BACKEND, err = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	if err != nil {
+		log.Fatal("utils.StringToLightningBackend", err)
+	}
 
 	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
 	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
@@ -775,7 +778,10 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 
 	config, nostrNotificationConfig, err := mint.SetUpConfigDB(ctx, &db)
 
-	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	config.MINT_LIGHTNING_BACKEND, err = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	if err != nil {
+		log.Fatal("utils.StringToLightningBackend", err)
+	}
 
 	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
 	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)

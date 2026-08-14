@@ -15,12 +15,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
+	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 )
 
 const AdminAuthKey = "admin-cookie"
+
+const adminLoginEventKind = 27235
+const adminLoginChallengeTTL = 15 * time.Minute
+const adminLoginFutureSkew = time.Minute
 
 // sessionTTL is the admin session lifetime, used for both the JWT exp claim
 // and the cookie maxAge so browser and server agree.
@@ -96,6 +101,14 @@ func AuthMiddleware(secret []byte, blacklist *TokenBlacklist, secure bool) gin.H
 
 var ErrIncorrectNpub = errors.New("incorrect npub used in signature")
 
+func validNostrLoginEvent(event nostr.Event, login database.NostrLoginAuth, now time.Time) bool {
+	createdAt := time.Unix(int64(event.CreatedAt), 0)
+	return event.Kind == adminLoginEventKind &&
+		int64(login.Expiry) >= now.Unix() &&
+		!createdAt.Before(now.Add(-adminLoginChallengeTTL)) &&
+		!createdAt.After(now.Add(adminLoginFutureSkew))
+}
+
 func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey *btcec.PublicKey, secure bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if adminNostrPubkey == nil {
@@ -161,6 +174,10 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 
 		if nostrLogin.Activated {
 			c.JSON(403, "This login value was already used, please reload the page")
+			return
+		}
+		if !validNostrLoginEvent(nostrEvent, nostrLogin, time.Now()) {
+			c.JSON(403, "Invalid or expired login challenge, please reload the page")
 			return
 		}
 

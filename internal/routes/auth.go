@@ -1,10 +1,12 @@
 package routes
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -72,14 +74,8 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		amountBlindMessages := uint64(0)
-
-		for _, blindMessage := range mintRequest.Outputs {
-			amountBlindMessages += blindMessage.Amount
-			// check all blind messages have the same unit
-		}
-
-		if amountBlindMessages > mint.Config.MINT_AUTH_MAX_BLIND_TOKENS {
+		amountBlindMessages, amountErr := mintRequest.Outputs.Amount()
+		if amountErr != nil || amountBlindMessages > mint.Config.MINT_AUTH_MAX_BLIND_TOKENS {
 			slog.Warn("Trying to mint auth tokens over the limit")
 			c.JSON(400, cashu.ErrorCodeToResponse(cashu.MAXIMUM_BAT_MINT_LIMIT_EXCEEDED, nil))
 			return
@@ -90,11 +86,9 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			if err != nil {
-				rollbackErr := mint.MintDB.Rollback(c.Request.Context(), tx)
-				if rollbackErr != nil {
-					slog.Warn("rollback error", slog.Any("error", rollbackErr))
-				}
+			rollbackErr := mint.MintDB.Rollback(c.Request.Context(), tx)
+			if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+				slog.Warn("rollback error", slog.Any("error", rollbackErr))
 			}
 		}()
 

@@ -2,6 +2,8 @@ package cashu_test
 
 import (
 	"encoding/hex"
+	"errors"
+	"math"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
@@ -46,6 +48,16 @@ func TestOrderKeysetByUnit(t *testing.T) {
 
 	if firstOrdKey.Keys["1"] != "03a524f43d6166ad3567f18b0a5c769c6ab4dc02149f4d5095ccf4e8ffa293e785" {
 		t.Errorf("keyset is not correct. %v", firstOrdKey.Keys["1"])
+	}
+}
+
+func TestFeesRejectsRoundingOverflow(t *testing.T) {
+	proofs := []cashu.Proof{{Id: "keyset"}}                                                 //nolint:exhaustruct // fees only use the keyset ID
+	keysets := []cashu.BasicKeysetResponse{{Id: "keyset", InputFeePpk: uint(math.MaxUint)}} //nolint:exhaustruct // fees only use ID and rate
+
+	_, err := cashu.Fees(proofs, keysets)
+	if !errors.Is(err, cashu.ErrAmountOverflow) {
+		t.Fatalf("Fees() error = %v, want ErrAmountOverflow", err)
 	}
 }
 

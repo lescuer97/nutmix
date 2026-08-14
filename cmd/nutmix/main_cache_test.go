@@ -17,13 +17,21 @@ func TestCacheMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	store := persistence.NewInMemoryStore(1 * time.Minute)
+	requireAuth := false
 
 	handerCallCount := 0
+	downstreamMiddlewareCallCount := 0
 	mutex := &sync.Mutex{}
 
 	r := gin.New()
 
-	r.Use(middleware.CacheMiddleware(store))
+	r.Use(middleware.CacheMiddleware(store, func() bool { return requireAuth }))
+	r.Use(func(c *gin.Context) {
+		mutex.Lock()
+		downstreamMiddlewareCallCount++
+		mutex.Unlock()
+		c.Next()
+	})
 
 	r.POST("/v1/swap", func(c *gin.Context) {
 		mutex.Lock()
@@ -96,6 +104,30 @@ func TestCacheMiddleware(t *testing.T) {
 		}
 		if handerCallCount != 2 {
 			t.Errorf("Expected handler to be called twice, got %d", handerCallCount)
+		}
+	})
+
+	t.Run("bypasses an existing cache entry when auth is enabled", func(t *testing.T) {
+		requireAuth = false
+		handerCallCount = 0
+		downstreamMiddlewareCallCount = 0
+
+		body := `{"key":"auth-enabled"}`
+
+		req1, _ := http.NewRequest("POST", "/v1/swap", bytes.NewBufferString(body))
+		w1 := httptest.NewRecorder()
+		r.ServeHTTP(w1, req1)
+
+		requireAuth = true
+		req2, _ := http.NewRequest("POST", "/v1/swap", bytes.NewBufferString(body))
+		w2 := httptest.NewRecorder()
+		r.ServeHTTP(w2, req2)
+
+		if handerCallCount != 2 {
+			t.Errorf("Expected handler to be called twice, got %d", handerCallCount)
+		}
+		if downstreamMiddlewareCallCount != 2 {
+			t.Errorf("Expected downstream middleware to be called twice, got %d", downstreamMiddlewareCallCount)
 		}
 	})
 }

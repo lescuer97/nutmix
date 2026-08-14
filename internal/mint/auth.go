@@ -23,11 +23,9 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 		return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if err != nil {
-			rollbackErr := m.MintDB.Rollback(ctx, tx)
-			if rollbackErr != nil {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
+		rollbackErr := m.MintDB.Rollback(ctx, tx)
+		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("rollback error", slog.Any("error", rollbackErr))
 		}
 	}()
 
@@ -102,11 +100,9 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 		return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if err != nil {
-			rollbackErr := m.MintDB.Rollback(ctx, tx)
-			if rollbackErr != nil {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
+		rollbackErr := m.MintDB.Rollback(ctx, tx)
+		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("rollback error", slog.Any("error", rollbackErr))
 		}
 	}()
 
@@ -115,7 +111,7 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 		return fmt.Errorf("m.MintDB.GetProofsFromSecretCurve(tx, []string{y} ). %w", err)
 	}
 	if len(proofsList) > 0 {
-		return fmt.Errorf("authProof already used. %w", err)
+		return errors.New("authProof already used")
 	}
 
 	proof := authProof.Proof(y, cashu.PROOF_PENDING)

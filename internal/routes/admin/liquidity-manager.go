@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
@@ -475,16 +476,12 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 				} else {
 					_ = c.Error(fmt.Errorf("rolling back because of failure: %v", p))
 				}
-				rollbackErr := mint.MintDB.Rollback(ctx, tx)
-				if rollbackErr != nil {
-					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
-				}
 			} else if err != nil {
 				_ = c.Error(fmt.Errorf("rolling back because of failure: %w", err))
-				rollbackErr := mint.MintDB.Rollback(ctx, tx)
-				if rollbackErr != nil {
-					slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
-				}
+			}
+			rollbackErr := mint.MintDB.Rollback(ctx, tx)
+			if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+				slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
 			}
 		}()
 
@@ -581,6 +578,12 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 			_ = c.Error(fmt.Errorf("mint.MintDB.GetTx(). %w", err))
 			return
 		}
+		defer func() {
+			rollbackErr := mint.MintDB.Rollback(ctx, txSwap)
+			if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+				slog.Warn("Failed to rollback transaction", slog.Any("error", rollbackErr))
+			}
+		}()
 
 		swapRequest, err = mint.MintDB.GetLiquiditySwapById(txSwap, swapId)
 		if err != nil {

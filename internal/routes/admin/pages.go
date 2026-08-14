@@ -35,7 +35,7 @@ func LoginPage(mint *mint.Mint, adminNostrKeyAvailable bool) gin.HandlerFunc {
 
 		nostrLogin := database.NostrLoginAuth{
 			Nonce:     nonce,
-			Expiry:    int(cashu.ExpiryTimeMinUnit(15)),
+			Expiry:    int(time.Now().Add(adminLoginChallengeTTL).Unix()),
 			Activated: false,
 		}
 

@@ -3,7 +3,9 @@ package mint
 import (
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
@@ -61,7 +63,6 @@ func TestRemoveWatchDoesNotCloseSameProofChannelTwice(t *testing.T) {
 	observer.AddProofWatch("filter-2", ProofWatchChannel{SubId: "same-sub", Channel: sharedProofChan2})
 	observer.AddProofWatch("filter-1", ProofWatchChannel{SubId: "other-sub", Channel: otherProofChan})
 
-
 	observer.RemoveWatch("same-sub")
 
 	remaining := observer.Proofs["filter-1"]
@@ -106,5 +107,37 @@ func TestRemoveWatchClosesMintAndMeltChannels(t *testing.T) {
 		}
 	default:
 		t.Fatal("expected melt channel to be closed and readable")
+	}
+}
+
+func TestSendEventsDoNotBlockOnFullChannels(t *testing.T) {
+	observer := newObserverForTest()
+	_, publicKey := btcec.PrivKeyFromBytes([]byte{1})
+	proof := cashu.Proof{Y: cashu.WrappedPublicKey{PublicKey: publicKey}}
+	mint := cashu.MintRequestDB{Quote: "mint"}
+	melt := cashu.MeltRequestDB{Quote: "melt"}
+	proofChan := make(chan cashu.Proof, 1)
+	mintChan := make(chan cashu.MintRequestDB, 1)
+	meltChan := make(chan cashu.MeltRequestDB, 1)
+
+	proofChan <- proof
+	mintChan <- mint
+	meltChan <- melt
+	observer.AddProofWatch(proof.Y.ToHex(), ProofWatchChannel{Channel: proofChan})
+	observer.AddMintWatch(mint.Quote, MintQuoteChannel{Channel: mintChan})
+	observer.AddMeltWatch(melt.Quote, MeltQuoteChannel{Channel: meltChan})
+
+	done := make(chan struct{})
+	go func() {
+		observer.SendProofsEvent(cashu.Proofs{proof})
+		observer.SendMintEvent(mint)
+		observer.SendMeltEvent(melt)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("event delivery blocked on a full subscriber channel")
 	}
 }

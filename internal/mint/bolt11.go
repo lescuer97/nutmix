@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lightningnetwork/lnd/invoices"
@@ -36,11 +37,9 @@ func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.Po
 	}
 
 	defer func() {
-		if err != nil {
-			rollbackErr := mint.MintDB.Rollback(ctx, tx)
-			if rollbackErr != nil {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
+		rollbackErr := mint.MintDB.Rollback(ctx, tx)
+		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("rollback error", slog.Any("error", rollbackErr))
 		}
 	}()
 

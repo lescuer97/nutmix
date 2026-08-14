@@ -111,7 +111,11 @@ func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 		watchArray, exists := o.Proofs[proof.Y.ToHex()]
 		if exists {
 			for _, v := range watchArray {
-				v.Channel <- proof
+				// ponytail: drop events for slow subscribers; clients can refresh state.
+				select {
+				case v.Channel <- proof:
+				default:
+				}
 			}
 		}
 	}
@@ -119,22 +123,30 @@ func (o *Observer) SendProofsEvent(proofs cashu.Proofs) {
 
 func (o *Observer) SendMeltEvent(melt cashu.MeltRequestDB) {
 	o.Lock()
-	watchArray, exists := o.MeltQuote[melt.Quote]
 	defer o.Unlock()
+
+	watchArray, exists := o.MeltQuote[melt.Quote]
 	if exists {
 		for _, v := range watchArray {
-			v.Channel <- melt
+			select {
+			case v.Channel <- melt:
+			default:
+			}
 		}
 	}
 }
 
 func (o *Observer) SendMintEvent(mint cashu.MintRequestDB) {
 	o.Lock()
-	watchArray, exists := o.MintQuote[mint.Quote]
 	defer o.Unlock()
+
+	watchArray, exists := o.MintQuote[mint.Quote]
 	if exists {
 		for _, v := range watchArray {
-			v.Channel <- mint
+			select {
+			case v.Channel <- mint:
+			default:
+			}
 		}
 	}
 }

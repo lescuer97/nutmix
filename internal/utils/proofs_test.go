@@ -140,8 +140,12 @@ func TestGetValuesFromProofs(t *testing.T) {
 		t.Fatal("GetAndCalculateProofsValues(&listOfProofs)")
 	}
 
-	if listOfProofs.Amount() != 8 {
-		t.Errorf("Incorrect total amount %v. Should be 8", listOfProofs.Amount())
+	amount, err := listOfProofs.Amount()
+	if err != nil {
+		t.Fatalf("listOfProofs.Amount(): %v", err)
+	}
+	if amount != 8 {
+		t.Errorf("Incorrect total amount %v. Should be 8", amount)
 	}
 
 	if secretsList[0].ToHex() != "02aa4a2c024e41bd87e8c2758d5a7c2d81e09afe52f67fc8a69768bd73d515e28f" {

@@ -292,9 +292,16 @@ func (m *Mint) bolt11Mint(ctx context.Context, request cashu.PostMintBolt11Reque
 	if err != nil {
 		return cashu.PostMintBolt11Response{}, fmt.Errorf("zpay32.Decode(mintRequestDB.Request, mint.LightningBackend.GetNetwork()). %w", err)
 	}
-	cashuBlindMessage := cashu.NewAmount(unit, request.Outputs.Amount())
+	outputsAmount, err := request.Outputs.Amount()
+	if err != nil {
+		return cashu.PostMintBolt11Response{}, errors.Join(cashu.ErrAmountNotEqualToInvoice, err)
+	}
+	cashuBlindMessage := cashu.NewAmount(unit, outputsAmount)
 	err = cashuBlindMessage.To(cashu.Msat)
 	if err != nil {
+		if errors.Is(err, cashu.ErrAmountOverflow) {
+			return cashu.PostMintBolt11Response{}, errors.Join(cashu.ErrAmountNotEqualToInvoice, err)
+		}
 		return cashu.PostMintBolt11Response{}, err
 	}
 

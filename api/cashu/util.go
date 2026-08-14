@@ -3,6 +3,7 @@ package cashu
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"math"
 	"strconv"
 )
 
@@ -50,8 +51,8 @@ func GenerateNonceHex() (string, error) {
 	return hex.EncodeToString(nonce), nil
 }
 
-func Fees(proofs []Proof, keysets []BasicKeysetResponse) (uint, error) {
-	totalFees := uint(0)
+func Fees(proofs []Proof, keysets []BasicKeysetResponse) (uint64, error) {
+	totalFees := uint64(0)
 
 	var keysetToUse BasicKeysetResponse
 	for _, proof := range proofs {
@@ -68,9 +69,16 @@ func Fees(proofs []Proof, keysets []BasicKeysetResponse) (uint, error) {
 			}
 		}
 
-		totalFees += keysetToUse.InputFeePpk
+		fee := uint64(keysetToUse.InputFeePpk)
+		if totalFees > math.MaxUint64-fee {
+			return 0, ErrAmountOverflow
+		}
+		totalFees += fee
 	}
 
+	if totalFees > math.MaxUint64-999 {
+		return 0, ErrAmountOverflow
+	}
 	totalFees = (totalFees + 999) / 1000
 
 	return totalFees, nil

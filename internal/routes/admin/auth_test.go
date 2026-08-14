@@ -9,6 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/nbd-wtf/go-nostr"
 )
 
 func setupMiddlewareEngine(secure bool) (*gin.Engine, *[]bool, []byte) {
@@ -49,6 +51,33 @@ func TestMakeJWTTokenHasExpiry(t *testing.T) {
 	want := time.Now().Add(sessionTTL)
 	if exp.Before(want.Add(-time.Minute)) || exp.After(want.Add(time.Minute)) {
 		t.Errorf("exp %v not within a minute of expected %v", exp, want)
+	}
+}
+
+func TestValidNostrLoginEvent(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	validEvent := nostr.Event{Kind: adminLoginEventKind, CreatedAt: nostr.Timestamp(now.Unix())} //nolint:exhaustruct
+	validLogin := database.NostrLoginAuth{Expiry: int(now.Add(adminLoginChallengeTTL).Unix())}   //nolint:exhaustruct
+
+	tests := []struct {
+		name  string
+		event nostr.Event
+		login database.NostrLoginAuth
+		want  bool
+	}{
+		{name: "valid", event: validEvent, login: validLogin, want: true},
+		{name: "wrong kind", event: nostr.Event{Kind: 1, CreatedAt: validEvent.CreatedAt}, login: validLogin, want: false},                                                                      //nolint:exhaustruct
+		{name: "expired challenge", event: validEvent, login: database.NostrLoginAuth{Expiry: int(now.Add(-time.Second).Unix())}, want: false},                                                  //nolint:exhaustruct
+		{name: "stale event", event: nostr.Event{Kind: adminLoginEventKind, CreatedAt: nostr.Timestamp(now.Add(-adminLoginChallengeTTL - time.Second).Unix())}, login: validLogin, want: false}, //nolint:exhaustruct
+		{name: "future event", event: nostr.Event{Kind: adminLoginEventKind, CreatedAt: nostr.Timestamp(now.Add(adminLoginFutureSkew + time.Second).Unix())}, login: validLogin, want: false},   //nolint:exhaustruct
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := validNostrLoginEvent(test.event, test.login, now); got != test.want {
+				t.Errorf("validNostrLoginEvent() = %v, want %v", got, test.want)
+			}
+		})
 	}
 }
 

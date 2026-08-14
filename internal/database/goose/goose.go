@@ -24,7 +24,7 @@ func RunMigration(db *sql.DB, databaseType DatabaseType) error {
 
 	gooseErr := goose.Up(db, "migrations")
 	if gooseErr != nil {
-		return fmt.Errorf(`goose.Up(db, "migrations"). %w`, err)
+		return fmt.Errorf(`goose.Up(db, "migrations"). %w`, gooseErr)
 	}
 
 	return nil

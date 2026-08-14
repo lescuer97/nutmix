@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
+	"strconv"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -620,6 +623,29 @@ func TestTagsInfoMarshalJSON(t *testing.T) {
 	}
 }
 
+func TestTagsInfoLocktimeUint64RoundTrip(t *testing.T) {
+	for _, locktime := range []uint64{math.MaxInt64, math.MaxInt64 + 1, math.MaxUint64} {
+		t.Run(strconv.FormatUint(locktime, 10), func(t *testing.T) {
+			encoded := fmt.Sprintf(`[["locktime","%d"]]`, locktime)
+			var tags TagsInfo
+			if err := json.Unmarshal([]byte(encoded), &tags); err != nil {
+				t.Fatalf("json.Unmarshal: %v", err)
+			}
+			if tags.Locktime != locktime {
+				t.Fatalf("locktime = %d, want %d", tags.Locktime, locktime)
+			}
+
+			marshaled, err := json.Marshal(&tags)
+			if err != nil {
+				t.Fatalf("json.Marshal: %v", err)
+			}
+			if string(marshaled) != encoded {
+				t.Fatalf("marshaled tags = %s, want %s", marshaled, encoded)
+			}
+		})
+	}
+}
+
 // TestHasSigAllMethod tests the HasSigAll() method
 func TestHasSigAllMethod(t *testing.T) {
 	// Test with SIG_ALL
@@ -1072,6 +1098,69 @@ func TestCheckValidWithTooManyPubkeys(t *testing.T) {
 	}
 	if !errors.Is(err, ErrInvalidSpendCondition) {
 		t.Errorf("expected ErrInvalidSpendCondition, got %v", err)
+	}
+}
+
+func TestCheckForSigAllRejectsTooManyPubkeys(t *testing.T) {
+	pubkeys := make([]string, 12)
+	for i := range pubkeys {
+		keyBytes := make([]byte, 32)
+		keyBytes[31] = byte(i + 1)
+		pubkeys[i] = hex.EncodeToString(secp256k1.PrivKeyFromBytes(keyBytes).PubKey().SerializeCompressed())
+	}
+
+	pubkeysTag := append([]string{"pubkeys"}, pubkeys[1:]...)
+	secret, err := json.Marshal([]any{
+		"P2PK",
+		map[string]any{
+			"nonce": "test",
+			"data":  pubkeys[0],
+			"tags": [][]string{
+				{"sigflag", "SIG_ALL"},
+				pubkeysTag,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+
+	_, err = checkForSigAll(Proofs{{Secret: string(secret)}}) //nolint:exhaustruct // Other proof fields are irrelevant.
+	if !errors.Is(err, ErrInvalidSpendCondition) {
+		t.Fatalf("expected ErrInvalidSpendCondition, got %v", err)
+	}
+}
+
+func TestWitnessSignatureLimit(t *testing.T) {
+	const signature = "83b585b5d719e95c1cef8514b14b3a027a2053fe174a1b693051c6e2dcbcf6478b4759e5a25a36a0fd67eae392b3a73afa6677b80d1edbbb6b0a9837ef8c413d"
+
+	for _, test := range []struct {
+		name    string
+		count   int
+		wantErr bool
+	}{
+		{name: "maximum", count: 11, wantErr: false},
+		{name: "over maximum", count: 12, wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			signatures := make([]string, test.count)
+			for i := range signatures {
+				signatures[i] = signature
+			}
+			witnessJSON, err := json.Marshal(map[string]any{"signatures": signatures})
+			if err != nil {
+				t.Fatalf("json.Marshal: %v", err)
+			}
+
+			var witness Witness
+			err = json.Unmarshal(witnessJSON, &witness)
+			if test.wantErr && !errors.Is(err, ErrInvalidSpendCondition) {
+				t.Fatalf("expected ErrInvalidSpendCondition, got %v", err)
+			}
+			if !test.wantErr && err != nil {
+				t.Fatalf("expected valid witness, got %v", err)
+			}
+		})
 	}
 }
 
