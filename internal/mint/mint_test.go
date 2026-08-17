@@ -258,6 +258,7 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 		UnpurposeErrors: nil,
 		Network:         *mint.LightningBackend.GetNetwork(),
 		InvoiceFee:      0,
+		NodeStatus:      lightning.ONLINE_STATUS,
 	}
 	ln.UnpurposeErrors = []lightning.FakeWalletError{
 		lightning.FailQueryFailed,
@@ -331,6 +332,7 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNPending(t *testing.T) {
 		UnpurposeErrors: nil,
 		Network:         *mint.LightningBackend.GetNetwork(),
 		InvoiceFee:      0,
+		NodeStatus:      lightning.ONLINE_STATUS,
 	}
 	ln.UnpurposeErrors = []lightning.FakeWalletError{
 		lightning.FailQueryPending,

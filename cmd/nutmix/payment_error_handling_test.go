@@ -117,6 +117,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	fakeWallet := lightning.FakeWallet{
 		Network:    *mint.LightningBackend.GetNetwork(),
 		InvoiceFee: 0,
+		NodeStatus: lightning.ONLINE_STATUS,
 		UnpurposeErrors: []lightning.FakeWalletError{
 			lightning.FailPaymentFailed, lightning.FailQueryPending,
 		},
@@ -287,6 +288,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 			lightning.FailPaymentFailed, lightning.FailQueryPending,
 		},
 		InvoiceFee: 0,
+		NodeStatus: lightning.ONLINE_STATUS,
 	}
 
 	mintInstance.LightningBackend = &fakeWallet
@@ -464,6 +466,7 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	fakeWallet := lightning.FakeWallet{
 		Network:    *mint.LightningBackend.GetNetwork(),
 		InvoiceFee: 0,
+		NodeStatus: lightning.ONLINE_STATUS,
 		UnpurposeErrors: []lightning.FakeWalletError{
 			lightning.FailPaymentFailed, lightning.FailQueryPending,
 		},

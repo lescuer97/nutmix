@@ -14,6 +14,7 @@ func TestUseMinimumFeeOnInvoice(t *testing.T) {
 		UnpurposeErrors: nil,
 		Network:         chainParam,
 		InvoiceFee:      2,
+		NodeStatus:      ONLINE_STATUS,
 	}
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
@@ -46,6 +47,7 @@ func TestUseFeeInvoice(t *testing.T) {
 		UnpurposeErrors: nil,
 		Network:         chainParam,
 		InvoiceFee:      150,
+		NodeStatus:      ONLINE_STATUS,
 	}
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)

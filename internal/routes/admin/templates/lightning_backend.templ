@@ -3,11 +3,13 @@ package templates
 import (
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
+	"strings"
 )
 
 templ LightningBackendPage(config utils.Config) {
 	@Layout("lightning") {
 		<main class="bolt11">
+			@LightningBackendStatusLoader()
 			@LightningConnectionSettings(config)
 		</main>
 	}
@@ -65,6 +67,79 @@ templ LightningConnectionSettings(config utils.Config) {
 			<button class="btn btn-primary" type="submit">Save Settings</button>
 		</div>
 	</form>
+}
+
+templ LightningBackendStatusLoader() {
+	<section class="card card-md lightning-status-panel" aria-labelledby="lightning-status-title">
+		<div class="lightning-status-heading">
+			<h3 id="lightning-status-title">Lightning Connection</h3>
+			<span>Active backend</span>
+		</div>
+		<div
+			id="lightning-backend-status"
+			hx-get="/admin/lightning-status"
+			hx-trigger="load, every 30s, lightning-status-changed from:body"
+			hx-swap="innerHTML"
+			hx-indicator="#lightning-status-loading"
+			hx-sync="#lightning-backend-status:replace"
+		>
+			<div class="lightning-status-content lightning-status-checking" role="status" aria-live="polite">
+				<span class="lightning-status-icon" aria-hidden="true">
+					<span class="loading-spinner"></span>
+				</span>
+				<div class="lightning-status-copy">
+					<strong>Checking connection</strong>
+					<span>Contacting the active Lightning backend.</span>
+				</div>
+				<span id="lightning-status-loading"></span>
+			</div>
+		</div>
+	</section>
+}
+
+templ LightningBackendStatus(status lightning.NodeStatus, deprecated bool) {
+	<div class={ "lightning-status-content", "lightning-status-" + strings.ToLower(string(status)) }>
+		<span class="lightning-status-icon" aria-hidden="true">
+			switch status {
+				case lightning.ONLINE_STATUS:
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10"></circle>
+						<path d="m9 12 2 2 4-4"></path>
+					</svg>
+				case lightning.OFFLINE_STATUS:
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10"></circle>
+						<path d="m15 9-6 6"></path>
+						<path d="m9 9 6 6"></path>
+					</svg>
+				default:
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10"></circle>
+						<path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 2-3 4"></path>
+						<path d="M12 18h.01"></path>
+					</svg>
+			}
+		</span>
+		<div class="lightning-status-copy">
+			switch status {
+				case lightning.ONLINE_STATUS:
+					<strong>Online</strong>
+					<span>The active Lightning backend is responding.</span>
+				case lightning.OFFLINE_STATUS:
+					<strong>Offline</strong>
+					<span>The active Lightning backend could not be reached.</span>
+				default:
+					<strong>Unknown</strong>
+					<span>The backend status could not be determined.</span>
+			}
+		</div>
+		if deprecated {
+			<span class="lightning-status-deprecation-badge">Deprecated</span>
+		}
+		<span id="lightning-status-loading" class="htmx-indicator lightning-status-loading" aria-hidden="true">
+			<span class="loading-spinner"></span>
+		</span>
+	</div>
 }
 
 templ SetupForms(lightningBackend string, config utils.Config) {

@@ -421,6 +421,17 @@ func (l CLNGRPCWallet) WalletBalance() (cashu.Amount, error) {
 	return cashu.NewAmount(cashu.Msat, fundsMSat), nil
 }
 
+func (l CLNGRPCWallet) Status(ctx context.Context) (NodeStatus, error) {
+	ctx = metadata.AppendToOutgoingContext(ctx, "rune", l.macaroon)
+	client := cln_grpc.NewNodeClient(l.grpcClient)
+
+	_, err := client.Getinfo(ctx, &cln_grpc.GetinfoRequest{})
+	if err != nil {
+		return OFFLINE_STATUS, err
+	}
+	return ONLINE_STATUS, nil
+}
+
 func (f CLNGRPCWallet) LightningType() Backend {
 	return CLNGRPC
 }

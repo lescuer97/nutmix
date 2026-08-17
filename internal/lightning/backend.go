@@ -1,6 +1,7 @@
 package lightning
 
 import (
+	"context"
 	"errors"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -9,7 +10,8 @@ import (
 )
 
 var (
-	ErrAlreadyPaid = errors.New("invoice already paid")
+	ErrAlreadyPaid                    = errors.New("invoice already paid")
+	ErrLNNodeImplementationDepracated = errors.New("lightning node implementation is deprecated")
 )
 
 type Backend uint
@@ -24,6 +26,14 @@ const FAKEWALLET Backend = iota + 4
 // Deprecated: Strike backend will be removed in v0.7.0.
 const STRIKE Backend = iota + 5
 
+// Check what is the current status of a node.
+type NodeStatus string
+
+const ONLINE_STATUS NodeStatus = "ONLINE"
+const OFFLINE_STATUS NodeStatus = "OFFLINE"
+const UNKNOWN_STATUS NodeStatus = "UNKNOWN"
+const DEPRACATED_STATUS NodeStatus = "DEPRACATED"
+
 type LightningBackend interface {
 	PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error)
 	CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error)
@@ -35,6 +45,7 @@ type LightningBackend interface {
 	WalletBalance() (cashu.Amount, error)
 	LightningType() Backend
 	GetNetwork() *chaincfg.Params
+	Status(ctx context.Context) (NodeStatus, error)
 	ActiveMPP() bool
 	VerifyUnitSupport(unit cashu.Unit) bool
 	DescriptionSupport() bool

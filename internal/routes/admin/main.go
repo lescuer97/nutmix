@@ -205,6 +205,8 @@ func AdminRoutes(ctx context.Context, r *gin.Engine, mint *m.Mint, secureCookie 
 		adminRoute.GET("/keysets-layout", KeysetsLayoutPage(&adminHandler))
 		// nolint: contextcheck
 		adminRoute.GET("/lightningdata", LightningDataFormFields(mint))
+		// nolint: contextcheck
+		adminRoute.GET("/lightning-status", LightningBackendStatus(mint))
 
 		liquidityMangerRouter := adminRoute.Group("")
 		// nolint: contextcheck
