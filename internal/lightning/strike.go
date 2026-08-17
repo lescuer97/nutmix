@@ -414,6 +414,14 @@ func (l Strike) WalletBalance() (cashu.Amount, error) {
 	return cashu.Amount{Unit: cashu.Msat, Amount: balanceTotal * 1000}, nil
 }
 
+func (l Strike) Status() (NodeStatus, error) {
+	_, err := l.WalletBalance()
+	if err != nil {
+		return OFFLINE_STATUS, err
+	}
+	return ONLINE_STATUS, nil
+}
+
 func (f Strike) LightningType() Backend {
 	return STRIKE
 }

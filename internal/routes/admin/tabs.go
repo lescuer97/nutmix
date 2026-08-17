@@ -751,6 +751,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				Network:         chainparam,
 				UnpurposeErrors: []lightning.FakeWalletError{},
 				InvoiceFee:      0,
+				NodeStatus:      lightning.ONLINE_STATUS,
 			}
 			newBackend = fakeWalletBackend
 

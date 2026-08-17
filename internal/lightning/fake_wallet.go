@@ -26,6 +26,7 @@ const (
 )
 
 type FakeWallet struct {
+	NodeStatus      NodeStatus
 	UnpurposeErrors []FakeWalletError
 	Network         chaincfg.Params
 	InvoiceFee      uint64
@@ -146,6 +147,13 @@ func (f FakeWallet) RequestInvoice(amount cashu.Amount, description *string) (In
 
 func (f FakeWallet) WalletBalance() (cashu.Amount, error) {
 	return cashu.Amount{Unit: cashu.Sat, Amount: 0}, nil
+}
+
+func (f FakeWallet) Status() (NodeStatus, error) {
+	if f.NodeStatus == "" {
+		return ONLINE_STATUS, nil
+	}
+	return f.NodeStatus, nil
 }
 
 func (f FakeWallet) LightningType() Backend {

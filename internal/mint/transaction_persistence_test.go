@@ -683,6 +683,7 @@ func TestCreateMeltQuoteUsesBackendAmountToSend(t *testing.T) {
 			Network:         *mint.LightningBackend.GetNetwork(),
 			UnpurposeErrors: []lightning.FakeWalletError{},
 			InvoiceFee:      0,
+			NodeStatus:      lightning.ONLINE_STATUS,
 		},
 		feesResponse: lightning.FeesResponse{
 			CheckingId:   "backend-checking-id",

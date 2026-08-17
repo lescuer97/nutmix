@@ -132,6 +132,9 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 	case len(detailBody.Detail) > 0:
 		return fmt.Errorf("LNBITS Unknown error %+v. Request Body %+v. body:%s. %w ", detailBody, reqBody, body, ErrLnbitsFailedPayment)
 	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("LNbits request failed with status %s", resp.Status)
+	}
 
 	err = json.Unmarshal(body, &responseType)
 	if err != nil {
@@ -307,6 +310,14 @@ func (l LnbitsWallet) WalletBalance() (cashu.Amount, error) {
 
 	// LNBits returns balance in sats
 	return cashu.Amount{Unit: cashu.Sat, Amount: uint64(channelBalance.Balance)}, nil
+}
+
+func (l LnbitsWallet) Status() (NodeStatus, error) {
+	_, err := l.WalletBalance()
+	if err != nil {
+		return OFFLINE_STATUS, err
+	}
+	return ONLINE_STATUS, nil
 }
 
 func (f LnbitsWallet) LightningType() Backend {

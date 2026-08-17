@@ -48,7 +48,7 @@ func makeAmountlessRegtestInvoice(t *testing.T) string {
 
 func TestValidateBolt11MeltQuoteRejectsAmountlessInvoice(t *testing.T) {
 	mint := Mint{ //nolint:exhaustruct // test only needs the LightningBackend; Config has 30+ fields
-		LightningBackend: lightning.FakeWallet{UnpurposeErrors: nil, Network: chaincfg.RegressionNetParams, InvoiceFee: 0},
+		LightningBackend: lightning.FakeWallet{UnpurposeErrors: nil, Network: chaincfg.RegressionNetParams, InvoiceFee: 0, NodeStatus: lightning.ONLINE_STATUS},
 	}
 
 	invoice := makeAmountlessRegtestInvoice(t)

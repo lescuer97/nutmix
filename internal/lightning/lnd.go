@@ -500,6 +500,17 @@ func (l LndGrpcWallet) WalletBalance() (cashu.Amount, error) {
 	return cashu.Amount{Unit: cashu.Msat, Amount: balance.LocalBalance.GetMsat()}, nil
 }
 
+func (l LndGrpcWallet) Status() (NodeStatus, error) {
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+	client := lnrpc.NewLightningClient(l.grpcClient)
+
+	_, err := client.GetInfo(ctx, &lnrpc.GetInfoRequest{})
+	if err != nil {
+		return OFFLINE_STATUS, err
+	}
+	return ONLINE_STATUS, nil
+}
+
 func (f LndGrpcWallet) LightningType() Backend {
 	return LNDGRPC
 }

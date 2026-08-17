@@ -114,6 +114,7 @@ func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig
 			Network:         chainparam,
 			UnpurposeErrors: []lightning.FakeWalletError{},
 			InvoiceFee:      0,
+			NodeStatus:      lightning.ONLINE_STATUS,
 		}
 
 		mint.LightningBackend = fake_wallet
