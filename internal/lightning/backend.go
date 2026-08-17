@@ -1,6 +1,7 @@
 package lightning
 
 import (
+	"context"
 	"errors"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -44,7 +45,7 @@ type LightningBackend interface {
 	WalletBalance() (cashu.Amount, error)
 	LightningType() Backend
 	GetNetwork() *chaincfg.Params
-	Status() (NodeStatus, error)
+	Status(ctx context.Context) (NodeStatus, error)
 	ActiveMPP() bool
 	VerifyUnitSupport(unit cashu.Unit) bool
 	DescriptionSupport() bool

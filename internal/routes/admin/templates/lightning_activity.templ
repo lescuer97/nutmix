@@ -62,7 +62,10 @@ templ LightningActivityTable(invoices []LightningInvoiceVisual) {
 templ LightningActivityLayout(config utils.Config, selectedRange string, searchQuery string) {
 	@Layout("lightning") {
 		<main class="main-content">
-			@TimeRangeSelector(selectedRange)
+			<div class="lightning-activity-toolbar">
+				@TimeRangeSelector(selectedRange)
+				@LightningBackendStatusLoader()
+			</div>
 			<div
 				id="ln-chart-placeholder"
 				class="mt-4 mb-4"

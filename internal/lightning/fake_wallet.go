@@ -1,6 +1,7 @@
 package lightning
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"slices"
@@ -149,7 +150,7 @@ func (f FakeWallet) WalletBalance() (cashu.Amount, error) {
 	return cashu.Amount{Unit: cashu.Sat, Amount: 0}, nil
 }
 
-func (f FakeWallet) Status() (NodeStatus, error) {
+func (f FakeWallet) Status(_ context.Context) (NodeStatus, error) {
 	if f.NodeStatus == "" {
 		return ONLINE_STATUS, nil
 	}

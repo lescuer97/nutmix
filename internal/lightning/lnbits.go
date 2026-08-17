@@ -2,6 +2,7 @@ package lightning
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -73,6 +74,10 @@ func lnbitsPaymentState(paymentStatus LNBitsPaymentStatus) PaymentStatus {
 }
 
 func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any, responseType any) error {
+	return l.lnbitsRequest(context.Background(), method, endpoint, reqBody, responseType)
+}
+
+func (l *LnbitsWallet) lnbitsRequest(ctx context.Context, method string, endpoint string, reqBody any, responseType any) error {
 	client := &http.Client{} //nolint:exhaustruct
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
@@ -81,9 +86,9 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 
 	b := bytes.NewBuffer(jsonBytes)
 
-	req, err := http.NewRequest(method, l.Endpoint+endpoint, b)
+	req, err := http.NewRequestWithContext(ctx, method, l.Endpoint+endpoint, b)
 	if err != nil {
-		return fmt.Errorf("http.NewRequest: %w", err)
+		return fmt.Errorf("http.NewRequestWithContext: %w", err)
 	}
 	req.Header.Set("X-Api-Key", l.Key)
 
@@ -298,12 +303,16 @@ func (l LnbitsWallet) RequestInvoice(amount cashu.Amount, description *string) (
 }
 
 func (l LnbitsWallet) WalletBalance() (cashu.Amount, error) {
+	return l.walletBalance(context.Background())
+}
+
+func (l LnbitsWallet) walletBalance(ctx context.Context) (cashu.Amount, error) {
 	var channelBalance struct {
 		Id      string `json:"id"`
 		Name    string `json:"name"`
 		Balance int    `json:"balance"`
 	}
-	err := l.LnbitsRequest("GET", "/api/v1/wallet", nil, &channelBalance)
+	err := l.lnbitsRequest(ctx, "GET", "/api/v1/wallet", nil, &channelBalance)
 	if err != nil {
 		return cashu.Amount{}, fmt.Errorf("l.LnbitsInvoiceRequest: %w", err)
 	}
@@ -312,8 +321,8 @@ func (l LnbitsWallet) WalletBalance() (cashu.Amount, error) {
 	return cashu.Amount{Unit: cashu.Sat, Amount: uint64(channelBalance.Balance)}, nil
 }
 
-func (l LnbitsWallet) Status() (NodeStatus, error) {
-	_, err := l.WalletBalance()
+func (l LnbitsWallet) Status(ctx context.Context) (NodeStatus, error) {
+	_, err := l.walletBalance(ctx)
 	if err != nil {
 		return OFFLINE_STATUS, err
 	}

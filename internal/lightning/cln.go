@@ -421,8 +421,8 @@ func (l CLNGRPCWallet) WalletBalance() (cashu.Amount, error) {
 	return cashu.NewAmount(cashu.Msat, fundsMSat), nil
 }
 
-func (l CLNGRPCWallet) Status() (NodeStatus, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
+func (l CLNGRPCWallet) Status(ctx context.Context) (NodeStatus, error) {
+	ctx = metadata.AppendToOutgoingContext(ctx, "rune", l.macaroon)
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
 	_, err := client.Getinfo(ctx, &cln_grpc.GetinfoRequest{})

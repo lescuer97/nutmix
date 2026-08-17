@@ -916,6 +916,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 		// Switch the live backend
 		mint.LightningBackend = newBackend
+		c.Header("HX-Trigger", "lightning-status-changed")
 
 		// Save to DB
 		err = persistConfigTx(c.Request.Context(), mint, mint.Config)
