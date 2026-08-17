@@ -133,8 +133,9 @@ web-build-prod:
     set -euo pipefail
     echo "Building web packages (prod, minified)"
     cd internal/routes/admin/static
+    rm -rf dist/js
     mkdir -p dist/js dist/css
-    bun build src/index.js src/modules/*js --outdir=dist/js --target=browser --format=esm --minify
+    bun build src/index.js src/modules/chart.js --outdir=dist/js --target=browser --format=esm --minify
     cp *.css dist/css/
 
 # builds web packages for local development
@@ -143,8 +144,9 @@ web-build-dev:
     set -euo pipefail
     echo "Building web packages (dev, unminified)"
     cd internal/routes/admin/static
+    rm -rf dist/js
     mkdir -p dist/js dist/css
-    bun build src/index.js src/modules/*js --outdir=dist/js --target=browser --minify --format=esm --sourcemap=inline
+    bun build src/index.js src/modules/chart.js --outdir=dist/js --target=browser --minify --format=esm --sourcemap=inline
     cp *.css dist/css/
 
 # Dev recipe
