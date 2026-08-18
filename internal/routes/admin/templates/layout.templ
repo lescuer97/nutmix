@@ -10,13 +10,24 @@ templ head() {
 	</head>
 }
 
-templ Layout(route string) {
+templ Layout(route string, backendEndOfLife bool) {
 	<!DOCTYPE html>
 	<html lang="en">
 		@head()
 		@Header()
 		<body data-route={ route }>
 			<div hx-ext="remove-me" id="notifications"></div>
+			if backendEndOfLife {
+				<aside id="backend-end-of-life-alert" class="deprecation-notice main-content" role="alert" aria-labelledby="backend-end-of-life-title">
+					<div class="deprecation-header">
+						<div class="deprecation-title-row">
+							<span class="deprecation-badge">End of life</span>
+							<span id="backend-end-of-life-title" class="deprecation-title">Strike backend stopped</span>
+						</div>
+					</div>
+					<p class="deprecation-copy">Strike support has ended. Minting and Lightning payments are unavailable until you select another Lightning backend.</p>
+				</aside>
+			}
 			{ children... }
 		</body>
 	</html>

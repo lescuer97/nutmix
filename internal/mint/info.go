@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
@@ -29,6 +30,7 @@ func (m *Mint) Info() cashu.GetInfoResponse {
 	}
 
 	nuts := make(map[string]any)
+	backendEndOfLife := lightning.IsBackendEndOfLife(m.LightningBackend)
 	var baseNuts = []string{"1", "2", "3", "4", "5", "6"}
 
 	var optionalNuts = []string{"7", "8", "9", "10", "11", "12", "17", "20"}
@@ -64,11 +66,12 @@ func (m *Mint) Info() cashu.GetInfoResponse {
 				Description: &descriptionEnabled,
 			}
 
+			mintingDisabled := m.Config.PEG_OUT_ONLY || backendEndOfLife
 			nuts[nut] = cashu.SwapMintInfo{
 				Methods: &[]cashu.SwapMintMethod{
 					bolt11Method,
 				},
-				Disabled:  &m.Config.PEG_OUT_ONLY,
+				Disabled:  &mintingDisabled,
 				Supported: nil,
 			}
 		case "5":
@@ -89,7 +92,7 @@ func (m *Mint) Info() cashu.GetInfoResponse {
 				Methods: &[]cashu.SwapMintMethod{
 					bolt11Method,
 				},
-				Disabled:  &b,
+				Disabled:  &backendEndOfLife,
 				Supported: nil,
 			}
 

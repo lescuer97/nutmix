@@ -12,6 +12,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lescuer97/nutmix/api/cashu"
+	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
@@ -63,6 +64,22 @@ func TestValidateBolt11MeltQuoteRejectsAmountlessInvoice(t *testing.T) {
 	}
 	if !errors.Is(err, cashu.ErrAmountlessInvoiceNotSupported) {
 		t.Fatalf("expected ErrAmountlessInvoiceNotSupported, got: %+v", err)
+	}
+}
+
+func TestReconcilePendingMeltQuotesIgnoresStrikeEndOfLife(t *testing.T) {
+	quote := cashu.MeltRequestDB{
+		Quote: "legacy-pending", Request: RegtestRequest, State: cashu.PENDING,
+		Unit: cashu.Sat.String(), CheckingId: "legacy-checking-id",
+	} //nolint:exhaustruct
+	db := &mockdb.MockDB{MeltRequest: []cashu.MeltRequestDB{quote}}                                     //nolint:exhaustruct
+	mint := Mint{MintDB: db, LightningBackend: lightning.Strike{Network: chaincfg.RegressionNetParams}} //nolint:exhaustruct
+
+	if err := mint.ReconcilePendingMeltQuotes(); err != nil {
+		t.Fatalf("ReconcilePendingMeltQuotes: %v", err)
+	}
+	if db.MeltRequest[0].State != cashu.PENDING || db.MeltRequest[0].CheckingId != quote.CheckingId {
+		t.Fatalf("pending quote changed: %+v", db.MeltRequest[0])
 	}
 }
 

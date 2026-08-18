@@ -42,6 +42,40 @@ func TestCheckIntegerFromStringFailureBool(t *testing.T) {
 	}
 }
 
+func TestBolt11PostRejectsStrikeBackend(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	form := url.Values{
+		"NETWORK":                {"regtest"},
+		"MINT_LIGHTNING_BACKEND": {string(utils.Strike)},
+		"STRIKE_KEY":             {"ignored"},
+		"STRIKE_ENDPOINT":        {"https://example.invalid"},
+	}
+	req, err := http.NewRequest(http.MethodPost, "/admin/bolt11", strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatalf("http.NewRequest: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	ctx.Request = req
+
+	var config utils.Config
+	config.Default()
+	db := &mockdb.MockDB{Config: config}                  //nolint:exhaustruct
+	mintInstance := mint.Mint{Config: config, MintDB: db} //nolint:exhaustruct
+	Bolt11Post(&mintInstance)(ctx)
+
+	if !strings.Contains(recorder.Body.String(), "Invalid backend selection") {
+		t.Fatalf("expected invalid selection response, got %q", recorder.Body.String())
+	}
+	if mintInstance.Config.MINT_LIGHTNING_BACKEND != config.MINT_LIGHTNING_BACKEND || db.Config.MINT_LIGHTNING_BACKEND != config.MINT_LIGHTNING_BACKEND {
+		t.Fatal("rejected Strike submission changed configuration")
+	}
+	if recorder.Header().Get("HX-Trigger") != "" {
+		t.Fatal("rejected Strike submission emitted a success trigger")
+	}
+}
+
 func mustNpub(t *testing.T) string {
 	t.Helper()
 

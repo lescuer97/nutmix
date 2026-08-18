@@ -25,6 +25,7 @@ func TestLightningBackendStatusComponent(t *testing.T) {
 	}{
 		{name: "online", status: lightning.ONLINE_STATUS, text: "Online", class: "lightning-status-online", icon: "m9 12 2 2 4-4"},
 		{name: "offline", status: lightning.OFFLINE_STATUS, text: "Offline", class: "lightning-status-offline", icon: "m15 9-6 6"},
+		{name: "stopped", status: lightning.STOPPED_STATUS, text: "Stopped", class: "lightning-status-stopped", icon: `width="12" height="12"`},
 		{name: "unknown", status: lightning.UNKNOWN_STATUS, text: "Unknown", class: "lightning-status-unknown", icon: "M9.09 9"},
 		{name: "online deprecated", status: lightning.ONLINE_STATUS, deprecated: true, text: "Online", class: "lightning-status-online", icon: "m9 12 2 2 4-4"},
 		{name: "offline deprecated", status: lightning.OFFLINE_STATUS, deprecated: true, text: "Offline", class: "lightning-status-offline", icon: "m15 9-6 6"},
@@ -78,7 +79,7 @@ func TestLightningBackendStatusLoader(t *testing.T) {
 
 func TestLightningActivityLayoutPlacesStatusBesideRangeSelector(t *testing.T) {
 	ctx, recorder := adminTestContext("/admin/ln")
-	if err := templates.LightningActivityLayout(utils.Config{}, "1w", "").Render(ctx.Request.Context(), recorder); err != nil {
+	if err := templates.LightningActivityLayout(utils.Config{}, "1w", "", false).Render(ctx.Request.Context(), recorder); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 
@@ -118,8 +119,8 @@ func TestLightningBackendStatusHandler(t *testing.T) {
 		want     []string
 		unwanted []string
 	}{
-		{name: "healthy LNBITS is deprecated", backend: statusBackend{backendType: lightning.LNBITS, status: lightning.ONLINE_STATUS}, want: []string{"Online", "lightning-status-online", "lightning-status-deprecation-badge", "Deprecated"}},  //nolint:staticcheck // Verify supported deprecated backend UI.
-		{name: "healthy Strike is deprecated", backend: statusBackend{backendType: lightning.STRIKE, status: lightning.ONLINE_STATUS}, want: []string{"Online", "lightning-status-online", "lightning-status-deprecation-badge", "Deprecated"}},  //nolint:staticcheck // Verify supported deprecated backend UI.
+		{name: "healthy LNBITS is deprecated", backend: statusBackend{backendType: lightning.LNBITS, status: lightning.ONLINE_STATUS}, want: []string{"Online", "lightning-status-online", "lightning-status-deprecation-badge", "Deprecated"}}, //nolint:staticcheck // Verify supported deprecated backend UI.
+		{name: "Strike is stopped", backend: lightning.Strike{}, want: []string{"Stopped", "lightning-status-stopped"}, unwanted: []string{"lightning-status-deprecation-badge", "Deprecated", "Offline"}},
 		{name: "offline deprecated backend", backend: statusBackend{backendType: lightning.LNBITS, status: lightning.OFFLINE_STATUS}, want: []string{"Offline", "lightning-status-offline", "lightning-status-deprecation-badge", "Deprecated"}}, //nolint:staticcheck // Verify supported deprecated backend UI.
 		{name: "LND is not deprecated", backend: statusBackend{backendType: lightning.LNDGRPC, status: lightning.ONLINE_STATUS}, want: []string{"Online"}, unwanted: []string{"lightning-status-deprecation-badge", "Deprecated"}},
 		{name: "CLN is not deprecated", backend: statusBackend{backendType: lightning.CLNGRPC, status: lightning.OFFLINE_STATUS}, want: []string{"Offline"}, unwanted: []string{"lightning-status-deprecation-badge", "Deprecated"}},
@@ -153,6 +154,42 @@ func TestLightningBackendStatusHandler(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestStrikeEndOfLifeAdminUI(t *testing.T) {
+	ctx, recorder := adminTestContext("/admin/ln")
+	config := utils.Config{MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct
+	if err := templates.LightningBackendPage(config, true).Render(ctx.Request.Context(), recorder); err != nil {
+		t.Fatalf("Render Strike page: %v", err)
+	}
+	body := recorder.Body.String()
+	for _, want := range []string{`id="backend-end-of-life-alert"`, "Strike backend stopped", "select another Lightning backend"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected body to contain %q, got %s", want, body)
+		}
+	}
+	for _, unwanted := range []string{`value="Strike"`, "STRIKE_KEY", "STRIKE_ENDPOINT"} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("did not expect body to contain %q, got %s", unwanted, body)
+		}
+	}
+
+	ctx, recorder = adminTestContext("/admin/ln")
+	config.MINT_LIGHTNING_BACKEND = utils.FAKE_WALLET
+	if err := templates.LightningBackendPage(config, false).Render(ctx.Request.Context(), recorder); err != nil {
+		t.Fatalf("Render Fake Wallet page: %v", err)
+	}
+	if strings.Contains(recorder.Body.String(), `id="backend-end-of-life-alert"`) {
+		t.Fatal("Strike alert rendered for a supported backend")
+	}
+
+	ctx, recorder = adminTestContext("/admin/lightningdata")
+	if err := templates.SetupForms(string(utils.Strike), config).Render(ctx.Request.Context(), recorder); err != nil {
+		t.Fatalf("Render SetupForms: %v", err)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("Strike setup fields rendered: %s", recorder.Body.String())
 	}
 }
 

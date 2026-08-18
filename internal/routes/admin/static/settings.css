@@ -63,6 +63,12 @@
     --lightning-status-glow: rgba(239, 68, 68, 0.34);
 }
 
+.lightning-status-stopped {
+    --lightning-status-color: var(--accent-red);
+    --lightning-status-bg: rgba(239, 68, 68, 0.12);
+    --lightning-status-glow: rgba(239, 68, 68, 0.34);
+}
+
 .lightning-status-unknown {
     --lightning-status-color: var(--accent-yellow);
     --lightning-status-bg: rgba(245, 158, 11, 0.12);

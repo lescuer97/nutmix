@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-templ LightningBackendPage(config utils.Config) {
-	@Layout("lightning") {
+templ LightningBackendPage(config utils.Config, backendEndOfLife bool) {
+	@Layout("lightning", backendEndOfLife) {
 		<main class="bolt11">
 			@LightningBackendStatusLoader()
 			@LightningConnectionSettings(config)
@@ -52,13 +52,6 @@ templ LightningConnectionSettings(config utils.Config) {
 						hx-target="#lightning-data"
 						selected?={ config.MINT_LIGHTNING_BACKEND == utils.LNBITS }
 					>LNBITS wallet (deprecated, will be removed in v0.8.0)</option>
-					<option
-						value="Strike"
-						hx-trigger="selected"
-						hx-get="/admin/lightningdata"
-						hx-target="#lightning-data"
-						selected?={ config.MINT_LIGHTNING_BACKEND == utils.Strike }
-					>Strike (deprecated, will be removed in v0.7.0)</option>
 				</select>
 			</label>
 		</div>
@@ -112,6 +105,10 @@ templ LightningBackendStatus(status lightning.NodeStatus, deprecated bool) {
 						<path d="m15 9-6 6"></path>
 						<path d="m9 9 6 6"></path>
 					</svg>
+				case lightning.STOPPED_STATUS:
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<rect x="6" y="6" width="12" height="12"></rect>
+					</svg>
 				default:
 					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 						<circle cx="12" cy="12" r="10"></circle>
@@ -128,6 +125,9 @@ templ LightningBackendStatus(status lightning.NodeStatus, deprecated bool) {
 				case lightning.OFFLINE_STATUS:
 					<strong>Offline</strong>
 					<span>The active Lightning backend could not be reached.</span>
+				case lightning.STOPPED_STATUS:
+					<strong>Stopped</strong>
+					<span>Strike support has ended. Select another Lightning backend.</span>
 				default:
 					<strong>Unknown</strong>
 					<span>The backend status could not be determined.</span>
@@ -150,8 +150,6 @@ templ SetupForms(lightningBackend string, config utils.Config) {
 			@ClnGrpc(config.CLN_GRPC_HOST, config.CLN_CA_CERT, config.CLN_CLIENT_CERT, config.CLN_CLIENT_KEY, config.CLN_MACAROON)
 		case string(utils.LNBITS):
 			@Lnbits(config.MINT_LNBITS_ENDPOINT, config.MINT_LNBITS_KEY)
-		case string(utils.Strike):
-			@Strike(config.STRIKE_KEY, config.STRIKE_ENDPOINT)
 		case string(utils.FAKE_WALLET):
 			@FakeFallet()
 	}
@@ -224,33 +222,6 @@ templ Lnbits(endpoint string, key string) {
 		<label for="MINT_LNBITS_KEY" class="settings-input">
 			LNBITS Key (Admin Key)
 			<input type="password" name="MINT_LNBITS_KEY" value={ key } placeholder="ea0..."/>
-		</label>
-	</div>
-}
-
-templ Strike(key string, endpoint string) {
-	<div class="form-section mt-4 mb-4">
-		<div class="deprecation-notice">
-			<div class="deprecation-header">
-				<div class="deprecation-title-row">
-					<span class="deprecation-badge">Deprecated</span>
-					<span class="deprecation-title">Strike backend</span>
-				</div>
-				<span class="deprecation-version">Will be removed in v0.7.0</span>
-			</div>
-			<p class="deprecation-copy">
-				Strike support is scheduled for removal in v0.7.0. Switch to another lightning backend before upgrading to avoid configuration breakage.
-			</p>
-		</div>
-	</div>
-	<div class="form-section">
-		<label for="STRIKE_ENDPOINT" class="settings-input">
-			Strike endpoint
-			<input type="text" required name="STRIKE_ENDPOINT" value={ endpoint } placeholder="https://api.strike.me"/>
-		</label>
-		<label for="STRIKE_KEY" class="settings-input">
-			Strike API key
-			<input type="password" required name="STRIKE_KEY" value={ key } placeholder="sk_..."/>
 		</label>
 	</div>
 }

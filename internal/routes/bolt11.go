@@ -1,13 +1,32 @@
 package routes
 
 import (
+	"errors"
 	"log/slog"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
+
+func renderLNBackendEndOfLife(c *gin.Context, err error, minting bool) bool {
+	if !errors.Is(err, lightning.LNBackendEndOfLife) {
+		return false
+	}
+
+	slog.Error("lightning backend is end of life", slog.Any("error", err))
+	detail := "Melting is temporarily unavailable"
+	code := cashu.UNKNOWN
+	if minting {
+		detail = "Minting is temporarily unavailable"
+		code = cashu.MINTING_DISABLED
+	}
+	c.JSON(http.StatusServiceUnavailable, cashu.ErrorCodeToResponse(code, &detail))
+	return true
+}
 
 func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 	v1 := r.Group("/v1")
@@ -28,6 +47,9 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		response, err := mint.CreateMintQuote(mintQuoteCtx, mintRequest, m.Bolt11)
 		if err != nil {
 			slog.Info("mint.CreateMintQuote(c.Request.Context(), mintRequest, m.Bolt11)", slog.Any("error", err))
+			if renderLNBackendEndOfLife(c, err, true) {
+				return
+			}
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -41,6 +63,9 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		response, err := mint.RefreshMintQuoteStatus(c.Request.Context(), quoteId, m.Bolt11)
 		if err != nil {
 			slog.Info("mint.RefreshMintQuoteStatus(c.Request.Context(), quoteId, m.Bolt11)", slog.Any("error", err))
+			if renderLNBackendEndOfLife(c, err, true) {
+				return
+			}
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -65,6 +90,9 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		response, err := mint.IssueTokens(mintCtx, mintRequest, m.Bolt11)
 		if err != nil {
 			slog.Info("mint.IssueTokens(c.Request.Context(), mintRequest, m.Bolt11)", slog.Any("error", err))
+			if renderLNBackendEndOfLife(c, err, true) {
+				return
+			}
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -88,6 +116,9 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		dbRequest, err := mint.CreateMeltQuote(meltQuoteCtx, meltRequest, m.Bolt11)
 		if err != nil {
 			slog.Warn("mint.CreateMeltQuote", slog.Any("error", err))
+			if renderLNBackendEndOfLife(c, err, false) {
+				return
+			}
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -101,6 +132,9 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		quote, err := mint.RefreshMeltQuoteState(c.Request.Context(), quoteId)
 		if err != nil {
 			slog.Warn("mint.RefreshMeltQuoteState(quoteId)", slog.Any("error", err))
+			if renderLNBackendEndOfLife(c, err, false) {
+				return
+			}
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
@@ -125,6 +159,9 @@ func registerV1Bolt11Routes(r *gin.Engine, mint *m.Mint) {
 		quote, err := mint.ExecuteMelt(meltCtx, meltRequest, m.Bolt11)
 		if err != nil {
 			slog.Warn("mint.ExecuteMelt(ctx, meltRequest)", slog.Any("error", err))
+			if renderLNBackendEndOfLife(c, err, false) {
+				return
+			}
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
 			c.JSON(400, cashu.ErrorCodeToResponse(errorCode, details))
 			return
