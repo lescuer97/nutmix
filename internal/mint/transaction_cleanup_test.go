@@ -10,7 +10,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 )
 
-type transactionCleanupDB struct {
+type transactionCleanupDB struct { //nolint:govet // Test double field order is not performance critical.
 	database.MintDB
 	meltRequest cashu.MeltRequestDB
 	proofs      cashu.Proofs
@@ -41,8 +41,8 @@ func (db *transactionCleanupDB) GetProofsFromSecretCurve(pgx.Tx, []cashu.Wrapped
 
 func TestTransactionCleanupOnEarlyReturns(t *testing.T) {
 	t.Run("paid melt quote", func(t *testing.T) {
-		db := &transactionCleanupDB{meltRequest: cashu.MeltRequestDB{Quote: "quote", State: cashu.PAID}}
-		mint := Mint{MintDB: db}
+		db := &transactionCleanupDB{meltRequest: cashu.MeltRequestDB{Quote: "quote", State: cashu.PAID}} //nolint:exhaustruct // Only quote state matters.
+		mint := Mint{MintDB: db}                                                                         //nolint:exhaustruct // Only the database is used.
 
 		_, err := CheckMeltRequest(context.Background(), &mint, "quote")
 		if err != nil {
@@ -54,10 +54,10 @@ func TestTransactionCleanupOnEarlyReturns(t *testing.T) {
 	})
 
 	t.Run("restore query error", func(t *testing.T) {
-		db := &transactionCleanupDB{restoreErr: errors.New("restore failed")}
-		mint := Mint{MintDB: db}
+		db := &transactionCleanupDB{restoreErr: errors.New("restore failed")} //nolint:exhaustruct // Only the injected error matters.
+		mint := Mint{MintDB: db}                                              //nolint:exhaustruct // Only the database is used.
 
-		_, err := mint.Restore(context.Background(), cashu.PostRestoreRequest{})
+		_, err := mint.Restore(context.Background(), cashu.PostRestoreRequest{}) //nolint:exhaustruct // Empty outputs exercise the query error path.
 		if err == nil {
 			t.Fatal("Restore() error = nil, want query error")
 		}
@@ -67,10 +67,10 @@ func TestTransactionCleanupOnEarlyReturns(t *testing.T) {
 	})
 
 	t.Run("used auth proof", func(t *testing.T) {
-		db := &transactionCleanupDB{proofs: cashu.Proofs{{}}}
-		mint := Mint{MintDB: db}
+		db := &transactionCleanupDB{proofs: cashu.Proofs{{}}} //nolint:exhaustruct // Only proof presence matters.
+		mint := Mint{MintDB: db}                              //nolint:exhaustruct // Only the database is used.
 
-		err := mint.VerifyAuthBlindToken(cashu.AuthProof{Secret: "used"})
+		err := mint.VerifyAuthBlindToken(cashu.AuthProof{Secret: "used"}) //nolint:exhaustruct // Only the secret is used.
 		if err == nil || err.Error() != "authProof already used" {
 			t.Fatalf("VerifyAuthBlindToken() error = %v, want authProof already used", err)
 		}

@@ -113,9 +113,9 @@ func TestRemoveWatchClosesMintAndMeltChannels(t *testing.T) {
 func TestSendEventsDoNotBlockOnFullChannels(t *testing.T) {
 	observer := newObserverForTest()
 	_, publicKey := btcec.PrivKeyFromBytes([]byte{1})
-	proof := cashu.Proof{Y: cashu.WrappedPublicKey{PublicKey: publicKey}}
-	mint := cashu.MintRequestDB{Quote: "mint"}
-	melt := cashu.MeltRequestDB{Quote: "melt"}
+	proof := cashu.Proof{Y: cashu.WrappedPublicKey{PublicKey: publicKey}} //nolint:exhaustruct // Only the event key matters.
+	mint := cashu.MintRequestDB{Quote: "mint"}                            //nolint:exhaustruct // Only the event key matters.
+	melt := cashu.MeltRequestDB{Quote: "melt"}                            //nolint:exhaustruct // Only the event key matters.
 	proofChan := make(chan cashu.Proof, 1)
 	mintChan := make(chan cashu.MintRequestDB, 1)
 	meltChan := make(chan cashu.MeltRequestDB, 1)
@@ -123,9 +123,9 @@ func TestSendEventsDoNotBlockOnFullChannels(t *testing.T) {
 	proofChan <- proof
 	mintChan <- mint
 	meltChan <- melt
-	observer.AddProofWatch(proof.Y.ToHex(), ProofWatchChannel{Channel: proofChan})
-	observer.AddMintWatch(mint.Quote, MintQuoteChannel{Channel: mintChan})
-	observer.AddMeltWatch(melt.Quote, MeltQuoteChannel{Channel: meltChan})
+	observer.AddProofWatch(proof.Y.ToHex(), ProofWatchChannel{Channel: proofChan}) //nolint:exhaustruct // Subscription ID is irrelevant.
+	observer.AddMintWatch(mint.Quote, MintQuoteChannel{Channel: mintChan})         //nolint:exhaustruct // Subscription ID is irrelevant.
+	observer.AddMeltWatch(melt.Quote, MeltQuoteChannel{Channel: meltChan})         //nolint:exhaustruct // Subscription ID is irrelevant.
 
 	done := make(chan struct{})
 	go func() {
