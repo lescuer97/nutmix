@@ -29,17 +29,17 @@ func TestSetUpMintLoadsLegacyStrikeAsTombstone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("localsigner.SetupLocalSigner: %v", err)
 	}
-	config := utils.Config{NETWORK: "regtest", MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct
+	config := utils.Config{NETWORK: "regtest", MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct,staticcheck // Verify legacy Strike configuration.
 
 	mint, err := SetUpMint(context.Background(), config, nil, db, &sig)
 	if err != nil {
 		t.Fatalf("SetUpMint: %v", err)
 	}
-	if mint.LightningBackend == nil || mint.LightningBackend.LightningType() != lightning.STRIKE {
+	if mint.LightningBackend == nil || mint.LightningBackend.LightningType() != lightning.STRIKE { //nolint:staticcheck // Verify legacy Strike configuration.
 		t.Fatal("legacy Strike config did not load the tombstone backend")
 	}
 	status, statusErr := mint.LightningBackend.Status(context.Background())
-	if status != lightning.STOPPED_STATUS || !errors.Is(statusErr, lightning.LNBackendEndOfLife) {
+	if status != lightning.STOPPED_STATUS || !errors.Is(statusErr, lightning.ErrLNBackendEndOfLife) {
 		t.Fatalf("Status() = %q, %v", status, statusErr)
 	}
 }

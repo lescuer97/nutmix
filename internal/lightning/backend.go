@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	ErrAlreadyPaid     = errors.New("invoice already paid")
-	LNBackendEndOfLife = errors.New("lightning backend is end of life")
+	ErrAlreadyPaid        = errors.New("invoice already paid")
+	ErrLNBackendEndOfLife = errors.New("lightning backend is end of life")
 )
 
 type Backend uint

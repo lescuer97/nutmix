@@ -39,7 +39,7 @@ func LightningBackendStatus(mint *m.Mint) gin.HandlerFunc {
 			defer cancel()
 
 			status, err := backend.Status(ctx)
-			if errors.Is(err, lightning.LNBackendEndOfLife) {
+			if errors.Is(err, lightning.ErrLNBackendEndOfLife) {
 				slog.Error("lightning backend is end of life and must be replaced", slog.Any("error", err))
 				nodeStatus = lightning.STOPPED_STATUS
 			} else if err != nil {

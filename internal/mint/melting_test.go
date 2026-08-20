@@ -68,10 +68,10 @@ func TestValidateBolt11MeltQuoteRejectsAmountlessInvoice(t *testing.T) {
 }
 
 func TestReconcilePendingMeltQuotesIgnoresStrikeEndOfLife(t *testing.T) {
-	quote := cashu.MeltRequestDB{
+	quote := cashu.MeltRequestDB{ //nolint:exhaustruct // Only reconciliation fields are relevant.
 		Quote: "legacy-pending", Request: RegtestRequest, State: cashu.PENDING,
 		Unit: cashu.Sat.String(), CheckingId: "legacy-checking-id",
-	} //nolint:exhaustruct
+	}
 	db := &mockdb.MockDB{MeltRequest: []cashu.MeltRequestDB{quote}}                                     //nolint:exhaustruct
 	mint := Mint{MintDB: db, LightningBackend: lightning.Strike{Network: chaincfg.RegressionNetParams}} //nolint:exhaustruct
 

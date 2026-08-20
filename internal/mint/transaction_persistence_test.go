@@ -87,10 +87,10 @@ func createMintTestBlindedMessages(t *testing.T, amount uint64, activeKeys signe
 	return blindedMessages
 }
 
-func createSpendableProofs(t *testing.T, mint *Mint, amount uint64, activeKeys signer.GetKeysResponse) cashu.Proofs {
+func createSpendableProofs(t *testing.T, mint *Mint, activeKeys signer.GetKeysResponse) cashu.Proofs {
 	t.Helper()
 
-	blindedMessages, secrets, blindingFactors := createMintTestBlindedMessagesWithSecrets(t, amount, activeKeys)
+	blindedMessages, secrets, blindingFactors := createMintTestBlindedMessagesWithSecrets(t, 4, activeKeys)
 	blindSignatures, _, err := mint.Signer.SignBlindMessages(blindedMessages)
 	if err != nil {
 		t.Fatalf("mint.Signer.SignBlindMessages(blindedMessages): %v", err)
@@ -684,11 +684,11 @@ func TestExecuteMeltRejectsStrikeBeforeReservingInputs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
 	}
-	quote := cashu.MeltRequestDB{
+	quote := cashu.MeltRequestDB{ //nolint:exhaustruct // Only persisted rejection fields are relevant.
 		Amount: 2, Quote: "strike-eol-melt", Request: RegtestRequest,
 		Unit: cashu.Sat.String(), Expiry: time.Now().Add(time.Minute).Unix(),
 		FeeReserve: 1, State: cashu.UNPAID, CheckingId: "legacy-checking-id",
-	} //nolint:exhaustruct
+	}
 	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetTx: %v", err)
@@ -702,13 +702,13 @@ func TestExecuteMeltRejectsStrikeBeforeReservingInputs(t *testing.T) {
 
 	request := cashu.PostMeltBolt11Request{
 		Quote:   quote.Quote,
-		Inputs:  createSpendableProofs(t, mint, 4, activeKeys),
+		Inputs:  createSpendableProofs(t, mint, activeKeys),
 		Outputs: createMintTestBlindedMessages(t, 1, activeKeys),
 	}
 	mint.LightningBackend = lightning.Strike{Network: *mint.LightningBackend.GetNetwork()}
 	_, err = mint.ExecuteMelt(ctx, request, Bolt11)
-	if !errors.Is(err, lightning.LNBackendEndOfLife) {
-		t.Fatalf("ExecuteMelt error = %v, want LNBackendEndOfLife", err)
+	if !errors.Is(err, lightning.ErrLNBackendEndOfLife) {
+		t.Fatalf("ExecuteMelt error = %v, want ErrLNBackendEndOfLife", err)
 	}
 
 	tx, err = mint.MintDB.GetTx(ctx)
@@ -840,7 +840,7 @@ func TestBolt11MeltSendsSuccessEvents(t *testing.T) {
 		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
 	}
 
-	proofs := createSpendableProofs(t, mint, 4, activeKeys)
+	proofs := createSpendableProofs(t, mint, activeKeys)
 	proofsForWatch := append(cashu.Proofs(nil), proofs...)
 	_, err = internalutils.GetAndCalculateProofsValues(&proofsForWatch)
 	if err != nil {

@@ -48,7 +48,7 @@ func TestBolt11PostRejectsStrikeBackend(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(recorder)
 	form := url.Values{
 		"NETWORK":                {"regtest"},
-		"MINT_LIGHTNING_BACKEND": {string(utils.Strike)},
+		"MINT_LIGHTNING_BACKEND": {string(utils.Strike)}, //nolint:staticcheck // Verify retired backend submissions are rejected.
 		"STRIKE_KEY":             {"ignored"},
 		"STRIKE_ENDPOINT":        {"https://example.invalid"},
 	}

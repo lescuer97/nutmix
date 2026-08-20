@@ -55,7 +55,7 @@ func TestExecuteSwapDoesNotRequireLightningBackend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
 	}
-	inputs := createSpendableProofs(t, mint, 4, activeKeys)
+	inputs := createSpendableProofs(t, mint, activeKeys)
 	mint.LightningBackend = nil
 
 	_, err = mint.ExecuteSwap(context.Background(), cashu.PostSwapRequest{
@@ -94,7 +94,7 @@ func runSwapCleanupFailureTest(t *testing.T, expectedErr string, mutateMint func
 		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
 	}
 
-	inputs := createSpendableProofs(t, mint, 4, activeKeys)
+	inputs := createSpendableProofs(t, mint, activeKeys)
 	proofYs, err := internalProofYs(inputs)
 	if err != nil {
 		t.Fatalf("internalProofYs(inputs): %v", err)

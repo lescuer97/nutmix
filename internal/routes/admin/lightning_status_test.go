@@ -159,7 +159,7 @@ func TestLightningBackendStatusHandler(t *testing.T) {
 
 func TestStrikeEndOfLifeAdminUI(t *testing.T) {
 	ctx, recorder := adminTestContext("/admin/ln")
-	config := utils.Config{MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct
+	config := utils.Config{MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct,staticcheck // Verify legacy Strike UI.
 	if err := templates.LightningBackendPage(config, true).Render(ctx.Request.Context(), recorder); err != nil {
 		t.Fatalf("Render Strike page: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestStrikeEndOfLifeAdminUI(t *testing.T) {
 	}
 
 	ctx, recorder = adminTestContext("/admin/lightningdata")
-	if err := templates.SetupForms(string(utils.Strike), config).Render(ctx.Request.Context(), recorder); err != nil {
+	if err := templates.SetupForms(string(utils.Strike), config).Render(ctx.Request.Context(), recorder); err != nil { //nolint:staticcheck // Verify retired backend fields stay hidden.
 		t.Fatalf("Render SetupForms: %v", err)
 	}
 	if recorder.Body.Len() != 0 {

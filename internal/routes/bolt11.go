@@ -13,7 +13,7 @@ import (
 )
 
 func renderLNBackendEndOfLife(c *gin.Context, err error, minting bool) bool {
-	if !errors.Is(err, lightning.LNBackendEndOfLife) {
+	if !errors.Is(err, lightning.ErrLNBackendEndOfLife) {
 		return false
 	}
 

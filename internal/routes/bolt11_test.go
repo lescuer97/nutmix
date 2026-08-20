@@ -14,10 +14,10 @@ import (
 func TestRenderLNBackendEndOfLife(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, test := range []struct {
-		name    string
-		minting bool
-		code    cashu.ErrorCode
 		detail  string
+		name    string
+		code    cashu.ErrorCode
+		minting bool
 	}{
 		{name: "minting", minting: true, code: cashu.MINTING_DISABLED, detail: "Minting is temporarily unavailable"},
 		{name: "melting", minting: false, code: cashu.UNKNOWN, detail: "Melting is temporarily unavailable"},
@@ -25,7 +25,7 @@ func TestRenderLNBackendEndOfLife(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			ctx, _ := gin.CreateTestContext(recorder)
-			if !renderLNBackendEndOfLife(ctx, fmt.Errorf("wrapped: %w", lightning.LNBackendEndOfLife), test.minting) {
+			if !renderLNBackendEndOfLife(ctx, fmt.Errorf("wrapped: %w", lightning.ErrLNBackendEndOfLife), test.minting) {
 				t.Fatal("expected error to be handled")
 			}
 			if recorder.Code != 503 {

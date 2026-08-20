@@ -12,25 +12,25 @@ import (
 func TestStrikeTombstone(t *testing.T) {
 	strike := Strike{Network: chaincfg.RegressionNetParams}
 	tests := []struct {
-		name string
 		call func() error
+		name string
 	}{
 		{name: "pay invoice", call: func() error {
-			_, err := strike.PayInvoice(cashu.MeltRequestDB{}, nil, cashu.Amount{}, false, cashu.Amount{})
+			_, err := strike.PayInvoice(cashu.MeltRequestDB{}, nil, cashu.Amount{}, false, cashu.Amount{}) //nolint:exhaustruct // Tombstone ignores request values.
 			return err
 		}},
 		{name: "check paid", call: func() error { _, _, _, err := strike.CheckPayed("", nil, ""); return err }},
-		{name: "check received", call: func() error { _, _, err := strike.CheckReceived(cashu.MintRequestDB{}, nil); return err }},
-		{name: "query fees", call: func() error { _, err := strike.QueryFees("", nil, false, cashu.Amount{}); return err }},
-		{name: "request invoice", call: func() error { _, err := strike.RequestInvoice(cashu.Amount{}, nil); return err }},
+		{name: "check received", call: func() error { _, _, err := strike.CheckReceived(cashu.MintRequestDB{}, nil); return err }}, //nolint:exhaustruct // Tombstone ignores request values.
+		{name: "query fees", call: func() error { _, err := strike.QueryFees("", nil, false, cashu.Amount{}); return err }},        //nolint:exhaustruct // Tombstone ignores request values.
+		{name: "request invoice", call: func() error { _, err := strike.RequestInvoice(cashu.Amount{}, nil); return err }},         //nolint:exhaustruct // Tombstone ignores request values.
 		{name: "wallet balance", call: func() error { _, err := strike.WalletBalance(); return err }},
 		{name: "status", call: func() error { _, err := strike.Status(context.Background()); return err }},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := test.call(); !errors.Is(err, LNBackendEndOfLife) {
-				t.Fatalf("error = %v, want LNBackendEndOfLife", err)
+			if err := test.call(); !errors.Is(err, ErrLNBackendEndOfLife) {
+				t.Fatalf("error = %v, want ErrLNBackendEndOfLife", err)
 			}
 		})
 	}
@@ -45,7 +45,7 @@ func TestStrikeTombstone(t *testing.T) {
 	if strike.ActiveMPP() || !strike.VerifyUnitSupport(cashu.Sat) || !strike.VerifyUnitSupport(cashu.EUR) || strike.VerifyUnitSupport(cashu.USD) || !strike.DescriptionSupport() {
 		t.Fatal("Strike capability metadata changed unexpectedly")
 	}
-	if !IsBackendEndOfLife(strike) || IsBackendEndOfLife(FakeWallet{}) || IsBackendEndOfLife(nil) {
+	if !IsBackendEndOfLife(strike) || IsBackendEndOfLife(FakeWallet{}) || IsBackendEndOfLife(nil) { //nolint:exhaustruct // Zero-value backend is sufficient.
 		t.Fatal("backend end-of-life detection returned an unexpected result")
 	}
 }

@@ -13,34 +13,34 @@ type Strike struct {
 	Network chaincfg.Params
 }
 
-var _ LightningBackend = Strike{}
+var _ LightningBackend = Strike{} //nolint:exhaustruct // Compile-time interface check only.
 
 func (Strike) PayInvoice(cashu.MeltRequestDB, *zpay32.Invoice, cashu.Amount, bool, cashu.Amount) (PaymentResponse, error) {
-	return PaymentResponse{}, LNBackendEndOfLife
+	return PaymentResponse{}, ErrLNBackendEndOfLife
 }
 
 func (Strike) CheckPayed(string, *zpay32.Invoice, string) (PaymentStatus, string, cashu.Amount, error) {
-	return UNKNOWN, "", cashu.Amount{}, LNBackendEndOfLife
+	return UNKNOWN, "", cashu.Amount{}, ErrLNBackendEndOfLife
 }
 
 func (Strike) CheckReceived(cashu.MintRequestDB, *zpay32.Invoice) (PaymentStatus, string, error) {
-	return UNKNOWN, "", LNBackendEndOfLife
+	return UNKNOWN, "", ErrLNBackendEndOfLife
 }
 
 func (Strike) QueryFees(string, *zpay32.Invoice, bool, cashu.Amount) (FeesResponse, error) {
-	return FeesResponse{}, LNBackendEndOfLife
+	return FeesResponse{}, ErrLNBackendEndOfLife
 }
 
 func (Strike) RequestInvoice(cashu.Amount, *string) (InvoiceResponse, error) {
-	return InvoiceResponse{}, LNBackendEndOfLife
+	return InvoiceResponse{}, ErrLNBackendEndOfLife
 }
 
 func (Strike) WalletBalance() (cashu.Amount, error) {
-	return cashu.Amount{}, LNBackendEndOfLife
+	return cashu.Amount{}, ErrLNBackendEndOfLife
 }
 
 func (Strike) Status(context.Context) (NodeStatus, error) {
-	return STOPPED_STATUS, LNBackendEndOfLife
+	return STOPPED_STATUS, ErrLNBackendEndOfLife
 }
 
 func (Strike) LightningType() Backend {
