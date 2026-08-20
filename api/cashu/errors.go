@@ -16,6 +16,7 @@ var (
 	ErrCommonSecretNotCorrectSize = errors.New("proof secret is not correct size")
 	ErrUnknown                    = errors.New("unknown error")
 	ErrPaymentMethodNotSupported  = errors.New("payment method not supported")
+	ErrAmountOverflow             = errors.New("amount overflow")
 
 	ErrMintRequestAlreadyIssued = errors.New("mint request already issued")
 	ErrAmountNotEqualToInvoice  = errors.New("Amount in request does not equal invoice")

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -28,12 +29,15 @@ func (p *Proofs) SetPendingAndQuoteRef(quote string) {
 		(*p)[i].Quote = &quote
 	}
 }
-func (p *Proofs) Amount() uint64 {
+func (p *Proofs) Amount() (uint64, error) {
 	amount := uint64(0)
 	for i := 0; i < len(*p); i++ {
+		if amount > math.MaxUint64-(*p)[i].Amount {
+			return 0, ErrAmountOverflow
+		}
 		amount += (*p)[i].Amount
 	}
-	return amount
+	return amount, nil
 }
 
 func (p *Proofs) SetProofsState(state ProofState) {
@@ -204,8 +208,12 @@ func (p Proof) VerifyHTLC(spendCondition *SpendCondition) (bool, error) {
 }
 
 func timelockPassed(spendCondition *SpendCondition) bool {
+	locktime := spendCondition.Data.Tags.Locktime
+	if locktime == 0 || locktime > math.MaxInt64 {
+		return false
+	}
 	currentTime := time.Now().Unix()
-	return spendCondition.Data.Tags.Locktime != 0 && currentTime > int64(spendCondition.Data.Tags.Locktime)
+	return currentTime > int64(locktime)
 }
 
 func (p Proof) verifyTimelockPassedSpendCondition(spendCondition *SpendCondition, witness *Witness) (bool, error) {

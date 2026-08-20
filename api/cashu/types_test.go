@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -76,6 +77,81 @@ func TestCashuAmountChangeSatToMsat(t *testing.T) {
 	}
 	if amount.Unit != Msat {
 		t.Errorf("unit is not correct")
+	}
+}
+
+func TestAmountToMsatOverflowDoesNotMutate(t *testing.T) {
+	amount := NewAmount(Sat, math.MaxUint64/1000+1)
+
+	err := amount.To(Msat)
+	if !errors.Is(err, ErrAmountOverflow) {
+		t.Fatalf("amount.To(Msat) error = %v, want ErrAmountOverflow", err)
+	}
+	if amount.Unit != Sat || amount.Amount != math.MaxUint64/1000+1 {
+		t.Fatalf("amount mutated on overflow: %+v", amount)
+	}
+}
+
+func TestAmountToMsatExactBoundary(t *testing.T) {
+	amount := NewAmount(Sat, math.MaxUint64/1000)
+
+	if err := amount.To(Msat); err != nil {
+		t.Fatalf("amount.To(Msat): %v", err)
+	}
+	if amount.Unit != Msat || amount.Amount != (math.MaxUint64/1000)*1000 {
+		t.Fatalf("amount = %+v, want exact conversion boundary", amount)
+	}
+}
+
+func TestBlindedMessagesAmountBoundaries(t *testing.T) {
+	tests := []struct {
+		name     string
+		messages BlindedMessages
+		want     uint64
+		wantErr  bool
+	}{
+		{name: "exact max", messages: BlindedMessages{{Amount: math.MaxUint64 - 1}, {Amount: 1}}, want: math.MaxUint64, wantErr: false}, //nolint:exhaustruct // only amounts matter
+		{name: "overflow", messages: BlindedMessages{{Amount: math.MaxUint64}, {Amount: 1}}, want: 0, wantErr: true},                    //nolint:exhaustruct // only amounts matter
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := test.messages.Amount()
+			if test.wantErr {
+				if !errors.Is(err, ErrAmountOverflow) {
+					t.Fatalf("Amount() error = %v, want ErrAmountOverflow", err)
+				}
+				return
+			}
+			if err != nil || got != test.want {
+				t.Fatalf("Amount() = (%d, %v), want (%d, nil)", got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestProofsAmountBoundaries(t *testing.T) {
+	tests := []struct {
+		name    string
+		proofs  Proofs
+		want    uint64
+		wantErr bool
+	}{
+		{name: "exact max", proofs: Proofs{{Amount: math.MaxUint64 - 1}, {Amount: 1}}, want: math.MaxUint64, wantErr: false}, //nolint:exhaustruct // only amounts matter
+		{name: "overflow", proofs: Proofs{{Amount: math.MaxUint64}, {Amount: 1}}, want: 0, wantErr: true},                    //nolint:exhaustruct // only amounts matter
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := test.proofs.Amount()
+			if test.wantErr {
+				if !errors.Is(err, ErrAmountOverflow) {
+					t.Fatalf("Amount() error = %v, want ErrAmountOverflow", err)
+				}
+				return
+			}
+			if err != nil || got != test.want {
+				t.Fatalf("Amount() = (%d, %v), want (%d, nil)", got, err, test.want)
+			}
+		})
 	}
 }
 

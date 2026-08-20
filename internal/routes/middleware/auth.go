@@ -39,6 +39,7 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 							slog.Error("Could not setup oidc service during middleware.", slog.Any("error", err))
 							errMsg := "This is a mint connectin error with the oidc service"
 							c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, &errMsg))
+							c.Abort()
 							return
 						}
 					}
@@ -57,6 +58,7 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 					if err != nil {
 						slog.Warn("mint.VerifyAuthClearToken(token)", slog.Any("error", err))
 						c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
+						c.Abort()
 						return
 					}
 					// Header exists, continue processing
@@ -112,6 +114,7 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 					if err != nil {
 						slog.Warn("mint.VerifyAuthBlindToken(authProof)", slog.Any("error", err))
 						c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
+						c.Abort()
 						return
 					}
 					// Header exists, continue processing

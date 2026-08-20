@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"encoding/hex"
 	"errors"
+	"math"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -706,6 +707,28 @@ func TestCreateMeltQuoteUsesBackendAmountToSend(t *testing.T) {
 	}
 	if quote.CheckingId != "backend-checking-id" {
 		t.Fatalf("expected checking id to use backend response, got %q", quote.CheckingId)
+	}
+}
+
+func TestCreateMeltQuoteRejectsFeeReserveOverflow(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+	mint.LightningBackend = quoteAmountBackend{
+		FakeWallet: lightning.FakeWallet{ //nolint:exhaustruct // embedded test backend only needs network and errors
+			Network:         *mint.LightningBackend.GetNetwork(),
+			UnpurposeErrors: []lightning.FakeWalletError{},
+		},
+		feesResponse: lightning.FeesResponse{ //nolint:exhaustruct // checking ID is irrelevant before overflow rejection
+			Fees:         cashu.NewAmount(cashu.Sat, math.MaxUint64),
+			AmountToSend: cashu.NewAmount(cashu.Sat, 1),
+		},
+	}
+
+	_, err := mint.CreateMeltQuote(context.Background(), cashu.PostMeltQuoteBolt11Request{ //nolint:exhaustruct // options are irrelevant
+		Request: RegtestRequest,
+		Unit:    cashu.Sat.String(),
+	}, Bolt11)
+	if !errors.Is(err, cashu.ErrAmountOverflow) {
+		t.Fatalf("CreateMeltQuote() error = %v, want ErrAmountOverflow", err)
 	}
 }
 

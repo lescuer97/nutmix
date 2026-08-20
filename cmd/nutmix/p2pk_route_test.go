@@ -255,7 +255,7 @@ func makeP2PKSpendCondition(pubkey *secp256k1.PublicKey, nSigs uint, pubkeys []*
 	spendCondition.Data.Data = hex.EncodeToString(pubkey.SerializeCompressed())
 	spendCondition.Data.Tags.Pubkeys = pubkeys
 	spendCondition.Data.Tags.NSigs = nSigs
-	spendCondition.Data.Tags.Locktime = locktime
+	spendCondition.Data.Tags.Locktime = uint64(locktime)
 	spendCondition.Data.Tags.Sigflag = sigflag
 	spendCondition.Data.Tags.Refund = refundPubkey
 

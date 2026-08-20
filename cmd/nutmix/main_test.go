@@ -727,8 +727,14 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 	}
 
 	config, nostrNotificationConfig, err := mint.SetUpConfigDB(ctx, db)
+	if err != nil {
+		log.Fatalf("could not setup config file: %+v ", err)
+	}
 
-	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	config.MINT_LIGHTNING_BACKEND, err = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	if err != nil {
+		log.Fatal("utils.StringToLightningBackend", err)
+	}
 
 	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
 	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
@@ -736,10 +742,6 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
 	config.MINT_LNBITS_KEY = os.Getenv(utils.MINT_LNBITS_KEY)
 	config.MINT_LNBITS_ENDPOINT = os.Getenv(utils.MINT_LNBITS_ENDPOINT)
-
-	if err != nil {
-		log.Fatalf("could not setup config file: %+v ", err)
-	}
 
 	signer, err := localsigner.SetupLocalSigner(db)
 	if err != nil {
@@ -774,8 +776,14 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 	}
 
 	config, nostrNotificationConfig, err := mint.SetUpConfigDB(ctx, &db)
+	if err != nil {
+		log.Fatalf("could not setup config file: %+v ", err)
+	}
 
-	config.MINT_LIGHTNING_BACKEND = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	config.MINT_LIGHTNING_BACKEND, err = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
+	if err != nil {
+		log.Fatal("utils.StringToLightningBackend", err)
+	}
 
 	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
 	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
@@ -783,10 +791,6 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
 	config.MINT_LNBITS_KEY = os.Getenv(utils.MINT_LNBITS_KEY)
 	config.MINT_LNBITS_ENDPOINT = os.Getenv(utils.MINT_LNBITS_ENDPOINT)
-
-	if err != nil {
-		log.Fatalf("could not setup config file: %+v ", err)
-	}
 
 	mint, err := mint.SetUpMint(ctx, config, nostrNotificationConfig, &db, &signer)
 

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -13,8 +14,31 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lescuer97/nutmix/internal/signer"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
+
+func TestValidateBolt11MeltInputsRejectsAggregateOverflow(t *testing.T) {
+	mint := Mint{}                                                                                      //nolint:exhaustruct // overflow is rejected before dependencies are used
+	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Amount: math.MaxUint64}, {Amount: 1}}} //nolint:exhaustruct // only inputs matter
+
+	_, err := mint.validateBolt11MeltInputs(request, cashu.MeltRequestDB{}) //nolint:exhaustruct // quote is unused before rejection
+	if !errors.Is(err, cashu.ErrNotEnoughtProofs) || !errors.Is(err, cashu.ErrAmountOverflow) {
+		t.Fatalf("validateBolt11MeltInputs() error = %v, want insufficient proofs amount overflow", err)
+	}
+}
+
+func TestValidateBolt11MeltInputsRejectsRequiredTotalOverflow(t *testing.T) {
+	keyset := cashu.BasicKeysetResponse{Id: "keyset", Unit: cashu.Sat.String()}                                               //nolint:exhaustruct // only ID and unit matter
+	mint := Mint{Signer: fixedKeysetSigner{keysets: signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{keyset}}}} //nolint:exhaustruct // only signer is reached
+	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Id: keyset.Id, Amount: math.MaxUint64}}}                     //nolint:exhaustruct // only inputs matter
+	quote := cashu.MeltRequestDB{Amount: math.MaxUint64, FeeReserve: 1}                                                       //nolint:exhaustruct // only required totals matter
+
+	_, err := mint.validateBolt11MeltInputs(request, quote)
+	if !errors.Is(err, cashu.ErrNotEnoughtProofs) || !errors.Is(err, cashu.ErrAmountOverflow) {
+		t.Fatalf("validateBolt11MeltInputs() error = %v, want insufficient proofs amount overflow", err)
+	}
+}
 
 const testSatKeysetId = "0143cd3bb4a53bc6aeca481bb5ee707ea702939c83d9a86541be106c0e3dfcfe52"
 

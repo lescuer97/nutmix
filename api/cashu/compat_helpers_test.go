@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"testing"
 )
 
@@ -171,7 +172,8 @@ func validateHTLCProofWithCompatTime(proof Proof, spendCondition *SpendCondition
 }
 
 func compatTimelockPassed(spendCondition *SpendCondition, currentUnix int64) bool {
-	return spendCondition.Data.Tags.Locktime != 0 && currentUnix > int64(spendCondition.Data.Tags.Locktime)
+	locktime := spendCondition.Data.Tags.Locktime
+	return locktime != 0 && locktime <= math.MaxInt64 && currentUnix > int64(locktime)
 }
 
 func validateSwapRequestForCompat(request PostSwapRequest) error {

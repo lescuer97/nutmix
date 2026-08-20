@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"sort"
 	"strings"
 	"time"
 
@@ -31,6 +30,11 @@ var bluePagesRelays = []string{
 
 const nostrDMPublishTimeout = 8 * time.Second
 
+const (
+	nostrNotificationEventAttr = "nostr_notification_event"
+	nostrNotificationEventTest = "test"
+)
+
 type NostrErrorNotifyHandler struct {
 	base slog.Handler
 	mint *m.Mint
@@ -54,7 +58,7 @@ func (h *NostrErrorNotifyHandler) Enabled(ctx context.Context, level slog.Level)
 func (h *NostrErrorNotifyHandler) Handle(ctx context.Context, record slog.Record) error {
 	handleErr := h.base.Handle(ctx, record)
 
-	if record.Level < slog.LevelError || h.mint == nil {
+	if h.mint == nil {
 		return handleErr
 	}
 
@@ -62,8 +66,8 @@ func (h *NostrErrorNotifyHandler) Handle(ctx context.Context, record slog.Record
 		return handleErr
 	}
 
-	message := formatRecordForNostr(record)
-	if strings.TrimSpace(message) == "" {
+	message, notify := notificationPayload(record)
+	if !notify {
 		return handleErr
 	}
 
@@ -208,17 +212,35 @@ func (h *NostrErrorNotifyHandler) sendNIP17PrivateNostrMessage(ctx context.Conte
 	return nil
 }
 
-func formatRecordForNostr(record slog.Record) string {
-	attrs := make([]string, 0, record.NumAttrs())
-	record.Attrs(func(attr slog.Attr) bool {
-		attrs = append(attrs, fmt.Sprintf("%s=%s", attr.Key, attr.Value.String()))
-		return true
-	})
-	sort.Strings(attrs)
-
-	if len(attrs) == 0 {
-		return fmt.Sprintf("[%s] %s", record.Level.String(), record.Message)
+func notificationPayload(record slog.Record) (string, bool) {
+	if record.Level < slog.LevelError {
+		return "", false
 	}
 
-	return fmt.Sprintf("[%s] %s | %s", record.Level.String(), record.Message, strings.Join(attrs, " "))
+	event := ""
+	found := false
+	valid := true
+	record.Attrs(func(attr slog.Attr) bool {
+		if attr.Key != nostrNotificationEventAttr {
+			return true
+		}
+		if found || attr.Value.Kind() != slog.KindString {
+			valid = false
+			return false
+		}
+		found = true
+		event = attr.Value.String()
+		return true
+	})
+
+	if !valid || !found || event != nostrNotificationEventTest {
+		return "", false
+	}
+
+	return fmt.Sprintf(
+		"[%s] event=%s occurred_at=%s",
+		record.Level.String(),
+		nostrNotificationEventTest,
+		record.Time.UTC().Format(time.RFC3339),
+	), true
 }

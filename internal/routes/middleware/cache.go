@@ -29,8 +29,13 @@ var cachedPaths = map[string]bool{
 	"/v1/swap":        true,
 }
 
-func CacheMiddleware(store *persistence.InMemoryStore) gin.HandlerFunc {
+func CacheMiddleware(store *persistence.InMemoryStore, requireAuth func() bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if requireAuth() {
+			c.Next()
+			return
+		}
+
 		if !cachedPaths[c.Request.URL.Path] {
 			c.Next()
 			return

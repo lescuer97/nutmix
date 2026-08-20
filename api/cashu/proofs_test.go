@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -224,6 +225,68 @@ func TestCheckP2PKProofWithSpendableLocktime(t *testing.T) {
 	}
 	if !valid {
 		t.Errorf("proof should have been valid")
+	}
+}
+
+func TestLocktimeBoundariesDoNotBypassAuthorization(t *testing.T) {
+	preimage := []byte("authorized preimage")
+	hash := sha256.Sum256(preimage)
+	priv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("secp256k1.GeneratePrivateKey: %v", err)
+	}
+	pubkey := hex.EncodeToString(priv.PubKey().SerializeCompressed())
+
+	for _, locktime := range []uint64{1, math.MaxInt64 + 1, math.MaxUint64} {
+		for _, sigflag := range []string{"SIG_INPUTS", "SIG_ALL"} {
+			for _, proofType := range []string{"P2PK", "HTLC"} {
+				t.Run(fmt.Sprintf("%s/%s/%d", proofType, sigflag, locktime), func(t *testing.T) {
+					data := pubkey
+					witness := ""
+					pubkeysTag := ""
+					if proofType == "HTLC" {
+						data = hex.EncodeToString(hash[:])
+					}
+					secret := fmt.Sprintf(`["%s",{"nonce":"abc","data":"%s","tags":[%s["locktime","%d"],["sigflag","%s"]]}]`, proofType, data, pubkeysTag, locktime, sigflag)
+					proof := Proof{Secret: secret, Witness: witness} //nolint:exhaustruct // only authorization fields matter
+
+					var err error
+					if sigflag == "SIG_ALL" {
+						err = (&PostSwapRequest{Inputs: Proofs{proof}}).ValidateSigflag() //nolint:exhaustruct // outputs are irrelevant
+					} else {
+						err = VerifyProofCondition(proof)
+					}
+					if locktime == 1 {
+						if err != nil {
+							t.Fatalf("expired locktime should permit refund path: %v", err)
+						}
+					} else if err == nil {
+						t.Fatal("future locktime bypassed authorization")
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestTimelockPassedBoundaries(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		locktime uint64
+		want     bool
+	}{
+		{name: "zero", locktime: 0, want: false},
+		{name: "expired", locktime: 1, want: true},
+		{name: "max int64", locktime: math.MaxInt64, want: false},
+		{name: "max int64 plus one", locktime: math.MaxInt64 + 1, want: false},
+		{name: "max uint64", locktime: math.MaxUint64, want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			condition := &SpendCondition{Data: SpendConditionData{Tags: TagsInfo{Locktime: test.locktime}}} //nolint:exhaustruct // only locktime matters
+			if got := timelockPassed(condition); got != test.want {
+				t.Fatalf("timelockPassed() = %v, want %v", got, test.want)
+			}
+		})
 	}
 }
 

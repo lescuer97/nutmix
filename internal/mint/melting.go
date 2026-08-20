@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -61,6 +62,9 @@ func (m *Mint) createAndStoreBolt11MeltQuote(ctx context.Context, meltRequest ca
 		checkingId = feesResponse.CheckingId
 		queryFee = feesResponse.Fees.Amount
 		amountToSend = feesResponse.AmountToSend
+	}
+	if queryFee == math.MaxUint64 {
+		return cashu.MeltRequestDB{}, cashu.ErrAmountOverflow
 	}
 	dbRequest := cashu.MeltRequestDB{
 		Amount:          amountToSend.Amount,
@@ -306,10 +310,17 @@ func (m *Mint) RefreshMeltQuoteState(ctx context.Context, quoteId string) (cashu
 				return quote, fmt.Errorf("cashu.Fees(pending_proofs, m.Keysets[quote.Unit]). %w", err)
 			}
 
-			totalExpent := quote.Amount + quote.FeePaid + uint64(fee)
+			pendingProofsAmount, err := pending_proofs.Amount()
+			if err != nil {
+				return quote, fmt.Errorf("pending_proofs.Amount(). %w", err)
+			}
+			if quote.Amount > math.MaxUint64-quote.FeePaid || quote.Amount+quote.FeePaid > math.MaxUint64-fee {
+				return quote, cashu.ErrAmountOverflow
+			}
+			totalExpent := quote.Amount + quote.FeePaid + fee
 
-			if len(changeMessages) > 0 && pending_proofs.Amount() > totalExpent {
-				overpaidFees := pending_proofs.Amount() - totalExpent
+			if len(changeMessages) > 0 && pendingProofsAmount > totalExpent {
+				overpaidFees := pendingProofsAmount - totalExpent
 				var blindMessages []cashu.BlindedMessage
 				for _, v := range changeMessages {
 					blindMessages = append(blindMessages, cashu.BlindedMessage{Id: v.Id, B_: v.B_, Witness: "", Amount: 0})
@@ -430,7 +441,10 @@ func (m *Mint) validateBolt11MeltInputs(meltRequest cashu.PostMeltBolt11Request,
 		return bolt11MeltData{}, cashu.ErrMeltAlreadyPaid
 	}
 
-	proofsAmount := meltRequest.Inputs.Amount()
+	proofsAmount, err := meltRequest.Inputs.Amount()
+	if err != nil {
+		return bolt11MeltData{}, errors.Join(cashu.ErrNotEnoughtProofs, err)
+	}
 
 	keysets, err := m.Signer.GetKeysets()
 	if err != nil {
@@ -440,10 +454,16 @@ func (m *Mint) validateBolt11MeltInputs(meltRequest cashu.PostMeltBolt11Request,
 	// check for needed amount of fees
 	fee, err := cashu.Fees(meltRequest.Inputs, keysets.Keysets)
 	if err != nil {
+		if errors.Is(err, cashu.ErrAmountOverflow) {
+			return bolt11MeltData{}, errors.Join(cashu.ErrNotEnoughtProofs, err)
+		}
 		return bolt11MeltData{}, fmt.Errorf("cashu.Fees(request.Inputs, keysets.Keysets). %w", err)
 	}
 
-	if proofsAmount < (quote.Amount + quote.FeeReserve + uint64(fee)) {
+	if quote.Amount > math.MaxUint64-quote.FeeReserve || quote.Amount+quote.FeeReserve > math.MaxUint64-fee {
+		return bolt11MeltData{}, errors.Join(cashu.ErrNotEnoughtProofs, cashu.ErrAmountOverflow)
+	}
+	if proofsAmount < quote.Amount+quote.FeeReserve+fee {
 		slog.Info(fmt.Sprintf("Not enought proofs to expend. Needs: %v", quote.Amount))
 		return bolt11MeltData{}, fmt.Errorf("%w", cashu.ErrNotEnoughtProofs)
 	}
@@ -498,7 +518,7 @@ func (m *Mint) validateBolt11MeltInputs(meltRequest cashu.PostMeltBolt11Request,
 	if unit != proofUnit {
 		return bolt11MeltData{}, fmt.Errorf("proofs unit are not the same as the quote. %w", cashu.ErrDifferentInputOutputUnit)
 	}
-	return bolt11MeltData{Fee: cashu.NewAmount(proofUnit, uint64(fee)), Unit: unit, AmountProofs: cashu.NewAmount(proofUnit, proofsAmount)}, nil
+	return bolt11MeltData{Fee: cashu.NewAmount(proofUnit, fee), Unit: unit, AmountProofs: cashu.NewAmount(proofUnit, proofsAmount)}, nil
 }
 
 func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest cashu.PostMeltBolt11Request) (cashu.MeltRequestDB, error) {
@@ -508,11 +528,9 @@ func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest 
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if err != nil {
-			rollbackErr := m.MintDB.Rollback(ctx, sizeCheckTx)
-			if rollbackErr != nil {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
+		rollbackErr := m.MintDB.Rollback(ctx, sizeCheckTx)
+		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("rollback error", slog.Any("error", rollbackErr))
 		}
 	}()
 	quote, err := m.MintDB.GetMeltRequestById(sizeCheckTx, meltRequest.Quote)
@@ -702,6 +720,9 @@ func (m *Mint) finalizePaidBolt11Melt(ctx context.Context, meltData bolt11MeltDa
 		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, nil, fmt.Errorf("meltData.Fee.To(meltData) %w", err)
 	}
 
+	if quote.Amount > math.MaxUint64-paidLightningFeeSat.Amount || quote.Amount+paidLightningFeeSat.Amount > math.MaxUint64-meltData.Fee.Amount {
+		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, nil, cashu.ErrAmountOverflow
+	}
 	totalExpent := quote.Amount + paidLightningFeeSat.Amount + meltData.Fee.Amount
 
 	var recoverySigs []cashu.RecoverSigDB

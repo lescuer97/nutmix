@@ -144,12 +144,15 @@ func (b BlindedMessage) GenerateBlindSignature(k *secp256k1.PrivateKey) (BlindSi
 
 type BlindedMessages []BlindedMessage
 
-func (p *BlindedMessages) Amount() uint64 {
+func (p *BlindedMessages) Amount() (uint64, error) {
 	amount := uint64(0)
 	for i := 0; i < len(*p); i++ {
+		if amount > math.MaxUint64-(*p)[i].Amount {
+			return 0, ErrAmountOverflow
+		}
 		amount += (*p)[i].Amount
 	}
-	return amount
+	return amount, nil
 }
 
 type BlindSignature struct {
@@ -671,6 +674,9 @@ func (a *Amount) To(toUnit Unit) error {
 	switch toUnit {
 	case Msat:
 		if a.Unit == Sat {
+			if a.Amount > math.MaxUint64/1000 {
+				return ErrAmountOverflow
+			}
 			a.Unit = toUnit
 			a.Amount = a.Amount * 1000
 			return nil

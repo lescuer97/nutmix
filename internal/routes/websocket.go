@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lightningnetwork/lnd/zpay32"
@@ -37,6 +38,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 			slog.Warn("upgrader.Upgrade(c.Writer, c.Request, nil)", slog.Any("error", err))
 			return
 		}
+		conn.SetReadLimit(1024)
 		defer func() {
 			err := conn.Close()
 			if err != nil {
@@ -232,21 +234,19 @@ func CheckStatusOfSub(ctx context.Context, request cashu.WsRequest, mint *m.Mint
 		// check if a new stored notif has already been seen and if no send a status update and store state
 		value, exists := alreadyCheckedFilter[filter]
 
-		tx, err := mint.MintDB.GetTx(ctx)
-		if err != nil {
-			return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
-		}
-		defer func() {
-			if err != nil {
-				rollbackErr := mint.MintDB.Rollback(ctx, tx)
-				if rollbackErr != nil {
-					slog.Warn("rollback error", slog.Any("error", rollbackErr))
-				}
-			}
-		}()
-
 		switch request.Params.Kind {
 		case cashu.Bolt11MintQuote:
+			tx, err := mint.MintDB.GetTx(ctx)
+			if err != nil {
+				return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
+			}
+			defer func() {
+				rollbackErr := mint.MintDB.Rollback(ctx, tx)
+				if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+					slog.Warn("rollback error", slog.Any("error", rollbackErr))
+				}
+			}()
+
 			quote, err := mint.MintDB.GetMintRequestById(tx, filter)
 			if err != nil {
 				return fmt.Errorf("mint.MintDB.GetMintRequestById(filter). %w", err)

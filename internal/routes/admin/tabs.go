@@ -13,6 +13,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
@@ -505,6 +506,7 @@ func MintSettingsNotificationsTest(mint *m.Mint) gin.HandlerFunc {
 		now := time.Now().UTC()
 		slog.Error(
 			"nostr test notification trigger",
+			slog.String(nostrNotificationEventAttr, nostrNotificationEventTest),
 			slog.String("source", "admin.nostr_notifications.test_button"),
 			slog.String("nonce", strconv.FormatInt(now.UnixNano(), 10)),
 			slog.Time("triggered_at", now),
@@ -644,10 +646,7 @@ func persistConfigTx(ctx context.Context, mint *m.Mint, config utils.Config) (er
 	}
 
 	defer func() {
-		if err == nil {
-			return
-		}
-		if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+		if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 			slog.Warn("mint.MintDB.Rollback(ctx, tx)", slog.String(utils.LogExtraInfo, rollbackErr.Error()))
 		}
 	}()
@@ -672,10 +671,7 @@ func persistNostrNotificationConfigTx(ctx context.Context, mint *m.Mint, config 
 	}
 
 	defer func() {
-		if err == nil {
-			return
-		}
-		if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil {
+		if rollbackErr := mint.MintDB.Rollback(ctx, tx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 			slog.Warn("mint.MintDB.Rollback(ctx, tx)", slog.String(utils.LogExtraInfo, rollbackErr.Error()))
 		}
 	}()

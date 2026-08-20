@@ -185,12 +185,10 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 					defer func() {
 						if p := recover(); p != nil {
 							slog.Warn("Rolling back because of failure", slog.Any("error", err))
-							rollbackErr := mint.MintDB.Rollback(ctx, afterCheckTx)
-							if rollbackErr != nil {
-								if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-									slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
-								}
-							}
+						}
+						rollbackErr := mint.MintDB.Rollback(ctx, afterCheckTx)
+						if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+							slog.Error("Failed to rollback transaction", slog.Any("error", rollbackErr))
 						}
 					}()
 					err = mint.MintDB.ChangeLiquiditySwapState(afterCheckTx, swap.Id, swap.State)

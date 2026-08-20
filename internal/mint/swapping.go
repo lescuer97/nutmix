@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
@@ -29,14 +30,9 @@ func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (
 		return cashu.PostSwapResponse{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 	defer func() {
-		if err != nil {
-			rollbackErr := m.MintDB.Rollback(ctx, sizeCheckTx)
-			if rollbackErr != nil {
-				if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-					slog.Warn("rollback error", slog.Any("error", rollbackErr))
-				}
-				return
-			}
+		rollbackErr := m.MintDB.Rollback(ctx, sizeCheckTx)
+		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("rollback error", slog.Any("error", rollbackErr))
 		}
 	}()
 
@@ -186,8 +182,14 @@ func (m *Mint) validateSwapBalanceAndUnits(request cashu.PostSwapRequest) error 
 	if len(request.Inputs) == 0 || len(request.Outputs) == 0 {
 		return fmt.Errorf("inputs or outputs are empty")
 	}
-	proofsAmount := request.Inputs.Amount()
-	blindMessageAmount := request.Outputs.Amount()
+	proofsAmount, err := request.Inputs.Amount()
+	if err != nil {
+		return errors.Join(cashu.ErrUnbalanced, err)
+	}
+	blindMessageAmount, err := request.Outputs.Amount()
+	if err != nil {
+		return errors.Join(cashu.ErrUnbalanced, err)
+	}
 
 	keysets, err := m.Signer.GetKeysets()
 	if err != nil {
@@ -197,12 +199,17 @@ func (m *Mint) validateSwapBalanceAndUnits(request cashu.PostSwapRequest) error 
 	// check for needed amount of fees
 	fee, err := cashu.Fees(request.Inputs, keysets.Keysets)
 	if err != nil {
+		if errors.Is(err, cashu.ErrAmountOverflow) {
+			return errors.Join(cashu.ErrUnbalanced, err)
+		}
 		return fmt.Errorf("cashu.Fees(request.Inputs, keysets.Keysets). %w", err)
 	}
 
-	balance := (proofsAmount - (uint64(fee) + blindMessageAmount))
-	if balance != 0 {
-		return fmt.Errorf("(proofs.Amount() - (uint64(fee) + AmountSignature)). %w", cashu.ErrUnbalanced)
+	if blindMessageAmount > math.MaxUint64-fee {
+		return errors.Join(cashu.ErrUnbalanced, cashu.ErrAmountOverflow)
+	}
+	if proofsAmount != blindMessageAmount+fee {
+		return fmt.Errorf("proofs amount != outputs amount + fee. %w", cashu.ErrUnbalanced)
 	}
 
 	// get unit from proofs
