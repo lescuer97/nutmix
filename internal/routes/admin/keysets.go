@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -27,7 +28,7 @@ func KeysetsPage(mint *m.Mint) gin.HandlerFunc {
 		})
 
 		availableUnits = append(availableUnits, cashu.AUTH)
-		err := templates.KeysetsPage(availableUnits).Render(ctx, c.Writer)
+		err := templates.KeysetsPage(availableUnits, lightning.IsBackendEndOfLife(mint.LightningBackend)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(fmt.Errorf("templates.KeysetsPage().Render(ctx, c.Writer). %w", err))

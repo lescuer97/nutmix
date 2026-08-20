@@ -88,10 +88,10 @@ func createMintTestBlindedMessages(t *testing.T, amount uint64, activeKeys signe
 	return blindedMessages
 }
 
-func createSpendableProofs(t *testing.T, mint *Mint, amount uint64, activeKeys signer.GetKeysResponse) cashu.Proofs {
+func createSpendableProofs(t *testing.T, mint *Mint, activeKeys signer.GetKeysResponse) cashu.Proofs {
 	t.Helper()
 
-	blindedMessages, secrets, blindingFactors := createMintTestBlindedMessagesWithSecrets(t, amount, activeKeys)
+	blindedMessages, secrets, blindingFactors := createMintTestBlindedMessagesWithSecrets(t, 4, activeKeys)
 	blindSignatures, _, err := mint.Signer.SignBlindMessages(blindedMessages)
 	if err != nil {
 		t.Fatalf("mint.Signer.SignBlindMessages(blindedMessages): %v", err)
@@ -677,6 +677,62 @@ func TestReserveMeltInputsAndMarkPendingPersistsProofQuoteReference(t *testing.T
 	}
 }
 
+func TestExecuteMeltRejectsStrikeBeforeReservingInputs(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	mint := SetupMintWithLightningMockPostgres(t)
+	ctx := context.Background()
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
+	}
+	quote := cashu.MeltRequestDB{ //nolint:exhaustruct // Only persisted rejection fields are relevant.
+		Amount: 2, Quote: "strike-eol-melt", Request: RegtestRequest,
+		Unit: cashu.Sat.String(), Expiry: time.Now().Add(time.Minute).Unix(),
+		FeeReserve: 1, State: cashu.UNPAID, CheckingId: "legacy-checking-id",
+	}
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx: %v", err)
+	}
+	if err := mint.MintDB.SaveMeltRequest(tx, quote); err != nil {
+		t.Fatalf("mint.MintDB.SaveMeltRequest: %v", err)
+	}
+	if err := mint.MintDB.Commit(ctx, tx); err != nil {
+		t.Fatalf("mint.MintDB.Commit: %v", err)
+	}
+
+	request := cashu.PostMeltBolt11Request{
+		Quote:   quote.Quote,
+		Inputs:  createSpendableProofs(t, mint, activeKeys),
+		Outputs: createMintTestBlindedMessages(t, 1, activeKeys),
+	}
+	mint.LightningBackend = lightning.Strike{Network: *mint.LightningBackend.GetNetwork()}
+	_, err = mint.ExecuteMelt(ctx, request, Bolt11)
+	if !errors.Is(err, lightning.ErrLNBackendEndOfLife) {
+		t.Fatalf("ExecuteMelt error = %v, want ErrLNBackendEndOfLife", err)
+	}
+
+	tx, err = mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx: %v", err)
+	}
+	defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
+	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, quote.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltRequestById: %v", err)
+	}
+	if savedQuote.State != cashu.UNPAID || savedQuote.CheckingId != quote.CheckingId {
+		t.Fatalf("melt quote changed before rejection: %+v", savedQuote)
+	}
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, quote.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetProofsFromQuote: %v", err)
+	}
+	if len(savedProofs) != 0 {
+		t.Fatalf("expected no reserved proofs, got %d", len(savedProofs))
+	}
+}
+
 func TestCreateMeltQuoteUsesBackendAmountToSend(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	mint.LightningBackend = quoteAmountBackend{
@@ -807,7 +863,7 @@ func TestBolt11MeltSendsSuccessEvents(t *testing.T) {
 		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
 	}
 
-	proofs := createSpendableProofs(t, mint, 4, activeKeys)
+	proofs := createSpendableProofs(t, mint, activeKeys)
 	proofsForWatch := append(cashu.Proofs(nil), proofs...)
 	_, err = internalutils.GetAndCalculateProofsValues(&proofsForWatch)
 	if err != nil {

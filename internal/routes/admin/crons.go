@@ -63,6 +63,10 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 	}
 
 	for {
+		if !utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND) {
+			time.Sleep(2 * time.Second)
+			continue
+		}
 		func() {
 			// check if there are new liquidity swaps to check
 			select {

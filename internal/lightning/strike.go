@@ -1,458 +1,64 @@
 package lightning
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-// Strike implements the Strike-hosted lightning backend.
-// Deprecated: Strike backend will be removed in v0.7.0.
+// Strike preserves legacy configuration while rejecting all retired operations.
 type Strike struct {
-	endpoint string
-	key      string
-	Network  chaincfg.Params
+	Network chaincfg.Params
 }
 
-type strikeAccountBalanceResponse struct {
-	Currency strikeCurrency `json:"currency"`
-	Current  string         `json:"current"`
-}
-type strikeInvoiceRequest struct {
-	CorrelationId string       `json:"correlationId"`
-	Description   *string      `json:"description,omitempty"`
-	Amount        strikeAmount `json:"amount"`
+var _ LightningBackend = Strike{} //nolint:exhaustruct // Compile-time interface check only.
+
+func (Strike) PayInvoice(cashu.MeltRequestDB, *zpay32.Invoice, cashu.Amount, bool, cashu.Amount) (PaymentResponse, error) {
+	return PaymentResponse{}, ErrLNBackendEndOfLife
 }
 
-type strikeInvoiceState string
-
-const UNPAID strikeInvoiceState = "UNPAID"
-const PAID strikeInvoiceState = "PAID"
-const PENDING_STRIKE strikeInvoiceState = "PENDING"
-const CANCELLED strikeInvoiceState = "CANCELLED"
-
-type strikePaymentState string
-
-const PENDING_STRIKE_PAYMENT strikePaymentState = "PENDING"
-const COMPLETED strikePaymentState = "COMPLETED"
-const FAILED_STRIKE_PAYMENT strikePaymentState = "FAILED"
-
-type strikeCurrency string
-
-const BTC strikeCurrency = "BTC"
-const USD strikeCurrency = "USD"
-const EUR strikeCurrency = "EUR"
-
-type strikeAmount struct {
-	Amount   string         `json:"amount"`
-	Currency strikeCurrency `json:"currency"`
+func (Strike) CheckPayed(string, *zpay32.Invoice, string) (PaymentStatus, string, cashu.Amount, error) {
+	return UNKNOWN, "", cashu.Amount{}, ErrLNBackendEndOfLife
 }
 
-// C0B9B39D8A69F62647352D1E048B07E0A788E0FDE77623BFBD31BC97AB743703
-
-func strikePaymentStateToCashuState(state strikePaymentState) (PaymentStatus, error) {
-	switch state {
-	case PENDING_STRIKE_PAYMENT:
-		return PENDING, nil
-	case COMPLETED:
-		return SETTLED, nil
-	case FAILED_STRIKE_PAYMENT:
-		return FAILED, nil
-	default:
-		return PENDING, fmt.Errorf("could not get payment status from strike state")
-	}
+func (Strike) CheckReceived(cashu.MintRequestDB, *zpay32.Invoice) (PaymentStatus, string, error) {
+	return UNKNOWN, "", ErrLNBackendEndOfLife
 }
 
-func CashuAmountToStrikeAmount(amount cashu.Amount) (strikeAmount, error) {
-	var strikeAmt strikeAmount
-	floatStr, err := amount.ToFloatString()
-	if err != nil {
-		return strikeAmt, fmt.Errorf("amount.ToFloatString(): %w", err)
-	}
-	switch amount.Unit {
-	case cashu.Sat:
-		return strikeAmount{
-			Amount:   floatStr,
-			Currency: BTC,
-		}, nil
-	case cashu.EUR:
-		return strikeAmount{
-			Amount:   floatStr,
-			Currency: EUR,
-		}, nil
-	}
-	return strikeAmt, cashu.ErrCouldNotConvertUnit
+func (Strike) QueryFees(string, *zpay32.Invoice, bool, cashu.Amount) (FeesResponse, error) {
+	return FeesResponse{}, ErrLNBackendEndOfLife
 }
 
-type strikeInvoiceResponse struct {
-	InvoiceId   string             `json:"invoiceId"`
-	Description string             `json:"description"`
-	Amount      strikeAmount       `json:"amount"`
-	State       strikeInvoiceState `json:"state"`
-}
-type strikeInvoiceQuoteResponse struct {
-	TargetAmount    strikeAmount `json:"targetAmount"`
-	QuoteId         string       `json:"quoteId"`
-	Description     string       `json:"description"`
-	LnInvoice       string       `json:"lnInvoice"`
-	Expiration      string       `json:"expiration"`
-	ExpirationInSec int64        `json:"expirationInSec"`
+func (Strike) RequestInvoice(cashu.Amount, *string) (InvoiceResponse, error) {
+	return InvoiceResponse{}, ErrLNBackendEndOfLife
 }
 
-type strikePaymentRequest struct {
-	LnInvoice      string         `json:"lnInvoice"`
-	SourceCurrency strikeCurrency `json:"sourceCurrency"`
+func (Strike) WalletBalance() (cashu.Amount, error) {
+	return cashu.Amount{}, ErrLNBackendEndOfLife
 }
 
-type strikePaymentQuoteResponse struct {
-	PaymentQuoteId      string       `json:"paymentQuoteId"`
-	LightningNetworkFee strikeAmount `json:"lightningNetworkFee"`
-	Amount              strikeAmount `json:"amount"`
-	TotalFee            strikeAmount `json:"totalFee"`
-	TotalAmount         strikeAmount `json:"totalAmount"`
+func (Strike) Status(context.Context) (NodeStatus, error) {
+	return STOPPED_STATUS, ErrLNBackendEndOfLife
 }
 
-type strikePaymentStatus struct {
-	PaymentId           string             `json:"paymentId"`
-	State               strikePaymentState `json:"state"`
-	Completed           string             `json:"completed"`
-	Amount              strikeAmount       `json:"amount"`
-	TotalFee            strikeAmount       `json:"totalFee"`
-	LightningNetworkFee strikeAmount       `json:"lightningNetworkFee"`
-	TotalAmount         strikeAmount       `json:"totalAmount"`
-	Lightning           struct {
-		NetworkFee strikeAmount `json:"networkFee"`
-	} `json:"lightning"`
-}
-
-type strikeErrorStatus struct {
-	TraceId *string `json:"TraceId,omitempty"`
-	Data    struct {
-		Code    string `json:"string"`
-		Message string `json:"message"`
-		Status  uint   `json:"status"`
-	} `json:"data"`
-}
-
-func (l *Strike) Setup(key string, endpoint string) error {
-	slog.Warn("Strike backend is deprecated and will be removed in v0.7.0")
-
-	if key == "" {
-		return fmt.Errorf("Strike key not available")
-	}
-
-	if endpoint == "" {
-		return fmt.Errorf("STRIKE endpoint not available")
-	}
-	l.key = key
-	l.endpoint = endpoint
-
-	return nil
-}
-
-func (l *Strike) StrikeRequest(method string, endpoint string, reqBody any, responseType any) error {
-	return l.strikeRequest(context.Background(), method, endpoint, reqBody, responseType)
-}
-
-func (l *Strike) strikeRequest(ctx context.Context, method string, endpoint string, reqBody any, responseType any) error {
-	client := &http.Client{} //nolint:exhaustruct
-	marshalledBody := bytes.NewBuffer(nil)
-	if reqBody != nil {
-		jsonBytes, err := json.Marshal(reqBody)
-		if err != nil {
-			return fmt.Errorf("json.Marshal: %w", err)
-		}
-		marshalledBody = bytes.NewBuffer(jsonBytes)
-	}
-	fullUrl := l.endpoint + endpoint
-	fullUrl = strings.TrimSpace(fullUrl)
-
-	req, err := http.NewRequestWithContext(ctx, method, fullUrl, marshalledBody)
-	if err != nil {
-		return fmt.Errorf("http.NewRequestWithContext: %w", err)
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", l.key))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("client.Do(req): %w", err)
-	}
-	defer func() {
-		err := resp.Body.Close()
-		if err != nil {
-			slog.Error("could not close body from call.", slog.Any("error", err))
-		}
-	}()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("io.ReadAll(resp.Body): %w", err)
-	}
-
-	switch resp.StatusCode {
-	case 200, 201, 202:
-		err = json.Unmarshal(body, &responseType)
-		if err != nil {
-			return fmt.Errorf("json.Unmarshal(body, &responseType): %w", err)
-		}
-		return nil
-
-	default:
-		var errorBody strikeErrorStatus
-		err = json.Unmarshal(body, &errorBody)
-		if err != nil {
-			return fmt.Errorf("json.Unmarshal(errorBody): %w", err)
-		}
-
-		switch errorBody.Data.Status {
-		case 400:
-			return fmt.Errorf("bad request %+v, %+v", errorBody, reqBody)
-		case 401:
-			return fmt.Errorf("unauthorized %+v", errorBody)
-		default:
-			return fmt.Errorf("unknown error %+v", errorBody)
-		}
-	}
-}
-
-func (l Strike) convertStrikeAmountToUInt(amount strikeAmount) (cashu.Amount, error) {
-	cashuAmount := cashu.Amount{
-		Unit:   cashu.Sat,
-		Amount: 0,
-	}
-	val, err := strconv.ParseFloat(amount.Amount, 64)
-	if err != nil {
-		return cashuAmount, fmt.Errorf("strconv.ParseUint(fee_str, 10, 64): %w", err)
-	}
-	var unit cashu.Unit
-	switch amount.Currency {
-	case BTC:
-		val = val * 1e8
-		unit = cashu.Sat
-	case EUR:
-		val = val * 100
-		unit = cashu.EUR
-	default:
-		return cashuAmount, fmt.Errorf("could not get the correct unit")
-	}
-
-	cashuAmount.Amount = uint64(val)
-	cashuAmount.Unit = unit
-	return cashuAmount, nil
-}
-
-func (l Strike) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
-	var strikePayment strikePaymentStatus
-	var invoiceRes PaymentResponse
-
-	err := l.StrikeRequest("PATCH", fmt.Sprintf("/v1/payment-quotes/%s/execute", melt_quote.CheckingId), nil, &strikePayment)
-	if err != nil {
-		return invoiceRes, fmt.Errorf(`"/v1/payment-quotes/%s/execute", melt_quote.CheckingId), nil, &strikePayment) %w`, melt_quote.CheckingId, err)
-	}
-
-	fee, err := l.convertStrikeAmountToUInt(strikePayment.LightningNetworkFee)
-	if err != nil {
-		return invoiceRes, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
-	}
-
-	state, err := strikePaymentStateToCashuState(strikePayment.State)
-	if err != nil {
-		return invoiceRes, fmt.Errorf(`strikeStateToCashuState(strikePayment.State) %w`, err)
-	}
-	payHash := *zpayInvoice.PaymentHash
-	invoiceRes.PaidFee = fee
-	invoiceRes.PaymentState = state
-	invoiceRes.PaymentRequest = melt_quote.Request
-	invoiceRes.Rhash = hex.EncodeToString(payHash[:])
-	invoiceRes.CheckingId = strikePayment.PaymentId
-
-	return invoiceRes, nil
-}
-
-func (l Strike) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
-	var paymentStatus strikePaymentStatus
-
-	err := l.StrikeRequest("GET", "/v1/payments/"+checkingId, nil, &paymentStatus)
-	if err != nil {
-		return FAILED, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, fmt.Errorf(`l.StrikeRequest("GET", "/v1/payments/"+checkingId: %w`, err)
-	}
-
-	lnFee, err := l.convertStrikeAmountToUInt(paymentStatus.LightningNetworkFee)
-	if err != nil {
-		return FAILED, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, fmt.Errorf(`strconv.ParseUint(paymentStatus.LightningNetworkFee, 10, 64): %w`, err)
-	}
-
-	state, err := strikePaymentStateToCashuState(paymentStatus.State)
-	if err != nil {
-		return PENDING, "", lnFee, fmt.Errorf("strikePaymentStateToCashuState(strikePayment.State): %w", err)
-	}
-	return state, "", lnFee, nil
-}
-func (l Strike) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.Invoice) (PaymentStatus, string, error) {
-	var paymentStatus strikeInvoiceResponse
-
-	err := l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/%s", quote.CheckingId), nil, &paymentStatus)
-	if err != nil {
-		return FAILED, "", fmt.Errorf(`l.StrikeRequest("GET", fmt.Sprintf("/v1/invoices/", quote), nil, &paymentStatus) %w`, err)
-	}
-
-	switch paymentStatus.State {
-	case UNPAID:
-		return FAILED, "", nil
-	case PAID:
-		return SETTLED, "", nil
-	case PENDING_STRIKE:
-		return PENDING, "", nil
-	case CANCELLED:
-		return FAILED, "", nil
-	default:
-		return PENDING, "", nil
-	}
-}
-
-func (l Strike) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (FeesResponse, error) {
-	var queryResponse strikePaymentQuoteResponse
-
-	var FeesResponse FeesResponse
-	strikeAmount, err := CashuAmountToStrikeAmount(amount)
-	if err != nil {
-		return FeesResponse, fmt.Errorf(`CashuAmountToStrikeAmount(): %w`, err)
-	}
-	strikeQuery := strikePaymentRequest{
-		LnInvoice:      invoice,
-		SourceCurrency: strikeAmount.Currency,
-	}
-
-	invoiceString := "/v1/payment-quotes/lightning"
-
-	err = l.StrikeRequest("POST", invoiceString, strikeQuery, &queryResponse)
-	if err != nil {
-		return FeesResponse, fmt.Errorf(`l.StrikeRequest("GET", invoiceString, nil, &queryResponse): %w`, err)
-	}
-
-	feeAmount, err := l.convertStrikeAmountToUInt(queryResponse.TotalFee)
-	if err != nil {
-		return FeesResponse, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
-	}
-	amountSend, err := l.convertStrikeAmountToUInt(queryResponse.Amount)
-	if err != nil {
-		return FeesResponse, fmt.Errorf(`l.fee(queryResponse.TotalFee) %w`, err)
-	}
-
-	feeAmount.Amount = GetFeeReserve(amount.Amount, feeAmount.Amount)
-	FeesResponse.Fees = feeAmount
-
-	FeesResponse.AmountToSend = amountSend
-	FeesResponse.CheckingId = queryResponse.PaymentQuoteId
-	return FeesResponse, nil
-}
-
-func (l Strike) RequestInvoice(amount cashu.Amount, description *string) (InvoiceResponse, error) {
-	var response InvoiceResponse
-	supported := l.VerifyUnitSupport(amount.Unit)
-	if !supported {
-		return response, fmt.Errorf("l.VerifyUnitSupport(amount.Unit). %w", cashu.ErrUnitNotSupported)
-	}
-
-	strikeAmt, err := CashuAmountToStrikeAmount(amount)
-	if err != nil {
-		return response, fmt.Errorf("CashuAmountToStrikeAmount(amount): %w", err)
-	}
-	reqInvoice := strikeInvoiceRequest{
-		CorrelationId: uuid.New().String(),
-		Description:   description,
-		Amount:        strikeAmt,
-	}
-
-	// get invoice request
-	var strikeInvoiceResponse strikeInvoiceResponse
-	err = l.StrikeRequest("POST", "/v1/invoices", reqInvoice, &strikeInvoiceResponse)
-	if err != nil {
-		return response, fmt.Errorf(`l.StrikeRequest("POST", "/v1/invoices", r: %w`, err)
-	}
-	// get invoice quote
-	var strikeInvoiceQuoteResponse strikeInvoiceQuoteResponse
-	err = l.StrikeRequest("POST", fmt.Sprintf("/v1/invoices/%s/quote", strikeInvoiceResponse.InvoiceId), nil, &strikeInvoiceQuoteResponse)
-	if err != nil {
-		return response, fmt.Errorf(`l.StrikeRequest("GET",fmt.Sprintf("/v1/invoices/", strikeInvoiceResponse.InvoiceId.String()), nil, &strikeInvoiceQuoteResponse): %w`, err)
-	}
-
-	response.PaymentRequest = strikeInvoiceQuoteResponse.LnInvoice
-	response.Rhash = strikeInvoiceQuoteResponse.QuoteId
-	response.CheckingId = strikeInvoiceResponse.InvoiceId
-
-	return response, nil
-}
-
-func (l Strike) WalletBalance() (cashu.Amount, error) {
-	return l.walletBalance(context.Background())
-}
-
-func (l Strike) walletBalance(ctx context.Context) (cashu.Amount, error) {
-	var balance []strikeAccountBalanceResponse
-	err := l.strikeRequest(ctx, "GET", "/v1/balances", nil, &balance)
-	if err != nil {
-		return cashu.Amount{Unit: cashu.Sat, Amount: 0}, fmt.Errorf(`l.StrikeRequest("GET", "/v1/balances": %w`, err)
-	}
-
-	balanceTotal := uint64(0)
-
-	for _, bal := range balance {
-		if bal.Currency == BTC {
-			currentBalance, err := l.convertStrikeAmountToUInt(strikeAmount{Amount: bal.Current, Currency: BTC})
-			if err != nil {
-				return cashu.Amount{Unit: cashu.Sat, Amount: 0}, fmt.Errorf(`l.convertToSatAmount(strikeAmount{Amount: bal.Current, Currency: BTC}). %w`, err)
-			}
-			balanceTotal += currentBalance.Amount
-		}
-	}
-
-	return cashu.Amount{Unit: cashu.Msat, Amount: balanceTotal * 1000}, nil
-}
-
-func (l Strike) Status(ctx context.Context) (NodeStatus, error) {
-	_, err := l.walletBalance(ctx)
-	if err != nil {
-		return OFFLINE_STATUS, err
-	}
-	return ONLINE_STATUS, nil
-}
-
-func (f Strike) LightningType() Backend {
+func (Strike) LightningType() Backend {
 	return STRIKE
 }
 
-func (f Strike) GetNetwork() *chaincfg.Params {
-	return &f.Network
+func (s Strike) GetNetwork() *chaincfg.Params {
+	return &s.Network
 }
 
-func (f Strike) ActiveMPP() bool {
+func (Strike) ActiveMPP() bool {
 	return false
 }
 
-func (f Strike) VerifyUnitSupport(unit cashu.Unit) bool {
-	switch unit {
-	case cashu.Sat:
-		return true
-	case cashu.EUR:
-		return true
-	default:
-		return false
-	}
+func (Strike) VerifyUnitSupport(unit cashu.Unit) bool {
+	return unit == cashu.Sat || unit == cashu.EUR
 }
-func (f Strike) DescriptionSupport() bool {
+
+func (Strike) DescriptionSupport() bool {
 	return true
 }

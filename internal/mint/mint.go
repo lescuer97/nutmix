@@ -148,14 +148,10 @@ func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig
 			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
 		}
 		mint.LightningBackend = clnWallet
-	case utils.Strike: //nolint:staticcheck // Strike remains supported until its planned removal in v0.7.0.
+	case utils.Strike: //nolint:staticcheck // Legacy configs use a stopped backend so the mint can still start.
+		slog.Error("Strike lightning backend is end of life; minting and melting are unavailable until it is replaced")
 		strikeWallet := lightning.Strike{
 			Network: chainparam,
-		}
-
-		err := strikeWallet.Setup(config.STRIKE_KEY, config.STRIKE_ENDPOINT)
-		if err != nil {
-			return &mint, fmt.Errorf("lndWallet.SetupGrpc %w", err)
 		}
 		mint.LightningBackend = strikeWallet
 

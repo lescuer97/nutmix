@@ -72,6 +72,25 @@ func (s failingSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 	return s.Signer.SignBlindMessages(messages)
 }
 
+func TestExecuteSwapDoesNotRequireLightningBackend(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	mint := SetupMintWithLightningMockPostgres(t)
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
+	}
+	inputs := createSpendableProofs(t, mint, activeKeys)
+	mint.LightningBackend = nil
+
+	_, err = mint.ExecuteSwap(context.Background(), cashu.PostSwapRequest{
+		Inputs:  inputs,
+		Outputs: createMintTestBlindedMessages(t, 4, activeKeys),
+	})
+	if err != nil {
+		t.Fatalf("ExecuteSwap: %v", err)
+	}
+}
+
 func TestExecuteSwapRemovesPendingProofsWhenSaveRestoreSigsFails(t *testing.T) {
 	runSwapCleanupFailureTest(t, "SaveRestoreSigs", func(mint *Mint) {
 		mint.MintDB = swapFailingDB{MintDB: mint.MintDB, saveRestoreSigsErr: errors.New("save restore sigs failed"), setProofsStateErr: nil}
@@ -99,7 +118,7 @@ func runSwapCleanupFailureTest(t *testing.T, expectedErr string, mutateMint func
 		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
 	}
 
-	inputs := createSpendableProofs(t, mint, 4, activeKeys)
+	inputs := createSpendableProofs(t, mint, activeKeys)
 	proofYs, err := internalProofYs(inputs)
 	if err != nil {
 		t.Fatalf("internalProofYs(inputs): %v", err)

@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	ErrAlreadyPaid                    = errors.New("invoice already paid")
-	ErrLNNodeImplementationDepracated = errors.New("lightning node implementation is deprecated")
+	ErrAlreadyPaid        = errors.New("invoice already paid")
+	ErrLNBackendEndOfLife = errors.New("lightning backend is end of life")
 )
 
 type Backend uint
@@ -32,7 +32,7 @@ type NodeStatus string
 const ONLINE_STATUS NodeStatus = "ONLINE"
 const OFFLINE_STATUS NodeStatus = "OFFLINE"
 const UNKNOWN_STATUS NodeStatus = "UNKNOWN"
-const DEPRACATED_STATUS NodeStatus = "DEPRACATED"
+const STOPPED_STATUS NodeStatus = "STOPPED"
 
 type LightningBackend interface {
 	PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error)
@@ -49,6 +49,19 @@ type LightningBackend interface {
 	ActiveMPP() bool
 	VerifyUnitSupport(unit cashu.Unit) bool
 	DescriptionSupport() bool
+}
+
+func IsBackendEndOfLife(backend LightningBackend) bool {
+	if backend == nil {
+		return false
+	}
+
+	switch backend.LightningType() {
+	case STRIKE:
+		return true
+	default:
+		return false
+	}
 }
 
 type PaymentStatus uint

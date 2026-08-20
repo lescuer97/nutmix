@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -38,7 +39,10 @@ func LightningBackendStatus(mint *m.Mint) gin.HandlerFunc {
 			defer cancel()
 
 			status, err := backend.Status(ctx)
-			if err != nil {
+			if errors.Is(err, lightning.ErrLNBackendEndOfLife) {
+				slog.Error("lightning backend is end of life and must be replaced", slog.Any("error", err))
+				nodeStatus = lightning.STOPPED_STATUS
+			} else if err != nil {
 				slog.Warn("could not check lightning backend status", slog.Any("error", err))
 				nodeStatus = lightning.OFFLINE_STATUS
 			} else {
@@ -46,13 +50,13 @@ func LightningBackendStatus(mint *m.Mint) gin.HandlerFunc {
 			}
 
 			switch backend.LightningType() {
-			case lightning.LNBITS, lightning.STRIKE: //nolint:staticcheck // Deprecated backends remain supported until their scheduled removal.
+			case lightning.LNBITS: //nolint:staticcheck // LNBITS remains supported until its scheduled removal.
 				deprecated = true
 			}
 		}
 
 		switch nodeStatus {
-		case lightning.ONLINE_STATUS, lightning.OFFLINE_STATUS, lightning.UNKNOWN_STATUS:
+		case lightning.ONLINE_STATUS, lightning.OFFLINE_STATUS, lightning.UNKNOWN_STATUS, lightning.STOPPED_STATUS:
 		default:
 			nodeStatus = lightning.UNKNOWN_STATUS
 		}

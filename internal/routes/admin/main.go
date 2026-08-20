@@ -39,10 +39,6 @@ func ErrorHtmlMessageMiddleware() gin.HandlerFunc {
 					message = ErrInvalidOICDURL.Error()
 				case errors.Is(e, ErrUnitNotCorrect):
 					message = "Keyset Unit is not correct"
-				case errors.Is(e, ErrInvalidStrikeCheck):
-					message = ErrInvalidStrikeCheck.Error()
-				case errors.Is(e, ErrInvalidStrikeConfig):
-					message = ErrInvalidStrikeCheck.Error()
 				case errors.Is(e, ErrIncorrectNpub):
 					message = ErrIncorrectNpub.Error()
 				case errors.Is(e, ErrCouldNotParseLogin):

@@ -2,6 +2,7 @@ package mint
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lescuer97/nutmix/api/cashu"
+	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
 	pq "github.com/lescuer97/nutmix/internal/database/postgresql"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	localsigner "github.com/lescuer97/nutmix/internal/signer/local_signer"
@@ -19,6 +21,28 @@ import (
 )
 
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
+
+func TestSetUpMintLoadsLegacyStrikeAsTombstone(t *testing.T) {
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	db := &mockdb.MockDB{} //nolint:exhaustruct
+	sig, err := localsigner.SetupLocalSigner(db)
+	if err != nil {
+		t.Fatalf("localsigner.SetupLocalSigner: %v", err)
+	}
+	config := utils.Config{NETWORK: "regtest", MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct,staticcheck // Verify legacy Strike configuration.
+
+	mint, err := SetUpMint(context.Background(), config, nil, db, &sig)
+	if err != nil {
+		t.Fatalf("SetUpMint: %v", err)
+	}
+	if mint.LightningBackend == nil || mint.LightningBackend.LightningType() != lightning.STRIKE { //nolint:staticcheck // Verify legacy Strike configuration.
+		t.Fatal("legacy Strike config did not load the tombstone backend")
+	}
+	status, statusErr := mint.LightningBackend.Status(context.Background())
+	if status != lightning.STOPPED_STATUS || !errors.Is(statusErr, lightning.ErrLNBackendEndOfLife) {
+		t.Fatalf("Status() = %q, %v", status, statusErr)
+	}
+}
 
 func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 	const posgrespassword = "password"

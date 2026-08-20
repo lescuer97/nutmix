@@ -59,8 +59,8 @@ templ LightningActivityTable(invoices []LightningInvoiceVisual) {
 	</div>
 }
 
-templ LightningActivityLayout(config utils.Config, selectedRange string, searchQuery string) {
-	@Layout("lightning") {
+templ LightningActivityLayout(config utils.Config, selectedRange string, searchQuery string, backendEndOfLife bool) {
+	@Layout("lightning", backendEndOfLife) {
 		<main class="main-content">
 			<div class="lightning-activity-toolbar">
 				@TimeRangeSelector(selectedRange)

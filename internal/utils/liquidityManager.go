@@ -57,7 +57,7 @@ func (s SwapType) ToString() string {
 
 func CanUseLiquidityManager(backend LightningBackend) bool {
 	switch backend {
-	case FAKE_WALLET:
+	case FAKE_WALLET, Strike:
 		return false
 	default:
 		return true

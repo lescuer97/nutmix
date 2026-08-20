@@ -79,43 +79,6 @@ func TestLnbitsStatusCancellation(t *testing.T) {
 	assertStatusCancellation(t, started, LnbitsWallet{Endpoint: server.URL, Key: "valid"}.Status) //nolint:exhaustruct
 }
 
-func TestStrikeStatus(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/v1/balances" {
-			http.Error(w, "unexpected request", http.StatusBadRequest)
-			return
-		}
-		if r.Header.Get("Authorization") != "Bearer valid" {
-			w.WriteHeader(http.StatusUnauthorized)
-			_, _ = w.Write([]byte(`{"data":{"status":401}}`))
-			return
-		}
-		_, _ = w.Write([]byte(`[{"currency":"BTC","current":"0"}]`))
-	}))
-	t.Cleanup(server.Close)
-
-	assertStatus(t, (&Strike{endpoint: server.URL, key: "valid"}).Status, ONLINE_STATUS, false)   //nolint:exhaustruct
-	assertStatus(t, (&Strike{endpoint: server.URL, key: "invalid"}).Status, OFFLINE_STATUS, true) //nolint:exhaustruct
-}
-
-func TestStrikeStatusCancellation(t *testing.T) {
-	started := make(chan struct{})
-	release := make(chan struct{})
-	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		close(started)
-		select {
-		case <-r.Context().Done():
-		case <-release:
-		}
-	}))
-	t.Cleanup(func() {
-		close(release)
-		server.Close()
-	})
-
-	assertStatusCancellation(t, started, (&Strike{endpoint: server.URL, key: "valid"}).Status) //nolint:exhaustruct
-}
-
 type lndStatusServer struct {
 	lnrpc.UnimplementedLightningServer
 	err     error

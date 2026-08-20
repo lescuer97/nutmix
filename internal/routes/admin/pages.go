@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes/admin/templates"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -67,6 +68,7 @@ func InitPage(mint *mint.Mint) gin.HandlerFunc {
 		err := templates.MintActivityLayout(
 			utils.CanUseLiquidityManager(mint.Config.MINT_LIGHTNING_BACKEND),
 			selectedRange,
+			lightning.IsBackendEndOfLife(mint.LightningBackend),
 		).Render(ctx, c.Writer)
 
 		if err != nil {
@@ -253,7 +255,7 @@ func LigthningLiquidityPage(mint *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		err := templates.LiquidityDashboard().Render(ctx, c.Writer)
+		err := templates.LiquidityDashboard(lightning.IsBackendEndOfLife(mint.LightningBackend)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)
@@ -323,7 +325,7 @@ func SwapStatusPage(mint *mint.Mint) gin.HandlerFunc {
 			component = templates.LightningSendSummary(amount, swap.LightningInvoice, swap.Id)
 		}
 
-		err = templates.SwapStatusPage(component).Render(ctx, c.Writer)
+		err = templates.SwapStatusPage(component, lightning.IsBackendEndOfLife(mint.LightningBackend)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)
@@ -341,7 +343,7 @@ func LnPage(mint *mint.Mint) gin.HandlerFunc {
 		selectedRange := c.DefaultQuery("since", "1w")
 		searchQuery := strings.TrimSpace(c.Query("search"))
 
-		err := templates.LightningActivityLayout(mint.Config, selectedRange, searchQuery).Render(ctx, c.Writer)
+		err := templates.LightningActivityLayout(mint.Config, selectedRange, searchQuery, lightning.IsBackendEndOfLife(mint.LightningBackend)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(err)

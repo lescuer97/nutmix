@@ -27,8 +27,6 @@ import (
 var (
 	ErrInvalidOICDURL         = errors.New("invalid OICD discovery URL")
 	ErrInvalidNostrKey        = errors.New("nostr npub is not valid")
-	ErrInvalidStrikeConfig    = errors.New("invalid strike config")
-	ErrInvalidStrikeCheck     = errors.New("could not verify strike configuration")
 	ErrCouldNotParseLogin     = errors.New("could not parse login")
 	ErrInvalidNostrSignature  = errors.New("invalid nostr signature")
 	ErrFailedLightningPayment = errors.New("failed lightning payment")
@@ -38,7 +36,7 @@ func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		err := templates.MintSettings(mint.Config, nostrNotificationConfigValue(mint.NostrNotificationConfig)).Render(ctx, c.Writer)
+		err := templates.MintSettings(mint.Config, nostrNotificationConfigValue(mint.NostrNotificationConfig), lightning.IsBackendEndOfLife(mint.LightningBackend)).Render(ctx, c.Writer)
 		if err != nil {
 			_ = c.Error(err)
 			c.Status(400)
@@ -692,7 +690,7 @@ func persistNostrNotificationConfigTx(ctx context.Context, mint *m.Mint, config 
 func LightningNodePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		err := templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer)
+		err := templates.LightningBackendPage(mint.Config, lightning.IsBackendEndOfLife(mint.LightningBackend)).Render(ctx, c.Writer)
 
 		if err != nil {
 			_ = c.Error(fmt.Errorf("templates.LightningBackendPage(mint.Config).Render(ctx, c.Writer). %w", err))
@@ -729,9 +727,6 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 			lnbitsKey      = mint.Config.MINT_LNBITS_KEY
 			lnbitsEndpoint = mint.Config.MINT_LNBITS_ENDPOINT
-
-			strikeKey      = mint.Config.STRIKE_KEY
-			strikeEndpoint = mint.Config.STRIKE_ENDPOINT
 
 			clnHost     = mint.Config.CLN_GRPC_HOST
 			clnCa       = mint.Config.CLN_CA_CERT
@@ -787,25 +782,6 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				Endpoint: lnbitsEndpoint,
 			}
 			newBackend = lnbitsWallet
-
-		case string(utils.Strike): //nolint:staticcheck // Strike remains configurable until its planned removal in v0.7.0.
-			newBackendType = utils.Strike //nolint:staticcheck // Strike remains configurable until its planned removal in v0.7.0.
-			strikeKey = c.Request.PostFormValue("STRIKE_KEY")
-			strikeEndpoint = c.Request.PostFormValue("STRIKE_ENDPOINT")
-
-			strikeWallet := lightning.Strike{
-				Network: chainparam,
-			}
-
-			err := strikeWallet.Setup(strikeKey, strikeEndpoint)
-			if err != nil {
-				_ = c.Error(fmt.Errorf("strikeWallet.Setup(strikeKey, strikeEndpoint) %w %w", err, ErrInvalidStrikeConfig))
-				if renderErr := RenderError(c, "Invalid Strike configuration"); renderErr != nil {
-					slog.Warn("failed to render error", slog.Any("error", renderErr))
-				}
-				return
-			}
-			newBackend = strikeWallet
 
 		case string(utils.CLNGRPC):
 			newBackendType = utils.CLNGRPC
@@ -899,9 +875,6 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		case utils.LNBITS: //nolint:staticcheck // LNBITS config is still persisted until its planned removal in v0.8.0.
 			mint.Config.MINT_LNBITS_KEY = lnbitsKey
 			mint.Config.MINT_LNBITS_ENDPOINT = lnbitsEndpoint
-		case utils.Strike: //nolint:staticcheck // Strike config is still persisted until its planned removal in v0.7.0.
-			mint.Config.STRIKE_KEY = strikeKey
-			mint.Config.STRIKE_ENDPOINT = strikeEndpoint
 		case utils.CLNGRPC:
 			mint.Config.CLN_GRPC_HOST = clnHost
 			mint.Config.CLN_MACAROON = clnMacaroon

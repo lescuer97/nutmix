@@ -412,6 +412,10 @@ func (m *Mint) ReconcilePendingMeltQuotes() error {
 		slog.Info("Attempting to solve pending quote for", slog.Any("quote", quote))
 		quote, err := m.RefreshMeltQuoteState(context.Background(), quote.Quote)
 		if err != nil {
+			if errors.Is(err, lightning.ErrLNBackendEndOfLife) {
+				slog.Error("pending melt quotes cannot be reconciled until the end-of-life lightning backend is replaced", slog.String("quote", quote.Quote), slog.Any("error", err))
+				return nil
+			}
 			return fmt.Errorf("m.RefreshMeltQuoteState(ctx, quote.Quote). %w", err)
 		}
 
@@ -798,6 +802,9 @@ func (m *Mint) bolt11Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11R
 	meltRequestData, err := m.validateBolt11MeltInputs(meltRequest, quote)
 	if err != nil {
 		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.validateBolt11MeltInputs(meltRequest, quote): %w", err)
+	}
+	if lightning.IsBackendEndOfLife(m.LightningBackend) {
+		return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, lightning.ErrLNBackendEndOfLife
 	}
 	quote, err = m.reserveMeltInputsAndMarkPending(ctx, meltRequest)
 	if err != nil {
