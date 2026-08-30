@@ -19,7 +19,8 @@ func (l *LDK) prepareInitConfig(ctx context.Context) (string, string, ldk_node.N
 	if l.db == nil {
 		return "", "", 0, PersistedConfig{}, fmt.Errorf("ldk database is nil")
 	}
-	if l.network == "" {
+	runtimeConfig := l.configSnapshot()
+	if runtimeConfig.Network == "" {
 		return "", "", 0, PersistedConfig{}, fmt.Errorf("ldk network is empty")
 	}
 
@@ -38,9 +39,9 @@ func (l *LDK) prepareInitConfig(ctx context.Context) (string, string, ldk_node.N
 		return "", "", 0, PersistedConfig{}, fmt.Errorf("ReadOrCreateSeed(storageDirPath): %w", err)
 	}
 
-	chainParams, err := utils.CheckChainParams(l.network)
+	chainParams, err := utils.CheckChainParams(runtimeConfig.Network)
 	if err != nil {
-		return "", "", 0, PersistedConfig{}, fmt.Errorf("utils.CheckChainParams(l.network): %w", err)
+		return "", "", 0, PersistedConfig{}, fmt.Errorf("utils.CheckChainParams(runtimeConfig.Network): %w", err)
 	}
 
 	network, err := convertChaninParamsToLdkNetwork(chainParams)

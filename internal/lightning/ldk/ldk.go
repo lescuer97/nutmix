@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"sync"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	ldk_node "github.com/lescuer97/ldkgo/bindings/ldk_node_ffi"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
 )
@@ -21,10 +23,6 @@ type Backend = lightning.Backend
 
 var _ lightning.LightningBackend = (*LDK)(nil)
 
-type Options struct {
-	StorageDir string
-}
-
 const (
 	SETTLED = lightning.SETTLED
 	FAILED  = lightning.FAILED
@@ -33,22 +31,27 @@ const (
 	LDKNODE = lightning.LDKNODE
 )
 
+type LdkConfig struct {
+	TorOnly    bool
+	NoOutgoing bool
+	Network    string
+	StorageDir string
+}
+
 type LDK struct {
-	node    *ldk_node.Node
-	db      database.MintDB
-	network string
-	options Options
-	torOnly bool
+	node     *ldk_node.Node
+	db       database.MintDB
+	configMu sync.RWMutex
+	config   LdkConfig
 }
 
-func NewLdk(ctx context.Context, db database.MintDB, network string) (*LDK, error) {
-	return NewLdkWithOptions(ctx, db, network, Options{StorageDir: ""})
-}
+func NewLdk(ctx context.Context, db database.MintDB, config LdkConfig) (*LDK, error) {
+	ldk, err := NewConfigBackend(db, config)
+	if err != nil {
+		return nil, err
+	}
 
-func NewLdkWithOptions(ctx context.Context, db database.MintDB, network string, options Options) (*LDK, error) {
-	ldk := NewConfigBackendWithOptions(db, network, options)
-
-	err := ldk.InitNode(ctx)
+	err = ldk.InitNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("ldk.InitNode(). %w", err)
 	}
@@ -60,23 +63,43 @@ func NewLdkWithOptions(ctx context.Context, db database.MintDB, network string, 
 	return ldk, nil
 }
 
-func NewConfigBackend(db database.MintDB, network string) (*LDK, error) {
-	return NewConfigBackendWithOptions(db, network, Options{StorageDir: ""}), nil
-}
-
-func NewConfigBackendWithOptions(db database.MintDB, network string, options Options) *LDK {
-	backend := &LDK{
-		node:    nil,
-		db:      db,
-		network: network,
-		options: options,
-		torOnly: false,
-	}
-	return backend
+func NewConfigBackend(db database.MintDB, config LdkConfig) (*LDK, error) {
+	return &LDK{
+		node:     nil,
+		db:       db,
+		configMu: sync.RWMutex{},
+		config:   config,
+	}, nil
 }
 
 func (l *LDK) storageDir() string {
-	return l.options.StorageDir
+	return l.configSnapshot().StorageDir
+}
+
+func (l *LDK) configSnapshot() LdkConfig {
+	if l == nil {
+		return LdkConfig{}
+	}
+
+	l.configMu.RLock()
+	defer l.configMu.RUnlock()
+	return l.config
+}
+
+func (l *LDK) setTorOnly(torOnly bool) {
+	l.configMu.Lock()
+	l.config.TorOnly = torOnly
+	l.configMu.Unlock()
+}
+
+func (l *LDK) checkOutgoingAllowed() error {
+	if l == nil {
+		return fmt.Errorf("ldk backend is nil")
+	}
+	if l.configSnapshot().NoOutgoing {
+		return cashu.ErrMeltingDisabled
+	}
+	return nil
 }
 
 func (l *LDK) InitNode(ctx context.Context) error {
@@ -146,8 +169,8 @@ func (l *LDK) InitNode(ctx context.Context) error {
 		}
 	}
 
+	l.setTorOnly(config.TorOnly)
 	l.node = node
-	l.torOnly = config.TorOnly
 	return nil
 }
 

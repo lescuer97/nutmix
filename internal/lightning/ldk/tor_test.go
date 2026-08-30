@@ -155,7 +155,7 @@ func TestValidatePersistedConfigTorOnlyChainSourceHosts(t *testing.T) {
 }
 
 func TestOpenChannelRejectsClearnetWhenTorOnly(t *testing.T) {
-	err := (&LDK{torOnly: true}).OpenChannel("02abc", "8.8.8.8:9735", 1000)
+	err := (&LDK{config: LdkConfig{TorOnly: true}}).OpenChannel("02abc", "8.8.8.8:9735", 1000)
 	if err == nil || !strings.Contains(err.Error(), "tor-only") {
 		t.Fatalf("expected tor-only validation error, got %v", err)
 	}

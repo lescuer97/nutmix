@@ -146,7 +146,12 @@ func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig
 		mint.LightningBackend = strikeWallet
 
 	case utils.LDK:
-		ldkNode, err := ldk.NewLdk(ctx, db, config.NETWORK)
+		ldkNode, err := ldk.NewLdk(ctx, db, ldk.LdkConfig{
+			TorOnly:    false,
+			NoOutgoing: false,
+			Network:    config.NETWORK,
+			StorageDir: "",
+		})
 		if err != nil {
 			slog.Error("ldk backend failed to start; mint running without lightning backend", slog.Any("error", err))
 			mint.LDKSetupError = err.Error()

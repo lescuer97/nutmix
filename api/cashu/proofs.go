@@ -17,6 +17,8 @@ import (
 
 type ProofState string
 
+var ErrMeltingDisabled = errors.New("melting is temporarily disabled")
+
 const PROOF_UNSPENT ProofState = "UNSPENT"
 const PROOF_SPENT ProofState = "SPENT"
 const PROOF_PENDING ProofState = "PENDING"

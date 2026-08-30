@@ -71,8 +71,9 @@ func (l *LDK) LightningType() Backend {
 }
 
 func (l *LDK) GetNetwork() *chaincfg.Params {
-	if l != nil && l.network != "" {
-		if chainParams, err := utils.CheckChainParams(l.network); err == nil {
+	config := l.configSnapshot()
+	if config.Network != "" {
+		if chainParams, err := utils.CheckChainParams(config.Network); err == nil {
 			return &chainParams
 		}
 	}
@@ -126,6 +127,9 @@ func (l *LDK) NewOnchainAddress() (string, error) {
 }
 
 func (l *LDK) SendOnchain(address string, sats uint64) error {
+	if err := l.checkOutgoingAllowed(); err != nil {
+		return err
+	}
 	node, err := l.getNode()
 	if err != nil {
 		return err

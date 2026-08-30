@@ -194,7 +194,12 @@ func ldkConfigBackendForMint(mint *m.Mint, network string) (*ldk.LDK, error) {
 	if currentLDK, ok := mint.LightningBackend.(*ldk.LDK); ok && mint.Config.MINT_LIGHTNING_BACKEND == utils.LDK {
 		return currentLDK, nil
 	}
-	ldk, err := ldk.NewConfigBackend(mint.MintDB, network)
+	ldk, err := ldk.NewConfigBackend(mint.MintDB, ldk.LdkConfig{
+		TorOnly:    false,
+		NoOutgoing: false,
+		Network:    network,
+		StorageDir: "",
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +262,12 @@ func prepareLDKBackend(ctx context.Context, mint *m.Mint, network string, existi
 			return ldkBackendPreparation{backend: nil, unchanged: false, activeLDKStopped: true}, fmt.Errorf("currentLDK.SaveConfig(...): %w", err)
 		}
 
-		backend, err := ldk.NewLdk(ctx, mint.MintDB, network)
+		backend, err := ldk.NewLdk(ctx, mint.MintDB, ldk.LdkConfig{
+			TorOnly:    false,
+			NoOutgoing: false,
+			Network:    network,
+			StorageDir: "",
+		})
 		if err != nil {
 			return ldkBackendPreparation{backend: nil, unchanged: false, activeLDKStopped: true}, fmt.Errorf("ldk.NewLdk(...): %w", err)
 		}
@@ -273,7 +283,12 @@ func prepareLDKBackend(ctx context.Context, mint *m.Mint, network string, existi
 		return ldkBackendPreparation{}, fmt.Errorf("configBackend.SaveConfig(...): %w", err)
 	}
 
-	backend, err := ldk.NewLdk(ctx, mint.MintDB, network)
+	backend, err := ldk.NewLdk(ctx, mint.MintDB, ldk.LdkConfig{
+		TorOnly:    false,
+		NoOutgoing: false,
+		Network:    network,
+		StorageDir: "",
+	})
 	if err != nil {
 		return ldkBackendPreparation{}, fmt.Errorf("ldk.NewLdk(...): %w", err)
 	}

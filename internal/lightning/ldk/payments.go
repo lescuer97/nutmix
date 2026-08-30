@@ -13,6 +13,9 @@ import (
 
 func (l *LDK) PayInvoice(meltQuote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var response PaymentResponse
+	if err := l.checkOutgoingAllowed(); err != nil {
+		return response, err
+	}
 	if zpayInvoice == nil {
 		return response, fmt.Errorf("zpay invoice is nil")
 	}

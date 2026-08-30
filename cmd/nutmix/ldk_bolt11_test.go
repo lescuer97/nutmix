@@ -70,7 +70,7 @@ func TestMintBolt11LDKLightning(t *testing.T) {
 		t.Fatalf("ldk.SaveConfig(...): %v", err)
 	}
 
-	setupBackend, err := ldk.NewLdk(ctx, db, "regtest")
+	setupBackend, err := ldk.NewLdk(ctx, db, ldk.LdkConfig{Network: "regtest"})
 	if err != nil {
 		t.Fatalf("ldk.NewLdk(...): %v", err)
 	}
@@ -136,7 +136,7 @@ func TestMintBolt11LDKLightning(t *testing.T) {
 	runtime.GC()
 	runtime.GC()
 
-	mintBackend, err := ldk.NewLdk(ctx, db, "regtest")
+	mintBackend, err := ldk.NewLdk(ctx, db, ldk.LdkConfig{Network: "regtest"})
 	if err != nil {
 		t.Fatalf("ldk.NewLdk(...): %v", err)
 	}

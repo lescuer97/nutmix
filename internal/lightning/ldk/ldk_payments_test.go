@@ -1,6 +1,7 @@
 package ldk
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -239,6 +240,32 @@ func TestCheckReceivedPropagatesGetNodeError(t *testing.T) {
 	}
 	if status != UNKNOWN {
 		t.Fatalf("status = %v, want %v", status, UNKNOWN)
+	}
+}
+
+func TestNoOutgoingRejectsSpending(t *testing.T) {
+	backend := &LDK{config: LdkConfig{NoOutgoing: true}}
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{
+			name: "invoice payment",
+			call: func() error {
+				_, err := backend.PayInvoice(cashu.MeltRequestDB{}, nil, cashu.Amount{}, false, cashu.Amount{})
+				return err
+			},
+		},
+		{name: "on-chain send", call: func() error { return backend.SendOnchain("", 0) }},
+		{name: "channel open", call: func() error { return backend.OpenChannelWithPush("", "", 0, 0) }},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.call(); !errors.Is(err, cashu.ErrMeltingDisabled) {
+				t.Fatalf("error = %v, want %v", err, cashu.ErrMeltingDisabled)
+			}
+		})
 	}
 }
 

@@ -902,7 +902,7 @@ func TestBolt11PostReusesUnchangedActiveLDKConfig(t *testing.T) {
 	if err := ldk.SaveConfig(context.Background(), mockDatabase, ldkConfig); err != nil {
 		t.Fatalf("ldk.SaveConfig(...): %v", err)
 	}
-	activeBackend, err := ldk.NewConfigBackend(mockDatabase, "regtest")
+	activeBackend, err := ldk.NewConfigBackend(mockDatabase, ldk.LdkConfig{Network: "regtest"})
 	if err != nil {
 		t.Fatalf("ldk.NewConfigBackend(...): %v", err)
 	}
@@ -948,7 +948,7 @@ func TestBolt11PostLeavesMintOfflineWhenActiveLDKReplacementFails(t *testing.T) 
 	if err := ldk.SaveConfig(context.Background(), mockDatabase, ldkConfig); err != nil {
 		t.Fatalf("ldk.SaveConfig(...): %v", err)
 	}
-	activeBackend, err := ldk.NewConfigBackend(mockDatabase, "regtest")
+	activeBackend, err := ldk.NewConfigBackend(mockDatabase, ldk.LdkConfig{Network: "regtest"})
 	if err != nil {
 		t.Fatalf("ldk.NewConfigBackend(...): %v", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -143,7 +144,7 @@ func TestPrepareInitConfigUsesSeedAndConfig(t *testing.T) {
 		t.Fatalf("SaveConfig(...): %v", err)
 	}
 
-	backend := &LDK{node: nil, db: db, network: "testnet3"}
+	backend := &LDK{node: nil, db: db, config: LdkConfig{Network: "testnet3"}}
 	seedMnemonic, storageDir, network, config, err := backend.prepareInitConfig(ctx)
 	if err != nil {
 		t.Fatalf("backend.prepareInitConfig(ctx): %v", err)
@@ -211,7 +212,7 @@ func TestPrepareInitConfigReturnsElectrumConfig(t *testing.T) {
 		t.Fatalf("SaveConfig(...): %v", err)
 	}
 
-	backend := &LDK{node: nil, db: db, network: "testnet3"}
+	backend := &LDK{node: nil, db: db, config: LdkConfig{Network: "testnet3"}}
 	_, storageDir, network, config, err := backend.prepareInitConfig(ctx)
 	if err != nil {
 		t.Fatalf("backend.prepareInitConfig(ctx): %v", err)
@@ -239,7 +240,7 @@ func TestPrepareInitConfigReturnsEsploraConfig(t *testing.T) {
 		t.Fatalf("SaveConfig(...): %v", err)
 	}
 
-	backend := &LDK{node: nil, db: db, network: "testnet3"}
+	backend := &LDK{node: nil, db: db, config: LdkConfig{Network: "testnet3"}}
 	_, storageDir, network, config, err := backend.prepareInitConfig(ctx)
 	if err != nil {
 		t.Fatalf("backend.prepareInitConfig(ctx): %v", err)
@@ -324,7 +325,10 @@ func TestPrepareInitConfigUsesExplicitStorageDir(t *testing.T) {
 		t.Fatalf("SaveConfig(...): %v", err)
 	}
 
-	backend := NewConfigBackendWithOptions(db, "regtest", Options{StorageDir: tempDir})
+	backend, err := NewConfigBackend(db, LdkConfig{Network: "regtest", StorageDir: tempDir})
+	if err != nil {
+		t.Fatalf("NewConfigBackend(...): %v", err)
+	}
 	seedMnemonic, storageDir, _, _, err := backend.prepareInitConfig(ctx)
 	if err != nil {
 		t.Fatalf("prepareInitConfig(...): %v", err)
@@ -359,15 +363,51 @@ func TestReadOrCreateSeedFallsBackToConfigDirectory(t *testing.T) {
 	}
 }
 
-func TestNewConfigBackendWithOptionsKeepsStorageDir(t *testing.T) {
-	backend := NewConfigBackendWithOptions(&mockdb.MockDB{}, "regtest", Options{StorageDir: "/tmp/ldk"})
+func TestNewConfigBackendKeepsConfig(t *testing.T) {
+	backend, err := NewConfigBackend(&mockdb.MockDB{}, LdkConfig{Network: "regtest", StorageDir: "/tmp/ldk"})
+	if err != nil {
+		t.Fatalf("NewConfigBackend(...): %v", err)
+	}
 	if backend.storageDir() != "/tmp/ldk" {
 		t.Fatalf("storageDir = %q", backend.storageDir())
+	}
+	config := backend.configSnapshot()
+	if config.Network != "regtest" || config.NoOutgoing {
+		t.Fatalf("config = %+v, want regtest with outgoing enabled", config)
+	}
+}
+
+func TestConfigConcurrentReadWrite(t *testing.T) {
+	backend := &LDK{config: LdkConfig{Network: "regtest", StorageDir: "/tmp/ldk"}}
+	var wait sync.WaitGroup
+	wait.Add(2)
+
+	go func() {
+		defer wait.Done()
+		for i := 0; i < 1000; i++ {
+			backend.setTorOnly(i%2 == 0)
+		}
+	}()
+	go func() {
+		defer wait.Done()
+		for i := 0; i < 1000; i++ {
+			_ = backend.configSnapshot()
+			_ = backend.storageDir()
+			_ = backend.checkOutgoingAllowed()
+		}
+	}()
+
+	wait.Wait()
+	if config := backend.configSnapshot(); config.Network != "regtest" || config.StorageDir != "/tmp/ldk" {
+		t.Fatalf("config changed unexpectedly: %+v", config)
 	}
 }
 
 func TestNodeStoragePathUsesExplicitStorageDir(t *testing.T) {
-	backend := NewConfigBackendWithOptions(&mockdb.MockDB{}, "regtest", Options{StorageDir: "/tmp/ldk"})
+	backend, err := NewConfigBackend(&mockdb.MockDB{}, LdkConfig{Network: "regtest", StorageDir: "/tmp/ldk"})
+	if err != nil {
+		t.Fatalf("NewConfigBackend(...): %v", err)
+	}
 	if got := backend.storageDir(); got != "/tmp/ldk" {
 		t.Fatalf("storageDir() = %q", got)
 	}
@@ -377,7 +417,10 @@ func TestNodeStoragePathFallsBackToConfigDirectory(t *testing.T) {
 	xdgConfigHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
 
-	backend := NewConfigBackendWithOptions(&mockdb.MockDB{}, "regtest", Options{})
+	backend, err := NewConfigBackend(&mockdb.MockDB{}, LdkConfig{Network: "regtest"})
+	if err != nil {
+		t.Fatalf("NewConfigBackend(...): %v", err)
+	}
 	if got := backend.storageDir(); got != "" {
 		t.Fatalf("storageDir() = %q, want empty explicit storage dir", got)
 	}
@@ -396,7 +439,10 @@ func TestPrepareInitConfigFailsForExplicitStorageFilePath(t *testing.T) {
 		t.Fatalf("SaveConfig(...): %v", err)
 	}
 
-	backend := NewConfigBackendWithOptions(db, "regtest", Options{StorageDir: blockingFile})
+	backend, err := NewConfigBackend(db, LdkConfig{Network: "regtest", StorageDir: blockingFile})
+	if err != nil {
+		t.Fatalf("NewConfigBackend(...): %v", err)
+	}
 	if _, _, _, _, err := backend.prepareInitConfig(ctx); err == nil {
 		t.Fatal("expected explicit invalid storage dir to fail")
 	}
@@ -426,7 +472,10 @@ func TestBackendStopAndReopenReusesStorageDirWithoutReseeding(t *testing.T) {
 		t.Fatalf("SaveConfig(...): %v", err)
 	}
 
-	first := NewConfigBackendWithOptions(db, "regtest", Options{})
+	first, err := NewConfigBackend(db, LdkConfig{Network: "regtest"})
+	if err != nil {
+		t.Fatalf("NewConfigBackend(...): %v", err)
+	}
 	if err := first.InitNode(ctx); err != nil {
 		t.Fatalf("first.InitNode(ctx): %v", err)
 	}
@@ -435,7 +484,10 @@ func TestBackendStopAndReopenReusesStorageDirWithoutReseeding(t *testing.T) {
 		t.Fatalf("os.ReadFile(...): %v", err)
 	}
 
-	second := NewConfigBackendWithOptions(db, "regtest", Options{})
+	second, err := NewConfigBackend(db, LdkConfig{Network: "regtest"})
+	if err != nil {
+		t.Fatalf("NewConfigBackend(...): %v", err)
+	}
 	if err := second.InitNode(ctx); err != nil {
 		t.Fatalf("second.InitNode(ctx): %v", err)
 	}
@@ -477,7 +529,7 @@ func TestNewLdkStartsAndStops(t *testing.T) {
 		t.Fatalf("SaveConfig(...): %v", err)
 	}
 
-	backend, err := NewLdk(ctx, db, "regtest")
+	backend, err := NewLdk(ctx, db, LdkConfig{Network: "regtest"})
 	if err != nil {
 		t.Fatalf("NewLdk(...): %v", err)
 	}
