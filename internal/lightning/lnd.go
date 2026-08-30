@@ -362,7 +362,7 @@ func (l LndGrpcWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 func convert_route_hints(routes [][]zpay32.HopHint) []*lnrpc.RouteHint {
 	routehints := make([]*lnrpc.RouteHint, 0, len(routes))
 	for _, route := range routes {
-		var hopHints []*lnrpc.HopHint
+		hopHints := make([]*lnrpc.HopHint, 0, len(route))
 		for _, hint := range route {
 			hophint := lnrpc.HopHint{
 				NodeId:                    hex.EncodeToString(hint.NodeID.SerializeCompressed()),
