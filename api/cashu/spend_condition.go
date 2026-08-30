@@ -190,7 +190,8 @@ func (tags *TagsInfo) MarshalJSON() ([]byte, error) {
 
 	// Add pubkeys if present
 	if len(tags.Pubkeys) > 0 {
-		pubkeysTag := []string{"pubkeys"}
+		pubkeysTag := make([]string, 1, 1+len(tags.Pubkeys))
+		pubkeysTag[0] = "pubkeys"
 		for _, pubkey := range tags.Pubkeys {
 			pubkeysTag = append(pubkeysTag, hex.EncodeToString(pubkey.SerializeCompressed()))
 		}
@@ -209,7 +210,8 @@ func (tags *TagsInfo) MarshalJSON() ([]byte, error) {
 
 	// Add refund pubkeys if present
 	if len(tags.Refund) > 0 {
-		refundTag := []string{"refund"}
+		refundTag := make([]string, 1, 1+len(tags.Refund))
+		refundTag[0] = "refund"
 		for _, pubkey := range tags.Refund {
 			refundTag = append(refundTag, hex.EncodeToString(pubkey.SerializeCompressed()))
 		}

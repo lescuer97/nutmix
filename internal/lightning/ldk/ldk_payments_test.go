@@ -1,0 +1,364 @@
+package ldk
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/btcsuite/btcd/chaincfg"
+	ldk_node "github.com/lescuer97/ldkgo/bindings/ldk_node_ffi"
+	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lightningnetwork/lnd/zpay32"
+)
+
+func mustDecodeMockInvoice(t *testing.T) *zpay32.Invoice {
+	t.Helper()
+
+	invoiceString, err := lightning.CreateMockInvoice(cashu.NewAmount(cashu.Sat, 1000), "test", chaincfg.RegressionNetParams, 3600)
+	if err != nil {
+		t.Fatalf("lightning.CreateMockInvoice(...): %v", err)
+	}
+
+	invoice, err := zpay32.Decode(invoiceString, &chaincfg.RegressionNetParams)
+	if err != nil {
+		t.Fatalf("zpay32.Decode(...): %v", err)
+	}
+
+	return invoice
+}
+
+func TestFilterPaymentsByType(t *testing.T) {
+	payments := []ldk_node.PaymentDetails{
+		{Id: "out-1", Direction: ldk_node.PaymentDirectionOutbound},
+		{Id: "in-1", Direction: ldk_node.PaymentDirectionInbound},
+		{Id: "out-2", Direction: ldk_node.PaymentDirectionOutbound},
+	}
+
+	tests := []struct {
+		name        string
+		paymentType PaymentType
+		wantIDs     []string
+		wantErr     string
+	}{
+		{name: "all", paymentType: All, wantIDs: []string{"out-1", "in-1", "out-2"}},
+		{name: "incoming", paymentType: Incoming, wantIDs: []string{"in-1"}},
+		{name: "outgoing", paymentType: Outgoing, wantIDs: []string{"out-1", "out-2"}},
+		{name: "unknown", paymentType: PaymentType(99), wantErr: "unknown payment type: 99"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := filterPaymentsByType(payments, tt.paymentType)
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("filterPaymentsByType(...) error = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("filterPaymentsByType(...) error = %v", err)
+			}
+			if len(got) != len(tt.wantIDs) {
+				t.Fatalf("filterPaymentsByType(...) len = %d, want %d", len(got), len(tt.wantIDs))
+			}
+			for i, wantID := range tt.wantIDs {
+				if got[i].Id != wantID {
+					t.Fatalf("filterPaymentsByType(...)[%d].Id = %q, want %q", i, got[i].Id, wantID)
+				}
+			}
+		})
+	}
+}
+
+func TestFindPaymentDetailsPrefersCheckingID(t *testing.T) {
+	hash := "invoice-hash"
+	fee := uint64(250)
+	newerHashMatch := ldk_node.PaymentDetails{
+		Id:                    "newer-hash-match",
+		Direction:             ldk_node.PaymentDirectionOutbound,
+		LatestUpdateTimestamp: 20,
+		Kind: ldk_node.PaymentKindBolt11{
+			Hash: hash,
+		},
+	}
+	exactByID := &ldk_node.PaymentDetails{
+		Id:                    "exact-id",
+		Direction:             ldk_node.PaymentDirectionOutbound,
+		LatestUpdateTimestamp: 10,
+		Status:                ldk_node.PaymentStatusSucceeded,
+		FeePaidMsat:           &fee,
+		Kind: ldk_node.PaymentKindBolt11{
+			Hash: hash,
+		},
+	}
+
+	got := findPaymentDetails([]ldk_node.PaymentDetails{newerHashMatch}, exactByID, ldk_node.PaymentDirectionOutbound, hash)
+	if got == nil {
+		t.Fatal("findPaymentDetails(...) returned nil")
+		return
+	}
+	if got.Id != "exact-id" {
+		t.Fatalf("findPaymentDetails(...).Id = %q, want %q", got.Id, "exact-id")
+	}
+}
+
+func TestFindPaymentDetailsDoesNotFallbackToLatestWhenHashMissing(t *testing.T) {
+	payments := []ldk_node.PaymentDetails{
+		{
+			Id:                    "different-hash",
+			Direction:             ldk_node.PaymentDirectionOutbound,
+			LatestUpdateTimestamp: 99,
+			Kind:                  ldk_node.PaymentKindBolt11{Hash: "different"},
+		},
+	}
+
+	got := findPaymentDetails(payments, nil, ldk_node.PaymentDirectionOutbound, "wanted")
+	if got != nil {
+		t.Fatalf("findPaymentDetails(...) = %+v, want nil", got)
+	}
+}
+
+func TestPaymentStatusFromDetailsNilFeePaidMsat(t *testing.T) {
+	preimage := "preimage"
+	status, gotPreimage, fee, err := paymentStatusFromDetails(&ldk_node.PaymentDetails{
+		Status: ldk_node.PaymentStatusSucceeded,
+		Kind: ldk_node.PaymentKindBolt11{
+			Preimage: &preimage,
+		},
+	})
+	if err != nil {
+		t.Fatalf("paymentStatusFromDetails(... ) error = %v", err)
+	}
+
+	if status != SETTLED {
+		t.Fatalf("paymentStatusFromDetails(... ) status = %v, want %v", status, SETTLED)
+	}
+	if gotPreimage != preimage {
+		t.Fatalf("paymentStatusFromDetails(... ) preimage = %q, want %q", gotPreimage, preimage)
+	}
+	if fee.Amount != 0 || fee.Unit != cashu.Msat {
+		t.Fatalf("paymentStatusFromDetails(... ) fee = %+v, want zero msat", fee)
+	}
+}
+
+func TestPaymentStatusFromDetailsMissingIsPending(t *testing.T) {
+	status, preimage, fee, err := paymentStatusFromDetails(nil)
+	if err != nil {
+		t.Fatalf("paymentStatusFromDetails(nil) error = %v", err)
+	}
+	if status != PENDING || preimage != "" || fee.Amount != 0 || fee.Unit != cashu.Msat {
+		t.Fatalf("paymentStatusFromDetails(nil) = %v, %q, %+v; want pending with zero msat fee", status, preimage, fee)
+	}
+}
+
+func TestJitBolt11PaymentBehavior(t *testing.T) {
+	preimage := "jit-preimage"
+	skimmedFee := uint64(100)
+	payment := ldk_node.PaymentDetails{
+		Id:        "jit-payment",
+		Direction: ldk_node.PaymentDirectionInbound,
+		Status:    ldk_node.PaymentStatusSucceeded,
+		Kind: ldk_node.PaymentKindBolt11{
+			Hash:                       "jit-hash",
+			Preimage:                   &preimage,
+			CounterpartySkimmedFeeMsat: &skimmedFee,
+		},
+	}
+
+	if !paymentMatches(&payment, ldk_node.PaymentDirectionInbound, "jit-hash") {
+		t.Fatal("paymentMatches(...) did not match JIT BOLT 11 payment hash")
+	}
+
+	_, gotPreimage, _, err := paymentStatusFromDetails(&payment)
+	if err != nil {
+		t.Fatalf("paymentStatusFromDetails(...) error = %v", err)
+	}
+	if gotPreimage != preimage {
+		t.Fatalf("paymentStatusFromDetails(...) preimage = %q, want %q", gotPreimage, preimage)
+	}
+
+	filtered, err := filterPaymentsByType([]ldk_node.PaymentDetails{payment}, Incoming)
+	if err != nil {
+		t.Fatalf("filterPaymentsByType(...) error = %v", err)
+	}
+	if len(filtered) != 1 || filtered[0].Id != payment.Id {
+		t.Fatalf("filterPaymentsByType(...) = %+v, want JIT payment", filtered)
+	}
+}
+
+func TestPaymentStatusFromDetailsRejectsUnknownStatus(t *testing.T) {
+	_, _, _, err := paymentStatusFromDetails(&ldk_node.PaymentDetails{
+		Status: ldk_node.PaymentStatus(999),
+		Kind: ldk_node.PaymentKindBolt11{
+			Hash: "invoice-hash",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected unknown status error")
+	}
+}
+
+func TestCheckPayedRejectsNilInvoice(t *testing.T) {
+	backend := &LDK{}
+	status, _, _, err := backend.CheckPayed("", nil, "")
+	if err == nil {
+		t.Fatal("expected nil invoice error")
+	}
+	if status != UNKNOWN {
+		t.Fatalf("status = %v, want %v", status, UNKNOWN)
+	}
+}
+
+func TestCheckReceivedRejectsNilInvoice(t *testing.T) {
+	backend := &LDK{}
+	status, _, err := backend.CheckReceived(cashu.MintRequestDB{}, nil)
+	if err == nil {
+		t.Fatal("expected nil invoice error")
+	}
+	if status != UNKNOWN {
+		t.Fatalf("status = %v, want %v", status, UNKNOWN)
+	}
+}
+
+func TestCheckPayedPropagatesGetNodeError(t *testing.T) {
+	backend := &LDK{}
+	status, _, _, err := backend.CheckPayed("", mustDecodeMockInvoice(t), "")
+	if err == nil {
+		t.Fatal("expected getNode error")
+	}
+	if status != UNKNOWN {
+		t.Fatalf("status = %v, want %v", status, UNKNOWN)
+	}
+}
+
+func TestCheckReceivedPropagatesGetNodeError(t *testing.T) {
+	backend := &LDK{}
+	status, _, err := backend.CheckReceived(cashu.MintRequestDB{}, mustDecodeMockInvoice(t))
+	if err == nil {
+		t.Fatal("expected getNode error")
+	}
+	if status != UNKNOWN {
+		t.Fatalf("status = %v, want %v", status, UNKNOWN)
+	}
+}
+
+func TestNoOutgoingRejectsSpending(t *testing.T) {
+	backend := &LDK{config: LdkConfig{NoOutgoing: true}}
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{
+			name: "invoice payment",
+			call: func() error {
+				_, err := backend.PayInvoice(cashu.MeltRequestDB{}, nil, cashu.Amount{}, false, cashu.Amount{})
+				return err
+			},
+		},
+		{name: "on-chain send", call: func() error { return backend.SendOnchain("", 0) }},
+		{name: "channel open", call: func() error { return backend.OpenChannelWithPush("", "", 0, 0) }},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.call(); !errors.Is(err, cashu.ErrMeltingDisabled) {
+				t.Fatalf("error = %v, want %v", err, cashu.ErrMeltingDisabled)
+			}
+		})
+	}
+}
+
+func TestLDKStopIsSafeWhenNotStarted(t *testing.T) {
+	backend := &LDK{}
+	if err := backend.Stop(t.Context(), StopImmediately); err != nil {
+		t.Fatalf("backend.Stop(): %v", err)
+	}
+}
+
+func TestLDKStopRejectsUnknownMode(t *testing.T) {
+	if err := (&LDK{}).Stop(t.Context(), StopMode(99)); err == nil {
+		t.Fatal("expected unknown stop mode error")
+	}
+}
+
+func TestHasPendingOutgoingBolt11Payments(t *testing.T) {
+	bolt11 := ldk_node.PaymentKindBolt11{Hash: "hash"}
+	tests := []struct {
+		name     string
+		payments []ldk_node.PaymentDetails
+		want     bool
+	}{
+		{name: "empty"},
+		{name: "outbound pending value", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusPending, Kind: bolt11}}, want: true},
+		{name: "outbound pending pointer", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusPending, Kind: &bolt11}}, want: true},
+		{name: "inbound pending", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionInbound, Status: ldk_node.PaymentStatusPending, Kind: bolt11}}},
+		{name: "outbound succeeded", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusSucceeded, Kind: bolt11}}},
+		{name: "outbound failed", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusFailed, Kind: bolt11}}},
+		{name: "outbound pending non bolt11", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusPending}}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := hasPendingOutgoingBolt11Payments(test.payments); got != test.want {
+				t.Fatalf("hasPendingOutgoingBolt11Payments(...) = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestWaitForInFlightPayments(t *testing.T) {
+	t.Run("returns when no payments are pending", func(t *testing.T) {
+		if err := waitForInFlightPayments(t.Context(), func() []ldk_node.PaymentDetails { return nil }); err != nil {
+			t.Fatalf("waitForInFlightPayments(...) error = %v", err)
+		}
+	})
+
+	t.Run("returns the sentinel when canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		payments := []ldk_node.PaymentDetails{{
+			Direction: ldk_node.PaymentDirectionOutbound,
+			Status:    ldk_node.PaymentStatusPending,
+			Kind:      ldk_node.PaymentKindBolt11{Hash: "hash"},
+		}}
+		if err := waitForInFlightPayments(ctx, func() []ldk_node.PaymentDetails { return payments }); !errors.Is(err, context.Canceled) {
+			t.Fatalf("waitForInFlightPayments(...) error = %v, want %v", err, context.Canceled)
+		}
+	})
+
+	t.Run("returns the cancellation cause", func(t *testing.T) {
+		ctx, cancel := context.WithCancelCause(t.Context())
+		cancel(ErrInFlightBolt11Payments)
+		payments := []ldk_node.PaymentDetails{{
+			Direction: ldk_node.PaymentDirectionOutbound,
+			Status:    ldk_node.PaymentStatusPending,
+			Kind:      ldk_node.PaymentKindBolt11{Hash: "hash"},
+		}}
+		if err := waitForInFlightPayments(ctx, func() []ldk_node.PaymentDetails { return payments }); !errors.Is(err, ErrInFlightBolt11Payments) {
+			t.Fatalf("waitForInFlightPayments(...) error = %v, want %v", err, ErrInFlightBolt11Payments)
+		}
+	})
+
+	t.Run("waits for pending payments", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		defer cancel()
+		calls := 0
+		err := waitForInFlightPayments(ctx, func() []ldk_node.PaymentDetails {
+			calls++
+			if calls == 1 {
+				return []ldk_node.PaymentDetails{{
+					Direction: ldk_node.PaymentDirectionOutbound,
+					Status:    ldk_node.PaymentStatusPending,
+					Kind:      ldk_node.PaymentKindBolt11{Hash: "hash"},
+				}}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("waitForInFlightPayments(...) error = %v", err)
+		}
+	})
+}

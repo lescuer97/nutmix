@@ -55,7 +55,7 @@ func TestGenerateKeysetsAndIdGeneration(t *testing.T) {
 	if hex.EncodeToString(generatedKeysets[0].PrivKey.PubKey().SerializeCompressed()) != "03a524f43d6166ad3567f18b0a5c769c6ab4dc02149f4d5095ccf4e8ffa293e785" {
 		t.Errorf("keyset id PrivKey is not correct. %+v", hex.EncodeToString(generatedKeysets[0].PrivKey.PubKey().SerializeCompressed()))
 	}
-	justPubkeys := []*btcec.PublicKey{}
+	justPubkeys := make([]*btcec.PublicKey, 0, len(generatedKeysets))
 
 	for i := range generatedKeysets {
 		justPubkeys = append(justPubkeys, generatedKeysets[i].GetPubKey())

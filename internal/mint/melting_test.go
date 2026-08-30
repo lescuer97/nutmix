@@ -19,6 +19,30 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
+func TestReleaseMeltReservation(t *testing.T) {
+	quote := cashu.MeltRequestDB{Quote: "quote", State: cashu.PENDING, CheckingId: "original"} //nolint:exhaustruct // Only cleanup fields matter.
+	proofs := cashu.Proofs{{Secret: "proof"}}                                                  //nolint:exhaustruct // Identity is sufficient for the mock database.
+	db := &mockdb.MockDB{
+		MeltRequest: []cashu.MeltRequestDB{quote},
+		Proofs:      proofs,
+		MeltChange:  []cashu.MeltChange{{Quote: quote.Quote}}, //nolint:exhaustruct // Only the quote is used for deletion.
+	}
+	mint := Mint{MintDB: db} //nolint:exhaustruct // Only the database is used.
+
+	if err := mint.releaseMeltReservation(t.Context(), quote, proofs); err != nil {
+		t.Fatalf("releaseMeltReservation(): %v", err)
+	}
+	if got := db.MeltRequest[0]; got.State != cashu.UNPAID || got.CheckingId != quote.CheckingId {
+		t.Fatalf("melt quote was not restored: %+v", got)
+	}
+	if len(db.Proofs) != 0 {
+		t.Fatalf("reserved proofs = %d, want 0", len(db.Proofs))
+	}
+	if len(db.MeltChange) != 0 {
+		t.Fatalf("saved change outputs = %d, want 0", len(db.MeltChange))
+	}
+}
+
 func TestValidateBolt11MeltInputsRejectsAggregateOverflow(t *testing.T) {
 	mint := Mint{}                                                                                      //nolint:exhaustruct // overflow is rejected before dependencies are used
 	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Amount: math.MaxUint64}, {Amount: 1}}} //nolint:exhaustruct // only inputs matter
@@ -131,7 +155,7 @@ func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, quoteA
 		Change:          nil,
 	}
 
-	proofs := cashu.Proofs{}
+	proofs := make(cashu.Proofs, 0, len(proofAmounts))
 	for i, amount := range proofAmounts {
 		cPriv, err := secp256k1.GeneratePrivateKey()
 		if err != nil {

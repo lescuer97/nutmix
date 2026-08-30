@@ -1,11 +1,15 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM golang:alpine3.22 AS builder
+FROM golang:1.26.7-trixie AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
 
-# Install build dependencies
-RUN apk add --no-cache protobuf curl unzip bash git
+RUN test "${TARGETOS}/${TARGETARCH}" = "linux/amd64"
+
+# Install build dependencies using apt-get
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    protobuf-compiler curl unzip bash git build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install just
 RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
@@ -37,17 +41,24 @@ RUN just web-build-prod
 
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} just build
 
+RUN ldk_dir="$(go list -m -f '{{.Dir}}' github.com/lescuer97/ldkgo)" \
+    && cp "${ldk_dir}/bindings/ldk_node_ffi/native/linux_amd64/libldk_node.so" /app/build/libldk_node.so
 
 # Runtime stage
-FROM alpine:3.22
+FROM debian:trixie-slim
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates tzdata libgcc-s1 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV LD_LIBRARY_PATH=/usr/local/lib
 
 WORKDIR /app
 
 # Copy the binary from builder
 COPY --from=builder /app/build/nutmix ./main
+COPY --from=builder /app/build/libldk_node.so /usr/local/lib/libldk_node.so
 
 # # Copy web assets
 # COPY --from=builder /app/internal/routes/admin/static/dist ./internal/routes/admin/static/dist

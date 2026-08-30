@@ -333,14 +333,8 @@ func TestRotateKeyUpCall(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != 200 {
-		t.Errorf("Expected status code 200, got %d", w.Code)
-	}
-
-	router.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Errorf("Expected status code 200, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status code %d, got %d", http.StatusOK, w.Code)
 	}
 
 	// Extract cookie from login response
@@ -372,6 +366,7 @@ func TestRotateKeyUpCall(t *testing.T) {
 
 	req = httptest.NewRequest("POST", "/admin/rotate/sats", strings.NewReader(string(jsonRequestBody)))
 	req.Header.Set("Content-Type", gin.MIMEJSON)
+	req.Header.Set("Origin", "http://example.com")
 	req.AddCookie(adminCookie)
 
 	router.ServeHTTP(w, req)

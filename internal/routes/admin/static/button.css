@@ -99,6 +99,35 @@
   filter: grayscale(100%);
 }
 
+.btn-submit-feedback .btn-loading-content {
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.btn-submit-feedback .btn-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-submit-feedback.htmx-request .btn-label {
+  display: none;
+}
+
+.btn-submit-feedback.htmx-request .btn-loading-content {
+  display: inline-flex;
+}
+
+.btn-submit-feedback .loading-spinner {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-icon.btn-submit-feedback .btn-loading-content {
+  gap: 0;
+}
+
 /* Shake Animation */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }

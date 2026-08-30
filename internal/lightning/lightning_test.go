@@ -5,8 +5,23 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lightningnetwork/lnd/lnrpc"
+	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
+
+func TestGetFeatureBits(t *testing.T) {
+	features := lnwire.NewFeatureVector(
+		lnwire.NewRawFeatureVector(lnwire.WumboChannelsRequired),
+		lnwire.Features,
+	)
+
+	got := getFeatureBits(features)
+	want := lnrpc.FeatureBit(lnwire.WumboChannelsRequired)
+	if len(got) != 1 || got[0] != want {
+		t.Fatalf("getFeatureBits() = %v, want [%v]", got, want)
+	}
+}
 
 func TestUseMinimumFeeOnInvoice(t *testing.T) {
 	chainParam := chaincfg.MainNetParams

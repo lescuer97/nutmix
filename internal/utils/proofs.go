@@ -56,6 +56,9 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrMintintDisabled):
 		message := cashu.ErrMintintDisabled.Error()
 		return cashu.MINTING_DISABLED, &message
+	case errors.Is(proofError, cashu.ErrMeltingDisabled):
+		message := cashu.ErrMeltingDisabled.Error()
+		return cashu.LIGHTNING_PAYMENT_FAILED, &message
 
 	case errors.Is(proofError, cashu.ErrMintRequestAlreadyIssued):
 		message := cashu.ErrMintRequestAlreadyIssued.Error()
