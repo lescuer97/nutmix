@@ -34,6 +34,8 @@ var (
 	ErrFailedLightningPayment = errors.New("failed lightning payment")
 )
 
+const inFlightBolt11PaymentsMessage = "Could not change the Lightning backend because LDK still has in-flight Bolt 11 payments after waiting 90 seconds"
+
 func MintSettingsPage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
@@ -253,7 +255,7 @@ func prepareLDKBackend(ctx context.Context, mint *m.Mint, network string, existi
 	}
 
 	if activeLDK {
-		if err := currentLDK.Stop(); err != nil {
+		if err := currentLDK.Stop(ctx, ldk.WaitForInFlightPayments); err != nil {
 			return ldkBackendPreparation{}, fmt.Errorf("currentLDK.Stop(): %w", err)
 		}
 		mint.LightningBackend = nil
@@ -303,6 +305,16 @@ type lightningBackendVerificationError struct {
 
 func (e *lightningBackendVerificationError) Error() string {
 	return e.err.Error()
+}
+
+func ldkBackendUpdateErrorMessage(err error, activeLDKStopped bool) string {
+	if errors.Is(err, ldk.ErrInFlightBolt11Payments) {
+		return inFlightBolt11PaymentsMessage
+	}
+	if activeLDKStopped {
+		return "LDK is offline: could not apply the new configuration"
+	}
+	return "Something went wrong setting up LDK communications"
 }
 
 func verifyLightningBackend(backend lightning.LightningBackend, chainparam chaincfg.Params) *lightningBackendVerificationError {
@@ -989,6 +1001,8 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		ctx := c.Request.Context()
 		oldConfig := mint.Config
 		oldBackend := mint.LightningBackend
+		oldLDK, oldBackendWasActiveLDK := oldBackend.(*ldk.LDK)
+		oldBackendWasActiveLDK = oldBackendWasActiveLDK && oldConfig.MINT_LIGHTNING_BACKEND == utils.LDK
 		oldLDKStopped := false
 
 		var newBackend lightning.LightningBackend
@@ -1080,12 +1094,11 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 
 			ldkPreparation, err := prepareLDKBackend(ctx, mint, chainparam.Name, existingLDKConfig, ldkConfig)
 			if err != nil {
-				mint.LDKSetupError = err.Error()
-				slog.Warn("prepareLDKBackend", slog.String(utils.LogExtraInfo, err.Error()))
-				message := "Something went wrong setting up LDK communications"
-				if ldkPreparation.activeLDKStopped {
-					message = "LDK is offline: could not apply the new configuration"
+				if !errors.Is(err, ldk.ErrInFlightBolt11Payments) {
+					mint.LDKSetupError = err.Error()
 				}
+				slog.Warn("prepareLDKBackend", slog.String(utils.LogExtraInfo, err.Error()))
+				message := ldkBackendUpdateErrorMessage(err, ldkPreparation.activeLDKStopped)
 				if renderErr := RenderError(c, message); renderErr != nil {
 					slog.Warn("failed to render error", slog.Any("error", renderErr))
 				}
@@ -1112,7 +1125,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			if newLDK != nil {
 				mint.LDKSetupError = verificationErr.err.Error()
 			}
-			if stopErr := newLDK.Stop(); stopErr != nil {
+			if stopErr := newLDK.Stop(ctx, ldk.StopImmediately); stopErr != nil {
 				slog.Warn("newLDK.Stop", slog.String(utils.LogExtraInfo, stopErr.Error()))
 			}
 			slog.Warn("verifyLightningBackend", slog.String(utils.LogExtraInfo, verificationErr.Error()))
@@ -1120,6 +1133,18 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 				slog.Warn("failed to render error", slog.Any("error", renderErr))
 			}
 			return
+		}
+
+		if oldBackendWasActiveLDK && !oldLDKStopped {
+			if err := oldLDK.Stop(ctx, ldk.WaitForInFlightPayments); err != nil {
+				slog.Warn("oldLDK.Stop", slog.String(utils.LogExtraInfo, err.Error()))
+				if renderErr := RenderError(c, ldkBackendUpdateErrorMessage(err, false)); renderErr != nil {
+					slog.Warn("failed to render error", slog.Any("error", renderErr))
+				}
+				return
+			}
+			mint.LightningBackend = nil
+			oldLDKStopped = true
 		}
 
 		mint.Config.NETWORK = chainparam.Name
@@ -1145,7 +1170,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 			mint.Config = oldConfig
 			if oldLDKStopped {
 				mint.LightningBackend = nil
-				if stopErr := newLDK.Stop(); stopErr != nil {
+				if stopErr := newLDK.Stop(ctx, ldk.StopImmediately); stopErr != nil {
 					slog.Warn("newLDK.Stop", slog.String(utils.LogExtraInfo, stopErr.Error()))
 				}
 			} else {

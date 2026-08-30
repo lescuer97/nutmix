@@ -75,7 +75,7 @@ func TestMintBolt11LDKLightning(t *testing.T) {
 		t.Fatalf("ldk.NewLdk(...): %v", err)
 	}
 	t.Cleanup(func() {
-		_ = setupBackend.Stop()
+		_ = setupBackend.Stop(context.Background(), ldk.StopImmediately)
 	})
 	if err := waitForBestBlock(t, setupBackend, 101, 30*time.Second); err != nil {
 		t.Fatal(err)
@@ -119,7 +119,7 @@ func TestMintBolt11LDKLightning(t *testing.T) {
 	}
 
 	t.Setenv("MINT_LIGHTNING_BACKEND", string(utils.LDK))
-	err = setupBackend.Stop()
+	err = setupBackend.Stop(ctx, ldk.StopImmediately)
 	if err != nil {
 		t.Fatalf("could not stop the setup ln node. %+v", err)
 	}
@@ -128,7 +128,7 @@ func TestMintBolt11LDKLightning(t *testing.T) {
 
 	router, mint := SetupRoutingForTesting(ctx, false)
 	if currentLDKBackend, ok := mint.LightningBackend.(*ldk.LDK); ok {
-		if err := currentLDKBackend.Stop(); err != nil {
+		if err := currentLDKBackend.Stop(ctx, ldk.StopImmediately); err != nil {
 			t.Fatalf("could not stop the setup routing ldk node. %+v", err)
 		}
 	}
@@ -142,7 +142,7 @@ func TestMintBolt11LDKLightning(t *testing.T) {
 	}
 	mint.LightningBackend = mintBackend
 	t.Cleanup(func() {
-		_ = mintBackend.Stop()
+		_ = mintBackend.Stop(context.Background(), ldk.StopImmediately)
 	})
 	if err := waitForLDKMintReady(t, mintBackend, 30*time.Second); err != nil {
 		t.Fatal(err)

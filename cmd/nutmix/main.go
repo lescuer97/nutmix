@@ -238,7 +238,7 @@ func shutdownServerAndBackend(ctx context.Context, srv *http.Server, mintInstanc
 		}
 	}
 
-	if err := stopLDKBackend(mintInstance); err != nil {
+	if err := stopLDKBackend(ctx, mintInstance); err != nil {
 		if shutdownErr != nil {
 			shutdownErr = fmt.Errorf("http shutdown: %w; ldk shutdown: %w", shutdownErr, err)
 		} else {
@@ -251,7 +251,7 @@ func shutdownServerAndBackend(ctx context.Context, srv *http.Server, mintInstanc
 	return shutdownErr
 }
 
-func stopLDKBackend(mintInstance *mint.Mint) error {
+func stopLDKBackend(ctx context.Context, mintInstance *mint.Mint) error {
 	if mintInstance == nil {
 		return nil
 	}
@@ -262,7 +262,7 @@ func stopLDKBackend(mintInstance *mint.Mint) error {
 	}
 
 	slog.Info("stopping ldk backend")
-	if err := ldkBackend.Stop(); err != nil {
+	if err := ldkBackend.Stop(ctx, ldk.StopImmediately); err != nil {
 		return fmt.Errorf("failed to stop ldk backend: %w", err)
 	}
 

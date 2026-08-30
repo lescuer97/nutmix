@@ -2,10 +2,12 @@ package ldk
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
@@ -29,20 +31,32 @@ const (
 	PENDING = lightning.PENDING
 	UNKNOWN = lightning.UNKNOWN
 	LDKNODE = lightning.LDKNODE
+
+	inFlightPaymentWaitTimeout  = 90 * time.Second
+	inFlightPaymentPollInterval = time.Second
 )
 
+type StopMode uint8
+
+const (
+	StopImmediately StopMode = iota
+	WaitForInFlightPayments
+)
+
+var ErrInFlightBolt11Payments = errors.New("outbound Bolt 11 payments are still in flight")
+
 type LdkConfig struct {
-	TorOnly    bool
-	NoOutgoing bool
 	Network    string
 	StorageDir string
+	TorOnly    bool
+	NoOutgoing bool
 }
 
 type LDK struct {
-	node     *ldk_node.Node
 	db       database.MintDB
-	configMu sync.RWMutex
+	node     *ldk_node.Node
 	config   LdkConfig
+	configMu sync.RWMutex
 }
 
 func NewLdk(ctx context.Context, db database.MintDB, config LdkConfig) (*LDK, error) {
@@ -78,7 +92,12 @@ func (l *LDK) storageDir() string {
 
 func (l *LDK) configSnapshot() LdkConfig {
 	if l == nil {
-		return LdkConfig{}
+		return LdkConfig{
+			Network:    "",
+			StorageDir: "",
+			TorOnly:    false,
+			NoOutgoing: false,
+		}
 	}
 
 	l.configMu.RLock()
@@ -89,6 +108,12 @@ func (l *LDK) configSnapshot() LdkConfig {
 func (l *LDK) setTorOnly(torOnly bool) {
 	l.configMu.Lock()
 	l.config.TorOnly = torOnly
+	l.configMu.Unlock()
+}
+
+func (l *LDK) setNoOutgoing(noOutgoing bool) {
+	l.configMu.Lock()
+	l.config.NoOutgoing = noOutgoing
 	l.configMu.Unlock()
 }
 
@@ -212,7 +237,10 @@ func (l *LDK) SpinUp() error {
 	return nil
 }
 
-func (l *LDK) Stop() error {
+func (l *LDK) Stop(ctx context.Context, mode StopMode) error {
+	if mode != StopImmediately && mode != WaitForInFlightPayments {
+		return fmt.Errorf("unknown LDK stop mode: %d", mode)
+	}
 	if l == nil {
 		return nil
 	}
@@ -221,12 +249,44 @@ func (l *LDK) Stop() error {
 		return nil
 	}
 
+	if mode == WaitForInFlightPayments {
+		l.setNoOutgoing(true)
+		stopCtx, cancel := context.WithTimeoutCause(ctx, inFlightPaymentWaitTimeout, ErrInFlightBolt11Payments)
+		err := waitForInFlightPayments(stopCtx, l.node.ListPayments)
+		cancel()
+		if err != nil {
+			l.setNoOutgoing(false)
+			return fmt.Errorf("wait for in-flight payments: %w", err)
+		}
+	}
+
 	err := l.node.Stop()
 	if err != nil {
+		if mode == WaitForInFlightPayments {
+			l.setNoOutgoing(false)
+		}
 		return fmt.Errorf("l.node.Stop(). %w", err)
 	}
 
-	return err
+	return nil
+}
+
+func waitForInFlightPayments(ctx context.Context, listPayments func() []ldk_node.PaymentDetails) error {
+	ticker := time.NewTicker(inFlightPaymentPollInterval)
+	defer ticker.Stop()
+
+	for hasPendingOutgoingBolt11Payments(listPayments()) {
+		select {
+		case <-ctx.Done():
+			if !hasPendingOutgoingBolt11Payments(listPayments()) {
+				return nil
+			}
+			return context.Cause(ctx)
+		case <-ticker.C:
+		}
+	}
+
+	return nil
 }
 
 func (l *LDK) Status(_ context.Context) (lightning.NodeStatus, error) {

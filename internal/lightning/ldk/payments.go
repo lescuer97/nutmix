@@ -226,6 +226,18 @@ func bolt11PaymentHash(kind ldk_node.PaymentKind) (string, bool) {
 	}
 }
 
+func hasPendingOutgoingBolt11Payments(payments []ldk_node.PaymentDetails) bool {
+	for _, payment := range payments {
+		if payment.Direction != ldk_node.PaymentDirectionOutbound || payment.Status != ldk_node.PaymentStatusPending {
+			continue
+		}
+		if _, ok := bolt11PaymentHash(payment.Kind); ok {
+			return true
+		}
+	}
+	return false
+}
+
 func paymentStatusFromDetails(details *ldk_node.PaymentDetails) (PaymentStatus, string, cashu.Amount, error) {
 	if details == nil {
 		return PENDING, "", cashu.Amount{Amount: 0, Unit: cashu.Msat}, nil

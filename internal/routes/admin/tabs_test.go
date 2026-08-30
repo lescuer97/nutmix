@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -878,6 +879,28 @@ func TestLDKConfigsEqual(t *testing.T) {
 	b.ConfigDirectory = "/tmp/ldk-b"
 	if ldkConfigsEqual(a, b) {
 		t.Fatalf("expected config directories to differ")
+	}
+}
+
+func TestLDKBackendUpdateErrorMessage(t *testing.T) {
+	tests := []struct {
+		name             string
+		err              error
+		activeLDKStopped bool
+		want             string
+	}{
+		{name: "in-flight payments", err: ldk.ErrInFlightBolt11Payments, want: inFlightBolt11PaymentsMessage},
+		{name: "wrapped in-flight payments", err: fmt.Errorf("stop: %w", ldk.ErrInFlightBolt11Payments), activeLDKStopped: true, want: inFlightBolt11PaymentsMessage},
+		{name: "offline", err: errors.New("start failed"), activeLDKStopped: true, want: "LDK is offline: could not apply the new configuration"},
+		{name: "generic", err: errors.New("setup failed"), want: "Something went wrong setting up LDK communications"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := ldkBackendUpdateErrorMessage(test.err, test.activeLDKStopped); got != test.want {
+				t.Fatalf("ldkBackendUpdateErrorMessage(...) = %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 

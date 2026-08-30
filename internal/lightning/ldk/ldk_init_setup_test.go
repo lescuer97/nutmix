@@ -386,6 +386,7 @@ func TestConfigConcurrentReadWrite(t *testing.T) {
 		defer wait.Done()
 		for i := 0; i < 1000; i++ {
 			backend.setTorOnly(i%2 == 0)
+			backend.setNoOutgoing(i%2 == 0)
 		}
 	}()
 	go func() {
@@ -491,7 +492,7 @@ func TestBackendStopAndReopenReusesStorageDirWithoutReseeding(t *testing.T) {
 	if err := second.InitNode(ctx); err != nil {
 		t.Fatalf("second.InitNode(ctx): %v", err)
 	}
-	t.Cleanup(func() { _ = second.Stop() })
+	t.Cleanup(func() { _ = second.Stop(context.Background(), StopImmediately) })
 	seedAfter, err := os.ReadFile(filepath.Join(tempDir, seedFileName))
 	if err != nil {
 		t.Fatalf("os.ReadFile(...): %v", err)
@@ -534,7 +535,7 @@ func TestNewLdkStartsAndStops(t *testing.T) {
 		t.Fatalf("NewLdk(...): %v", err)
 	}
 
-	if err := backend.Stop(); err != nil {
+	if err := backend.Stop(ctx, StopImmediately); err != nil {
 		t.Fatalf("backend.Stop(): %v", err)
 	}
 }

@@ -1,8 +1,10 @@
 package ldk
 
 import (
+	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	ldk_node "github.com/lescuer97/ldkgo/bindings/ldk_node_ffi"
@@ -271,7 +273,92 @@ func TestNoOutgoingRejectsSpending(t *testing.T) {
 
 func TestLDKStopIsSafeWhenNotStarted(t *testing.T) {
 	backend := &LDK{}
-	if err := backend.Stop(); err != nil {
+	if err := backend.Stop(t.Context(), StopImmediately); err != nil {
 		t.Fatalf("backend.Stop(): %v", err)
 	}
+}
+
+func TestLDKStopRejectsUnknownMode(t *testing.T) {
+	if err := (&LDK{}).Stop(t.Context(), StopMode(99)); err == nil {
+		t.Fatal("expected unknown stop mode error")
+	}
+}
+
+func TestHasPendingOutgoingBolt11Payments(t *testing.T) {
+	bolt11 := ldk_node.PaymentKindBolt11{Hash: "hash"}
+	tests := []struct {
+		name     string
+		payments []ldk_node.PaymentDetails
+		want     bool
+	}{
+		{name: "empty"},
+		{name: "outbound pending value", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusPending, Kind: bolt11}}, want: true},
+		{name: "outbound pending pointer", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusPending, Kind: &bolt11}}, want: true},
+		{name: "inbound pending", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionInbound, Status: ldk_node.PaymentStatusPending, Kind: bolt11}}},
+		{name: "outbound succeeded", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusSucceeded, Kind: bolt11}}},
+		{name: "outbound failed", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusFailed, Kind: bolt11}}},
+		{name: "outbound pending non bolt11", payments: []ldk_node.PaymentDetails{{Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusPending}}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := hasPendingOutgoingBolt11Payments(test.payments); got != test.want {
+				t.Fatalf("hasPendingOutgoingBolt11Payments(...) = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestWaitForInFlightPayments(t *testing.T) {
+	t.Run("returns when no payments are pending", func(t *testing.T) {
+		if err := waitForInFlightPayments(t.Context(), func() []ldk_node.PaymentDetails { return nil }); err != nil {
+			t.Fatalf("waitForInFlightPayments(...) error = %v", err)
+		}
+	})
+
+	t.Run("returns the sentinel when canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		payments := []ldk_node.PaymentDetails{{
+			Direction: ldk_node.PaymentDirectionOutbound,
+			Status:    ldk_node.PaymentStatusPending,
+			Kind:      ldk_node.PaymentKindBolt11{Hash: "hash"},
+		}}
+		if err := waitForInFlightPayments(ctx, func() []ldk_node.PaymentDetails { return payments }); !errors.Is(err, context.Canceled) {
+			t.Fatalf("waitForInFlightPayments(...) error = %v, want %v", err, context.Canceled)
+		}
+	})
+
+	t.Run("returns the cancellation cause", func(t *testing.T) {
+		ctx, cancel := context.WithCancelCause(t.Context())
+		cancel(ErrInFlightBolt11Payments)
+		payments := []ldk_node.PaymentDetails{{
+			Direction: ldk_node.PaymentDirectionOutbound,
+			Status:    ldk_node.PaymentStatusPending,
+			Kind:      ldk_node.PaymentKindBolt11{Hash: "hash"},
+		}}
+		if err := waitForInFlightPayments(ctx, func() []ldk_node.PaymentDetails { return payments }); !errors.Is(err, ErrInFlightBolt11Payments) {
+			t.Fatalf("waitForInFlightPayments(...) error = %v, want %v", err, ErrInFlightBolt11Payments)
+		}
+	})
+
+	t.Run("waits for pending payments", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		defer cancel()
+		calls := 0
+		err := waitForInFlightPayments(ctx, func() []ldk_node.PaymentDetails {
+			calls++
+			if calls == 1 {
+				return []ldk_node.PaymentDetails{{
+					Direction: ldk_node.PaymentDirectionOutbound,
+					Status:    ldk_node.PaymentStatusPending,
+					Kind:      ldk_node.PaymentKindBolt11{Hash: "hash"},
+				}}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("waitForInFlightPayments(...) error = %v", err)
+		}
+	})
 }
