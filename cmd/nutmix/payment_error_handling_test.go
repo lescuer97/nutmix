@@ -188,7 +188,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		t.Errorf("Incorrect error code, got %v", errorResponse.Code)
 	}
 
-	secreList := []string{}
+	secreList := make([]string, 0, len(meltProofs))
 	for _, p := range meltProofs {
 		secreList = append(secreList, p.Secret)
 	}
@@ -343,7 +343,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		t.Fatalf("Expected ErrQuoteIsPending, got %v", err)
 	}
 
-	secreList := []string{}
+	secreList := make([]string, 0, len(meltProofs))
 	for _, p := range meltProofs {
 		secreList = append(secreList, p.Secret)
 	}

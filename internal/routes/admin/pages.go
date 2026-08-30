@@ -375,7 +375,7 @@ func LightningTable(adminHandler *adminHandler) gin.HandlerFunc {
 
 		mintRequests := make([]cashu.MintRequestDB, 0)
 		meltRequests := make([]cashu.MeltRequestDB, 0)
-		filtered := make([]templates.LightningInvoiceVisual, 0)
+		var filtered []templates.LightningInvoiceVisual
 
 		if len([]rune(searchQuery)) < minLightningSearchLength {
 			errGroup := errgroup.Group{}

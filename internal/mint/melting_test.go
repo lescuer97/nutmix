@@ -155,7 +155,7 @@ func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, quoteA
 		Change:          nil,
 	}
 
-	proofs := cashu.Proofs{}
+	proofs := make(cashu.Proofs, 0, len(proofAmounts))
 	for i, amount := range proofAmounts {
 		cPriv, err := secp256k1.GeneratePrivateKey()
 		if err != nil {

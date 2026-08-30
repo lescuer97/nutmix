@@ -189,7 +189,7 @@ func OrderedListOfPubkeys(listKeys []MintKey) []*secp256k1.PublicKey {
 		return listKeys[i].Amount < listKeys[j].Amount
 	})
 
-	pubkeys := make([]*secp256k1.PublicKey, 0)
+	pubkeys := make([]*secp256k1.PublicKey, 0, len(listKeys))
 	for i := range listKeys {
 		if listKeys[i].PrivKey == nil {
 			panic("Private key should have never been null at this point")

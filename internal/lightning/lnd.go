@@ -360,7 +360,7 @@ func (l LndGrpcWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 }
 
 func convert_route_hints(routes [][]zpay32.HopHint) []*lnrpc.RouteHint {
-	routehints := []*lnrpc.RouteHint{}
+	routehints := make([]*lnrpc.RouteHint, 0, len(routes))
 	for _, route := range routes {
 		var hopHints []*lnrpc.HopHint
 		for _, hint := range route {
@@ -383,7 +383,7 @@ func convert_route_hints(routes [][]zpay32.HopHint) []*lnrpc.RouteHint {
 
 func getFeatureBits(features *lnwire.FeatureVector) []lnrpc.FeatureBit {
 	invoiceFeatures := features.Features()
-	featureBits := make([]lnrpc.FeatureBit, len(invoiceFeatures))
+	featureBits := make([]lnrpc.FeatureBit, 0, len(invoiceFeatures))
 
 	for k := range invoiceFeatures {
 		feature := lnrpc.FeatureBit(int32(k))

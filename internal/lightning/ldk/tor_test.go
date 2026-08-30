@@ -10,7 +10,7 @@ import (
 func validTorV3Address(t *testing.T) string {
 	t.Helper()
 
-	publicKey := make([]byte, 32)
+	publicKey := make([]byte, 32, 35)
 	for i := range publicKey {
 		publicKey[i] = byte(i)
 	}

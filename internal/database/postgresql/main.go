@@ -132,7 +132,7 @@ func (pql Postgresql) SaveNewSeed(tx pgx.Tx, seed cashu.Seed) error {
 func (pql Postgresql) SaveNewSeeds(seeds []cashu.Seed) error {
 	tries := 0
 
-	entries := [][]any{}
+	entries := make([][]any, 0, len(seeds))
 	columns := []string{"active", "created_at", "unit", "id", "version", "input_fee_ppk", "final_expiry", "derivation_path", "amounts", "legacy", "issuer_version"}
 	tableName := "seeds"
 
@@ -325,7 +325,7 @@ func (pql Postgresql) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu
 }
 
 func (pql Postgresql) SaveProof(tx pgx.Tx, proofs []cashu.Proof) error {
-	entries := [][]any{}
+	entries := make([][]any, 0, len(proofs))
 	columns := []string{"c", "secret", "amount", "id", "y", "witness", "seen_at", "state", "quote"}
 	tableName := "proofs"
 
@@ -491,7 +491,7 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.Wr
 }
 
 func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error {
-	entries := [][]any{}
+	entries := make([][]any, 0, len(recover_sigs))
 	columns := []string{"id", "amount", "B_", "C_", "created_at", "dleq_e", "dleq_s"}
 	tableName := "recovery_signature"
 	tries := 0

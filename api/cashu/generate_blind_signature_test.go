@@ -55,7 +55,7 @@ func TestGenerateBlindSignatureAndCheckSignature(t *testing.T) {
 		t.Errorf("could not create blindmessage %+v", err)
 	}
 
-	justPubkeys := []*secp256k1.PublicKey{}
+	justPubkeys := make([]*secp256k1.PublicKey, 0, len(generatedKeysets))
 	for i := range generatedKeysets {
 		justPubkeys = append(justPubkeys, generatedKeysets[i].GetPubKey())
 	}
