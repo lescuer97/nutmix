@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25.4-trixie AS builder
+FROM golang:1.26.7-trixie AS builder
 
 ARG TARGETOS
 ARG TARGETARCH

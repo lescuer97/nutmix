@@ -193,7 +193,7 @@ lint *flags: ensure-golangci-lint
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running linter..."
-    golangci-lint run {{flags}}
+    GOTOOLCHAIN=go1.26.7 golangci-lint run {{flags}}
 
 # Clean recipe
 clean:
