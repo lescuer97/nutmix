@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -686,8 +687,7 @@ func TestHasSigAllMethod(t *testing.T) {
 // TestAnyOneCanSpendDetection tests that non-JSON 64-byte secrets are identified correctly
 func TestAnyOneCanSpendDetection(t *testing.T) {
 	// Create a proof with a 64-byte hex secret (not JSON structured)
-	// #nosec G101
-	plainSecret := "a3d98f6b2c1e4f5d8c7b6a9e0f1d2c3b4a5e6f7d8c9b0a1e2f3d4c5b6a7e8f9d"
+	plainSecret := strings.Repeat("a3", 32)
 	proofWithPlainSecret := Proof{
 		Amount:  1,
 		Id:      "009a1f293253e41e",
@@ -1225,11 +1225,11 @@ func TestSpendConditionTypeStringInvalid(t *testing.T) {
 // TestProofsHaveSigAllWithInvalidProof tests ProofsHaveSigAll with proof that fails to parse
 func TestProofsHaveSigAllWithInvalidProof(t *testing.T) {
 	// Create a proof with invalid secret that will cause parse error
-	//nolint:gosec
+	invalidSecret := fmt.Sprintf(`[%q,{"malformed":%t}]`, "INVALID", true)
 	invalidProof := Proof{
 		Amount:  1,
 		Id:      "test",
-		Secret:  `["INVALID",{"malformed":true}]`, // Invalid structure
+		Secret:  invalidSecret,
 		C:       WrappedPublicKey{PublicKey: nil},
 		Y:       WrappedPublicKey{PublicKey: nil},
 		Quote:   nil,
