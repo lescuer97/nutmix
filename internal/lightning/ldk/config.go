@@ -284,13 +284,38 @@ func SaveConfig(ctx context.Context, db database.MintDB, config PersistedConfig)
 		return fmt.Errorf("ldk database is nil")
 	}
 
-	normalizedConfig, err := normalizePersistedConfig(config)
+	databaseConfig, err := ToDatabaseConfig(config)
 	if err != nil {
-		return fmt.Errorf("normalizePersistedConfig(config): %w", err)
+		return err
 	}
 
 	slog.Debug("saving persisted ldk config to database")
-	if err := db.SetLDKConfig(ctx, database.LDKConfig{
+	tx, err := db.GetTx(ctx)
+	if err != nil {
+		return fmt.Errorf("db.GetTx(ctx): %w", err)
+	}
+	defer func() {
+		_ = db.Rollback(ctx, tx)
+	}()
+
+	if err := db.SetLDKConfig(ctx, tx, databaseConfig); err != nil {
+		return fmt.Errorf("db.SetLDKConfig(tx, config): %w", err)
+	}
+	if err := db.Commit(ctx, tx); err != nil {
+		return fmt.Errorf("db.Commit(ctx, tx): %w", err)
+	}
+	slog.Info("saved persisted ldk config to database")
+
+	return nil
+}
+
+func ToDatabaseConfig(config PersistedConfig) (database.LDKConfig, error) {
+	normalizedConfig, err := normalizePersistedConfig(config)
+	if err != nil {
+		return database.LDKConfig{}, fmt.Errorf("normalizePersistedConfig(config): %w", err)
+	}
+
+	return database.LDKConfig{
 		ConfigDirectory:   normalizedConfig.ConfigDirectory,
 		ChainSourceType:   database.LDKChainSourceType(normalizedConfig.ChainSourceType),
 		ElectrumServerURL: normalizedConfig.ElectrumServerURL,
@@ -298,12 +323,7 @@ func SaveConfig(ctx context.Context, db database.MintDB, config PersistedConfig)
 		TorOnly:           normalizedConfig.TorOnly,
 		TorProxyAddress:   normalizedConfig.TorProxyAddress,
 		Rpc:               database.LDKRPCConfig(normalizedConfig.Rpc),
-	}); err != nil {
-		return fmt.Errorf("db.SetLDKConfig(ctx, config): %w", err)
-	}
-	slog.Info("saved persisted ldk config to database")
-
-	return nil
+	}, nil
 }
 
 func (config PersistedConfig) Validate() error {

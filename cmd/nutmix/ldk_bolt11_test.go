@@ -127,10 +127,8 @@ func TestMintBolt11LDKLightning(t *testing.T) {
 	runtime.GC()
 
 	router, mint := SetupRoutingForTesting(ctx, false)
-	if currentLDKBackend, ok := mint.LightningBackend.(*ldk.LDK); ok {
-		if err := currentLDKBackend.Stop(ctx, ldk.StopImmediately); err != nil {
-			t.Fatalf("could not stop the setup routing ldk node. %+v", err)
-		}
+	if err := stopLDKBackend(ctx, mint); err != nil {
+		t.Fatalf("could not stop the setup routing ldk node. %+v", err)
 	}
 	mint.LightningBackend = nil
 	runtime.GC()

@@ -60,12 +60,34 @@ type LDK struct {
 }
 
 func NewLdk(ctx context.Context, db database.MintDB, config LdkConfig) (*LDK, error) {
+	persistedConfig, err := GetPersistedConfig(ctx, db)
+	if err != nil {
+		return nil, fmt.Errorf("GetPersistedConfig(ctx, db): %w", err)
+	}
+
+	ldk, err := NewConfigBackend(db, config)
+	if err != nil {
+		return nil, err
+	}
+	return startLDK(ctx, ldk, persistedConfig)
+}
+
+func NewLdkWithPersistedConfig(ctx context.Context, db database.MintDB, config LdkConfig, persistedConfig PersistedConfig) (*LDK, error) {
+	normalizedConfig, err := normalizePersistedConfig(persistedConfig)
+	if err != nil {
+		return nil, fmt.Errorf("normalizePersistedConfig(persistedConfig): %w", err)
+	}
+
 	ldk, err := NewConfigBackend(db, config)
 	if err != nil {
 		return nil, err
 	}
 
-	err = ldk.InitNode(ctx)
+	return startLDK(ctx, ldk, normalizedConfig)
+}
+
+func startLDK(ctx context.Context, ldk *LDK, persistedConfig PersistedConfig) (*LDK, error) {
+	err := ldk.initNode(ctx, persistedConfig)
 	if err != nil {
 		return nil, fmt.Errorf("ldk.InitNode(). %w", err)
 	}
@@ -132,9 +154,18 @@ func (l *LDK) InitNode(ctx context.Context) error {
 		return fmt.Errorf("ldk backend is nil")
 	}
 
-	seedMnemonic, ldkStorage, network, config, err := l.prepareInitConfig(ctx)
+	persistedConfig, err := GetPersistedConfig(ctx, l.db)
 	if err != nil {
-		return fmt.Errorf("l.prepareInitConfig(ctx): %w", err)
+		return fmt.Errorf("GetPersistedConfig(ctx, l.db): %w", err)
+	}
+
+	return l.initNode(ctx, persistedConfig)
+}
+
+func (l *LDK) initNode(ctx context.Context, persistedConfig PersistedConfig) error {
+	seedMnemonic, ldkStorage, network, config, err := l.prepareInitConfig(persistedConfig)
+	if err != nil {
+		return fmt.Errorf("l.prepareInitConfig(persistedConfig): %w", err)
 	}
 
 	builder := ldk_node.NewBuilder()
@@ -184,18 +215,23 @@ func (l *LDK) InitNode(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not Create ldk-node. %w", err)
 	}
+	l.node = node
 	if config.TorOnly {
 		listeningAddresses := node.ListeningAddresses()
 		log.Printf("listeningAddresses: %+v", listeningAddresses)
 		if listeningAddresses != nil {
 			if err := validateTorOnlyListeningAddresses(*listeningAddresses); err != nil {
-				return fmt.Errorf("validate tor-only listening addresses: %w", err)
+				validationErr := fmt.Errorf("validate tor-only listening addresses: %w", err)
+				if stopErr := node.Stop(); stopErr != nil {
+					validationErr = errors.Join(validationErr, fmt.Errorf("stop invalid LDK node: %w", stopErr))
+				}
+				l.node = nil
+				return validationErr
 			}
 		}
 	}
 
 	l.setTorOnly(config.TorOnly)
-	l.node = node
 	return nil
 }
 

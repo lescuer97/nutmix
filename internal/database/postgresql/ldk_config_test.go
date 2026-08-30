@@ -3,7 +3,9 @@ package postgresql
 import (
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/internal/database"
+	"github.com/lescuer97/nutmix/internal/utils"
 )
 
 func TestSetAndGetLDKConfigRoundTripEsplora(t *testing.T) {
@@ -25,9 +27,9 @@ func TestSetAndGetLDKConfigRoundTripEsplora(t *testing.T) {
 		},
 	}
 
-	if err := db.SetLDKConfig(ctx, want); err != nil {
-		t.Fatalf("db.SetLDKConfig(ctx, want): %v", err)
-	}
+	commitConfigTx(t, db, func(tx pgx.Tx) error {
+		return db.SetLDKConfig(ctx, tx, want)
+	})
 
 	got, err := db.GetLDKConfig(ctx)
 	if err != nil {
@@ -66,14 +68,94 @@ func TestSetAndGetLDKConfigRoundTripEsplora(t *testing.T) {
 	}
 
 	want.TorProxyAddress = nil
-	if err := db.SetLDKConfig(ctx, want); err != nil {
-		t.Fatalf("db.SetLDKConfig(ctx, want without proxy): %v", err)
-	}
+	commitConfigTx(t, db, func(tx pgx.Tx) error {
+		return db.SetLDKConfig(ctx, tx, want)
+	})
 	got, err = db.GetLDKConfig(ctx)
 	if err != nil {
 		t.Fatalf("db.GetLDKConfig(ctx): %v", err)
 	}
 	if got.TorProxyAddress != nil {
 		t.Fatalf("expected nil tor proxy address, got %q", *got.TorProxyAddress)
+	}
+}
+
+func TestSetLDKConfigRollsBackWithTransaction(t *testing.T) {
+	db, ctx := setupTestDB(t)
+	tx, err := db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("db.GetTx(ctx): %v", err)
+	}
+
+	config := database.LDKConfig{
+		ConfigDirectory: "/tmp/ldk-rollback",
+		ChainSourceType: database.LDKChainSourceBitcoind,
+		Rpc: database.LDKRPCConfig{
+			Address: "127.0.0.1", Username: "user", Password: "pass", Port: 18443,
+		},
+	}
+	if err := db.SetLDKConfig(ctx, tx, config); err != nil {
+		t.Fatalf("db.SetLDKConfig(tx, config): %v", err)
+	}
+	if err := db.Rollback(ctx, tx); err != nil {
+		t.Fatalf("db.Rollback(ctx, tx): %v", err)
+	}
+
+	if _, err := db.GetLDKConfig(ctx); err == nil {
+		t.Fatal("expected rolled-back LDK config not to be persisted")
+	}
+}
+
+func TestLightningAndLDKConfigsRollBackTogether(t *testing.T) {
+	db, ctx := setupTestDB(t)
+	var oldConfig utils.Config
+	oldConfig.Default()
+	oldConfig.NAME = "old"
+	oldConfig.NETWORK = "regtest"
+	oldLDK := database.LDKConfig{
+		ConfigDirectory: "/tmp/ldk-old",
+		ChainSourceType: database.LDKChainSourceBitcoind,
+		Rpc:             database.LDKRPCConfig{Address: "127.0.0.1", Username: "user", Password: "pass", Port: 18443},
+	}
+	commitConfigTx(t, db, func(tx pgx.Tx) error {
+		if err := db.SetConfig(tx, oldConfig); err != nil {
+			return err
+		}
+		return db.SetLDKConfig(ctx, tx, oldLDK)
+	})
+
+	tx, err := db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("db.GetTx(ctx): %v", err)
+	}
+	newConfig := oldConfig
+	newConfig.NAME = "new"
+	newLDK := oldLDK
+	newLDK.Rpc.Address = "127.0.0.2"
+	if err := db.UpdateConfig(tx, newConfig); err != nil {
+		t.Fatalf("db.UpdateConfig(tx, newConfig): %v", err)
+	}
+	if err := db.SetLDKConfig(ctx, tx, newLDK); err != nil {
+		t.Fatalf("db.SetLDKConfig(ctx, tx, newLDK): %v", err)
+	}
+	if err := db.Rollback(ctx, tx); err != nil {
+		t.Fatalf("db.Rollback(ctx, tx): %v", err)
+	}
+
+	readTx, err := db.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("db.GetTx(ctx): %v", err)
+	}
+	defer func() { _ = db.Rollback(ctx, readTx) }()
+	gotConfig, err := db.GetConfig(readTx)
+	if err != nil {
+		t.Fatalf("db.GetConfig(readTx): %v", err)
+	}
+	gotLDK, err := db.GetLDKConfig(ctx)
+	if err != nil {
+		t.Fatalf("db.GetLDKConfig(ctx): %v", err)
+	}
+	if gotConfig.NAME != oldConfig.NAME || gotLDK.Rpc.Address != oldLDK.Rpc.Address {
+		t.Fatalf("rollback mismatch: config=%q LDK address=%q", gotConfig.NAME, gotLDK.Rpc.Address)
 	}
 }

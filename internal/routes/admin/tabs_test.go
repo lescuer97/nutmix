@@ -13,9 +13,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
+	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/lightning/ldk"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -109,6 +111,33 @@ func TestBolt11PostRejectsStrikeBackend(t *testing.T) {
 	}
 	if recorder.Header().Get("HX-Trigger") != "" {
 		t.Fatal("rejected Strike submission emitted a success trigger")
+	}
+}
+
+func TestBolt11PostAssignsDirectBackendAfterPersistence(t *testing.T) {
+	var config utils.Config
+	config.Default()
+	config.NETWORK = "regtest"
+	config.MINT_LIGHTNING_BACKEND = utils.LNDGRPC
+
+	db := &mockdb.MockDB{Config: config}
+	mintInstance := &mint.Mint{
+		Config:           config,
+		MintDB:           db,
+		LightningBackend: lightning.FakeWallet{Network: chaincfg.RegressionNetParams},
+	}
+	values := url.Values{
+		"NETWORK":                {"regtest"},
+		"MINT_LIGHTNING_BACKEND": {string(utils.FAKE_WALLET)},
+	}
+
+	Bolt11Post(mintInstance)(newPostContext(values))
+
+	if _, ok := mintInstance.LightningBackend.(lightning.FakeWallet); !ok {
+		t.Fatalf("expected direct fake wallet, got %T", mintInstance.LightningBackend)
+	}
+	if mintInstance.Config.MINT_LIGHTNING_BACKEND != utils.FAKE_WALLET || db.Config.MINT_LIGHTNING_BACKEND != utils.FAKE_WALLET {
+		t.Fatal("expected runtime and database configuration to use fake wallet")
 	}
 }
 
@@ -956,9 +985,16 @@ func TestBolt11PostReusesUnchangedActiveLDKConfig(t *testing.T) {
 	if mockDatabase.LDKConfig == nil || mockDatabase.LDKConfig.Rpc.Address != "127.0.0.1" {
 		t.Fatalf("expected persisted LDK config to remain unchanged, got %+v", mockDatabase.LDKConfig)
 	}
+
+	mintInstance.LDKSetupError = "previous replacement failed"
+	c, recorder := newPostContextWithRecorder(values)
+	Bolt11Post(mintInstance)(c)
+	if strings.Contains(recorder.Body.String(), "settings are unchanged") {
+		t.Fatal("stopped LDK backend was incorrectly treated as unchanged")
+	}
 }
 
-func TestBolt11PostLeavesMintOfflineWhenActiveLDKReplacementFails(t *testing.T) {
+func TestBolt11PostKeepsOldBackendWhenActiveLDKReplacementAndRestoreFail(t *testing.T) {
 	configDir := filepath.Join(setTempConfigDir(t), "ldk")
 	ldkConfig := mustBitcoindPersistedConfigForAdminTest(t, configDir)
 
@@ -993,13 +1029,13 @@ func TestBolt11PostLeavesMintOfflineWhenActiveLDKReplacementFails(t *testing.T) 
 	c, recorder := newPostContextWithRecorder(values)
 	Bolt11Post(mintInstance)(c)
 
-	if mintInstance.LightningBackend != nil {
-		t.Fatal("expected mint to be offline after replacement startup failure")
+	if mintInstance.LightningBackend != activeBackend {
+		t.Fatalf("expected old backend after replacement failure, got %T", mintInstance.LightningBackend)
 	}
-	if mockDatabase.LDKConfig == nil || mockDatabase.LDKConfig.Rpc.Address != "127.0.0.2" {
-		t.Fatalf("expected replacement config to be saved, got %+v", mockDatabase.LDKConfig)
+	if mockDatabase.LDKConfig == nil || mockDatabase.LDKConfig.Rpc.Address != "127.0.0.1" {
+		t.Fatalf("expected old LDK config to remain persisted, got %+v", mockDatabase.LDKConfig)
 	}
 	if !strings.Contains(recorder.Body.String(), "LDK is offline") {
-		t.Fatalf("expected offline error response, got %q", recorder.Body.String())
+		t.Fatalf("expected replacement error response, got %q", recorder.Body.String())
 	}
 }

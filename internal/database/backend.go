@@ -162,7 +162,7 @@ type MintDB interface {
 	GetNostrNotificationConfig(tx pgx.Tx) (*utils.NostrNotificationConfig, error)
 	UpdateNostrNotificationConfig(tx pgx.Tx, config utils.NostrNotificationConfig) error
 	GetLDKConfig(ctx context.Context) (LDKConfig, error)
-	SetLDKConfig(ctx context.Context, config LDKConfig) error
+	SetLDKConfig(ctx context.Context, tx pgx.Tx, config LDKConfig) error
 
 	SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error
 	GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error)

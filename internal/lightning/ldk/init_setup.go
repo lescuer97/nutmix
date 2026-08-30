@@ -1,7 +1,6 @@
 package ldk
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -12,7 +11,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-func (l *LDK) prepareInitConfig(ctx context.Context) (string, string, ldk_node.Network, PersistedConfig, error) {
+func (l *LDK) prepareInitConfig(config PersistedConfig) (string, string, ldk_node.Network, PersistedConfig, error) {
 	if l == nil {
 		return "", "", 0, PersistedConfig{}, fmt.Errorf("ldk backend is nil")
 	}
@@ -22,11 +21,6 @@ func (l *LDK) prepareInitConfig(ctx context.Context) (string, string, ldk_node.N
 	runtimeConfig := l.configSnapshot()
 	if runtimeConfig.Network == "" {
 		return "", "", 0, PersistedConfig{}, fmt.Errorf("ldk network is empty")
-	}
-
-	config, err := GetPersistedConfig(ctx, l.db)
-	if err != nil {
-		return "", "", 0, PersistedConfig{}, fmt.Errorf("GetPersistedConfig(ctx, l.db): %w", err)
 	}
 
 	storageDirPath, err := l.resolveStorageDir(config)

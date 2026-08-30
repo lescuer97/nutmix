@@ -139,15 +139,16 @@ func TestPrepareInitConfigUsesSeedAndConfig(t *testing.T) {
 	ctx := context.Background()
 	tempDir := t.TempDir()
 	db := &mockdb.MockDB{}
-	err := SaveConfig(ctx, db, mustPersistedConfig(t, tempDir))
+	persistedConfig := mustPersistedConfig(t, tempDir)
+	err := SaveConfig(ctx, db, persistedConfig)
 	if err != nil {
 		t.Fatalf("SaveConfig(...): %v", err)
 	}
 
 	backend := &LDK{node: nil, db: db, config: LdkConfig{Network: "testnet3"}}
-	seedMnemonic, storageDir, network, config, err := backend.prepareInitConfig(ctx)
+	seedMnemonic, storageDir, network, config, err := backend.prepareInitConfig(persistedConfig)
 	if err != nil {
-		t.Fatalf("backend.prepareInitConfig(ctx): %v", err)
+		t.Fatalf("backend.prepareInitConfig(persistedConfig): %v", err)
 	}
 
 	if seedMnemonic == "" {
@@ -161,6 +162,49 @@ func TestPrepareInitConfigUsesSeedAndConfig(t *testing.T) {
 	}
 	if config.Rpc.Address != "127.0.0.1" {
 		t.Fatalf("rpc address mismatch, got %q", config.Rpc.Address)
+	}
+}
+
+func TestPrepareInitConfigUsesSuppliedPersistedConfig(t *testing.T) {
+	config := mustPersistedConfig(t, t.TempDir())
+	db := &mockdb.MockDB{}
+	backend := &LDK{
+		db:     db,
+		config: LdkConfig{Network: "regtest"},
+	}
+
+	_, _, _, got, err := backend.prepareInitConfig(config)
+	if err != nil {
+		t.Fatalf("backend.prepareInitConfig(config): %v", err)
+	}
+	if got != config {
+		t.Fatalf("config = %+v, want %+v", got, config)
+	}
+	if db.LDKConfig != nil {
+		t.Fatal("expected supplied config not to be persisted")
+	}
+}
+
+func TestToDatabaseConfigNormalizesAndConverts(t *testing.T) {
+	configDirectory := t.TempDir()
+	config, err := ToDatabaseConfig(PersistedConfig{
+		ConfigDirectory: configDirectory,
+		ChainSourceType: " BITCOIND ",
+		Rpc: RPCConfig{
+			Address:  " 127.0.0.1 ",
+			Port:     18443,
+			Username: " user ",
+			Password: " pass ",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ToDatabaseConfig(...): %v", err)
+	}
+	if config.ConfigDirectory != configDirectory || config.ChainSourceType != "bitcoind" {
+		t.Fatalf("unexpected database config: %+v", config)
+	}
+	if config.Rpc.Address != "127.0.0.1" || config.Rpc.Username != "user" || config.Rpc.Password != "pass" {
+		t.Fatalf("unexpected normalized RPC config: %+v", config.Rpc)
 	}
 }
 
@@ -213,7 +257,11 @@ func TestPrepareInitConfigReturnsElectrumConfig(t *testing.T) {
 	}
 
 	backend := &LDK{node: nil, db: db, config: LdkConfig{Network: "testnet3"}}
-	_, storageDir, network, config, err := backend.prepareInitConfig(ctx)
+	persistedConfig, err := GetPersistedConfig(ctx, db)
+	if err != nil {
+		t.Fatalf("GetPersistedConfig(...): %v", err)
+	}
+	_, storageDir, network, config, err := backend.prepareInitConfig(persistedConfig)
 	if err != nil {
 		t.Fatalf("backend.prepareInitConfig(ctx): %v", err)
 	}
@@ -241,7 +289,11 @@ func TestPrepareInitConfigReturnsEsploraConfig(t *testing.T) {
 	}
 
 	backend := &LDK{node: nil, db: db, config: LdkConfig{Network: "testnet3"}}
-	_, storageDir, network, config, err := backend.prepareInitConfig(ctx)
+	persistedConfig, err := GetPersistedConfig(ctx, db)
+	if err != nil {
+		t.Fatalf("GetPersistedConfig(...): %v", err)
+	}
+	_, storageDir, network, config, err := backend.prepareInitConfig(persistedConfig)
 	if err != nil {
 		t.Fatalf("backend.prepareInitConfig(ctx): %v", err)
 	}
@@ -329,7 +381,11 @@ func TestPrepareInitConfigUsesExplicitStorageDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewConfigBackend(...): %v", err)
 	}
-	seedMnemonic, storageDir, _, _, err := backend.prepareInitConfig(ctx)
+	persistedConfig, err := GetPersistedConfig(ctx, db)
+	if err != nil {
+		t.Fatalf("GetPersistedConfig(...): %v", err)
+	}
+	seedMnemonic, storageDir, _, _, err := backend.prepareInitConfig(persistedConfig)
 	if err != nil {
 		t.Fatalf("prepareInitConfig(...): %v", err)
 	}
@@ -444,7 +500,11 @@ func TestPrepareInitConfigFailsForExplicitStorageFilePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewConfigBackend(...): %v", err)
 	}
-	if _, _, _, _, err := backend.prepareInitConfig(ctx); err == nil {
+	persistedConfig, err := GetPersistedConfig(ctx, db)
+	if err != nil {
+		t.Fatalf("GetPersistedConfig(...): %v", err)
+	}
+	if _, _, _, _, err := backend.prepareInitConfig(persistedConfig); err == nil {
 		t.Fatal("expected explicit invalid storage dir to fail")
 	}
 }
@@ -526,13 +586,12 @@ func TestNewLdkStartsAndStops(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewPersistedConfig(...): %v", err)
 	}
-	if err := SaveConfig(ctx, db, config); err != nil {
-		t.Fatalf("SaveConfig(...): %v", err)
-	}
-
-	backend, err := NewLdk(ctx, db, LdkConfig{Network: "regtest"})
+	backend, err := NewLdkWithPersistedConfig(ctx, db, LdkConfig{Network: "regtest"}, config)
 	if err != nil {
-		t.Fatalf("NewLdk(...): %v", err)
+		t.Fatalf("NewLdkWithPersistedConfig(...): %v", err)
+	}
+	if db.SetLDKConfigCalls != 0 || db.LDKConfig != nil {
+		t.Fatal("expected candidate LDK startup not to persist config")
 	}
 
 	if err := backend.Stop(ctx, StopImmediately); err != nil {

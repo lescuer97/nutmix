@@ -87,7 +87,6 @@ func LdkBalancesFragment(m *mint.Mint) gin.HandlerFunc {
 			}
 			return
 		}
-
 		balances, err := ldkBackend.Balances()
 		if err != nil {
 			slog.Error("could not fetch ldk balances",
@@ -126,7 +125,6 @@ func LdkChannelsFragment(m *mint.Mint) gin.HandlerFunc {
 			}
 			return
 		}
-
 		channels, err := ldkBackend.ChannelSummaries()
 		if err != nil {
 			slog.Error("could not fetch ldk channels",
@@ -160,7 +158,6 @@ func LdkNetworkSummaryFragment(m *mint.Mint) gin.HandlerFunc {
 			renderLdkNetworkSummaryError(c)
 			return
 		}
-
 		peers, err := ldkPeerSummariesLoader(ldkBackend)
 		if err != nil {
 			slog.Error("could not fetch ldk peers",
@@ -208,7 +205,6 @@ func LdkAddressFragment(m *mint.Mint) gin.HandlerFunc {
 			renderLdkActionPanelError(c, "Could not generate on-chain address")
 			return
 		}
-
 		address, err := ldkBackend.NewOnchainAddress()
 		if err != nil {
 			slog.Error("could not generate ldk on-chain address",
@@ -243,7 +239,6 @@ func LdkOpenChannelFormFragment(m *mint.Mint) gin.HandlerFunc {
 			renderLdkActionPanelError(c, "Could not load channel form")
 			return
 		}
-
 		balances, err := ldkBackend.Balances()
 		if err != nil {
 			slog.Error("could not fetch ldk balances for channel form",
@@ -283,7 +278,6 @@ func LdkOpenChannel(m *mint.Mint) gin.HandlerFunc {
 			renderLdkNoSwapError(c, "Could not open channel")
 			return
 		}
-
 		balances, err := ldkBackend.Balances()
 		if err != nil {
 			slog.Error("could not fetch ldk balances for opening channel",
@@ -347,7 +341,6 @@ func LdkCloseChannel(m *mint.Mint) gin.HandlerFunc {
 			renderLdkNoSwapError(c, "Unable to start cooperative close")
 			return
 		}
-
 		channels, err := ldkBackend.ChannelSummaries()
 		if err != nil {
 			slog.Error("could not fetch channels before close channel",
@@ -422,7 +415,6 @@ func LdkForceCloseChannel(m *mint.Mint) gin.HandlerFunc {
 			renderLdkNoSwapError(c, "Unable to start force close")
 			return
 		}
-
 		channels, err := ldkBackend.ChannelSummaries()
 		if err != nil {
 			slog.Error("could not fetch channels before force close channel",

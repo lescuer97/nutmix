@@ -153,11 +153,9 @@ func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig
 			StorageDir: "",
 		})
 		if err != nil {
-			slog.Error("ldk backend failed to start; mint running without lightning backend", slog.Any("error", err))
-			mint.LDKSetupError = err.Error()
-		} else {
-			mint.LightningBackend = ldkNode
+			return &mint, fmt.Errorf("start configured LDK backend: %w", err)
 		}
+		mint.LightningBackend = ldkNode
 
 	default:
 		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)

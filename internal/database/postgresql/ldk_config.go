@@ -26,8 +26,8 @@ func (pql Postgresql) GetLDKConfig(ctx context.Context) (database.LDKConfig, err
 	return config, nil
 }
 
-func (pql Postgresql) SetLDKConfig(ctx context.Context, config database.LDKConfig) error {
-	_, err := pql.pool.Exec(ctx, `
+func (pql Postgresql) SetLDKConfig(ctx context.Context, tx pgx.Tx, config database.LDKConfig) error {
+	_, err := tx.Exec(ctx, `
 		INSERT INTO ldk (id, chain_source_type, electrum_server_url, esplora_server_url, rpc_address, rpc_username, rpc_password, rpc_port, tor_only, tor_proxy_address, config_directory)
 		VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (id) DO UPDATE SET
@@ -43,7 +43,7 @@ func (pql Postgresql) SetLDKConfig(ctx context.Context, config database.LDKConfi
 			config_directory = EXCLUDED.config_directory
 	`, config.ChainSourceType, config.ElectrumServerURL, config.EsploraServerURL, config.Rpc.Address, config.Rpc.Username, config.Rpc.Password, config.Rpc.Port, config.TorOnly, config.TorProxyAddress, config.ConfigDirectory)
 	if err != nil {
-		return fmt.Errorf("pql.pool.Exec(set ldk config): %w", err)
+		return fmt.Errorf("tx.Exec(set ldk config): %w", err)
 	}
 
 	return nil

@@ -66,8 +66,9 @@ func (m *MockDB) GetLDKConfig(ctx context.Context) (database.LDKConfig, error) {
 	return *m.LDKConfig, nil
 }
 
-func (m *MockDB) SetLDKConfig(ctx context.Context, config database.LDKConfig) error {
+func (m *MockDB) SetLDKConfig(ctx context.Context, tx pgx.Tx, config database.LDKConfig) error {
 	_ = ctx
+	_ = tx
 	m.SetLDKConfigCalls++
 	copyConfig := config
 	m.LDKConfig = &copyConfig

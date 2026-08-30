@@ -20,7 +20,6 @@ func LdkOnchainSendFormFragment(m *mint.Mint) gin.HandlerFunc {
 			renderLdkActionPanelError(c, "Could not load on-chain send form")
 			return
 		}
-
 		balances, err := ldkBackend.Balances()
 		if err != nil {
 			slog.Error("could not fetch ldk balances for on-chain send form",
@@ -48,7 +47,6 @@ func LdkSendOnchain(m *mint.Mint) gin.HandlerFunc {
 			renderLdkNoSwapError(c, "Could not send on-chain payment")
 			return
 		}
-
 		satsAmount, err := parseLdkOnchainSendAmount(amountText)
 		if err != nil {
 			renderLdkNoSwapError(c, displayLdkValidationError(err))
