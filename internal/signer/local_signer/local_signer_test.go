@@ -332,6 +332,71 @@ func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
 	}
 }
 
+func TestSignBlindMessagesAfterRotation(t *testing.T) {
+	db := mockdb.MockDB{} //nolint:exhaustruct
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	localSigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := localSigner.GetActiveKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	blindedKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := cashu.BlindedMessage{
+		B_: cashu.WrappedPublicKey{PublicKey: blindedKey.PubKey()},
+		Id: keys.Keysets[0].Id, Amount: 1, Witness: "",
+	}
+	if _, _, err := localSigner.SignBlindMessages([]cashu.BlindedMessage{message}); err != nil {
+		t.Fatalf("sign before rotation: %v", err)
+	}
+	if err := localSigner.RotateKeyset(cashu.Sat, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	keys, err = localSigner.GetActiveKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys.Keysets) != 1 || keys.Keysets[0].Id == message.Id {
+		t.Fatal("rotation must produce a different active keyset")
+	}
+	if _, ok := localSigner.keysets[message.Id]; !ok {
+		t.Fatal("old keyset must remain known")
+	}
+	if _, ok := localSigner.activeKeysets[message.Id]; ok || localSigner.keysets[message.Id][1].Active {
+		t.Fatal("old keyset must be known and inactive")
+	}
+	for _, test := range []struct {
+		name string
+		id   string
+		want error
+	}{
+		{name: "inactive", id: message.Id, want: cashu.ErrUsingInactiveKeyset},
+		{name: "unknown", id: "00ababababababab", want: cashu.ErrKeysetNotKnow},
+		{name: "active", id: keys.Keysets[0].Id, want: nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			output := message
+			output.Id = test.id
+			signatures, recovery, err := localSigner.SignBlindMessages([]cashu.BlindedMessage{output})
+			if !errors.Is(err, test.want) {
+				t.Fatalf("SignBlindMessages() = %v, want %v", err, test.want)
+			}
+			if test.want != nil {
+				if signatures != nil || recovery != nil {
+					t.Fatal("rejected outputs must not return signatures or recovery records")
+				}
+			} else if len(signatures) != 1 || len(recovery) != 1 || signatures[0].Id != output.Id || signatures[0].C_.PublicKey == nil {
+				t.Fatal("active output must return a signature and recovery record")
+			}
+		})
+	}
+}
+
 // NOTE: Regression test for SECURITY_AUDIT.md finding 3.2 — a nil B_ with a
 // valid active keyset must return ErrInvalidBlindMessage instead of panicking.
 func TestSignBlindMessagesRejectsNilB(t *testing.T) {
