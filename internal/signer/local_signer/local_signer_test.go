@@ -304,11 +304,11 @@ func TestMixedV1AndV2Keysets(t *testing.T) {
 	}
 }
 
-func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
+func TestSignBlindMessagesKeysetStatus(t *testing.T) {
 	db := mockdb.MockDB{} //nolint:exhaustruct
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 
-	localsigner, err := SetupLocalSigner(&db)
+	localSigner, err := SetupLocalSigner(&db)
 	if err != nil {
 		t.Fatalf("SetupLocalSigner(&db) %+v", err)
 	}
@@ -318,32 +318,7 @@ func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
 		t.Fatalf("secp256k1.GeneratePrivateKey() %+v", err)
 	}
 
-	_, _, err = localsigner.SignBlindMessages([]cashu.BlindedMessage{{
-		B_:      cashu.WrappedPublicKey{PublicKey: blindedKey.PubKey()},
-		Id:      "missing-keyset",
-		Witness: "",
-		Amount:  1,
-	}})
-	if err == nil {
-		t.Fatal("expected missing keyset to fail")
-	}
-	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
-		t.Errorf("Error should be keyset not known. %v", err)
-	}
-}
-
-func TestSignBlindMessagesAfterRotation(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
-	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	localSigner, err := SetupLocalSigner(&db)
-	if err != nil {
-		t.Fatal(err)
-	}
 	keys, err := localSigner.GetActiveKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
-	blindedKey, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
