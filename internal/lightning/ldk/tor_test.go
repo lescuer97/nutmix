@@ -5,6 +5,8 @@ import (
 	"encoding/base32"
 	"strings"
 	"testing"
+
+	ldk_node "github.com/lescuer97/ldkgo/bindings/ldk_node_ffi"
 )
 
 func validTorV3Address(t *testing.T) string {
@@ -158,5 +160,70 @@ func TestOpenChannelRejectsClearnetWhenTorOnly(t *testing.T) {
 	err := (&LDK{config: LdkConfig{TorOnly: true}}).OpenChannel("02abc", "8.8.8.8:9735", 1000)
 	if err == nil || !strings.Contains(err.Error(), "tor-only") {
 		t.Fatalf("expected tor-only validation error, got %v", err)
+	}
+}
+
+func TestValidateTorOnly(t *testing.T) {
+	if err := (&LDK{}).ValidateTorOnly(true); err == nil {
+		t.Fatal("expected an uninitialized node to be rejected")
+	}
+	for _, address := range []string{"127.0.0.1:9735", "8.8.8.8:9735"} {
+		t.Run(address, func(t *testing.T) {
+			directory := t.TempDir()
+			mnemonic, err := ReadOrCreateSeed(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			builder := ldk_node.NewBuilder()
+			builder.SetNetwork(ldk_node.NetworkRegtest)
+			builder.SetStorageDirPath(directory)
+			if err := builder.SetListeningAddresses([]string{address}); err != nil {
+				t.Fatal(err)
+			}
+			node, err := builder.Build(ldk_node.NodeEntropyFromBip39Mnemonic(mnemonic, nil))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(node.Destroy)
+			config := LdkConfig{Network: "regtest", StorageDir: directory, NoOutgoing: true}
+			backend := &LDK{node: node, config: config}
+			if err := backend.ValidateTorOnly(true); (err != nil) != (address == "8.8.8.8:9735") {
+				t.Fatalf("unexpected enable validation result: %v", err)
+			}
+			if backend.configSnapshot() != config {
+				t.Fatal("validation changed runtime config")
+			}
+			if err := backend.ValidateTorOnly(false); err != nil {
+				t.Fatalf("disable validation: %v", err)
+			}
+			for _, torOnly := range []bool{true, false} {
+				backend.SetTorOnly(torOnly)
+				config.TorOnly = torOnly
+				if backend.configSnapshot() != config || backend.node != node {
+					t.Fatal("policy update changed other config or native node reference")
+				}
+			}
+		})
+	}
+}
+
+func TestValidateTorOnlyPeers(t *testing.T) {
+	for _, address := range []string{validTorV3Address(t), "127.0.0.1:9735", "8.8.8.8:9735", ""} {
+		peers := []ldk_node.PeerDetails{{NodeId: "peer", Address: address, IsPersisted: true}}
+		wantError := address == "8.8.8.8:9735" || address == ""
+		if err := validateTorOnlyPeers(peers); (err != nil) != wantError {
+			t.Fatalf("peer %q: unexpected validation result: %v", address, err)
+		}
+	}
+	if err := validateTorOnlyPeers(nil); err != nil {
+		t.Fatalf("empty peers: %v", err)
+	}
+	peers := []ldk_node.PeerDetails{{NodeId: "peer", Address: "127.0.0.1:9735", IsConnected: true, IsPersisted: true}}
+	if err := validateTorOnlyPeers(peers); err == nil || !strings.Contains(err.Error(), "reconnect address is unavailable") {
+		t.Fatalf("expected hidden reconnect address to be rejected: %v", err)
+	}
+	peers[0].IsPersisted = false
+	if err := validateTorOnlyPeers(peers); err != nil {
+		t.Fatalf("non-persisted connected peer: %v", err)
 	}
 }

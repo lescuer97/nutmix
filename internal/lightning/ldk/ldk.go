@@ -127,10 +127,41 @@ func (l *LDK) configSnapshot() LdkConfig {
 	return l.config
 }
 
-func (l *LDK) setTorOnly(torOnly bool) {
+// SetTorOnly changes the Go-side address policy, not native networking.
+func (l *LDK) SetTorOnly(torOnly bool) {
 	l.configMu.Lock()
 	l.config.TorOnly = torOnly
 	l.configMu.Unlock()
+}
+
+func (l *LDK) ValidateTorOnly(torOnly bool) error {
+	node, err := l.getNode()
+	if err != nil {
+		return err
+	}
+	if !torOnly {
+		return nil
+	}
+	if addresses := node.ListeningAddresses(); addresses != nil {
+		if err := validateTorOnlyListeningAddresses(*addresses); err != nil {
+			return err
+		}
+	}
+	// ponytail: snapshot validation only; strict Tor-only needs native transport enforcement.
+	return validateTorOnlyPeers(node.ListPeers())
+}
+
+func validateTorOnlyPeers(peers []ldk_node.PeerDetails) error {
+	for _, peer := range peers {
+		// ListPeers hides the persisted reconnect address while a peer is connected.
+		if peer.IsConnected && peer.IsPersisted {
+			return fmt.Errorf("cannot enable tor-only while persisted peer %s is connected: reconnect address is unavailable", peer.NodeId)
+		}
+		if err := validateTorOnlySocketAddress(peer.Address); err != nil {
+			return fmt.Errorf("peer %s is not a valid tor-only peer: %w", peer.NodeId, err)
+		}
+	}
+	return nil
 }
 
 func (l *LDK) setNoOutgoing(noOutgoing bool) {
@@ -231,7 +262,7 @@ func (l *LDK) initNode(ctx context.Context, persistedConfig PersistedConfig) err
 		}
 	}
 
-	l.setTorOnly(config.TorOnly)
+	l.SetTorOnly(config.TorOnly)
 	return nil
 }
 

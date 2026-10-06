@@ -15,6 +15,7 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
@@ -33,6 +34,15 @@ type ldkConfigErrorDB struct {
 
 func (db *ldkConfigErrorDB) GetLDKConfig(context.Context) (database.LDKConfig, error) {
 	return database.LDKConfig{}, db.err
+}
+
+type ldkCommitErrorDB struct {
+	*mockdb.MockDB
+	err error
+}
+
+func (db *ldkCommitErrorDB) Commit(context.Context, pgx.Tx) error {
+	return db.err
 }
 
 func newPostContext(values url.Values) *gin.Context {
@@ -978,6 +988,55 @@ func TestLDKConfigsEqual(t *testing.T) {
 	}
 }
 
+func TestLDKConfigRequiresRestart(t *testing.T) {
+	for _, source := range []ldk.ChainSourceType{ldk.ChainSourceBitcoind, ldk.ChainSourceElectrum, ldk.ChainSourceEsplora} {
+		current := mustBitcoindPersistedConfigForAdminTest(t, t.TempDir())
+		current.ChainSourceType = source
+		current.ElectrumServerURL = "ssl://localhost:50002"
+		current.EsploraServerURL = "http://localhost:3002"
+		proxy := "localhost:9050"
+		current.TorProxyAddress = &proxy
+		tests := []struct {
+			name   string
+			change func(*ldk.PersistedConfig)
+			want   bool
+		}{
+			{"unchanged", func(*ldk.PersistedConfig) {}, false},
+			{"tor policy", func(c *ldk.PersistedConfig) { c.TorOnly = true }, false},
+			{"source", func(c *ldk.PersistedConfig) { c.ChainSourceType = "other" }, true},
+			{"directory", func(c *ldk.PersistedConfig) { c.ConfigDirectory += "-new" }, true},
+			{"proxy removed", func(c *ldk.PersistedConfig) { c.TorProxyAddress = nil }, true},
+			{"proxy changed", func(c *ldk.PersistedConfig) { p := "localhost:9150"; c.TorProxyAddress = &p }, true},
+			{"same proxy value", func(c *ldk.PersistedConfig) { p := proxy; c.TorProxyAddress = &p }, false},
+			{"rpc address", func(c *ldk.PersistedConfig) { c.Rpc.Address = "localhost" }, source == ldk.ChainSourceBitcoind},
+			{"rpc port", func(c *ldk.PersistedConfig) { c.Rpc.Port++ }, source == ldk.ChainSourceBitcoind},
+			{"rpc username", func(c *ldk.PersistedConfig) { c.Rpc.Username += "-new" }, source == ldk.ChainSourceBitcoind},
+			{"rpc password", func(c *ldk.PersistedConfig) { c.Rpc.Password += "-new" }, source == ldk.ChainSourceBitcoind},
+			{"electrum url", func(c *ldk.PersistedConfig) { c.ElectrumServerURL += "/new" }, source == ldk.ChainSourceElectrum},
+			{"esplora url", func(c *ldk.PersistedConfig) { c.EsploraServerURL += "/new" }, source == ldk.ChainSourceEsplora},
+		}
+		for _, test := range tests {
+			t.Run(string(source)+"/"+test.name, func(t *testing.T) {
+				incoming := current
+				test.change(&incoming)
+				if got := ldkConfigRequiresRestart(current, incoming); got != test.want {
+					t.Fatalf("requires restart = %v, want %v", got, test.want)
+				}
+				if test.name != "unchanged" && test.name != "same proxy value" && ldkConfigsEqual(current, incoming) {
+					t.Fatal("changed config was classified as unchanged")
+				}
+			})
+		}
+	}
+	current := mustBitcoindPersistedConfigForAdminTest(t, t.TempDir())
+	incoming := current
+	proxy := "localhost:9050"
+	incoming.TorProxyAddress = &proxy
+	if !ldkConfigRequiresRestart(current, incoming) {
+		t.Fatal("adding a proxy must require a restart")
+	}
+}
+
 func TestLDKBackendUpdateErrorMessage(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -1105,4 +1164,133 @@ func TestBolt11PostKeepsOldBackendWhenActiveLDKReplacementAndRestoreFail(t *test
 	if !strings.Contains(recorder.Body.String(), "LDK is offline") {
 		t.Fatalf("expected replacement error response, got %q", recorder.Body.String())
 	}
+}
+
+func TestTransitionLightningBackendUpdatesRunningLDKWithoutRestart(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/fee-estimates" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprint(w, `{"1":1.0}`)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(server.Close)
+	config, err := ldk.NewPersistedConfigWithChainSource(ldk.ChainSourceEsplora, ldk.RPCConfig{}, "", server.URL, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mintConfig utils.Config
+	mintConfig.Default()
+	mintConfig.NETWORK = "regtest"
+	mintConfig.MINT_LIGHTNING_BACKEND = utils.LDK
+	db := &ldkCommitErrorDB{MockDB: &mockdb.MockDB{}}
+	backend, err := ldk.NewLdkWithPersistedConfig(t.Context(), db, ldk.LdkConfig{Network: "regtest"}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := backend.Stop(context.Background(), ldk.StopImmediately); err != nil {
+			t.Error(err)
+		}
+	})
+	commitErr := errors.New("commit failed")
+	for _, test := range []struct {
+		name   string
+		oldTor bool
+		newTor bool
+		fail   bool
+	}{
+		{name: "enable policy", newTor: true},
+		{name: "disable policy", oldTor: true},
+		{name: "inactive sources"},
+		{name: "failed enable", newTor: true, fail: true},
+		{name: "failed disable", oldTor: true, fail: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			current := config
+			current.TorOnly = test.oldTor
+			backend.SetTorOnly(test.oldTor)
+			stored, err := ldk.ToDatabaseConfig(current)
+			if err != nil {
+				t.Fatal(err)
+			}
+			db.LDKConfig = &stored
+			db.Config = mintConfig
+			db.SetLDKConfigCalls = 0
+			db.err = nil
+			if test.fail {
+				db.err = commitErr
+			}
+			mintInstance := &mint.Mint{Config: mintConfig, MintDB: db, LightningBackend: backend}
+			incoming := current
+			incoming.TorOnly = test.newTor
+			if test.name == "inactive sources" {
+				incoming.Rpc.Password = "new inactive password"
+				incoming.ElectrumServerURL = "ssl://localhost:50002"
+			}
+			newConfig := mintConfig
+			newConfig.NAME = "updated"
+			wantStored, err := ldk.ToDatabaseConfig(incoming)
+			if err != nil {
+				t.Fatal(err)
+			}
+			unchanged, err := transitionLightningBackend(t.Context(), mintInstance, chaincfg.RegressionNetParams, mintConfig, newConfig, nil, &current, &incoming)
+			if test.fail {
+				if !errors.Is(err, commitErr) || mintInstance.Config.NAME != mintConfig.NAME {
+					t.Fatalf("failed commit changed mint config or returned wrong error: %v", err)
+				}
+			} else if err != nil || unchanged || db.SetLDKConfigCalls != 1 || mintInstance.Config.NAME != newConfig.NAME {
+				t.Fatalf("update failed: unchanged=%v saves=%d error=%v", unchanged, db.SetLDKConfigCalls, err)
+			} else if *db.LDKConfig != wantStored {
+				t.Fatal("incoming config was not persisted")
+			}
+			if mintInstance.LightningBackend != backend {
+				t.Fatal("backend reference was replaced")
+			}
+			if status, err := backend.Status(t.Context()); err != nil || status != lightning.ONLINE_STATUS {
+				t.Fatalf("node stopped: status=%v error=%v", status, err)
+			}
+			wantTor := test.newTor
+			if test.fail {
+				wantTor = test.oldTor
+			}
+			// A valid pubkey and local, closed port avoid any external connection if the policy is disabled.
+			err = backend.OpenChannel("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", "0.0.0.0:0", 1000)
+			if err == nil || strings.Contains(err.Error(), "tor-only") != wantTor {
+				t.Fatalf("runtime policy does not match expected tor-only=%v: %v", wantTor, err)
+			}
+			payments, err := backend.Payments(ldk.All)
+			if err != nil || len(payments) != 0 {
+				t.Fatalf("update generated verification payments: %v, %v", payments, err)
+			}
+		})
+	}
+	t.Run("form submission", func(t *testing.T) {
+		backend.SetTorOnly(false)
+		stored, err := ldk.ToDatabaseConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		db.LDKConfig = &stored
+		db.Config = mintConfig
+		db.SetLDKConfigCalls = 0
+		db.err = nil
+		mintInstance := &mint.Mint{Config: mintConfig, MintDB: db, LightningBackend: backend}
+		values := url.Values{
+			"NETWORK":                {"regtest"},
+			"MINT_LIGHTNING_BACKEND": {string(utils.LDK)},
+			"LDK_CHAIN_SOURCE_TYPE":  {string(ldk.ChainSourceEsplora)},
+			"ESPLORA_SERVER_URL":     {server.URL},
+			"TOR_ONLY":               {"true"},
+		}
+		c, recorder := newPostContextWithRecorder(values)
+		Bolt11Post(mintInstance)(c)
+		if recorder.Header().Get("HX-Trigger") != "lightning-status-changed" || !strings.Contains(recorder.Body.String(), "settings changed") {
+			t.Fatalf("expected successful changed response, got %q", recorder.Body.String())
+		}
+		if mintInstance.LightningBackend != backend || db.SetLDKConfigCalls != 1 || !db.LDKConfig.TorOnly {
+			t.Fatal("form submission did not persist policy on the existing backend")
+		}
+	})
 }

@@ -195,6 +195,30 @@ func ldkConfigsEqual(current ldk.PersistedConfig, incoming ldk.PersistedConfig) 
 		current.ConfigDirectory == incoming.ConfigDirectory
 }
 
+func ldkConfigRequiresRestart(current ldk.PersistedConfig, incoming ldk.PersistedConfig) bool {
+	if current.ChainSourceType != incoming.ChainSourceType || current.ConfigDirectory != incoming.ConfigDirectory {
+		return true
+	}
+	if (current.TorProxyAddress == nil) != (incoming.TorProxyAddress == nil) {
+		return true
+	}
+	if current.TorProxyAddress != nil && *current.TorProxyAddress != *incoming.TorProxyAddress {
+		return true
+	}
+
+	// ponytail: only the selected chain source is installed in the native node.
+	switch current.ChainSourceType {
+	case ldk.ChainSourceBitcoind:
+		return current.Rpc != incoming.Rpc
+	case ldk.ChainSourceElectrum:
+		return current.ElectrumServerURL != incoming.ElectrumServerURL
+	case ldk.ChainSourceEsplora:
+		return current.EsploraServerURL != incoming.EsploraServerURL
+	default:
+		return true
+	}
+}
+
 func loadLDKConfig(ctx context.Context, c *gin.Context, mint *m.Mint) (ldk.PersistedConfig, ldk.PersistedConfig, error) {
 	defaultConfigDirectory, err := ldk.DefaultConfigDirectory()
 	if err != nil {
@@ -927,8 +951,28 @@ func transitionLightningBackend(
 	currentLDK, activeLDK := current.(*ldk.LDK)
 	if activeLDK && oldConfig.MINT_LIGHTNING_BACKEND == utils.LDK && mint.LDKSetupError == "" &&
 		incomingLDKConfig != nil && oldConfig.NETWORK == chainparam.Name &&
-		existingLDKConfig != nil && ldkConfigsEqual(*existingLDKConfig, *incomingLDKConfig) {
-		return true, nil
+		existingLDKConfig != nil {
+		if ldkConfigsEqual(*existingLDKConfig, *incomingLDKConfig) {
+			return true, nil
+		}
+		if newConfig.MINT_LIGHTNING_BACKEND == utils.LDK && !ldkConfigRequiresRestart(*existingLDKConfig, *incomingLDKConfig) {
+			if status, err := currentLDK.Status(ctx); err == nil && status == lightning.ONLINE_STATUS {
+				if err := incomingLDKConfig.Validate(); err != nil {
+					return false, fmt.Errorf("validate LDK configuration: %w", err)
+				}
+				if existingLDKConfig.TorOnly != incomingLDKConfig.TorOnly {
+					if err := currentLDK.ValidateTorOnly(incomingLDKConfig.TorOnly); err != nil {
+						return false, fmt.Errorf("validate LDK tor-only policy: %w", err)
+					}
+				}
+				if err := persistLightningConfigTx(ctx, mint, newConfig, incomingLDKConfig); err != nil {
+					return false, fmt.Errorf("persist lightning configuration: %w", err)
+				}
+				currentLDK.SetTorOnly(incomingLDKConfig.TorOnly)
+				mint.Config = newConfig
+				return false, nil
+			}
+		}
 	}
 
 	oldStopped := false

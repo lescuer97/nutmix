@@ -441,7 +441,7 @@ func TestConfigConcurrentReadWrite(t *testing.T) {
 	go func() {
 		defer wait.Done()
 		for i := 0; i < 1000; i++ {
-			backend.setTorOnly(i%2 == 0)
+			backend.SetTorOnly(i%2 == 0)
 			backend.setNoOutgoing(i%2 == 0)
 		}
 	}()
