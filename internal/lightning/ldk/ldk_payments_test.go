@@ -13,6 +13,27 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
+type bolt11PaymentRecorder struct {
+	ldk_node.Bolt11PaymentInterface
+	method      string
+	amountMsat  uint64
+	paymentID   ldk_node.PaymentId
+	routeParams *ldk_node.RouteParametersConfig
+}
+
+func (r *bolt11PaymentRecorder) Send(_ *ldk_node.Bolt11Invoice, routeParams *ldk_node.RouteParametersConfig) (ldk_node.PaymentId, error) {
+	r.method = "send"
+	r.routeParams = routeParams
+	return r.paymentID, nil
+}
+
+func (r *bolt11PaymentRecorder) SendUsingAmountUnderpaying(_ *ldk_node.Bolt11Invoice, amountMsat uint64, routeParams *ldk_node.RouteParametersConfig) (ldk_node.PaymentId, error) {
+	r.method = "underpay"
+	r.amountMsat = amountMsat
+	r.routeParams = routeParams
+	return r.paymentID, nil
+}
+
 func mustDecodeMockInvoice(t *testing.T) *zpay32.Invoice {
 	t.Helper()
 
@@ -266,6 +287,44 @@ func TestNoOutgoingRejectsSpending(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if err := test.call(); !errors.Is(err, cashu.ErrMeltingDisabled) {
 				t.Fatalf("error = %v, want %v", err, cashu.ErrMeltingDisabled)
+			}
+		})
+	}
+}
+
+func TestSendAmountBearingBolt11Payment(t *testing.T) {
+	routeParams := &ldk_node.RouteParametersConfig{}
+	tests := []struct {
+		name              string
+		mpp               bool
+		amountMsat        uint64
+		invoiceAmountMsat uint64
+		wantMethod        string
+		wantAmountMsat    uint64
+	}{
+		{name: "partial mpp", mpp: true, amountMsat: 400_000, invoiceAmountMsat: 1_000_000, wantMethod: "underpay", wantAmountMsat: 400_000},
+		{name: "full mpp", mpp: true, amountMsat: 1_000_000, invoiceAmountMsat: 1_000_000, wantMethod: "send"},
+		{name: "non mpp", amountMsat: 400_000, invoiceAmountMsat: 1_000_000, wantMethod: "send"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := &bolt11PaymentRecorder{paymentID: "payment-id"}
+			paymentID, err := sendAmountBearingBolt11Payment(recorder, nil, test.invoiceAmountMsat, test.amountMsat, test.mpp, routeParams)
+			if err != nil {
+				t.Fatalf("sendAmountBearingBolt11Payment(...): %v", err)
+			}
+			if paymentID != recorder.paymentID {
+				t.Fatalf("payment ID = %q, want %q", paymentID, recorder.paymentID)
+			}
+			if recorder.method != test.wantMethod {
+				t.Fatalf("method = %q, want %q", recorder.method, test.wantMethod)
+			}
+			if recorder.amountMsat != test.wantAmountMsat {
+				t.Fatalf("amount = %d, want %d", recorder.amountMsat, test.wantAmountMsat)
+			}
+			if recorder.routeParams != routeParams {
+				t.Fatal("route parameters were not forwarded")
 			}
 		})
 	}

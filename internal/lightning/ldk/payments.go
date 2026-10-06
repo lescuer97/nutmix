@@ -48,7 +48,8 @@ func (l *LDK) PayInvoice(meltQuote cashu.MeltRequestDB, zpayInvoice *zpay32.Invo
 
 	bolt11 := node.Bolt11Payment()
 	var paymentID ldk_node.PaymentId
-	if zpayInvoice.MilliSat == nil || *zpayInvoice.MilliSat == 0 {
+	invoiceAmountMsat := ldkInvoice.AmountMilliSatoshis()
+	if invoiceAmountMsat == nil || *invoiceAmountMsat == 0 {
 		if amountMsat.Amount == 0 {
 			return response, fmt.Errorf("amount is not available for the invoice")
 		}
@@ -56,11 +57,8 @@ func (l *LDK) PayInvoice(meltQuote cashu.MeltRequestDB, zpayInvoice *zpay32.Invo
 		if err != nil {
 			return response, fmt.Errorf("bolt11.SendUsingAmount(ldkInvoice, amountMsat.Amount, routeParams) %w", err)
 		}
-	} else {
-		paymentID, err = bolt11.Send(ldkInvoice, routeParams)
-		if err != nil {
-			return response, fmt.Errorf("bolt11.Send(ldkInvoice, routeParams) %w", err)
-		}
+	} else if paymentID, err = sendAmountBearingBolt11Payment(bolt11, ldkInvoice, *invoiceAmountMsat, amountMsat.Amount, mpp, routeParams); err != nil {
+		return response, err
 	}
 
 	response.PaymentRequest = meltQuote.Request
@@ -83,6 +81,22 @@ func (l *LDK) PayInvoice(meltQuote cashu.MeltRequestDB, zpayInvoice *zpay32.Invo
 	response.Preimage = preimage
 	response.PaidFee = fee
 	return response, nil
+}
+
+func sendAmountBearingBolt11Payment(bolt11 ldk_node.Bolt11PaymentInterface, invoice *ldk_node.Bolt11Invoice, invoiceAmountMsat uint64, amountMsat uint64, mpp bool, routeParams *ldk_node.RouteParametersConfig) (ldk_node.PaymentId, error) {
+	if mpp && amountMsat < invoiceAmountMsat {
+		paymentID, err := bolt11.SendUsingAmountUnderpaying(invoice, amountMsat, routeParams)
+		if err != nil {
+			return "", fmt.Errorf("bolt11.SendUsingAmountUnderpaying(invoice, amountMsat, routeParams) %w", err)
+		}
+		return paymentID, nil
+	}
+
+	paymentID, err := bolt11.Send(invoice, routeParams)
+	if err != nil {
+		return "", fmt.Errorf("bolt11.Send(invoice, routeParams) %w", err)
+	}
+	return paymentID, nil
 }
 
 func (l *LDK) buildRouteParameters(node *ldk_node.Node, feeReserve cashu.Amount, mpp bool) (*ldk_node.RouteParametersConfig, error) {

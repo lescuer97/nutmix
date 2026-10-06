@@ -217,9 +217,11 @@ func loadLDKConfig(ctx context.Context, c *gin.Context, mint *m.Mint) (ldk.Persi
 	}
 	if persistedConfig, err := ldk.GetPersistedConfig(ctx, mint.MintDB); err == nil {
 		existingConfig = persistedConfig
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return ldk.PersistedConfig{}, ldk.PersistedConfig{}, fmt.Errorf("ldk.GetPersistedConfig(...): %w", err)
 	}
 
-	incomingConfig, err := parseLDKPersistedConfig(c, existingConfig, defaultConfigDirectory)
+	incomingConfig, err := parseLDKPersistedConfig(c, existingConfig, existingConfig.ConfigDirectory)
 	if err != nil {
 		return ldk.PersistedConfig{}, ldk.PersistedConfig{}, fmt.Errorf("parseLDKPersistedConfig(...): %w", err)
 	}

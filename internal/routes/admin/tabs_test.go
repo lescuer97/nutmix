@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/gin-gonic/gin"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/lightning/ldk"
@@ -24,6 +25,15 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
+
+type ldkConfigErrorDB struct {
+	*mockdb.MockDB
+	err error
+}
+
+func (db *ldkConfigErrorDB) GetLDKConfig(context.Context) (database.LDKConfig, error) {
+	return database.LDKConfig{}, db.err
+}
 
 func newPostContext(values url.Values) *gin.Context {
 	c, _ := newPostContextWithRecorder(values)
@@ -690,6 +700,63 @@ func TestParseLDKPersistedConfig(t *testing.T) {
 	}
 	if config.ConfigDirectory != configDirectory {
 		t.Fatalf("unexpected config directory: %q", config.ConfigDirectory)
+	}
+}
+
+func TestLoadLDKConfigPreservesConfigDirectory(t *testing.T) {
+	configRoot := setTempConfigDir(t)
+	defaultDirectory := filepath.Join(configRoot, "ldk")
+	customDirectory := filepath.Join(t.TempDir(), "custom-ldk")
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+	customConfig := mustBitcoindPersistedConfigForAdminTest(t, customDirectory)
+
+	tests := []struct {
+		name          string
+		persisted     *ldk.PersistedConfig
+		wantDirectory string
+	}{
+		{name: "persisted custom directory", persisted: &customConfig, wantDirectory: customDirectory},
+		{name: "first setup uses default directory", wantDirectory: defaultDirectory},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			db := &mockdb.MockDB{}
+			if test.persisted != nil {
+				databaseConfig, err := ldk.ToDatabaseConfig(*test.persisted)
+				if err != nil {
+					t.Fatalf("ldk.ToDatabaseConfig(...): %v", err)
+				}
+				db.LDKConfig = &databaseConfig
+			}
+
+			existing, incoming, err := loadLDKConfig(t.Context(), newPostContext(values), &mint.Mint{MintDB: db})
+			if err != nil {
+				t.Fatalf("loadLDKConfig(...): %v", err)
+			}
+			if existing.ConfigDirectory != test.wantDirectory {
+				t.Fatalf("existing directory = %q, want %q", existing.ConfigDirectory, test.wantDirectory)
+			}
+			if incoming.ConfigDirectory != test.wantDirectory {
+				t.Fatalf("incoming directory = %q, want %q", incoming.ConfigDirectory, test.wantDirectory)
+			}
+		})
+	}
+}
+
+func TestLoadLDKConfigRejectsDatabaseError(t *testing.T) {
+	setTempConfigDir(t)
+	dbErr := errors.New("get ldk config")
+	db := &ldkConfigErrorDB{MockDB: &mockdb.MockDB{}, err: dbErr}
+
+	_, _, err := loadLDKConfig(t.Context(), newPostContext(url.Values{}), &mint.Mint{MintDB: db})
+	if !errors.Is(err, dbErr) {
+		t.Fatalf("loadLDKConfig(...) error = %v, want %v", err, dbErr)
 	}
 }
 
