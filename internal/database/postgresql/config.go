@@ -127,7 +127,7 @@ func (pql Postgresql) GetConfig(tx pgx.Tx) (utils.Config, error) {
 	return config, nil
 }
 
-func (pql Postgresql) SetConfig(tx pgx.Tx, config utils.Config) error {
+func (pql Postgresql) SetConfig(ctx context.Context, tx pgx.Tx, config utils.Config) error {
 	tries := 0
 	stmt := `
         INSERT INTO config (
@@ -168,7 +168,7 @@ func (pql Postgresql) SetConfig(tx pgx.Tx, config utils.Config) error {
 
 	for {
 		tries += 1
-		_, err := tx.Exec(context.Background(), stmt,
+		_, err := tx.Exec(ctx, stmt,
 			1,
 			config.NAME,
 			config.DESCRIPTION,

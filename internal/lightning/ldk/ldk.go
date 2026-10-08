@@ -69,7 +69,7 @@ func NewLdk(ctx context.Context, db database.MintDB, config LdkConfig) (*LDK, er
 	if err != nil {
 		return nil, err
 	}
-	return startLDK(ctx, ldk, persistedConfig)
+	return startLDK(ldk, persistedConfig)
 }
 
 func NewLdkWithPersistedConfig(ctx context.Context, db database.MintDB, config LdkConfig, persistedConfig PersistedConfig) (*LDK, error) {
@@ -83,11 +83,11 @@ func NewLdkWithPersistedConfig(ctx context.Context, db database.MintDB, config L
 		return nil, err
 	}
 
-	return startLDK(ctx, ldk, normalizedConfig)
+	return startLDK(ldk, normalizedConfig)
 }
 
-func startLDK(ctx context.Context, ldk *LDK, persistedConfig PersistedConfig) (*LDK, error) {
-	err := ldk.initNode(ctx, persistedConfig)
+func startLDK(ldk *LDK, persistedConfig PersistedConfig) (*LDK, error) {
+	err := ldk.initNode(persistedConfig)
 	if err != nil {
 		return nil, fmt.Errorf("ldk.InitNode(). %w", err)
 	}
@@ -190,10 +190,10 @@ func (l *LDK) InitNode(ctx context.Context) error {
 		return fmt.Errorf("GetPersistedConfig(ctx, l.db): %w", err)
 	}
 
-	return l.initNode(ctx, persistedConfig)
+	return l.initNode(persistedConfig)
 }
 
-func (l *LDK) initNode(ctx context.Context, persistedConfig PersistedConfig) error {
+func (l *LDK) initNode(persistedConfig PersistedConfig) error {
 	seedMnemonic, ldkStorage, network, config, err := l.prepareInitConfig(persistedConfig)
 	if err != nil {
 		return fmt.Errorf("l.prepareInitConfig(persistedConfig): %w", err)

@@ -19,12 +19,12 @@ func readOrCreateSeedFile(dirPath string) (seed string, created bool, err error)
 	if err != nil {
 		return "", false, fmt.Errorf("open seed directory: %w", err)
 	}
-	defer syscall.Close(dirFD)
+	defer func() { _ = syscall.Close(dirFD) }()
 
 	if err := syscall.Flock(dirFD, syscall.LOCK_EX); err != nil {
 		return "", false, fmt.Errorf("lock seed directory: %w", err)
 	}
-	defer syscall.Flock(dirFD, syscall.LOCK_UN)
+	defer func() { _ = syscall.Flock(dirFD, syscall.LOCK_UN) }()
 
 	seedFD, err := syscall.Openat(dirFD, seedFileName, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0)
 	if err == nil {
@@ -119,7 +119,7 @@ func openSeedDirectory(dirPath string) (int, error) {
 
 func readExistingSeedFile(dirFD, seedFD int) (string, error) {
 	seedFile := os.NewFile(uintptr(seedFD), seedFileName)
-	defer seedFile.Close()
+	defer func() { _ = seedFile.Close() }()
 
 	var stat syscall.Stat_t
 	if err := syscall.Fstat(seedFD, &stat); err != nil {

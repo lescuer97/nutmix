@@ -991,7 +991,9 @@ func transitionLightningBackend(
 			mint.LightningBackend = current
 			return errors.Join(updateErr, errLDKBackendOffline, fmt.Errorf("old backend cannot be restored"))
 		}
-		restored, restoreErr := ldk.NewLdkWithPersistedConfig(ctx, mint.MintDB, ldk.LdkConfig{Network: oldConfig.NETWORK}, *existingLDKConfig)
+		restored, restoreErr := ldk.NewLdkWithPersistedConfig(ctx, mint.MintDB, ldk.LdkConfig{
+			Network: oldConfig.NETWORK, StorageDir: "", TorOnly: false, NoOutgoing: false,
+		}, *existingLDKConfig)
 		if restoreErr != nil {
 			mint.LightningBackend = current
 			return errors.Join(updateErr, errLDKBackendOffline, fmt.Errorf("restore previous LDK: %w", restoreErr))
@@ -1009,7 +1011,9 @@ func transitionLightningBackend(
 
 	if incomingLDKConfig != nil {
 		var err error
-		candidateLDK, err = ldk.NewLdkWithPersistedConfig(ctx, mint.MintDB, ldk.LdkConfig{Network: chainparam.Name}, *incomingLDKConfig)
+		candidateLDK, err = ldk.NewLdkWithPersistedConfig(ctx, mint.MintDB, ldk.LdkConfig{
+			Network: chainparam.Name, StorageDir: "", TorOnly: false, NoOutgoing: false,
+		}, *incomingLDKConfig)
 		if err != nil {
 			return false, restore(fmt.Errorf("start replacement LDK: %w", err))
 		}

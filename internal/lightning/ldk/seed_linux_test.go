@@ -3,6 +3,7 @@
 package ldk
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,29 +114,33 @@ func TestReadOrCreateSeedRejectsNonRegularFile(t *testing.T) {
 }
 
 func TestReadOrCreateSeedPreservesMalformedExistingFile(t *testing.T) {
-	dirPath := t.TempDir()
-	seedPath := filepath.Join(dirPath, seedFileName)
-	malformed := []byte("not a seed")
-	if err := os.WriteFile(seedPath, malformed, 0o644); err != nil {
-		t.Fatalf("os.WriteFile(seedPath): %v", err)
-	}
+	for _, mode := range []os.FileMode{0o400, 0o600, 0o644} {
+		t.Run(fmt.Sprintf("%o", mode), func(t *testing.T) {
+			dirPath := t.TempDir()
+			seedPath := filepath.Join(dirPath, seedFileName)
+			malformed := []byte("not a seed")
+			if err := os.WriteFile(seedPath, malformed, mode); err != nil {
+				t.Fatalf("os.WriteFile(seedPath): %v", err)
+			}
 
-	if _, err := ReadOrCreateSeed(dirPath); err == nil {
-		t.Fatal("ReadOrCreateSeed malformed seed succeeded")
-	}
-	contents, err := os.ReadFile(seedPath)
-	if err != nil {
-		t.Fatalf("os.ReadFile(seedPath): %v", err)
-	}
-	if string(contents) != string(malformed) {
-		t.Fatalf("malformed seed changed: got %q, want %q", contents, malformed)
-	}
-	info, err := os.Stat(seedPath)
-	if err != nil {
-		t.Fatalf("os.Stat(seedPath): %v", err)
-	}
-	if info.Mode().Perm() != 0o644 {
-		t.Fatalf("malformed seed mode changed: got %o, want 644", info.Mode().Perm())
+			if _, err := ReadOrCreateSeed(dirPath); err == nil {
+				t.Fatal("ReadOrCreateSeed malformed seed succeeded")
+			}
+			contents, err := os.ReadFile(seedPath)
+			if err != nil {
+				t.Fatalf("os.ReadFile(seedPath): %v", err)
+			}
+			if string(contents) != string(malformed) {
+				t.Fatalf("malformed seed changed: got %q, want %q", contents, malformed)
+			}
+			info, err := os.Stat(seedPath)
+			if err != nil {
+				t.Fatalf("os.Stat(seedPath): %v", err)
+			}
+			if info.Mode().Perm() != mode {
+				t.Fatalf("malformed seed mode changed: got %o, want %o", info.Mode().Perm(), mode)
+			}
+		})
 	}
 }
 
@@ -160,21 +165,25 @@ func TestReadOrCreateSeedRejectsOversizedExistingFile(t *testing.T) {
 }
 
 func TestReadOrCreateSeedEnforcesExistingFileMode(t *testing.T) {
-	dirPath := t.TempDir()
-	seedPath := filepath.Join(dirPath, seedFileName)
-	seed := "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega"
-	if err := os.WriteFile(seedPath, []byte(seed), 0o644); err != nil {
-		t.Fatalf("os.WriteFile(seedPath): %v", err)
-	}
+	for _, mode := range []os.FileMode{0o400, 0o600, 0o644} {
+		t.Run(fmt.Sprintf("%o", mode), func(t *testing.T) {
+			dirPath := t.TempDir()
+			seedPath := filepath.Join(dirPath, seedFileName)
+			seed := "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega"
+			if err := os.WriteFile(seedPath, []byte(seed), mode); err != nil {
+				t.Fatalf("os.WriteFile(seedPath): %v", err)
+			}
 
-	if _, err := ReadOrCreateSeed(dirPath); err != nil {
-		t.Fatalf("ReadOrCreateSeed(dirPath): %v", err)
-	}
-	info, err := os.Stat(seedPath)
-	if err != nil {
-		t.Fatalf("os.Stat(seedPath): %v", err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("seed mode = %o, want 600", info.Mode().Perm())
+			if _, err := ReadOrCreateSeed(dirPath); err != nil {
+				t.Fatalf("ReadOrCreateSeed(dirPath): %v", err)
+			}
+			info, err := os.Stat(seedPath)
+			if err != nil {
+				t.Fatalf("os.Stat(seedPath): %v", err)
+			}
+			if info.Mode().Perm() != 0o600 {
+				t.Fatalf("seed mode = %o, want 600", info.Mode().Perm())
+			}
+		})
 	}
 }

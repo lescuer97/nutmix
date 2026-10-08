@@ -88,9 +88,9 @@ func SetUpConfigDB(ctx context.Context, db database.MintDB) (utils.Config, *util
 
 		// if the file config is set use that to set, if nothing is set do default
 		// write to config db
-		err = db.SetConfig(tx, config)
+		err = db.SetConfig(ctx, tx, config)
 		if err != nil {
-			return config, nil, fmt.Errorf("db.SetConfig(tx, config): %w", err)
+			return config, nil, fmt.Errorf("db.SetConfig(ctx, tx, config): %w", err)
 		}
 
 		if fileNostrConfig.NOSTR_NOTIFICATIONS || fileNostrConfig.NOSTR_NOTIFICATION_NIP04_DM {

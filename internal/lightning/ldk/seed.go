@@ -3,7 +3,6 @@ package ldk
 import (
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"strings"
 
 	ldk_node "github.com/lescuer97/ldkgo/bindings/ldk_node_ffi"
@@ -47,10 +46,6 @@ func resolveSeedDirPath(dirPath string) (string, error) {
 	}
 
 	return configDirPath, nil
-}
-
-func seedFilePath(dirPath string) string {
-	return filepath.Join(dirPath, seedFileName)
 }
 
 func validateSeedMnemonic(seed string) error {

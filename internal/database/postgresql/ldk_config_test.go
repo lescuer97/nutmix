@@ -118,7 +118,7 @@ func TestLightningAndLDKConfigsRollBackTogether(t *testing.T) {
 		Rpc:             database.LDKRPCConfig{Address: "127.0.0.1", Username: "user", Password: "pass", Port: 18443},
 	}
 	commitConfigTx(t, db, func(tx pgx.Tx) error {
-		if err := db.SetConfig(tx, oldConfig); err != nil {
+		if err := db.SetConfig(ctx, tx, oldConfig); err != nil {
 			return err
 		}
 		return db.SetLDKConfig(ctx, tx, oldLDK)

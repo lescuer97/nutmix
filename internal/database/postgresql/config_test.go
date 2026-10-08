@@ -3,13 +3,39 @@ package postgresql
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
+
+type setConfigContextTx struct {
+	pgx.Tx
+	ctx context.Context
+}
+
+func (tx *setConfigContextTx) Exec(ctx context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+	tx.ctx = ctx
+	return pgconn.CommandTag{}, ctx.Err()
+}
+
+func TestSetConfigUsesCallerContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	tx := &setConfigContextTx{}
+	var config utils.Config
+	config.Default()
+	if err := (Postgresql{}).SetConfig(ctx, tx, config); !errors.Is(err, context.Canceled) {
+		t.Fatalf("SetConfig canceled context: got %v, want context.Canceled", err)
+	}
+	if tx.ctx != ctx {
+		t.Fatal("SetConfig did not pass the caller's context to Exec")
+	}
+}
 
 func mustWrappedPubkey(t *testing.T, hexPubkey string) cashu.WrappedPublicKey {
 	t.Helper()
@@ -51,13 +77,13 @@ func commitConfigTx(t *testing.T, db Postgresql, fn func(tx pgx.Tx) error) {
 }
 
 func TestUpdateNostrNotificationConfig_PersistsNpubsAndFlags(t *testing.T) {
-	db, _ := setupTestDB(t)
+	db, ctx := setupTestDB(t)
 
 	var config utils.Config
 	config.Default()
 
 	commitConfigTx(t, db, func(tx pgx.Tx) error {
-		return db.SetConfig(tx, config)
+		return db.SetConfig(ctx, tx, config)
 	})
 
 	npub1 := mustWrappedPubkey(t, "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac")
@@ -73,7 +99,6 @@ func TestUpdateNostrNotificationConfig_PersistsNpubsAndFlags(t *testing.T) {
 		return db.UpdateNostrNotificationConfig(tx, nostrConfig)
 	})
 
-	ctx := context.Background()
 	tx, err := db.GetTx(ctx)
 	if err != nil {
 		t.Fatalf("db.GetTx(ctx): %v", err)
@@ -148,13 +173,13 @@ func TestGetNostrNotificationConfig_ReturnsNilWhenRowMissing(t *testing.T) {
 }
 
 func TestUpdateConfig_DoesNotPersistNostrNotificationFields(t *testing.T) {
-	db, _ := setupTestDB(t)
+	db, ctx := setupTestDB(t)
 
 	var config utils.Config
 	config.Default()
 
 	commitConfigTx(t, db, func(tx pgx.Tx) error {
-		return db.SetConfig(tx, config)
+		return db.SetConfig(ctx, tx, config)
 	})
 
 	config.NAME = "updated-name"
@@ -163,7 +188,6 @@ func TestUpdateConfig_DoesNotPersistNostrNotificationFields(t *testing.T) {
 		return db.UpdateConfig(tx, config)
 	})
 
-	ctx := context.Background()
 	tx, err := db.GetTx(ctx)
 	if err != nil {
 		t.Fatalf("db.GetTx(ctx): %v", err)
@@ -192,13 +216,13 @@ func TestUpdateConfig_DoesNotPersistNostrNotificationFields(t *testing.T) {
 }
 
 func TestUpdateNostrNotificationConfig_PreservesDisabledRow(t *testing.T) {
-	db, _ := setupTestDB(t)
+	db, ctx := setupTestDB(t)
 
 	var config utils.Config
 	config.Default()
 
 	commitConfigTx(t, db, func(tx pgx.Tx) error {
-		return db.SetConfig(tx, config)
+		return db.SetConfig(ctx, tx, config)
 	})
 
 	npub := mustWrappedPubkey(t, "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac")
@@ -211,7 +235,6 @@ func TestUpdateNostrNotificationConfig_PreservesDisabledRow(t *testing.T) {
 		return db.UpdateNostrNotificationConfig(tx, nostrConfig)
 	})
 
-	ctx := context.Background()
 	tx, err := db.GetTx(ctx)
 	if err != nil {
 		t.Fatalf("db.GetTx(ctx): %v", err)

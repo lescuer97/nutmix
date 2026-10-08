@@ -157,7 +157,7 @@ type MintDB interface {
 	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	GetConfig(tx pgx.Tx) (utils.Config, error)
-	SetConfig(tx pgx.Tx, config utils.Config) error
+	SetConfig(ctx context.Context, tx pgx.Tx, config utils.Config) error
 	UpdateConfig(tx pgx.Tx, config utils.Config) error
 	GetNostrNotificationConfig(tx pgx.Tx) (*utils.NostrNotificationConfig, error)
 	UpdateNostrNotificationConfig(tx pgx.Tx, config utils.NostrNotificationConfig) error
