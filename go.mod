@@ -1,6 +1,6 @@
 module github.com/lescuer97/nutmix
 
-go 1.25.4
+go 1.26.7
 
 require (
 	github.com/BurntSushi/toml v1.5.0
@@ -132,6 +132,7 @@ require (
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/lescuer97/ldkgo v0.0.0-20260809213440-674bde65ffba // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/lightninglabs/gozmq v0.0.0-20191113021534-d20a764486bf // indirect
 	github.com/lightninglabs/neutrino v0.16.1 // indirect

@@ -1,0 +1,229 @@
+package ldk
+
+import (
+	"crypto/sha3"
+	"encoding/base32"
+	"strings"
+	"testing"
+
+	ldk_node "github.com/lescuer97/ldkgo/bindings/ldk_node_ffi"
+)
+
+func validTorV3Address(t *testing.T) string {
+	t.Helper()
+
+	publicKey := make([]byte, 32, 35)
+	for i := range publicKey {
+		publicKey[i] = byte(i)
+	}
+	checksumInput := append([]byte(".onion checksum"), publicKey...)
+	checksumInput = append(checksumInput, 3)
+	checksum := sha3.Sum256(checksumInput)
+	payload := append(publicKey, checksum[:2]...)
+	payload = append(payload, 3)
+
+	return strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(payload)) + ".onion:9735"
+}
+
+func TestValidateTorV3SocketAddress(t *testing.T) {
+	validAddress := validTorV3Address(t)
+
+	for _, address := range []string{
+		validAddress,
+		strings.ToUpper(strings.TrimSuffix(validAddress, ":9735")) + ":9735",
+	} {
+		if err := validateTorV3SocketAddress(address); err != nil {
+			t.Fatalf("validateTorV3SocketAddress(%q): %v", address, err)
+		}
+	}
+
+	for _, address := range []string{
+		"abcdefghijklmnop.onion:9735",
+		"example.com:9735",
+		"127.0.0.1:9735",
+		strings.TrimSuffix(validAddress, ":9735"),
+		strings.TrimSuffix(validAddress, "9735") + "0",
+		"invalid.onion:9735",
+	} {
+		if err := validateTorV3SocketAddress(address); err == nil {
+			t.Fatalf("expected %q to be rejected", address)
+		}
+	}
+}
+
+func TestValidateTorOnlyListeningAddresses(t *testing.T) {
+	if err := validateTorOnlyListeningAddresses(nil); err != nil {
+		t.Fatalf("validateTorOnlyListeningAddresses(nil): %v", err)
+	}
+	for _, address := range []string{validTorV3Address(t), "127.0.0.1:9735", "localhost:9735", "[::1]:9735"} {
+		if err := validateTorOnlyListeningAddresses([]string{address}); err != nil {
+			t.Fatalf("validateTorOnlyListeningAddresses(%q): %v", address, err)
+		}
+	}
+	if err := validateTorOnlyListeningAddresses([]string{"8.8.8.8:9735"}); err == nil {
+		t.Fatal("expected clearnet listening address to be rejected")
+	}
+}
+
+func TestValidateTorProxySocketAddress(t *testing.T) {
+	for _, address := range []string{"127.0.0.1:9050", "localhost:9150", "[::1]:9050"} {
+		if err := validateTorProxySocketAddress(address); err != nil {
+			t.Fatalf("validateTorProxySocketAddress(%q): %v", address, err)
+		}
+	}
+
+	for _, address := range []string{"", ":9050", "localhost", "localhost:0", "localhost:65536"} {
+		if err := validateTorProxySocketAddress(address); err == nil {
+			t.Fatalf("expected %q to be rejected", address)
+		}
+	}
+}
+
+func TestValidatePersistedConfigTorOnlyWithoutProxy(t *testing.T) {
+	config := mustPersistedConfig(t, t.TempDir())
+	config.TorOnly = true
+	if err := validatePersistedConfig(config); err != nil {
+		t.Fatalf("validatePersistedConfig(config): %v", err)
+	}
+
+	proxyAddress := "127.0.0.1:9050"
+	config.TorProxyAddress = &proxyAddress
+	if err := validatePersistedConfig(config); err != nil {
+		t.Fatalf("validatePersistedConfig(config): %v", err)
+	}
+}
+
+func TestValidatePersistedConfigTorOnlyChainSourceHosts(t *testing.T) {
+	onionHost := strings.TrimSuffix(validTorV3Address(t), ":9735")
+
+	bitcoindConfig := func(address string) PersistedConfig {
+		config := mustPersistedConfig(t, t.TempDir())
+		config.TorOnly = true
+		config.Rpc.Address = address
+		return config
+	}
+
+	for _, address := range []string{"127.0.0.1", "localhost", "::1", onionHost} {
+		if err := validatePersistedConfig(bitcoindConfig(address)); err != nil {
+			t.Fatalf("expected bitcoind address %q to be accepted: %v", address, err)
+		}
+	}
+	for _, address := range []string{"8.8.8.8", "example.com", "abcdefghijklmnop.onion"} {
+		if err := validatePersistedConfig(bitcoindConfig(address)); err == nil {
+			t.Fatalf("expected bitcoind address %q to be rejected", address)
+		}
+	}
+
+	electrumConfig := func(serverURL string) PersistedConfig {
+		config := mustPersistedConfig(t, t.TempDir())
+		config.TorOnly = true
+		config.ChainSourceType = ChainSourceElectrum
+		config.ElectrumServerURL = serverURL
+		return config
+	}
+
+	for _, serverURL := range []string{"ssl://127.0.0.1:50002", "tcp://localhost:50001", "ssl://" + onionHost + ":50002"} {
+		if err := validatePersistedConfig(electrumConfig(serverURL)); err != nil {
+			t.Fatalf("expected electrum url %q to be accepted: %v", serverURL, err)
+		}
+	}
+	if err := validatePersistedConfig(electrumConfig("ssl://electrum.example.com:50002")); err == nil {
+		t.Fatal("expected clearnet electrum url to be rejected")
+	}
+
+	esploraConfig := func(serverURL string) PersistedConfig {
+		config := mustPersistedConfig(t, t.TempDir())
+		config.TorOnly = true
+		config.ChainSourceType = ChainSourceEsplora
+		config.EsploraServerURL = serverURL
+		return config
+	}
+
+	for _, serverURL := range []string{"http://127.0.0.1:3002", "https://" + onionHost} {
+		if err := validatePersistedConfig(esploraConfig(serverURL)); err != nil {
+			t.Fatalf("expected esplora url %q to be accepted: %v", serverURL, err)
+		}
+	}
+	if err := validatePersistedConfig(esploraConfig("https://mempool.space")); err == nil {
+		t.Fatal("expected clearnet esplora url to be rejected")
+	}
+
+	// clearnet chain sources stay valid when tor only is disabled
+	config := electrumConfig("ssl://electrum.example.com:50002")
+	config.TorOnly = false
+	if err := validatePersistedConfig(config); err != nil {
+		t.Fatalf("expected clearnet electrum url to be accepted without tor only: %v", err)
+	}
+}
+
+func TestOpenChannelRejectsClearnetWhenTorOnly(t *testing.T) {
+	err := (&LDK{config: LdkConfig{TorOnly: true}}).OpenChannel("02abc", "8.8.8.8:9735", 1000)
+	if err == nil || !strings.Contains(err.Error(), "tor-only") {
+		t.Fatalf("expected tor-only validation error, got %v", err)
+	}
+}
+
+func TestValidateTorOnly(t *testing.T) {
+	if err := (&LDK{}).ValidateTorOnly(true); err == nil {
+		t.Fatal("expected an uninitialized node to be rejected")
+	}
+	for _, address := range []string{"127.0.0.1:9735", "8.8.8.8:9735"} {
+		t.Run(address, func(t *testing.T) {
+			directory := t.TempDir()
+			mnemonic, err := ReadOrCreateSeed(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			builder := ldk_node.NewBuilder()
+			builder.SetNetwork(ldk_node.NetworkRegtest)
+			builder.SetStorageDirPath(directory)
+			if err := builder.SetListeningAddresses([]string{address}); err != nil {
+				t.Fatal(err)
+			}
+			node, err := builder.Build(ldk_node.NodeEntropyFromBip39Mnemonic(mnemonic, nil))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(node.Destroy)
+			config := LdkConfig{Network: "regtest", StorageDir: directory, NoOutgoing: true}
+			backend := &LDK{node: node, config: config}
+			if err := backend.ValidateTorOnly(true); (err != nil) != (address == "8.8.8.8:9735") {
+				t.Fatalf("unexpected enable validation result: %v", err)
+			}
+			if backend.configSnapshot() != config {
+				t.Fatal("validation changed runtime config")
+			}
+			if err := backend.ValidateTorOnly(false); err != nil {
+				t.Fatalf("disable validation: %v", err)
+			}
+			for _, torOnly := range []bool{true, false} {
+				backend.SetTorOnly(torOnly)
+				config.TorOnly = torOnly
+				if backend.configSnapshot() != config || backend.node != node {
+					t.Fatal("policy update changed other config or native node reference")
+				}
+			}
+		})
+	}
+}
+
+func TestValidateTorOnlyPeers(t *testing.T) {
+	for _, address := range []string{validTorV3Address(t), "127.0.0.1:9735", "8.8.8.8:9735", ""} {
+		peers := []ldk_node.PeerDetails{{NodeId: "peer", Address: address, IsPersisted: true}}
+		wantError := address == "8.8.8.8:9735" || address == ""
+		if err := validateTorOnlyPeers(peers); (err != nil) != wantError {
+			t.Fatalf("peer %q: unexpected validation result: %v", address, err)
+		}
+	}
+	if err := validateTorOnlyPeers(nil); err != nil {
+		t.Fatalf("empty peers: %v", err)
+	}
+	peers := []ldk_node.PeerDetails{{NodeId: "peer", Address: "127.0.0.1:9735", IsConnected: true, IsPersisted: true}}
+	if err := validateTorOnlyPeers(peers); err == nil || !strings.Contains(err.Error(), "reconnect address is unavailable") {
+		t.Fatalf("expected hidden reconnect address to be rejected: %v", err)
+	}
+	peers[0].IsPersisted = false
+	if err := validateTorOnlyPeers(peers); err != nil {
+		t.Fatalf("non-persisted connected peer: %v", err)
+	}
+}

@@ -44,6 +44,7 @@ func LogoutHandler(blacklist *TokenBlacklist, secure bool) gin.HandlerFunc {
 		blacklist.AddToken(tokenString, expirationTime)
 
 		// Clear the cookie
+		c.SetSameSite(http.SameSiteStrictMode)
 		c.SetCookie(AdminAuthKey, "", -1, "/", "", secure, true)
 
 		// Send redirect to login page

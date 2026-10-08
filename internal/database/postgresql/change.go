@@ -11,7 +11,7 @@ import (
 )
 
 func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error {
-	entries := [][]any{}
+	entries := make([][]any, 0, len(change))
 	columns := []string{`B_`, "created_at", "id", "quote"}
 	tableName := "melt_change_message"
 

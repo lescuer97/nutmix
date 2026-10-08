@@ -44,6 +44,27 @@ func TestSetUpMintLoadsLegacyStrikeAsTombstone(t *testing.T) {
 	}
 }
 
+func TestSetUpMintFailsWhenConfiguredLDKCannotStart(t *testing.T) {
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	db := &mockdb.MockDB{} //nolint:exhaustruct
+	sig, err := localsigner.SetupLocalSigner(db)
+	if err != nil {
+		t.Fatalf("localsigner.SetupLocalSigner: %v", err)
+	}
+	config := utils.Config{NETWORK: "regtest", MINT_LIGHTNING_BACKEND: utils.LDK} //nolint:exhaustruct
+
+	mint, err := SetUpMint(context.Background(), config, nil, db, &sig)
+	if err == nil {
+		t.Fatal("expected configured LDK startup to fail")
+	}
+	if mint == nil {
+		t.Fatal("expected partial mint for startup diagnostics")
+	}
+	if mint.LightningBackend != nil {
+		t.Fatal("failed LDK startup published a backend")
+	}
+}
+
 func SetupMintWithLightningMockPostgres(t *testing.T) *Mint {
 	const posgrespassword = "password"
 	const postgresuser = "user"

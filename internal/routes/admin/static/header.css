@@ -68,6 +68,7 @@ body[data-route="stats"] .nav-tab[data-tab="stats"],
 body[data-route="lightning"] .nav-tab[data-tab="lightning"],
 body[data-route="settings"] .nav-tab[data-tab="settings"], 
 body[data-route="liquidity"] .nav-tab[data-tab="liquidity"],
+body[data-route="ldk"] .nav-tab[data-tab="ldk"],
 body[data-route="keysets"] .nav-tab[data-tab="keysets"] {
   color: var(--accent-cyan);
 }
@@ -97,4 +98,3 @@ body[data-route="keysets"] .nav-tab[data-tab="keysets"] {
     min-width: 80px;
   }
 }
-

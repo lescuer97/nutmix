@@ -20,6 +20,7 @@ import (
 	"github.com/lescuer97/nutmix/internal/database"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
 	pq "github.com/lescuer97/nutmix/internal/database/postgresql"
+	"github.com/lescuer97/nutmix/internal/lightning/ldk"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
@@ -730,18 +731,9 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 	if err != nil {
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
-
-	config.MINT_LIGHTNING_BACKEND, err = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
-	if err != nil {
-		log.Fatal("utils.StringToLightningBackend", err)
+	if err := applyTestingConfigEnv(&config); err != nil {
+		log.Fatal("applyTestingConfigEnv", err)
 	}
-
-	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
-	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
-	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
-	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
-	config.MINT_LNBITS_KEY = os.Getenv(utils.MINT_LNBITS_KEY)
-	config.MINT_LNBITS_ENDPOINT = os.Getenv(utils.MINT_LNBITS_ENDPOINT)
 
 	signer, err := localsigner.SetupLocalSigner(db)
 	if err != nil {
@@ -779,18 +771,9 @@ func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.En
 	if err != nil {
 		log.Fatalf("could not setup config file: %+v ", err)
 	}
-
-	config.MINT_LIGHTNING_BACKEND, err = utils.StringToLightningBackend(os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
-	if err != nil {
-		log.Fatal("utils.StringToLightningBackend", err)
+	if err := applyTestingConfigEnv(&config); err != nil {
+		log.Fatal("applyTestingConfigEnv", err)
 	}
-
-	config.NETWORK = os.Getenv(mint.NETWORK_ENV)
-	config.LND_GRPC_HOST = os.Getenv(utils.LND_HOST)
-	config.LND_TLS_CERT = os.Getenv(utils.LND_TLS_CERT)
-	config.LND_MACAROON = os.Getenv(utils.LND_MACAROON)
-	config.MINT_LNBITS_KEY = os.Getenv(utils.MINT_LNBITS_KEY)
-	config.MINT_LNBITS_ENDPOINT = os.Getenv(utils.MINT_LNBITS_ENDPOINT)
 
 	mint, err := mint.SetUpMint(ctx, config, nostrNotificationConfig, &db, &signer)
 
@@ -898,50 +881,16 @@ func TestMintBolt11LndLigthning(t *testing.T) {
 	ctx = context.WithValue(ctx, ctxKeyDatabaseURL, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, ctxKeyNetwork, os.Getenv(mint.NETWORK_ENV))
 
-	aliceLnd, bobLnd, btcD, lnbitsAlice, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "bolt11-tests")
-	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
-	if aliceLnd != nil {
-		t.Cleanup(func() {
-			err := aliceLnd.Terminate(context.Background())
-			if err != nil {
-				t.Fatalf("failed to terminate container: %s", err)
-			}
-		})
+	_, bobLnd, _, _, err := utils.SetUpLightingNetworkTestEnviroment(t, ctx)
+	if err != nil {
+		t.Fatalf("Error setting up lightning network environment: %+v", err)
 	}
-	if bobLnd != nil {
-		t.Cleanup(func() {
-			err := bobLnd.Terminate(context.Background())
-			if err != nil {
-				t.Fatalf("failed to terminate container: %s", err)
-			}
-		})
-	}
-	if btcD != nil {
-		t.Cleanup(func() {
-			err := btcD.Terminate(context.Background())
-			if err != nil {
-				t.Fatalf("failed to terminate container: %s", err)
-			}
-		})
-	}
-	if lnbitsAlice != nil {
-		t.Cleanup(func() {
-			err := lnbitsAlice.Terminate(context.Background())
-			if err != nil {
-				t.Fatalf("failed to terminate container: %s", err)
-			}
-		})
-	}
-
 	ctx = context.WithValue(ctx, ctxKeyLndHost, os.Getenv(utils.LND_HOST))
 	ctx = context.WithValue(ctx, ctxKeyLndTLSCert, os.Getenv(utils.LND_TLS_CERT))
 	ctx = context.WithValue(ctx, ctxKeyLndMacaroon, os.Getenv(utils.LND_MACAROON))
 
-	if err != nil {
-		t.Fatalf("Error setting up lightning network environment: %+v", err)
-	}
-
-	LightningBolt11Test(t, ctx, bobLnd)
+	router, mint := SetupRoutingForTesting(ctx, false)
+	LightningBolt11Test(t, ctx, router, mint, bobLnd)
 }
 func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	const posgrespassword = "password"
@@ -955,7 +904,7 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
+				WithStartupTimeout(60*time.Second)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -975,48 +924,15 @@ func TestMintBolt11LNBITSLigthning(t *testing.T) {
 	ctx = context.WithValue(ctx, ctxKeyLightningBackend, os.Getenv(mint.MINT_LIGHTNING_BACKEND_ENV))
 	ctx = context.WithValue(ctx, ctxKeyDatabaseURL, os.Getenv(database.DATABASE_URL_ENV))
 	ctx = context.WithValue(ctx, ctxKeyNetwork, os.Getenv(mint.NETWORK_ENV))
-	ctx = context.WithValue(ctx, ctxKeyMintLnbitsEndpoint, os.Getenv(utils.MINT_LNBITS_ENDPOINT))
-	ctx = context.WithValue(ctx, ctxKeyMintLnbitsKey, os.Getenv(utils.MINT_LNBITS_KEY))
-	aliceLnd, bobLnd, btcD, lnbitsAlice, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-bolt11-tests")
-	// Better setup: Use t.Cleanup to ensure container is killed even if test panics
-	if aliceLnd != nil {
-		t.Cleanup(func() {
-			err := aliceLnd.Terminate(context.Background())
-			if err != nil {
-				t.Fatalf("failed to terminate container: %s", err)
-			}
-		})
-	}
-	if bobLnd != nil {
-		t.Cleanup(func() {
-			err := bobLnd.Terminate(context.Background())
-			if err != nil {
-				t.Fatalf("failed to terminate container: %s", err)
-			}
-		})
-	}
-	if btcD != nil {
-		t.Cleanup(func() {
-			err := btcD.Terminate(context.Background())
-			if err != nil {
-				t.Fatalf("failed to terminate container: %s", err)
-			}
-		})
-	}
-	if lnbitsAlice != nil {
-		t.Cleanup(func() {
-			err := lnbitsAlice.Terminate(context.Background())
-			if err != nil {
-				t.Fatalf("failed to terminate container: %s", err)
-			}
-		})
-	}
-
+	_, bobLnd, _, _, err := utils.SetUpLightingNetworkTestEnviroment(t, ctx)
 	if err != nil {
 		t.Fatalf("Error setting up lightning network environment: %+v", err)
 	}
+	ctx = context.WithValue(ctx, ctxKeyMintLnbitsEndpoint, os.Getenv(utils.MINT_LNBITS_ENDPOINT))
+	ctx = context.WithValue(ctx, ctxKeyMintLnbitsKey, os.Getenv(utils.MINT_LNBITS_KEY))
 
-	LightningBolt11Test(t, ctx, bobLnd)
+	router, mint := SetupRoutingForTesting(ctx, false)
+	LightningBolt11Test(t, ctx, router, mint, bobLnd)
 }
 
 func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResponse, secrets []string, secretsKey []*secp256k1.PrivateKey) ([]cashu.Proof, error) {
@@ -1052,9 +968,7 @@ func GenerateProofs(signatures []cashu.BlindSignature, keyset signer.GetKeysResp
 	return proofs, nil
 }
 
-func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainers.Container) {
-	router, mint := SetupRoutingForTesting(ctx, false)
-
+func LightningBolt11Test(t *testing.T, ctx context.Context, router *gin.Engine, mint *mint.Mint, bobLnd testcontainers.Container) {
 	// MINTING TESTING STARTS
 
 	// request mint quote of 1000 sats
@@ -1157,19 +1071,19 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Errorf("Incorrect error string, got %s", errorResponse.Error)
 	}
 
-	// needs to wait a second for the containers to catch up
+	// Give the payment a brief head start before polling for the mint-side state update.
 	time.Sleep(500 * time.Millisecond)
 	// Lnd BOB pays the invoice
-	_, _, err = bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "payinvoice", postMintQuoteResponse.Request, "--force"})
+	_, _, err = bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "payinvoice", postMintQuoteResponse.Request, "--force"})
 
 	if err != nil {
 		t.Fatalf("Error paying invoice %+v", err)
 	}
+	if err := waitForMintQuoteState(t, router, postMintQuoteResponse.Quote, cashu.PAID, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
 	// Minting with invalid signatures
-	w = httptest.NewRecorder()
-
-	router.ServeHTTP(w, req)
-
 	excesMintingBlindMessage, _, _, err := CreateBlindedMessages(1000, activeKeys)
 	if err != nil {
 		t.Fatalf("Error creating blinded messages: %v", err)
@@ -1524,7 +1438,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	// SWAP TESTING ENDS
 
 	// MELTING TESTING STARTS
-	_, invoiceReader, err := bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "addinvoice", "--amt", "900"})
+	_, invoiceReader, err := bobLnd.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "addinvoice", "--amt", "900", "--private"})
 
 	if err != nil {
 		t.Fatalf("Error adding invoice: %+v", err)
@@ -1656,6 +1570,9 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("melt returned status %d: %s", w.Code, w.Body.String())
+	}
 
 	var postMeltResponse cashu.PostMeltQuoteBolt11Response
 
@@ -1665,8 +1582,11 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 		t.Fatalf("Error unmarshalling response: %v", err)
 	}
 
-	if postMeltResponse.State != cashu.PAID {
-		t.Errorf("Expected state to be PAID, got %v", postMintQuoteResponseTwo.State)
+	if postMeltResponse.State != cashu.PAID && postMeltResponse.State != cashu.PENDING {
+		t.Fatalf("Expected initial melt state to be PAID or PENDING, got %v", postMeltResponse.State)
+	}
+	if err := waitForMeltQuoteState(t, router, postMeltQuoteResponse.Quote, cashu.PAID, 30*time.Second); err != nil {
+		t.Fatal(err)
 	}
 
 	// Test melt that has already been melted
@@ -1691,6 +1611,88 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	}
 
 	// MELTING TESTING ENDS
+}
+
+func waitForLDKMintReady(t *testing.T, backend *ldk.LDK, timeout time.Duration) error {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	var lastState ldk.DebugState
+	var lastSummaries []ldk.LDKChannelSummary
+	var lastErr error
+	for time.Now().Before(deadline) {
+		if err := backend.SyncWallets(); err != nil {
+			lastErr = err
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		state, err := backend.DebugState()
+		if err != nil {
+			lastErr = err
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		lastState = state
+		summaries, err := backend.ChannelSummaries()
+		if err != nil {
+			lastErr = err
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		lastSummaries = summaries
+		for _, summary := range summaries {
+			if summary.State == "active" {
+				return nil
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return fmt.Errorf("timed out waiting for ldk mint readiness: state=%+v summaries=%+v lastErr=%v", lastState, lastSummaries, lastErr)
+}
+
+func waitForMintQuoteState(t *testing.T, router *gin.Engine, quote string, expected cashu.ACTION_STATE, timeout time.Duration) error {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		req := httptest.NewRequest("GET", "/v1/mint/quote/bolt11/"+quote, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code == 200 {
+			var quoteResp cashu.MintRequestDB
+			if err := json.Unmarshal(w.Body.Bytes(), &quoteResp); err == nil && quoteResp.State == expected {
+				return nil
+			}
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return fmt.Errorf("timed out waiting for mint quote %s state %s", quote, expected)
+}
+
+func waitForMeltQuoteState(t *testing.T, router *gin.Engine, quote string, expected cashu.ACTION_STATE, timeout time.Duration) error {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		req := httptest.NewRequest("GET", "/v1/melt/quote/bolt11/"+quote, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code == 200 {
+			var quoteResp cashu.PostMeltQuoteBolt11Response
+			if err := json.Unmarshal(w.Body.Bytes(), &quoteResp); err == nil && quoteResp.State == expected {
+				return nil
+			}
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return fmt.Errorf("timed out waiting for melt quote %s state %s", quote, expected)
 }
 
 func TestWrongUnitOnMeltAndMint(t *testing.T) {

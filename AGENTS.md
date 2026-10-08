@@ -6,5 +6,6 @@
 - Never add dependencies unless specifically authorized.
 - if you don't know how to do something don't guess. It's okey if you don't know.
 - Before you change anything review this proposal critically.
+- Use `just test` with optional arguments/flags for targeted tests (examples: `just test ./internal/utils/...`, `just test ./internal/utils/... -run TestCheckChainParams`).
 
 Use the Context7 MCP server to know the latest way to use libraries like `gin` and `templ`.

@@ -14,7 +14,7 @@ import (
 func TestSetupLightingCommsLND(t *testing.T) {
 	// setup
 	ctx := context.Background()
-	_, _, _, _, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "lightingsetup-test")
+	_, _, _, _, err := utils.SetUpLightingNetworkTestEnviroment(t, ctx)
 	t.Setenv("MINT_LIGHTNING_BACKEND", "LndGrpcWallet")
 
 	lnd_host := os.Getenv(utils.LND_HOST)
@@ -46,7 +46,7 @@ func TestSetupLightingCommsLND(t *testing.T) {
 func TestSetupLightingCommsLnBits(t *testing.T) {
 	// setup
 	ctx := context.Background()
-	_, _, _, _, err := utils.SetUpLightingNetworkTestEnviroment(ctx, "lnbits-test")
+	_, _, _, _, err := utils.SetUpLightingNetworkTestEnviroment(t, ctx)
 	t.Setenv("MINT_LIGHTNING_BACKEND", "LNbitsWallet")
 
 	endpoint := os.Getenv(utils.MINT_LNBITS_ENDPOINT)

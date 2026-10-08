@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -11,14 +13,69 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
+	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lescuer97/nutmix/internal/lightning/ldk"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip19"
 )
+
+type ldkConfigErrorDB struct {
+	*mockdb.MockDB
+	err error
+}
+
+func (db *ldkConfigErrorDB) GetLDKConfig(context.Context) (database.LDKConfig, error) {
+	return database.LDKConfig{}, db.err
+}
+
+type ldkCommitErrorDB struct {
+	*mockdb.MockDB
+	err error
+}
+
+func (db *ldkCommitErrorDB) Commit(context.Context, pgx.Tx) error {
+	return db.err
+}
+
+func newPostContext(values url.Values) *gin.Context {
+	c, _ := newPostContextWithRecorder(values)
+	return c
+}
+
+func newPostContextWithRecorder(values url.Values) (*gin.Context, *httptest.ResponseRecorder) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	req := httptest.NewRequest(http.MethodPost, "/admin/bolt11", nil)
+	req.PostForm = values
+	req.Form = values
+	c.Request = req
+	return c, rec
+}
+
+func mustBitcoindPersistedConfigForAdminTest(t *testing.T, configDirectory string) ldk.PersistedConfig {
+	t.Helper()
+
+	config, err := ldk.NewPersistedConfig(ldk.RPCConfig{
+		Address:  "127.0.0.1",
+		Port:     18443,
+		Username: "user",
+		Password: "pass",
+	}, configDirectory)
+	if err != nil {
+		t.Fatalf("ldk.NewPersistedConfig(...): %v", err)
+	}
+
+	return config
+}
 
 func TestCheckIntegerFromStringSuccess(t *testing.T) {
 	text := "2"
@@ -74,6 +131,33 @@ func TestBolt11PostRejectsStrikeBackend(t *testing.T) {
 	}
 	if recorder.Header().Get("HX-Trigger") != "" {
 		t.Fatal("rejected Strike submission emitted a success trigger")
+	}
+}
+
+func TestBolt11PostAssignsDirectBackendAfterPersistence(t *testing.T) {
+	var config utils.Config
+	config.Default()
+	config.NETWORK = "regtest"
+	config.MINT_LIGHTNING_BACKEND = utils.LNDGRPC
+
+	db := &mockdb.MockDB{Config: config}
+	mintInstance := &mint.Mint{
+		Config:           config,
+		MintDB:           db,
+		LightningBackend: lightning.FakeWallet{Network: chaincfg.RegressionNetParams},
+	}
+	values := url.Values{
+		"NETWORK":                {"regtest"},
+		"MINT_LIGHTNING_BACKEND": {string(utils.FAKE_WALLET)},
+	}
+
+	Bolt11Post(mintInstance)(newPostContext(values))
+
+	if _, ok := mintInstance.LightningBackend.(lightning.FakeWallet); !ok {
+		t.Fatalf("expected direct fake wallet, got %T", mintInstance.LightningBackend)
+	}
+	if mintInstance.Config.MINT_LIGHTNING_BACKEND != utils.FAKE_WALLET || db.Config.MINT_LIGHTNING_BACKEND != utils.FAKE_WALLET {
+		t.Fatal("expected runtime and database configuration to use fake wallet")
 	}
 }
 
@@ -601,4 +685,612 @@ func TestMintSettingsNotificationsDoesNotMutateConfigOnDBFailure(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(configDir, utils.NostrNotificationNsecFileName)); err != nil {
 		t.Fatalf("expected nostr notification nsec file to still be created before DB failure: %v", err)
 	}
+}
+
+func TestParseLDKPersistedConfig(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	c := newPostContext(values)
+
+	config, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(c): %v", err)
+	}
+	if config.ChainSourceType != ldk.ChainSourceBitcoind {
+		t.Fatalf("unexpected chain source type: %q", config.ChainSourceType)
+	}
+	if config.Rpc.Address != "127.0.0.1" || config.Rpc.Port != 18443 || config.Rpc.Username != "user" || config.Rpc.Password != "pass" {
+		t.Fatalf("unexpected parsed rpc config: %+v", config.Rpc)
+	}
+	if config.ConfigDirectory != configDirectory {
+		t.Fatalf("unexpected config directory: %q", config.ConfigDirectory)
+	}
+}
+
+func TestLoadLDKConfigPreservesConfigDirectory(t *testing.T) {
+	configRoot := setTempConfigDir(t)
+	defaultDirectory := filepath.Join(configRoot, "ldk")
+	customDirectory := filepath.Join(t.TempDir(), "custom-ldk")
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+	customConfig := mustBitcoindPersistedConfigForAdminTest(t, customDirectory)
+
+	tests := []struct {
+		name          string
+		persisted     *ldk.PersistedConfig
+		wantDirectory string
+	}{
+		{name: "persisted custom directory", persisted: &customConfig, wantDirectory: customDirectory},
+		{name: "first setup uses default directory", wantDirectory: defaultDirectory},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			db := &mockdb.MockDB{}
+			if test.persisted != nil {
+				databaseConfig, err := ldk.ToDatabaseConfig(*test.persisted)
+				if err != nil {
+					t.Fatalf("ldk.ToDatabaseConfig(...): %v", err)
+				}
+				db.LDKConfig = &databaseConfig
+			}
+
+			existing, incoming, err := loadLDKConfig(t.Context(), newPostContext(values), &mint.Mint{MintDB: db})
+			if err != nil {
+				t.Fatalf("loadLDKConfig(...): %v", err)
+			}
+			if existing.ConfigDirectory != test.wantDirectory {
+				t.Fatalf("existing directory = %q, want %q", existing.ConfigDirectory, test.wantDirectory)
+			}
+			if incoming.ConfigDirectory != test.wantDirectory {
+				t.Fatalf("incoming directory = %q, want %q", incoming.ConfigDirectory, test.wantDirectory)
+			}
+		})
+	}
+}
+
+func TestLoadLDKConfigRejectsDatabaseError(t *testing.T) {
+	setTempConfigDir(t)
+	dbErr := errors.New("get ldk config")
+	db := &ldkConfigErrorDB{MockDB: &mockdb.MockDB{}, err: dbErr}
+
+	_, _, err := loadLDKConfig(t.Context(), newPostContext(url.Values{}), &mint.Mint{MintDB: db})
+	if !errors.Is(err, dbErr) {
+		t.Fatalf("loadLDKConfig(...) error = %v, want %v", err, dbErr)
+	}
+}
+
+func TestParseLDKPersistedConfigPreservesExistingBitcoindPassword(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+
+	c := newPostContext(values)
+	existingConfig := mustBitcoindPersistedConfigForAdminTest(t, configDirectory)
+
+	config, err := parseLDKPersistedConfig(c, existingConfig, configDirectory)
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(c): %v", err)
+	}
+	if config.Rpc.Password != existingConfig.Rpc.Password {
+		t.Fatalf("expected existing password to be preserved")
+	}
+}
+
+func TestParseLDKPersistedConfigElectrum(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceElectrum))
+	values.Set("ELECTRUM_SERVER_URL", "ssl://electrum.example:50002")
+
+	c := newPostContext(values)
+	existingConfig := mustBitcoindPersistedConfigForAdminTest(t, configDirectory)
+
+	config, err := parseLDKPersistedConfig(c, existingConfig, configDirectory)
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(c): %v", err)
+	}
+	if config.ChainSourceType != ldk.ChainSourceElectrum {
+		t.Fatalf("unexpected chain source type: %q", config.ChainSourceType)
+	}
+	if config.ElectrumServerURL != "ssl://electrum.example:50002" {
+		t.Fatalf("unexpected electrum server url: %q", config.ElectrumServerURL)
+	}
+	if config.Rpc.Password != existingConfig.Rpc.Password {
+		t.Fatalf("expected inactive bitcoind config to be preserved")
+	}
+}
+
+func TestParseLDKPersistedConfigEsplora(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceEsplora))
+	values.Set("ESPLORA_SERVER_URL", "https://blockstream.info/api")
+
+	c := newPostContext(values)
+	existingConfig := mustBitcoindPersistedConfigForAdminTest(t, configDirectory)
+
+	config, err := parseLDKPersistedConfig(c, existingConfig, configDirectory)
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(c): %v", err)
+	}
+	if config.ChainSourceType != ldk.ChainSourceEsplora {
+		t.Fatalf("unexpected chain source type: %q", config.ChainSourceType)
+	}
+	if config.EsploraServerURL != "https://blockstream.info/api" {
+		t.Fatalf("unexpected esplora server url: %q", config.EsploraServerURL)
+	}
+	if config.Rpc.Password != existingConfig.Rpc.Password {
+		t.Fatalf("expected inactive bitcoind config to be preserved")
+	}
+}
+
+func TestParseLDKPersistedConfigRejectsInvalidPort(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "70000")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	c := newPostContext(values)
+
+	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
+	if err == nil {
+		t.Fatalf("expected invalid port error")
+	}
+}
+
+func TestParseLDKPersistedConfigRejectsInvalidElectrumURL(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceElectrum))
+	values.Set("ELECTRUM_SERVER_URL", "electrum.example:50002")
+
+	c := newPostContext(values)
+
+	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
+	if err == nil {
+		t.Fatalf("expected invalid electrum url error")
+	}
+}
+
+func TestParseLDKPersistedConfigRejectsInvalidEsploraURL(t *testing.T) {
+	configDirectory := t.TempDir()
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceEsplora))
+	values.Set("ESPLORA_SERVER_URL", "blockstream.info/api")
+
+	c := newPostContext(values)
+
+	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: configDirectory, ChainSourceType: ldk.ChainSourceBitcoind}, configDirectory)
+	if err == nil {
+		t.Fatalf("expected invalid esplora url error")
+	}
+}
+
+func TestParseLDKPersistedConfigRejectsInvalidConfigDirectory(t *testing.T) {
+	values := url.Values{}
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	c := newPostContext(values)
+
+	_, err := parseLDKPersistedConfig(c, ldk.PersistedConfig{ConfigDirectory: "relative/ldk", ChainSourceType: ldk.ChainSourceBitcoind}, "relative/ldk")
+	if err == nil {
+		t.Fatalf("expected invalid config directory error")
+	}
+}
+
+func TestParseLDKPersistedConfigTorOnly(t *testing.T) {
+	newTorOnlyValues := func(rpcAddress string) url.Values {
+		values := url.Values{}
+		values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+		values.Set("BITCOIN_NODE_RPC_ADDRESS", rpcAddress)
+		values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+		values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+		values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+		values.Set("TOR_ONLY", "true")
+		return values
+	}
+
+	// tor only without a proxy is valid; localhost is exempt from the onion requirement
+	config, err := parseLDKPersistedConfig(newPostContext(newTorOnlyValues("127.0.0.1")), ldk.PersistedConfig{ConfigDirectory: t.TempDir(), ChainSourceType: ldk.ChainSourceBitcoind}, t.TempDir())
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(tor only, localhost): %v", err)
+	}
+	if !config.TorOnly {
+		t.Fatal("expected tor only to be enabled")
+	}
+	if config.TorProxyAddress != nil {
+		t.Fatalf("expected no tor proxy address, got %q", *config.TorProxyAddress)
+	}
+
+	// tor only rejects clearnet chain source addresses at parse time
+	_, err = parseLDKPersistedConfig(newPostContext(newTorOnlyValues("8.8.8.8")), ldk.PersistedConfig{ConfigDirectory: t.TempDir(), ChainSourceType: ldk.ChainSourceBitcoind}, t.TempDir())
+	if err == nil {
+		t.Fatal("expected tor-only config with clearnet rpc address to be rejected")
+	}
+
+	// proxy address is accepted independently of tor only
+	values := newTorOnlyValues("127.0.0.1")
+	values.Del("TOR_ONLY")
+	values.Set("TOR_PROXY_ADDRESS", "127.0.0.1:9050")
+	config, err = parseLDKPersistedConfig(newPostContext(values), ldk.PersistedConfig{ConfigDirectory: t.TempDir(), ChainSourceType: ldk.ChainSourceBitcoind}, t.TempDir())
+	if err != nil {
+		t.Fatalf("parseLDKPersistedConfig(proxy without tor only): %v", err)
+	}
+	if config.TorOnly {
+		t.Fatal("expected tor only to be disabled")
+	}
+	if config.TorProxyAddress == nil || *config.TorProxyAddress != "127.0.0.1:9050" {
+		t.Fatalf("unexpected tor proxy address: %v", config.TorProxyAddress)
+	}
+}
+
+func TestLDKConfigsEqual(t *testing.T) {
+	a := ldk.PersistedConfig{
+		ChainSourceType: ldk.ChainSourceBitcoind,
+		Rpc: ldk.RPCConfig{
+			Address:  "127.0.0.1",
+			Port:     18443,
+			Username: "user",
+			Password: "pass",
+		},
+		ConfigDirectory: "/tmp/ldk-a",
+	}
+	b := a
+
+	if !ldkConfigsEqual(a, b) {
+		t.Fatalf("expected configs to be equal")
+	}
+
+	b.Rpc.Port = 8332
+	if ldkConfigsEqual(a, b) {
+		t.Fatalf("expected configs to differ")
+	}
+
+	b = a
+	b.ChainSourceType = ldk.ChainSourceElectrum
+	b.ElectrumServerURL = "ssl://electrum.example:50002"
+	if ldkConfigsEqual(a, b) {
+		t.Fatalf("expected chain source types to differ")
+	}
+
+	b = a
+	b.ChainSourceType = ldk.ChainSourceEsplora
+	b.EsploraServerURL = "https://blockstream.info/api"
+	if ldkConfigsEqual(a, b) {
+		t.Fatalf("expected chain source types to differ")
+	}
+
+	b = a
+	b.ConfigDirectory = "/tmp/ldk-b"
+	if ldkConfigsEqual(a, b) {
+		t.Fatalf("expected config directories to differ")
+	}
+}
+
+func TestLDKConfigRequiresRestart(t *testing.T) {
+	for _, source := range []ldk.ChainSourceType{ldk.ChainSourceBitcoind, ldk.ChainSourceElectrum, ldk.ChainSourceEsplora} {
+		current := mustBitcoindPersistedConfigForAdminTest(t, t.TempDir())
+		current.ChainSourceType = source
+		current.ElectrumServerURL = "ssl://localhost:50002"
+		current.EsploraServerURL = "http://localhost:3002"
+		proxy := "localhost:9050"
+		current.TorProxyAddress = &proxy
+		tests := []struct {
+			name   string
+			change func(*ldk.PersistedConfig)
+			want   bool
+		}{
+			{"unchanged", func(*ldk.PersistedConfig) {}, false},
+			{"tor policy", func(c *ldk.PersistedConfig) { c.TorOnly = true }, false},
+			{"source", func(c *ldk.PersistedConfig) { c.ChainSourceType = "other" }, true},
+			{"directory", func(c *ldk.PersistedConfig) { c.ConfigDirectory += "-new" }, true},
+			{"proxy removed", func(c *ldk.PersistedConfig) { c.TorProxyAddress = nil }, true},
+			{"proxy changed", func(c *ldk.PersistedConfig) { p := "localhost:9150"; c.TorProxyAddress = &p }, true},
+			{"same proxy value", func(c *ldk.PersistedConfig) { p := proxy; c.TorProxyAddress = &p }, false},
+			{"rpc address", func(c *ldk.PersistedConfig) { c.Rpc.Address = "localhost" }, source == ldk.ChainSourceBitcoind},
+			{"rpc port", func(c *ldk.PersistedConfig) { c.Rpc.Port++ }, source == ldk.ChainSourceBitcoind},
+			{"rpc username", func(c *ldk.PersistedConfig) { c.Rpc.Username += "-new" }, source == ldk.ChainSourceBitcoind},
+			{"rpc password", func(c *ldk.PersistedConfig) { c.Rpc.Password += "-new" }, source == ldk.ChainSourceBitcoind},
+			{"electrum url", func(c *ldk.PersistedConfig) { c.ElectrumServerURL += "/new" }, source == ldk.ChainSourceElectrum},
+			{"esplora url", func(c *ldk.PersistedConfig) { c.EsploraServerURL += "/new" }, source == ldk.ChainSourceEsplora},
+		}
+		for _, test := range tests {
+			t.Run(string(source)+"/"+test.name, func(t *testing.T) {
+				incoming := current
+				test.change(&incoming)
+				if got := ldkConfigRequiresRestart(current, incoming); got != test.want {
+					t.Fatalf("requires restart = %v, want %v", got, test.want)
+				}
+				if test.name != "unchanged" && test.name != "same proxy value" && ldkConfigsEqual(current, incoming) {
+					t.Fatal("changed config was classified as unchanged")
+				}
+			})
+		}
+	}
+	current := mustBitcoindPersistedConfigForAdminTest(t, t.TempDir())
+	incoming := current
+	proxy := "localhost:9050"
+	incoming.TorProxyAddress = &proxy
+	if !ldkConfigRequiresRestart(current, incoming) {
+		t.Fatal("adding a proxy must require a restart")
+	}
+}
+
+func TestLDKBackendUpdateErrorMessage(t *testing.T) {
+	tests := []struct {
+		name             string
+		err              error
+		activeLDKStopped bool
+		want             string
+	}{
+		{name: "in-flight payments", err: ldk.ErrInFlightBolt11Payments, want: inFlightBolt11PaymentsMessage},
+		{name: "wrapped in-flight payments", err: fmt.Errorf("stop: %w", ldk.ErrInFlightBolt11Payments), activeLDKStopped: true, want: inFlightBolt11PaymentsMessage},
+		{name: "offline", err: errors.New("start failed"), activeLDKStopped: true, want: "LDK is offline: could not apply the new configuration"},
+		{name: "generic", err: errors.New("setup failed"), want: "Something went wrong setting up LDK communications"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := ldkBackendUpdateErrorMessage(test.err, test.activeLDKStopped); got != test.want {
+				t.Fatalf("ldkBackendUpdateErrorMessage(...) = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestBolt11PostReusesUnchangedActiveLDKConfig(t *testing.T) {
+	configDir := filepath.Join(setTempConfigDir(t), "ldk")
+	ldkConfig, err := ldk.NewPersistedConfig(ldk.RPCConfig{
+		Address:  "127.0.0.1",
+		Port:     18443,
+		Username: "user",
+		Password: "pass",
+	}, configDir)
+	if err != nil {
+		t.Fatalf("ldk.NewPersistedConfig(...): %v", err)
+	}
+
+	var config utils.Config
+	config.Default()
+	config.NETWORK = "regtest"
+	config.MINT_LIGHTNING_BACKEND = utils.LDK
+
+	mockDatabase := &mockdb.MockDB{Config: config}
+	if err := ldk.SaveConfig(context.Background(), mockDatabase, ldkConfig); err != nil {
+		t.Fatalf("ldk.SaveConfig(...): %v", err)
+	}
+	activeBackend, err := ldk.NewConfigBackend(mockDatabase, ldk.LdkConfig{Network: "regtest"})
+	if err != nil {
+		t.Fatalf("ldk.NewConfigBackend(...): %v", err)
+	}
+	mintInstance := &mint.Mint{
+		Config:           config,
+		MintDB:           mockDatabase,
+		LightningBackend: activeBackend,
+	}
+
+	values := url.Values{}
+	values.Set("NETWORK", "regtest")
+	values.Set("MINT_LIGHTNING_BACKEND", string(utils.LDK))
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.1")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	mockDatabase.SetLDKConfigCalls = 0
+	Bolt11Post(mintInstance)(newPostContext(values))
+
+	if mintInstance.LightningBackend != activeBackend {
+		t.Fatal("expected active LDK backend to remain in use")
+	}
+	if mockDatabase.SetLDKConfigCalls != 0 {
+		t.Fatalf("expected unchanged LDK config not to be saved, got %d saves", mockDatabase.SetLDKConfigCalls)
+	}
+	if mockDatabase.LDKConfig == nil || mockDatabase.LDKConfig.Rpc.Address != "127.0.0.1" {
+		t.Fatalf("expected persisted LDK config to remain unchanged, got %+v", mockDatabase.LDKConfig)
+	}
+
+	mintInstance.LDKSetupError = "previous replacement failed"
+	c, recorder := newPostContextWithRecorder(values)
+	Bolt11Post(mintInstance)(c)
+	if strings.Contains(recorder.Body.String(), "settings are unchanged") {
+		t.Fatal("stopped LDK backend was incorrectly treated as unchanged")
+	}
+}
+
+func TestBolt11PostKeepsOldBackendWhenActiveLDKReplacementAndRestoreFail(t *testing.T) {
+	configDir := filepath.Join(setTempConfigDir(t), "ldk")
+	ldkConfig := mustBitcoindPersistedConfigForAdminTest(t, configDir)
+
+	var config utils.Config
+	config.Default()
+	config.NETWORK = "regtest"
+	config.MINT_LIGHTNING_BACKEND = utils.LDK
+
+	mockDatabase := &mockdb.MockDB{Config: config}
+	if err := ldk.SaveConfig(context.Background(), mockDatabase, ldkConfig); err != nil {
+		t.Fatalf("ldk.SaveConfig(...): %v", err)
+	}
+	activeBackend, err := ldk.NewConfigBackend(mockDatabase, ldk.LdkConfig{Network: "regtest"})
+	if err != nil {
+		t.Fatalf("ldk.NewConfigBackend(...): %v", err)
+	}
+	mintInstance := &mint.Mint{
+		Config:           config,
+		MintDB:           mockDatabase,
+		LightningBackend: activeBackend,
+	}
+
+	values := url.Values{}
+	values.Set("NETWORK", "regtest")
+	values.Set("MINT_LIGHTNING_BACKEND", string(utils.LDK))
+	values.Set("LDK_CHAIN_SOURCE_TYPE", string(ldk.ChainSourceBitcoind))
+	values.Set("BITCOIN_NODE_RPC_ADDRESS", "127.0.0.2")
+	values.Set("BITCOIN_NODE_RPC_PORT", "18443")
+	values.Set("BITCOIN_NODE_RPC_USERNAME", "user")
+	values.Set("BITCOIN_NODE_RPC_PASSWORD", "pass")
+
+	c, recorder := newPostContextWithRecorder(values)
+	Bolt11Post(mintInstance)(c)
+
+	if mintInstance.LightningBackend != activeBackend {
+		t.Fatalf("expected old backend after replacement failure, got %T", mintInstance.LightningBackend)
+	}
+	if mockDatabase.LDKConfig == nil || mockDatabase.LDKConfig.Rpc.Address != "127.0.0.1" {
+		t.Fatalf("expected old LDK config to remain persisted, got %+v", mockDatabase.LDKConfig)
+	}
+	if !strings.Contains(recorder.Body.String(), "LDK is offline") {
+		t.Fatalf("expected replacement error response, got %q", recorder.Body.String())
+	}
+}
+
+func TestTransitionLightningBackendUpdatesRunningLDKWithoutRestart(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/fee-estimates" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprint(w, `{"1":1.0}`)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(server.Close)
+	config, err := ldk.NewPersistedConfigWithChainSource(ldk.ChainSourceEsplora, ldk.RPCConfig{}, "", server.URL, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mintConfig utils.Config
+	mintConfig.Default()
+	mintConfig.NETWORK = "regtest"
+	mintConfig.MINT_LIGHTNING_BACKEND = utils.LDK
+	db := &ldkCommitErrorDB{MockDB: &mockdb.MockDB{}}
+	backend, err := ldk.NewLdkWithPersistedConfig(t.Context(), db, ldk.LdkConfig{Network: "regtest"}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := backend.Stop(context.Background(), ldk.StopImmediately); err != nil {
+			t.Error(err)
+		}
+	})
+	commitErr := errors.New("commit failed")
+	for _, test := range []struct {
+		name   string
+		oldTor bool
+		newTor bool
+		fail   bool
+	}{
+		{name: "enable policy", newTor: true},
+		{name: "disable policy", oldTor: true},
+		{name: "inactive sources"},
+		{name: "failed enable", newTor: true, fail: true},
+		{name: "failed disable", oldTor: true, fail: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			current := config
+			current.TorOnly = test.oldTor
+			backend.SetTorOnly(test.oldTor)
+			stored, err := ldk.ToDatabaseConfig(current)
+			if err != nil {
+				t.Fatal(err)
+			}
+			db.LDKConfig = &stored
+			db.Config = mintConfig
+			db.SetLDKConfigCalls = 0
+			db.err = nil
+			if test.fail {
+				db.err = commitErr
+			}
+			mintInstance := &mint.Mint{Config: mintConfig, MintDB: db, LightningBackend: backend}
+			incoming := current
+			incoming.TorOnly = test.newTor
+			if test.name == "inactive sources" {
+				incoming.Rpc.Password = "new inactive password"
+				incoming.ElectrumServerURL = "ssl://localhost:50002"
+			}
+			newConfig := mintConfig
+			newConfig.NAME = "updated"
+			wantStored, err := ldk.ToDatabaseConfig(incoming)
+			if err != nil {
+				t.Fatal(err)
+			}
+			unchanged, err := transitionLightningBackend(t.Context(), mintInstance, chaincfg.RegressionNetParams, mintConfig, newConfig, nil, &current, &incoming)
+			if test.fail {
+				if !errors.Is(err, commitErr) || mintInstance.Config.NAME != mintConfig.NAME {
+					t.Fatalf("failed commit changed mint config or returned wrong error: %v", err)
+				}
+			} else if err != nil || unchanged || db.SetLDKConfigCalls != 1 || mintInstance.Config.NAME != newConfig.NAME {
+				t.Fatalf("update failed: unchanged=%v saves=%d error=%v", unchanged, db.SetLDKConfigCalls, err)
+			} else if *db.LDKConfig != wantStored {
+				t.Fatal("incoming config was not persisted")
+			}
+			if mintInstance.LightningBackend != backend {
+				t.Fatal("backend reference was replaced")
+			}
+			if status, err := backend.Status(t.Context()); err != nil || status != lightning.ONLINE_STATUS {
+				t.Fatalf("node stopped: status=%v error=%v", status, err)
+			}
+			wantTor := test.newTor
+			if test.fail {
+				wantTor = test.oldTor
+			}
+			// A valid pubkey and local, closed port avoid any external connection if the policy is disabled.
+			err = backend.OpenChannel("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", "0.0.0.0:0", 1000)
+			if err == nil || strings.Contains(err.Error(), "tor-only") != wantTor {
+				t.Fatalf("runtime policy does not match expected tor-only=%v: %v", wantTor, err)
+			}
+			payments, err := backend.Payments(ldk.All)
+			if err != nil || len(payments) != 0 {
+				t.Fatalf("update generated verification payments: %v, %v", payments, err)
+			}
+		})
+	}
+	t.Run("form submission", func(t *testing.T) {
+		backend.SetTorOnly(false)
+		stored, err := ldk.ToDatabaseConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		db.LDKConfig = &stored
+		db.Config = mintConfig
+		db.SetLDKConfigCalls = 0
+		db.err = nil
+		mintInstance := &mint.Mint{Config: mintConfig, MintDB: db, LightningBackend: backend}
+		values := url.Values{
+			"NETWORK":                {"regtest"},
+			"MINT_LIGHTNING_BACKEND": {string(utils.LDK)},
+			"LDK_CHAIN_SOURCE_TYPE":  {string(ldk.ChainSourceEsplora)},
+			"ESPLORA_SERVER_URL":     {server.URL},
+			"TOR_ONLY":               {"true"},
+		}
+		c, recorder := newPostContextWithRecorder(values)
+		Bolt11Post(mintInstance)(c)
+		if recorder.Header().Get("HX-Trigger") != "lightning-status-changed" || !strings.Contains(recorder.Body.String(), "settings changed") {
+			t.Fatalf("expected successful changed response, got %q", recorder.Body.String())
+		}
+		if mintInstance.LightningBackend != backend || db.SetLDKConfigCalls != 1 || !db.LDKConfig.TorOnly {
+			t.Fatal("form submission did not persist policy on the existing backend")
+		}
+	})
 }

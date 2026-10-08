@@ -590,6 +590,32 @@ func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest 
 	return quote, nil
 }
 
+func (m *Mint) releaseMeltReservation(ctx context.Context, quote cashu.MeltRequestDB, proofs cashu.Proofs) error {
+	tx, err := m.MintDB.GetTx(ctx)
+	if err != nil {
+		return fmt.Errorf("m.MintDB.GetTx(ctx): %w", err)
+	}
+	defer func() {
+		if rollbackErr := m.MintDB.Rollback(ctx, tx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("rollback error", slog.Any("error", rollbackErr))
+		}
+	}()
+
+	if err := m.MintDB.ChangeMeltRequestState(tx, quote.Quote, cashu.UNPAID, quote.Melted, quote.FeePaid); err != nil {
+		return fmt.Errorf("m.MintDB.ChangeMeltRequestState(tx, quote.Quote, cashu.UNPAID, quote.Melted, quote.FeePaid): %w", err)
+	}
+	if err := m.MintDB.DeleteProofs(tx, proofs); err != nil {
+		return fmt.Errorf("m.MintDB.DeleteProofs(tx, proofs): %w", err)
+	}
+	if err := m.MintDB.DeleteChangeByQuote(tx, quote.Quote); err != nil {
+		return fmt.Errorf("m.MintDB.DeleteChangeByQuote(tx, quote.Quote): %w", err)
+	}
+	if err := m.MintDB.Commit(ctx, tx); err != nil {
+		return fmt.Errorf("m.MintDB.Commit(ctx, tx): %w", err)
+	}
+	return nil
+}
+
 func (m *Mint) attemptBolt11MeltPayment(ctx context.Context, meltRequest cashu.PostMeltBolt11Request, quote cashu.MeltRequestDB) (cashu.MeltRequestDB, cashu.Amount, error) {
 	// Commit all blind messages and proofs as pending before going over the network
 	invoice, err := zpay32.Decode(quote.Request, m.LightningBackend.GetNetwork())
@@ -608,6 +634,13 @@ func (m *Mint) attemptBolt11MeltPayment(ctx context.Context, meltRequest cashu.P
 		// Convert feeReserve to Amount for the lightning backend
 		feeReserveAmount := cashu.NewAmount(unit, quote.FeeReserve)
 		payment, err := m.LightningBackend.PayInvoice(quote, invoice, feeReserveAmount, quote.Mpp, amount)
+		if errors.Is(err, cashu.ErrMeltingDisabled) {
+			paymentErr := fmt.Errorf("m.LightningBackend.PayInvoice(...): %w", err)
+			if cleanupErr := m.releaseMeltReservation(ctx, quote, meltRequest.Inputs); cleanupErr != nil {
+				return cashu.MeltRequestDB{}, cashu.Amount{}, errors.Join(paymentErr, cleanupErr)
+			}
+			return cashu.MeltRequestDB{}, cashu.Amount{}, paymentErr
+		}
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {
 			lnTx, err := m.MintDB.GetTx(ctx)

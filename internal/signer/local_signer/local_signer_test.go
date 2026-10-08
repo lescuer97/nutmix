@@ -653,7 +653,7 @@ func TestLoadLegacyAndNonLegacySeeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("signer.DeriveKeyset(legacy) %v", err)
 	}
-	legacyPubkeys := []*secp256k1.PublicKey{}
+	legacyPubkeys := make([]*secp256k1.PublicKey, 0, len(legacyKeysets))
 	for _, k := range legacyKeysets {
 		legacyPubkeys = append(legacyPubkeys, k.GetPubKey())
 	}
@@ -683,7 +683,7 @@ func TestLoadLegacyAndNonLegacySeeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("signer.DeriveKeyset(nonLegacy) %v", err)
 	}
-	nonLegacyPubkeys := []*secp256k1.PublicKey{}
+	nonLegacyPubkeys := make([]*secp256k1.PublicKey, 0, len(nonLegacyKeysets))
 	for _, k := range nonLegacyKeysets {
 		nonLegacyPubkeys = append(nonLegacyPubkeys, k.GetPubKey())
 	}

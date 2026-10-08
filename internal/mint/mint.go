@@ -12,6 +12,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/lightning"
+	"github.com/lescuer97/nutmix/internal/lightning/ldk"
 	"github.com/lescuer97/nutmix/internal/signer"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
@@ -24,6 +25,7 @@ type Mint struct {
 	Observer                *Observer
 	NostrNotificationConfig *utils.NostrNotificationConfig
 	MintPubkey              string
+	LDKSetupError           string
 	Config                  utils.Config
 }
 
@@ -75,20 +77,7 @@ func (m *Mint) CheckProofsAreSameUnit(proofs []cashu.Proof, keys []cashu.BasicKe
 }
 
 func CheckChainParams(network string) (chaincfg.Params, error) {
-	switch network {
-	case "testnet3":
-		return chaincfg.TestNet3Params, nil
-	case "testnet":
-		return chaincfg.TestNet3Params, nil
-	case "mainnet":
-		return chaincfg.MainNetParams, nil
-	case "regtest":
-		return chaincfg.RegressionNetParams, nil
-	case "signet":
-		return chaincfg.SigNetParams, nil
-	default:
-		return chaincfg.MainNetParams, fmt.Errorf("invalid network: %s", network)
-	}
+	return utils.CheckChainParams(network)
 }
 
 func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig *utils.NostrNotificationConfig, db database.MintDB, sig signer.Signer) (*Mint, error) {
@@ -101,6 +90,7 @@ func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig
 		LightningBackend:        nil,
 		OICDClient:              nil,
 		Observer:                nil,
+		LDKSetupError:           "",
 	}
 
 	chainparam, err := CheckChainParams(config.NETWORK)
@@ -154,6 +144,18 @@ func SetUpMint(ctx context.Context, config utils.Config, nostrNotificationConfig
 			Network: chainparam,
 		}
 		mint.LightningBackend = strikeWallet
+
+	case utils.LDK:
+		ldkNode, err := ldk.NewLdk(ctx, db, ldk.LdkConfig{
+			TorOnly:    false,
+			NoOutgoing: false,
+			Network:    config.NETWORK,
+			StorageDir: "",
+		})
+		if err != nil {
+			return &mint, fmt.Errorf("start configured LDK backend: %w", err)
+		}
+		mint.LightningBackend = ldkNode
 
 	default:
 		log.Fatalf("Unknown lightning backend: %s", config.MINT_LIGHTNING_BACKEND)

@@ -79,7 +79,7 @@ func TestLightningBackendStatusLoader(t *testing.T) {
 
 func TestLightningActivityLayoutPlacesStatusBesideRangeSelector(t *testing.T) {
 	ctx, recorder := adminTestContext("/admin/ln")
-	if err := templates.LightningActivityLayout(utils.Config{}, "1w", "", false).Render(ctx.Request.Context(), recorder); err != nil {
+	if err := templates.LightningActivityLayout(utils.Config{}, "1w", "", false, false, "").Render(ctx.Request.Context(), recorder); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 
@@ -160,7 +160,7 @@ func TestLightningBackendStatusHandler(t *testing.T) {
 func TestStrikeEndOfLifeAdminUI(t *testing.T) {
 	ctx, recorder := adminTestContext("/admin/ln")
 	config := utils.Config{MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct,staticcheck // Verify legacy Strike UI.
-	if err := templates.LightningBackendPage(config, true).Render(ctx.Request.Context(), recorder); err != nil {
+	if err := templates.LightningBackendPage(config, true, false, "").Render(ctx.Request.Context(), recorder); err != nil {
 		t.Fatalf("Render Strike page: %v", err)
 	}
 	body := recorder.Body.String()
@@ -177,7 +177,7 @@ func TestStrikeEndOfLifeAdminUI(t *testing.T) {
 
 	ctx, recorder = adminTestContext("/admin/ln")
 	config.MINT_LIGHTNING_BACKEND = utils.FAKE_WALLET
-	if err := templates.LightningBackendPage(config, false).Render(ctx.Request.Context(), recorder); err != nil {
+	if err := templates.LightningBackendPage(config, false, false, "").Render(ctx.Request.Context(), recorder); err != nil {
 		t.Fatalf("Render Fake Wallet page: %v", err)
 	}
 	if strings.Contains(recorder.Body.String(), `id="backend-end-of-life-alert"`) {
@@ -185,7 +185,7 @@ func TestStrikeEndOfLifeAdminUI(t *testing.T) {
 	}
 
 	ctx, recorder = adminTestContext("/admin/lightningdata")
-	if err := templates.SetupForms(string(utils.Strike), config).Render(ctx.Request.Context(), recorder); err != nil { //nolint:staticcheck // Verify retired backend fields stay hidden.
+	if err := templates.SetupForms(string(utils.Strike), config, templates.DefaultLDKResourceSnapshot(), templates.LDKFormValues{}).Render(ctx.Request.Context(), recorder); err != nil { //nolint:staticcheck // Verify retired backend fields stay hidden.
 		t.Fatalf("Render SetupForms: %v", err)
 	}
 	if recorder.Body.Len() != 0 {

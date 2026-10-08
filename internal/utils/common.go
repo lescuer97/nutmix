@@ -25,6 +25,7 @@ const CLNGRPC LightningBackend = "ClnGrpcWallet"
 
 // Deprecated: Strike backend will be removed in v0.7.0.
 const Strike LightningBackend = "Strike"
+const LDK LightningBackend = "LDK"
 
 var ErrUnknownLnBackedn = errors.New("LN backend is not known")
 
@@ -36,8 +37,12 @@ func StringToLightningBackend(text string) (LightningBackend, error) {
 		return LNDGRPC, nil
 	case string(LNBITS):
 		return LNBITS, nil
+	case string(CLNGRPC):
+		return CLNGRPC, nil
 	case string(Strike):
 		return Strike, nil
+	case string(LDK):
+		return LDK, nil
 	default:
 		return FAKE_WALLET, ErrUnknownLnBackedn
 	}
