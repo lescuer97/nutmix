@@ -117,11 +117,17 @@ func (p *PostMeltBolt11Request) verifySigAllRepetition() error {
 	if err != nil {
 		return fmt.Errorf("firstProof.parseSpendCondition(). %w", err)
 	}
+	if !firstSpendCondition.Type.IsSpendConditioned() || !firstSpendCondition.HasSigAll() {
+		return ErrInvalidSpendCondition
+	}
 
 	for _, proof := range p.Inputs {
 		spendCondition, err := proof.parseSpendCondition()
 		if err != nil {
 			return fmt.Errorf("could not parseSpendCondition. This should not happen as we are inside sig all. %w", err)
+		}
+		if spendCondition.Type != firstSpendCondition.Type || !spendCondition.HasSigAll() {
+			return ErrInvalidSpendCondition
 		}
 
 		if spendCondition.Data.Data != firstSpendCondition.Data.Data {

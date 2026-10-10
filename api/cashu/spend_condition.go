@@ -225,6 +225,11 @@ func (tags *TagsInfo) MarshalJSON() ([]byte, error) {
 }
 
 func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
+	// Repeated JSON fields must not merge conditions while hiding earlier tags.
+	if tags.originalTag != "" {
+		return fmt.Errorf("duplicate tags field: %w", ErrDuplicateTag)
+	}
+
 	var arrayToCheck [][]string
 
 	err := json.Unmarshal(b, &arrayToCheck)
