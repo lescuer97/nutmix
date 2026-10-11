@@ -21,7 +21,7 @@ func TestSpendConditionDuplicateTagsFieldRejected(t *testing.T) {
 		`"tags":[],"tags":null`,
 	} {
 		t.Run(fields, func(t *testing.T) {
-			proof := Proof{Secret: fmt.Sprintf(`["P2PK",{"nonce":"test","data":"test",%s}]`, fields)}
+			proof := Proof{Secret: fmt.Sprintf(`["P2PK",{"nonce":"test","data":"test",%s}]`, fields)} //nolint:exhaustruct // Only secret parsing is exercised.
 			_, _, err := proof.IsProofSpendConditioned()
 			if !errors.Is(err, ErrDuplicateTag) {
 				t.Fatalf("IsProofSpendConditioned() = %v, want duplicate tags field rejection", err)
@@ -38,8 +38,8 @@ func TestSigAllDuplicateTagsAttackRejected(t *testing.T) {
 	victimKey := hex.EncodeToString(victim.PubKey().SerializeCompressed())
 	victimTags := fmt.Sprintf(`[["locktime","4102444800"],["refund","%s"]]`, hex.EncodeToString(refund.PubKey().SerializeCompressed()))
 	inputs := Proofs{
-		{Amount: 1, Secret: fmt.Sprintf(`["P2PK",{"nonce":"attacker","data":"%s","tags":[["sigflag","SIG_ALL"],["pubkeys","%s"]],"tags":%s}]`, victimKey, hex.EncodeToString(attacker.PubKey().SerializeCompressed()), victimTags)},
-		{Amount: 1, Secret: fmt.Sprintf(`["P2PK",{"nonce":"victim","data":"%s","tags":%s}]`, victimKey, victimTags)},
+		{Amount: 1, Secret: fmt.Sprintf(`["P2PK",{"nonce":"attacker","data":"%s","tags":[["sigflag","SIG_ALL"],["pubkeys","%s"]],"tags":%s}]`, victimKey, hex.EncodeToString(attacker.PubKey().SerializeCompressed()), victimTags)}, //nolint:exhaustruct // Mint signatures and witness are populated below; persistence fields are unused.
+		{Amount: 1, Secret: fmt.Sprintf(`["P2PK",{"nonce":"victim","data":"%s","tags":%s}]`, victimKey, victimTags)},                                                                                                                //nolint:exhaustruct // Mint signature is populated below; no victim witness is supplied.
 	}
 	for i := range inputs {
 		y, err := crypto.HashToCurve([]byte(inputs[i].Secret))
@@ -51,16 +51,16 @@ func TestSigAllDuplicateTagsAttackRejected(t *testing.T) {
 			t.Fatal("test input must have a valid mint signature")
 		}
 	}
-	outputs := BlindedMessages{{Amount: 2, B_: WrappedPublicKey{attacker.PubKey()}}}
+	outputs := BlindedMessages{{Amount: 2, B_: WrappedPublicKey{attacker.PubKey()}, Id: "", Witness: ""}}
 	swap := PostSwapRequest{Inputs: inputs, Outputs: outputs}
 	melt := PostMeltBolt11Request{Quote: "test-quote", Inputs: inputs, Outputs: outputs}
 	for _, operation := range []struct {
+		validate func() error
 		name     string
 		message  string
-		validate func() error
 	}{
-		{"swap", swap.makeSigAllMsg(), swap.ValidateSigflag},
-		{"melt", melt.makeSigAllMsg(), melt.ValidateSigflag},
+		{swap.ValidateSigflag, "swap", swap.makeSigAllMsg()},
+		{melt.ValidateSigflag, "melt", melt.makeSigAllMsg()},
 	} {
 		t.Run(operation.name, func(t *testing.T) {
 			inputs[0].Witness = signSecret(t, attacker, operation.message)
@@ -95,15 +95,15 @@ func TestSigAllRepetitionInvariants(t *testing.T) {
 		{"malformed first secret", `not-json`, secret("P2PK", "second", "data", allTags), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			inputs := Proofs{{Secret: tc.first}, {Secret: tc.second}}
-			swap := PostSwapRequest{Inputs: inputs}
-			melt := PostMeltBolt11Request{Inputs: inputs}
+			inputs := Proofs{{Secret: tc.first}, {Secret: tc.second}} //nolint:exhaustruct // Repetition checks only parse secrets.
+			swap := PostSwapRequest{Inputs: inputs, Outputs: nil}
+			melt := PostMeltBolt11Request{Inputs: inputs, Quote: "", Outputs: nil}
 			for _, operation := range []struct {
-				name     string
 				validate func() error
+				name     string
 			}{
-				{"swap", swap.verifySigAllRepetition},
-				{"melt", melt.verifySigAllRepetition},
+				{swap.verifySigAllRepetition, "swap"},
+				{melt.verifySigAllRepetition, "melt"},
 			} {
 				t.Run(operation.name, func(t *testing.T) {
 					err := operation.validate()
