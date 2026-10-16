@@ -116,6 +116,18 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 
 	proof := authProof.Proof(y, cashu.PROOF_PENDING)
 	proofArray := cashu.Proofs{proof}
+	keysets, err := m.Signer.GetAuthKeys()
+	if err != nil {
+		return fmt.Errorf("m.Signer.GetAuthKeys(). %w", err)
+	}
+	unit, err := checkProofsAreSameUnit(proofArray, keysets.Keysets)
+	if err != nil {
+		return fmt.Errorf("checkProofsAreSameUnit(proofArray, keysets.Keysets). %w", err)
+	}
+	if unit != cashu.AUTH {
+		return cashu.ErrUnitNotSupported
+	}
+
 	err = m.MintDB.SaveProof(tx, proofArray)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.SaveProof(tx, proofArray). %w", err)
