@@ -53,7 +53,7 @@ func (l *LDK) OpenChannelWithPush(nodeID string, address string, sats uint64, pu
 	}
 
 	pushToAmount := pushMsat
-	_, err = node.OpenChannel(nodeID, address, sats, &pushToAmount, &config)
+	_, err = node.OpenChannel(nodeID, address, sats, &pushToAmount, nil, &config)
 	if err != nil {
 		return fmt.Errorf("node.OpenChannel(...): %w", err)
 	}

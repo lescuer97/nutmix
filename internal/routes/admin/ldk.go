@@ -50,7 +50,11 @@ func LdkLightningPage(m *mint.Mint) gin.HandlerFunc {
 
 func LdkPaymentsPage(m *mint.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		err := renderLdkPage(c, m, templates.LdkSectionPayments)
+		page, err := loadLdkPaymentsRequest(m, c.Query("type"), c.Query("cursor"))
+		if err != nil {
+			page = paymentsErrorPage(c.Query("type"), c.Query("cursor"), err)
+		}
+		err = templates.LdkPageShell(showLDKNodeLink(m), ldkAlertMessage(m), templates.LdkSectionPayments, templates.LdkPaymentsPageContent(page)).Render(c.Request.Context(), c.Writer)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -66,8 +70,6 @@ func ldkPageContent(section templates.LdkSection) templ.Component {
 	switch section {
 	case templates.LdkSectionLightning:
 		return templates.LdkLightningPageContent()
-	case templates.LdkSectionPayments:
-		return templates.LdkPaymentsPageContent()
 	default:
 		return templates.LdkOnchainPageContent()
 	}

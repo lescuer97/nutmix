@@ -73,16 +73,8 @@ templ LdkLightningPageContent() {
 	</div>
 }
 
-templ LdkPaymentsPageContent() {
-	<div
-		id="ldk-payments-fragment"
-		hx-get="/admin/ldk/payments/list?type=all&show=25"
-		hx-trigger="load"
-		hx-target="#ldk-payments-fragment"
-		hx-swap="outerHTML"
-	>
-		@LdkPaymentsCardLoading()
-	</div>
+templ LdkPaymentsPageContent(page LdkPaymentsPage) {
+	@LdkPaymentsFragment(page)
 }
 
 templ LdkBalancesFragment(totalOnchain string, availableOnchain string) {

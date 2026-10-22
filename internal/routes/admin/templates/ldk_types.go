@@ -1,6 +1,8 @@
 package templates
 
-import "fmt"
+import (
+	"net/url"
+)
 
 type LdkSection uint8
 
@@ -41,37 +43,28 @@ const (
 	LdkPaymentsFilterAll      = "all"
 	LdkPaymentsFilterIncoming = "incoming"
 	LdkPaymentsFilterOutgoing = "outgoing"
-	LdkPaymentsShow25         = "25"
-	LdkPaymentsShow100        = "100"
-	LdkPaymentsShow150        = "150"
-	LdkPaymentsShowAll        = "all"
 )
 
-func LdkPaymentsQuery(filter string, show string) string {
-	return fmt.Sprintf("?type=%s&show=%s", filter, show)
+func LdkPaymentsURL(filter string, cursor string) string {
+	values := url.Values{}
+	values.Set("type", filter)
+	if cursor != "" {
+		values.Set("cursor", cursor)
+	}
+	return "/admin/ldk/payments?" + values.Encode()
 }
 
 //nolint:govet // Templ view model keeps related UI fields grouped for readability.
 type LdkPaymentsPage struct {
-	ShowOptions           []LdkPaymentsShowOptionData
 	Rows                  []LdkPaymentRow
 	ActiveFilter          string
-	SelectedShow          string
+	NextURL               string
+	FirstURL              string
 	EmptyMessage          string
 	ErrorMessage          string
-	RetryQuery            string
+	RetryURL              string
 	CopyButtonClass       string
 	CopyButtonDefaultText string
-	TotalItems            int
-	ShowingFrom           int
-	ShowingTo             int
-}
-
-type LdkPaymentsShowOptionData struct {
-	Label    string
-	Value    string
-	Query    string
-	Selected bool
 }
 
 type LdkPaymentRow struct {

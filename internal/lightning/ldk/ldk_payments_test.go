@@ -370,7 +370,7 @@ func TestHasPendingOutgoingBolt11Payments(t *testing.T) {
 
 func TestWaitForInFlightPayments(t *testing.T) {
 	t.Run("returns when no payments are pending", func(t *testing.T) {
-		if err := waitForInFlightPayments(t.Context(), func() []ldk_node.PaymentDetails { return nil }); err != nil {
+		if err := waitForInFlightPayments(t.Context(), func() ([]ldk_node.PaymentDetails, error) { return nil, nil }); err != nil {
 			t.Fatalf("waitForInFlightPayments(...) error = %v", err)
 		}
 	})
@@ -383,7 +383,7 @@ func TestWaitForInFlightPayments(t *testing.T) {
 			Status:    ldk_node.PaymentStatusPending,
 			Kind:      ldk_node.PaymentKindBolt11{Hash: "hash"},
 		}}
-		if err := waitForInFlightPayments(ctx, func() []ldk_node.PaymentDetails { return payments }); !errors.Is(err, context.Canceled) {
+		if err := waitForInFlightPayments(ctx, func() ([]ldk_node.PaymentDetails, error) { return payments, nil }); !errors.Is(err, context.Canceled) {
 			t.Fatalf("waitForInFlightPayments(...) error = %v, want %v", err, context.Canceled)
 		}
 	})
@@ -396,7 +396,7 @@ func TestWaitForInFlightPayments(t *testing.T) {
 			Status:    ldk_node.PaymentStatusPending,
 			Kind:      ldk_node.PaymentKindBolt11{Hash: "hash"},
 		}}
-		if err := waitForInFlightPayments(ctx, func() []ldk_node.PaymentDetails { return payments }); !errors.Is(err, ErrInFlightBolt11Payments) {
+		if err := waitForInFlightPayments(ctx, func() ([]ldk_node.PaymentDetails, error) { return payments, nil }); !errors.Is(err, ErrInFlightBolt11Payments) {
 			t.Fatalf("waitForInFlightPayments(...) error = %v, want %v", err, ErrInFlightBolt11Payments)
 		}
 	})
@@ -405,19 +405,100 @@ func TestWaitForInFlightPayments(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 		defer cancel()
 		calls := 0
-		err := waitForInFlightPayments(ctx, func() []ldk_node.PaymentDetails {
+		err := waitForInFlightPayments(ctx, func() ([]ldk_node.PaymentDetails, error) {
 			calls++
 			if calls == 1 {
 				return []ldk_node.PaymentDetails{{
 					Direction: ldk_node.PaymentDirectionOutbound,
 					Status:    ldk_node.PaymentStatusPending,
 					Kind:      ldk_node.PaymentKindBolt11{Hash: "hash"},
-				}}
+				}}, nil
 			}
-			return nil
+			return nil, nil
 		})
 		if err != nil {
 			t.Fatalf("waitForInFlightPayments(...) error = %v", err)
+		}
+	})
+}
+
+func TestListAllPayments(t *testing.T) {
+	var token *ldk_node.PageToken
+	calls := 0
+	payments, err := listAllPayments(func(got **ldk_node.PageToken) (ldk_node.PaymentDetailsPage, error) {
+		calls++
+		if calls == 1 {
+			if got != nil {
+				t.Fatal("first page must not have a token")
+			}
+			return ldk_node.PaymentDetailsPage{NextPageToken: &token}, nil
+		}
+		if calls != 2 || got != &token {
+			t.Fatal("unexpected pagination call")
+		}
+		return ldk_node.PaymentDetailsPage{Payments: []ldk_node.PaymentDetails{{}}}, nil
+	})
+	if err != nil || calls != 2 || len(payments) != 1 {
+		t.Fatalf("got %d payments, %d calls, error %v", len(payments), calls, err)
+	}
+}
+
+func TestPaymentsPage(t *testing.T) {
+	t.Run("one call preserves opaque cursor and native order", func(t *testing.T) {
+		const cursor = "token /+?&= opaque"
+		returned := ldk_node.NewPageToken("next /+?&= token")
+		returnedPtr := returned
+		calls := 0
+		payments, next, err := paymentsPage(func(got **ldk_node.PageToken) (ldk_node.PaymentDetailsPage, error) {
+			calls++
+			if got == nil || *got == nil || (*got).String() != cursor {
+				t.Fatalf("input cursor token = %v, want %q", got, cursor)
+			}
+			return ldk_node.PaymentDetailsPage{Payments: []ldk_node.PaymentDetails{{Id: "new", Kind: ldk_node.PaymentKindBolt11{}}, {Id: "old", Kind: ldk_node.PaymentKindBolt11{}}}, NextPageToken: &returnedPtr}, nil
+		}, All, cursor)
+		if err != nil || calls != 1 || next != "next /+?&= token" {
+			t.Fatalf("paymentsPage() calls=%d next=%q error=%v", calls, next, err)
+		}
+		if len(payments) != 2 || payments[0].Id != "new" || payments[1].Id != "old" {
+			t.Fatalf("payment order = %+v", payments)
+		}
+	})
+
+	t.Run("filters returned batch and retains continuation when empty", func(t *testing.T) {
+		returned := ldk_node.NewPageToken("continuation")
+		returnedPtr := returned
+		calls := 0
+		payments, next, err := paymentsPage(func(got **ldk_node.PageToken) (ldk_node.PaymentDetailsPage, error) {
+			calls++
+			if got != nil {
+				t.Fatal("first page received a cursor")
+			}
+			return ldk_node.PaymentDetailsPage{Payments: []ldk_node.PaymentDetails{
+				{Id: "incoming", Direction: ldk_node.PaymentDirectionInbound, Status: ldk_node.PaymentStatusSucceeded, Kind: ldk_node.PaymentKindBolt11{}},
+				{Id: "pending", Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusPending, Kind: ldk_node.PaymentKindBolt11{}},
+				{Id: "failed", Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusFailed, Kind: ldk_node.PaymentKindBolt11{}},
+				{Id: "outgoing", Direction: ldk_node.PaymentDirectionOutbound, Status: ldk_node.PaymentStatusSucceeded, Kind: ldk_node.PaymentKindBolt11{}},
+			}, NextPageToken: &returnedPtr}, nil
+		}, Outgoing, "")
+		if err != nil || calls != 1 || len(payments) != 1 || payments[0].Id != "outgoing" || next != "continuation" {
+			t.Fatalf("payments=%+v next=%q calls=%d error=%v", payments, next, calls, err)
+		}
+	})
+
+	t.Run("invalid type and native error", func(t *testing.T) {
+		calls := 0
+		_, _, err := paymentsPage(func(**ldk_node.PageToken) (ldk_node.PaymentDetailsPage, error) {
+			calls++
+			return ldk_node.PaymentDetailsPage{Payments: []ldk_node.PaymentDetails{{Kind: ldk_node.PaymentKindBolt11{}}}}, nil
+		}, PaymentType(99), "")
+		if err == nil || calls != 1 {
+			t.Fatalf("invalid type calls=%d error=%v", calls, err)
+		}
+		_, _, err = paymentsPage(func(**ldk_node.PageToken) (ldk_node.PaymentDetailsPage, error) {
+			return ldk_node.PaymentDetailsPage{}, ldk_node.ErrNodeErrorInvalidPageToken
+		}, All, "bad")
+		if !errors.Is(err, ldk_node.ErrNodeErrorInvalidPageToken) {
+			t.Fatalf("error=%v", err)
 		}
 	})
 }

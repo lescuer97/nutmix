@@ -180,7 +180,12 @@ func TestValidateTorOnly(t *testing.T) {
 			if err := builder.SetListeningAddresses([]string{address}); err != nil {
 				t.Fatal(err)
 			}
-			node, err := builder.Build(ldk_node.NodeEntropyFromBip39Mnemonic(mnemonic, nil))
+			parsedMnemonic, err := ldk_node.MnemonicFromStr(mnemonic)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(parsedMnemonic.Destroy)
+			node, err := builder.Build(ldk_node.NodeEntropyFromBip39Mnemonic(parsedMnemonic, nil))
 			if err != nil {
 				t.Fatal(err)
 			}

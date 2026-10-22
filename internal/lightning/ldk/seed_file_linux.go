@@ -38,7 +38,10 @@ func readOrCreateSeedFile(dirPath string) (seed string, created bool, err error)
 		return "", false, fmt.Errorf("open seed file: %w", err)
 	}
 
-	seed = generateSeedMnemonic()
+	seed, err = generateSeedMnemonic()
+	if err != nil {
+		return "", false, fmt.Errorf("generate seed mnemonic: %w", err)
+	}
 	if strings.TrimSpace(seed) == "" {
 		return "", false, fmt.Errorf("generated seed mnemonic is empty")
 	}

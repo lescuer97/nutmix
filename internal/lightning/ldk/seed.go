@@ -11,9 +11,13 @@ import (
 
 const seedFileName = "ldk_seed"
 
-func generateSeedMnemonic() string {
-	wordCount := ldk_node.WordCountWords24
-	return ldk_node.GenerateEntropyMnemonic(&wordCount)
+func generateSeedMnemonic() (string, error) {
+	mnemonic, err := ldk_node.MnemonicGenerate(ldk_node.WordCountWords24)
+	if err != nil {
+		return "", err
+	}
+	defer mnemonic.Destroy()
+	return mnemonic.String(), nil
 }
 
 func ReadOrCreateSeed(dirPath string) (string, error) {

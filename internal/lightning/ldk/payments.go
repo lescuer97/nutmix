@@ -184,10 +184,33 @@ func (l *LDK) lookupPaymentDetails(invoice *zpay32.Invoice, direction ldk_node.P
 	hash := hex.EncodeToString(invoice.PaymentHash[:])
 	var paymentByID *ldk_node.PaymentDetails
 	if checkingID != "" {
-		paymentByID = node.Payment(checkingID)
+		paymentByID, err = node.Payment(checkingID)
+		if err != nil {
+			return nil, fmt.Errorf("lookup payment: %w", err)
+		}
 	}
 
-	return findPaymentDetails(node.ListPayments(), paymentByID, direction, hash), nil
+	payments, err := listAllPayments(node.ListPayments)
+	if err != nil {
+		return nil, err
+	}
+	return findPaymentDetails(payments, paymentByID, direction, hash), nil
+}
+
+func listAllPayments(listPage func(**ldk_node.PageToken) (ldk_node.PaymentDetailsPage, error)) ([]ldk_node.PaymentDetails, error) {
+	var payments []ldk_node.PaymentDetails
+	var token **ldk_node.PageToken
+	for {
+		page, err := listPage(token)
+		if err != nil {
+			return nil, fmt.Errorf("list payments: %w", err)
+		}
+		payments = append(payments, page.Payments...)
+		token = page.NextPageToken
+		if token == nil {
+			return payments, nil
+		}
+	}
 }
 
 func findPaymentDetails(payments []ldk_node.PaymentDetails, paymentByID *ldk_node.PaymentDetails, direction ldk_node.PaymentDirection, hash string) *ldk_node.PaymentDetails {
@@ -378,7 +401,45 @@ func (l *LDK) Payments(paymentType PaymentType) ([]ldk_node.PaymentDetails, erro
 	if err != nil {
 		return nil, err
 	}
-	return filterPaymentsByType(node.ListPayments(), paymentType)
+	payments, err := listAllPayments(node.ListPayments)
+	if err != nil {
+		return nil, err
+	}
+	return filterPaymentsByType(payments, paymentType)
+}
+
+// PaymentsPage fetches and filters exactly one native page, preserving the
+// creation order provided by LDK. cursor is passed through unchanged.
+func (l *LDK) PaymentsPage(paymentType PaymentType, cursor string) ([]ldk_node.PaymentDetails, string, error) {
+	node, err := l.getNode()
+	if err != nil {
+		return nil, "", err
+	}
+	return paymentsPage(node.ListPayments, paymentType, cursor)
+}
+
+func paymentsPage(listPage func(**ldk_node.PageToken) (ldk_node.PaymentDetailsPage, error), paymentType PaymentType, cursor string) ([]ldk_node.PaymentDetails, string, error) {
+	var token **ldk_node.PageToken
+	if cursor != "" {
+		nativeToken := ldk_node.NewPageToken(cursor)
+		defer nativeToken.Destroy()
+		token = &nativeToken
+	}
+	page, err := listPage(token)
+	if err != nil {
+		return nil, "", fmt.Errorf("list payments: %w", err)
+	}
+	defer page.Destroy()
+
+	next := ""
+	if page.NextPageToken != nil && *page.NextPageToken != nil {
+		next = (*page.NextPageToken).String()
+	}
+	payments, err := filterPaymentsByType(page.Payments, paymentType)
+	if err != nil {
+		return nil, "", err
+	}
+	return payments, next, nil
 }
 
 func filterPaymentsByType(payments []ldk_node.PaymentDetails, paymentType PaymentType) ([]ldk_node.PaymentDetails, error) {

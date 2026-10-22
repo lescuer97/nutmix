@@ -238,7 +238,12 @@ func (l *LDK) initNode(persistedConfig PersistedConfig) error {
 		}
 	}
 
-	nodeEntropy := ldk_node.NodeEntropyFromBip39Mnemonic(seedMnemonic, nil)
+	mnemonic, err := ldk_node.MnemonicFromStr(seedMnemonic)
+	if err != nil {
+		return fmt.Errorf("parse seed mnemonic: %w", err)
+	}
+	defer mnemonic.Destroy()
+	nodeEntropy := ldk_node.NodeEntropyFromBip39Mnemonic(mnemonic, nil)
 	slog.Debug("building ldk node")
 
 	builder.SetStorageDirPath(ldkStorage)
@@ -319,7 +324,9 @@ func (l *LDK) Stop(ctx context.Context, mode StopMode) error {
 	if mode == WaitForInFlightPayments {
 		l.setNoOutgoing(true)
 		stopCtx, cancel := context.WithTimeoutCause(ctx, inFlightPaymentWaitTimeout, ErrInFlightBolt11Payments)
-		err := waitForInFlightPayments(stopCtx, l.node.ListPayments)
+		err := waitForInFlightPayments(stopCtx, func() ([]ldk_node.PaymentDetails, error) {
+			return listAllPayments(l.node.ListPayments)
+		})
 		cancel()
 		if err != nil {
 			l.setNoOutgoing(false)
@@ -338,22 +345,31 @@ func (l *LDK) Stop(ctx context.Context, mode StopMode) error {
 	return nil
 }
 
-func waitForInFlightPayments(ctx context.Context, listPayments func() []ldk_node.PaymentDetails) error {
+func waitForInFlightPayments(ctx context.Context, listPayments func() ([]ldk_node.PaymentDetails, error)) error {
 	ticker := time.NewTicker(inFlightPaymentPollInterval)
 	defer ticker.Stop()
 
-	for hasPendingOutgoingBolt11Payments(listPayments()) {
+	for {
+		payments, err := listPayments()
+		if err != nil {
+			return err
+		}
+		if !hasPendingOutgoingBolt11Payments(payments) {
+			return nil
+		}
 		select {
 		case <-ctx.Done():
-			if !hasPendingOutgoingBolt11Payments(listPayments()) {
+			payments, err := listPayments()
+			if err != nil {
+				return err
+			}
+			if !hasPendingOutgoingBolt11Payments(payments) {
 				return nil
 			}
 			return context.Cause(ctx)
 		case <-ticker.C:
 		}
 	}
-
-	return nil
 }
 
 func (l *LDK) Status(_ context.Context) (lightning.NodeStatus, error) {

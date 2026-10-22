@@ -389,30 +389,22 @@ templ LdkPaymentsCard(page LdkPaymentsPage) {
 		<div class="ldk-payments-header">
 			<div>
 				<p class="text-secondary text-sm uppercase">Payment history</p>
-				if page.ErrorMessage == "" {
-					<p class="text-secondary mt-3">Showing { strconv.Itoa(page.ShowingFrom) } to { strconv.Itoa(page.ShowingTo) } of { strconv.Itoa(page.TotalItems) } payments</p>
-				}
 			</div>
 			if page.ErrorMessage == "" {
 				<div class="ldk-payments-filters">
-					@LdkPaymentsFilterButton("All", LdkPaymentsFilterAll, page.ActiveFilter, page.SelectedShow)
-					@LdkPaymentsFilterButton("Incoming", LdkPaymentsFilterIncoming, page.ActiveFilter, page.SelectedShow)
-					@LdkPaymentsFilterButton("Outgoing", LdkPaymentsFilterOutgoing, page.ActiveFilter, page.SelectedShow)
+					@LdkPaymentsFilterButton("All", LdkPaymentsFilterAll, page.ActiveFilter)
+					@LdkPaymentsFilterButton("Incoming", LdkPaymentsFilterIncoming, page.ActiveFilter)
+					@LdkPaymentsFilterButton("Outgoing", LdkPaymentsFilterOutgoing, page.ActiveFilter)
 				</div>
 			}
 		</div>
 		if page.ErrorMessage != "" {
 			<div class="ldk-payments-empty mt-4">
 				<p class="text-secondary">{ page.ErrorMessage }</p>
-				<button
-					type="button"
-					class="btn btn-secondary btn-sm mt-4"
-					hx-get={ "/admin/ldk/payments/list" + page.RetryQuery }
-					hx-target="#ldk-payments-fragment"
-					hx-swap="outerHTML"
-				>
-					Retry
-				</button>
+				<a class="btn btn-secondary btn-sm mt-4" href={ page.RetryURL }>Retry</a>
+				if page.FirstURL != "" {
+					<a class="btn btn-secondary btn-sm mt-4" href={ page.FirstURL }>First page</a>
+				}
 			</div>
 		} else if len(page.Rows) == 0 {
 			<div class="ldk-payments-empty mt-4">
@@ -425,45 +417,25 @@ templ LdkPaymentsCard(page LdkPaymentsPage) {
 				}
 			</div>
 		}
-		if page.ErrorMessage == "" {
+		if page.ErrorMessage == "" && (page.FirstURL != "" || page.NextURL != "") {
 			<div class="ldk-payments-footer">
-				<span class="text-secondary">Show:</span>
-				<div class="ldk-payments-show-options">
-					for _, option := range page.ShowOptions {
-						@LdkPaymentsShowOption(option)
-					}
-				</div>
+				if page.FirstURL != "" {
+					<a class="btn btn-secondary btn-sm" href={ page.FirstURL }>First page</a>
+				}
+				if page.NextURL != "" {
+					<a class="btn btn-secondary btn-sm" href={ page.NextURL }>Next</a>
+				}
 			</div>
 		}
 	</div>
 }
 
-templ LdkPaymentsFilterButton(label string, filter string, activeFilter string, selectedShow string) {
+templ LdkPaymentsFilterButton(label string, filter string, activeFilter string) {
 	{{ className := "btn btn-secondary btn-sm ldk-payments-filter" }}
 	if filter == activeFilter {
 		{{ className += " ldk-payments-filter-active" }}
 	}
-	<button
-		type="button"
-		class={ className }
-		hx-get={ "/admin/ldk/payments/list" + LdkPaymentsQuery(filter, selectedShow) }
-		hx-target="#ldk-payments-fragment"
-		hx-swap="outerHTML"
-	>{ label }</button>
-}
-
-templ LdkPaymentsShowOption(option LdkPaymentsShowOptionData) {
-	{{ className := "btn btn-secondary btn-sm ldk-payments-show-option" }}
-	if option.Selected {
-		{{ className += " ldk-payments-show-option-active" }}
-	}
-	<button
-		type="button"
-		class={ className }
-		hx-get={ "/admin/ldk/payments/list" + option.Query }
-		hx-target="#ldk-payments-fragment"
-		hx-swap="outerHTML"
-	>{ option.Label }</button>
+	<a class={ className } href={ LdkPaymentsURL(filter, "") }>{ label }</a>
 }
 
 templ LdkPaymentListItem(row LdkPaymentRow, copyButtonClass string, defaultCopyText string) {

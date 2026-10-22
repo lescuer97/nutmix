@@ -92,7 +92,7 @@ func TestLdkPageShellRendersLightningSection(t *testing.T) {
 
 func TestLdkPageShellRendersPaymentsSection(t *testing.T) {
 	var b bytes.Buffer
-	if err := LdkPageShell(true, "", LdkSectionPayments, LdkPaymentsPageContent()).Render(context.Background(), &b); err != nil {
+	if err := LdkPageShell(true, "", LdkSectionPayments, LdkPaymentsPageContent(LdkPaymentsPage{ActiveFilter: "all"})).Render(context.Background(), &b); err != nil {
 		t.Fatalf("LdkPageShell(...).Render: %v", err)
 	}
 
@@ -103,11 +103,7 @@ func TestLdkPageShellRendersPaymentsSection(t *testing.T) {
 		"href=\"/admin/ldk/lightning\"",
 		"href=\"/admin/ldk/payments\"",
 		"id=\"ldk-payments-fragment\"",
-		"hx-get=\"/admin/ldk/payments/list?type=all&show=25\"",
-		"hx-trigger=\"load\"",
-		"hx-target=\"#ldk-payments-fragment\"",
-		"hx-swap=\"outerHTML\"",
-		"Loading payments",
+		">All</a>",
 		"ldk-section-tab-active",
 	}
 	for _, check := range checks {
@@ -139,12 +135,8 @@ func TestLdkPageShellRendersPaymentsSection(t *testing.T) {
 func TestLdkPaymentsFragmentRendersSuccessState(t *testing.T) {
 	page := LdkPaymentsPage{
 		ActiveFilter:          LdkPaymentsFilterIncoming,
-		SelectedShow:          LdkPaymentsShow25,
-		TotalItems:            2,
-		ShowingFrom:           1,
-		ShowingTo:             2,
-		RetryQuery:            LdkPaymentsQuery(LdkPaymentsFilterAll, LdkPaymentsShow25),
-		ShowOptions:           []LdkPaymentsShowOptionData{{Label: "25", Value: LdkPaymentsShow25, Query: LdkPaymentsQuery(LdkPaymentsFilterIncoming, LdkPaymentsShow25), Selected: true}, {Label: "ALL", Value: LdkPaymentsShowAll, Query: LdkPaymentsQuery(LdkPaymentsFilterIncoming, LdkPaymentsShowAll)}},
+		NextURL:               LdkPaymentsURL("incoming", "opaque /+?"),
+		FirstURL:              LdkPaymentsURL("incoming", ""),
 		CopyButtonClass:       "ldk-payment-copy-btn",
 		CopyButtonDefaultText: "Copy",
 		Rows: []LdkPaymentRow{{
@@ -171,8 +163,7 @@ func TestLdkPaymentsFragmentRendersSuccessState(t *testing.T) {
 	checks := []string{
 		"id=\"ldk-payments-fragment\"",
 		"Payment history",
-		"Showing 1 to 2 of 2 payments",
-		">Incoming<",
+		"href=\"/admin/ldk/payments?type=incoming\">Incoming</a>",
 		"Inbound Payment",
 		"ON-CHAIN",
 		"Succeeded",
@@ -181,27 +172,23 @@ func TestLdkPaymentsFragmentRendersSuccessState(t *testing.T) {
 		"2026-03-25 16:18:05 UTC",
 		"data-copy-text=\"abcdef1234567890\"",
 		"ldk-payment-copy-btn",
-		">Show:</span>",
-		">25</button>",
-		">ALL</button>",
+		"href=\"/admin/ldk/payments?cursor=opaque+%2F%2B%3F&amp;type=incoming\">Next</a>",
+		"href=\"/admin/ldk/payments?type=incoming\">First page</a>",
 	}
 	for _, check := range checks {
 		if !strings.Contains(out, check) {
 			t.Fatalf("expected %q in payments success fragment", check)
 		}
 	}
+	if strings.Contains(out, "hx-get=\"/admin/ldk/payments") || strings.Contains(out, "show=") {
+		t.Fatalf("payment navigation must use ordinary links without obsolete show parameters")
+	}
 }
 
 func TestLdkPaymentsFragmentRendersEmptyState(t *testing.T) {
 	page := LdkPaymentsPage{
-		ActiveFilter:          LdkPaymentsFilterOutgoing,
-		SelectedShow:          LdkPaymentsShow150,
-		TotalItems:            0,
-		ShowingFrom:           0,
-		ShowingTo:             0,
-		EmptyMessage:          "No outgoing payments found.",
-		RetryQuery:            LdkPaymentsQuery(LdkPaymentsFilterAll, LdkPaymentsShow25),
-		ShowOptions:           []LdkPaymentsShowOptionData{{Label: "150", Value: LdkPaymentsShow150, Query: LdkPaymentsQuery(LdkPaymentsFilterOutgoing, LdkPaymentsShow150), Selected: true}},
+		ActiveFilter:          "outgoing",
+		EmptyMessage:          "No matching payments on this page.",
 		CopyButtonClass:       "ldk-payment-copy-btn",
 		CopyButtonDefaultText: "Copy",
 	}
@@ -214,20 +201,23 @@ func TestLdkPaymentsFragmentRendersEmptyState(t *testing.T) {
 	out := b.String()
 	checks := []string{
 		"id=\"ldk-payments-fragment\"",
-		"Showing 0 to 0 of 0 payments",
-		"No outgoing payments found.",
+		"No matching payments on this page.",
 	}
 	for _, check := range checks {
 		if !strings.Contains(out, check) {
 			t.Fatalf("expected %q in payments empty fragment", check)
 		}
 	}
+	if strings.Contains(out, "hx-get=\"/admin/ldk/payments") || strings.Contains(out, "show=") {
+		t.Fatalf("empty payment navigation must not use HTMX or obsolete show parameters")
+	}
 }
 
 func TestLdkPaymentsFragmentRendersErrorState(t *testing.T) {
 	page := LdkPaymentsPage{
 		ErrorMessage:          "Invalid payments page",
-		RetryQuery:            LdkPaymentsQuery(LdkPaymentsFilterAll, LdkPaymentsShow25),
+		RetryURL:              LdkPaymentsURL("all", "cursor !"),
+		FirstURL:              LdkPaymentsURL("all", ""),
 		CopyButtonClass:       "ldk-payment-copy-btn",
 		CopyButtonDefaultText: "Copy",
 	}
@@ -242,7 +232,8 @@ func TestLdkPaymentsFragmentRendersErrorState(t *testing.T) {
 		"id=\"ldk-payments-fragment\"",
 		"Invalid payments page",
 		"Retry",
-		"hx-get=\"/admin/ldk/payments/list?type=all&amp;show=25\"",
+		"href=\"/admin/ldk/payments?cursor=cursor+%21&amp;type=all\"",
+		"First page",
 	}
 	for _, check := range checks {
 		if !strings.Contains(out, check) {

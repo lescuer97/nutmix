@@ -1,8 +1,6 @@
 package admin
 
 import (
-	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -11,18 +9,13 @@ import (
 )
 
 const (
-	ldkPaymentsFilterAll         = "all"
-	ldkPaymentsFilterIncoming    = "incoming"
-	ldkPaymentsFilterOutgoing    = "outgoing"
-	ldkPaymentsShow25            = "25"
-	ldkPaymentsShow100           = "100"
-	ldkPaymentsShow150           = "150"
-	ldkPaymentsShowAll           = "all"
-	ldkPaymentsUnknownValue      = "Unavailable"
-	ldkPaymentsUnknownTime       = "Unknown"
-	ldkPaymentsCopyButtonClass   = "ldk-payment-copy-btn"
-	ldkPaymentsCopyDefaultText   = "Copy"
-	ldkPaymentsDefaultRetryQuery = "?type=all&show=25"
+	ldkPaymentsFilterAll       = "all"
+	ldkPaymentsFilterIncoming  = "incoming"
+	ldkPaymentsFilterOutgoing  = "outgoing"
+	ldkPaymentsUnknownValue    = "Unavailable"
+	ldkPaymentsUnknownTime     = "Unknown"
+	ldkPaymentsCopyButtonClass = "ldk-payment-copy-btn"
+	ldkPaymentsCopyDefaultText = "Copy"
 )
 
 type ldkPaymentsError string
@@ -33,13 +26,7 @@ func (e ldkPaymentsError) Error() string {
 
 const (
 	errInvalidPaymentsFilter ldkPaymentsError = "invalid payment filter"
-	errInvalidPaymentsShow   ldkPaymentsError = "invalid payments show"
 )
-
-type indexedPayment struct {
-	payment ldk_node.PaymentDetails
-	index   int
-}
 
 func parseLdkPaymentsFilter(raw string) (string, error) {
 	value := strings.TrimSpace(strings.ToLower(raw))
@@ -55,31 +42,7 @@ func parseLdkPaymentsFilter(raw string) (string, error) {
 	}
 }
 
-func parseLdkPaymentsShow(raw string) (string, int, error) {
-	value := strings.TrimSpace(strings.ToLower(raw))
-	if value == "" {
-		return ldkPaymentsShow25, 25, nil
-	}
-
-	switch value {
-	case ldkPaymentsShow25:
-		return value, 25, nil
-	case ldkPaymentsShow100:
-		return value, 100, nil
-	case ldkPaymentsShow150:
-		return value, 150, nil
-	case ldkPaymentsShowAll:
-		return value, -1, nil
-	default:
-		return "", 0, errInvalidPaymentsShow
-	}
-}
-
-func buildLdkPaymentsQuery(filter string, show string) string {
-	return fmt.Sprintf("?type=%s&show=%s", filter, show)
-}
-
-func prepareLdkPaymentsPage(payments []ldk_node.PaymentDetails, filter string, show string) (templates.LdkPaymentsPage, error) {
+func prepareLdkPaymentsPage(payments []ldk_node.PaymentDetails, filter string, cursor string, next string) (templates.LdkPaymentsPage, error) {
 	if filter == "" {
 		filter = ldkPaymentsFilterAll
 	}
@@ -88,83 +51,42 @@ func prepareLdkPaymentsPage(payments []ldk_node.PaymentDetails, filter string, s
 	if err != nil {
 		return templates.LdkPaymentsPage{}, err
 	}
-	selectedShow, limit, err := parseLdkPaymentsShow(show)
-	if err != nil {
-		return templates.LdkPaymentsPage{}, err
-	}
-
-	prepared := make([]indexedPayment, 0, len(payments))
-	for i, payment := range payments {
-		prepared = append(prepared, indexedPayment{payment: payment, index: i})
-	}
-
-	sort.SliceStable(prepared, func(i, j int) bool {
-		left := prepared[i]
-		right := prepared[j]
-		if left.payment.LatestUpdateTimestamp != right.payment.LatestUpdateTimestamp {
-			return left.payment.LatestUpdateTimestamp > right.payment.LatestUpdateTimestamp
-		}
-		if left.payment.Id != right.payment.Id {
-			return left.payment.Id < right.payment.Id
-		}
-		return left.index < right.index
-	})
-
-	filtered := make([]indexedPayment, 0, len(prepared))
-	for _, payment := range prepared {
-		if includeLdkPaymentDirection(payment.payment.Direction, filter) {
+	filtered := make([]ldk_node.PaymentDetails, 0, len(payments))
+	for _, payment := range payments {
+		if includeLdkPaymentDirection(payment.Direction, filter) {
 			filtered = append(filtered, payment)
 		}
 	}
 
 	pageData := templates.LdkPaymentsPage{
-		ShowOptions:           buildLdkPaymentsShowOptions(filter, selectedShow),
 		Rows:                  nil,
 		ActiveFilter:          filter,
-		SelectedShow:          selectedShow,
+		NextURL:               "",
+		FirstURL:              "",
 		EmptyMessage:          "",
 		ErrorMessage:          "",
-		RetryQuery:            ldkPaymentsDefaultRetryQuery,
+		RetryURL:              templates.LdkPaymentsURL(filter, ""),
 		CopyButtonClass:       ldkPaymentsCopyButtonClass,
 		CopyButtonDefaultText: ldkPaymentsCopyDefaultText,
-		TotalItems:            len(filtered),
-		ShowingFrom:           0,
-		ShowingTo:             0,
+	}
+	if next != "" {
+		pageData.NextURL = templates.LdkPaymentsURL(filter, next)
+	}
+	if cursor != "" {
+		pageData.FirstURL = templates.LdkPaymentsURL(filter, "")
 	}
 
 	if len(filtered) == 0 {
-		pageData.EmptyMessage = ldkPaymentsEmptyMessage(filter)
+		pageData.EmptyMessage = ldkPaymentsEmptyMessage()
 		return pageData, nil
 	}
 
-	end := len(filtered)
-	if limit > 0 && limit < end {
-		end = limit
-	}
-
-	pageData.ShowingFrom = 1
-	pageData.ShowingTo = end
-
-	pageData.Rows = make([]templates.LdkPaymentRow, 0, end)
-	for _, payment := range filtered[:end] {
-		pageData.Rows = append(pageData.Rows, mapLdkPaymentRow(payment.payment))
+	pageData.Rows = make([]templates.LdkPaymentRow, 0, len(filtered))
+	for _, payment := range filtered {
+		pageData.Rows = append(pageData.Rows, mapLdkPaymentRow(payment))
 	}
 
 	return pageData, nil
-}
-
-func buildLdkPaymentsShowOptions(filter string, selectedShow string) []templates.LdkPaymentsShowOptionData {
-	options := []templates.LdkPaymentsShowOptionData{
-		{Label: "25", Value: ldkPaymentsShow25, Query: "", Selected: false},
-		{Label: "100", Value: ldkPaymentsShow100, Query: "", Selected: false},
-		{Label: "150", Value: ldkPaymentsShow150, Query: "", Selected: false},
-		{Label: "ALL", Value: ldkPaymentsShowAll, Query: "", Selected: false},
-	}
-	for i := range options {
-		options[i].Query = buildLdkPaymentsQuery(filter, options[i].Value)
-		options[i].Selected = options[i].Value == selectedShow
-	}
-	return options
 }
 
 func includeLdkPaymentDirection(direction ldk_node.PaymentDirection, filter string) bool {
@@ -180,15 +102,8 @@ func includeLdkPaymentDirection(direction ldk_node.PaymentDirection, filter stri
 	}
 }
 
-func ldkPaymentsEmptyMessage(filter string) string {
-	switch filter {
-	case ldkPaymentsFilterIncoming:
-		return "No incoming payments found."
-	case ldkPaymentsFilterOutgoing:
-		return "No outgoing payments found."
-	default:
-		return "No payments found."
-	}
+func ldkPaymentsEmptyMessage() string {
+	return "No matching payments on this page."
 }
 
 func mapLdkPaymentRow(payment ldk_node.PaymentDetails) templates.LdkPaymentRow {
@@ -323,18 +238,15 @@ func formatLdkPaymentTimestamp(timestamp uint64) string {
 
 func newLdkPaymentsErrorPage(message string) templates.LdkPaymentsPage {
 	return templates.LdkPaymentsPage{
-		ShowOptions:           nil,
 		Rows:                  nil,
 		ActiveFilter:          "",
-		SelectedShow:          "",
+		NextURL:               "",
+		FirstURL:              "",
 		EmptyMessage:          "",
 		ErrorMessage:          message,
-		RetryQuery:            ldkPaymentsDefaultRetryQuery,
+		RetryURL:              templates.LdkPaymentsURL(ldkPaymentsFilterAll, ""),
 		CopyButtonClass:       ldkPaymentsCopyButtonClass,
 		CopyButtonDefaultText: ldkPaymentsCopyDefaultText,
-		TotalItems:            0,
-		ShowingFrom:           0,
-		ShowingTo:             0,
 	}
 }
 
@@ -342,33 +254,14 @@ func ldkPaymentsInvalidFilterPage() templates.LdkPaymentsPage {
 	return newLdkPaymentsErrorPage("Invalid payment filter")
 }
 
-func ldkPaymentsInvalidShowPage() templates.LdkPaymentsPage {
-	return newLdkPaymentsErrorPage("Invalid payments show value")
-}
-
 func ldkPaymentsLoadFailurePage() templates.LdkPaymentsPage {
 	return newLdkPaymentsErrorPage("Could not load payments")
 }
 
-func loadLdkPaymentsPage(allPayments []ldk_node.PaymentDetails, rawFilter string, rawPage string) (templates.LdkPaymentsPage, error) {
+func loadLdkPaymentsPage(payments []ldk_node.PaymentDetails, rawFilter string, cursor string, next string) (templates.LdkPaymentsPage, error) {
 	filter, err := parseLdkPaymentsFilter(rawFilter)
 	if err != nil {
 		return templates.LdkPaymentsPage{}, err
 	}
-	selectedShow, _, err := parseLdkPaymentsShow(rawPage)
-	if err != nil {
-		return templates.LdkPaymentsPage{}, err
-	}
-	return prepareLdkPaymentsPage(allPayments, filter, selectedShow)
-}
-
-func ldkPaymentsPageForError(err error) templates.LdkPaymentsPage {
-	switch err {
-	case errInvalidPaymentsFilter:
-		return ldkPaymentsInvalidFilterPage()
-	case errInvalidPaymentsShow:
-		return ldkPaymentsInvalidShowPage()
-	default:
-		return ldkPaymentsLoadFailurePage()
-	}
+	return prepareLdkPaymentsPage(payments, filter, cursor, next)
 }
