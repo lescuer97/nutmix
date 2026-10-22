@@ -299,7 +299,7 @@ func (l *LDK) SpinUp() error {
 	if err := l.node.Start(); err != nil {
 		errStop := l.node.Stop()
 		if errStop != nil {
-			return fmt.Errorf("node.Stop(): %w", errStop)
+			return errors.Join(fmt.Errorf("node.Start(): %w", err), fmt.Errorf("node.Stop(): %w", errStop))
 		}
 		return fmt.Errorf("node.Start(): %w", err)
 	}

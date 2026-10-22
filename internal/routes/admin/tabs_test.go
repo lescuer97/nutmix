@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -1168,12 +1170,24 @@ func TestBolt11PostKeepsOldBackendWhenActiveLDKReplacementAndRestoreFail(t *test
 
 func TestTransitionLightningBackendUpdatesRunningLDKWithoutRestart(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/fee-estimates" {
+		switch r.URL.Path {
+		case "/fee-estimates":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = fmt.Fprint(w, `{"1":1.0}`)
-			return
+		case "/blocks/tip/hash":
+			_, _ = fmt.Fprint(w, chaincfg.RegressionNetParams.GenesisHash.String())
+		case "/block/0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206/header":
+			var header bytes.Buffer
+			if err := chaincfg.RegressionNetParams.GenesisBlock.Header.Serialize(&header); err != nil {
+				t.Errorf("serialize regtest genesis header: %v", err)
+				return
+			}
+			_, _ = fmt.Fprint(w, hex.EncodeToString(header.Bytes()))
+		case "/block/0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206/status":
+			_, _ = fmt.Fprint(w, `{"in_best_chain":true,"height":0}`)
+		default:
+			http.NotFound(w, r)
 		}
-		http.NotFound(w, r)
 	}))
 	t.Cleanup(server.Close)
 	config, err := ldk.NewPersistedConfigWithChainSource(ldk.ChainSourceEsplora, ldk.RPCConfig{}, "", server.URL, t.TempDir())
