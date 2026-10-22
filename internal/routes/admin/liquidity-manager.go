@@ -60,7 +60,7 @@ func LnSendPage(mint *m.Mint) gin.HandlerFunc {
 			balance = strconv.FormatUint(milillisatBalance.Amount, 10)
 		}
 
-		component := templates.LnSendPage(balance, lightning.IsBackendEndOfLife(mint.LightningBackend))
+		component := templates.LnSendPage(balance, lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint), ldkAlertMessage(mint))
 
 		err = component.Render(ctx, c.Writer)
 		if err != nil {
@@ -75,7 +75,7 @@ func LnReceivePage(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		component := templates.LnReceivePage(lightning.IsBackendEndOfLife(mint.LightningBackend))
+		component := templates.LnReceivePage(lightning.IsBackendEndOfLife(mint.LightningBackend), showLDKNodeLink(mint), ldkAlertMessage(mint))
 
 		err := component.Render(ctx, c.Writer)
 		if err != nil {

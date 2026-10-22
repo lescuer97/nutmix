@@ -1,6 +1,7 @@
 package mockdb
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -16,7 +17,7 @@ func (pql *MockDB) GetConfig(tx pgx.Tx) (utils.Config, error) {
 	return pql.Config, nil
 }
 
-func (pql *MockDB) SetConfig(tx pgx.Tx, config utils.Config) error {
+func (pql *MockDB) SetConfig(ctx context.Context, tx pgx.Tx, config utils.Config) error {
 	_ = tx
 	pql.Config = config
 	return nil

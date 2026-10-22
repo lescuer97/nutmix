@@ -59,7 +59,7 @@ func TestSetUpConfigDBCreatesNostrNotificationNsecOnInitialBootstrap(t *testing.
 		t.Fatalf("os.MkdirAll(configDir, 0750): %v", err)
 	}
 
-	configFilePath := filepath.Join(configDir, ConfigFileName)
+	configFilePath := filepath.Join(configDir, utils.ConfigFileName)
 	configFile := []byte("NETWORK = \"mainnet\"\nMINT_LIGHTNING_BACKEND = \"FakeWallet\"\nNOSTR_NOTIFICATIONS = true\n")
 	if err := os.WriteFile(configFilePath, configFile, 0o600); err != nil {
 		t.Fatalf("os.WriteFile(configFilePath, configFile, 0600): %v", err)

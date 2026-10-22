@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
+	"testing"
+	"time"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
@@ -32,7 +32,10 @@ const (
 
 // This is used for testing purpose
 // returns alice, bob, btcNode, aliceLnBits, error
-func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (testcontainers.Container, testcontainers.Container, testcontainers.Container, testcontainers.Container, error) {
+func SetUpLightingNetworkTestEnviroment(t *testing.T, ctx context.Context) (testcontainers.Container, testcontainers.Container, testcontainers.Container, testcontainers.Container, error) {
+	t.Helper()
+	cleanupCtx := context.WithoutCancel(ctx)
+
 	// setup
 	net, err := network.New(ctx,
 		network.WithAttachable(),
@@ -47,11 +50,13 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		// log.Fatalln("Error: ", err)
 		return nil, nil, nil, nil, fmt.Errorf("could not setup network: %w", err)
 	}
+	t.Cleanup(func() {
+		_ = net.Remove(cleanupCtx)
+	})
 
 	// Create bitcoind regtest node
 	reqbtcd := testcontainers.ContainerRequest{ //nolint:exhaustruct
 		Image:        "polarlightning/bitcoind:29.0",
-		Name:         "bitcoindbackend" + names,
 		WaitingFor:   wait.ForLog("Initialized HTTP server"),
 		ExposedPorts: []string{"18443/tcp", "18444/tcp", "28334/tcp", "28335/tcp", "28336/tcp"},
 		Networks:     []string{net.Name},
@@ -62,11 +67,13 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	btcdC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct
 		ContainerRequest: reqbtcd,
 		Started:          true,
-		Reuse:            true,
 	})
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not setup bitcoind %w", err)
 	}
+	t.Cleanup(func() {
+		_ = btcdC.Terminate(cleanupCtx)
+	})
 
 	btcdIP, err := btcdC.ContainerIP(ctx)
 
@@ -88,46 +95,40 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	// create Alice node LND
 	reqlndAlice := testcontainers.ContainerRequest{ //nolint:exhaustruct
 		Image:        "polarlightning/lnd:0.19.2-beta",
-		WaitingFor:   wait.ForLog("Server listening on").AsRegexp(),
+		WaitingFor:   wait.ForLog("(RPC server listening on|Server listening on)").AsRegexp(),
 		ExposedPorts: []string{"18445/tcp", "10009/tcp", "8080/tcp", "9735/tcp"},
-		Name:         "lndAlice" + names,
 		Networks:     []string{net.Name},
 		Cmd:          []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=alice" /* "--externalip=alice", */, "--tlsextradomain=alice", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9735", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8080", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
 	}
 
 	lndAliceC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct
 		ContainerRequest: reqlndAlice,
-		Reuse:            true,
 		Started:          true,
 	})
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not create Alice lnd container  %w", err)
 	}
+	t.Cleanup(func() {
+		_ = lndAliceC.Terminate(cleanupCtx)
+	})
 
-	_, addressReader, err := lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "newaddress", "p2tr"})
+	newAddressCmd := []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "newaddress", "p2tr"}
+	err = execContainerCommandWithRetry(ctx, lndAliceC, newAddressCmd)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not execute newaddress command: %w", err)
 	}
-
-	buf := make([]byte, 1024)
+	addressOutput, err := execContainerCommand(ctx, lndAliceC, newAddressCmd)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not read newaddress command output: %w", err)
+	}
 
 	type LndAddress struct {
 		Address string `json:"address"`
 	}
 
 	var address LndAddress
-	for {
-		n, err := addressReader.Read(buf)
-		if n > 0 {
-			index := strings.Index(string(buf[:n]), "{")
-			err := json.Unmarshal(buf[index:n], &address)
-			if err != nil {
-				log.Fatalln("json.Unmarshal: ", err)
-			}
-		}
-		if err != nil {
-			break
-		}
+	if err := unmarshalContainerJSONOutput(addressOutput, &address); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not parse newaddress output: %w", err)
 	}
 
 	// fund Alice node
@@ -143,7 +144,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		return nil, nil, nil, nil, fmt.Errorf("could not create blocks  %w", err)
 	}
 
-	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "listunspent"})
+	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "listunspent"})
 
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not check balance  %w ", err)
@@ -153,22 +154,22 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	reqLndBob := testcontainers.ContainerRequest{ //nolint:exhaustruct
 		Image:        "polarlightning/lnd:0.19.2-beta",
-		WaitingFor:   wait.ForLog("Server listening on").AsRegexp(),
+		WaitingFor:   wait.ForLog("(RPC server listening on|Server listening on)").AsRegexp(),
 		ExposedPorts: []string{"18446/tcp", "9736/tcp", "10009/tcp", "8081/tcp"},
-		Name:         "lndBob" + names,
-
-		Networks: []string{net.Name},
-		Cmd:      []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=bob" /* "--externalip=alice", */, "--tlsextradomain=bob", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9736", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8081", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
+		Networks:     []string{net.Name},
+		Cmd:          []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=bob" /* "--externalip=alice", */, "--tlsextradomain=bob", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9736", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8081", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
 	}
 
 	LndBobC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct
 		ContainerRequest: reqLndBob,
 		Started:          true,
-		Reuse:            true,
 	})
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not create Bob lnd container: %w", err)
 	}
+	t.Cleanup(func() {
+		_ = LndBobC.Terminate(cleanupCtx)
+	})
 
 	lndBobIp, err := LndBobC.ContainerIP(ctx)
 
@@ -176,12 +177,15 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		return nil, nil, nil, nil, fmt.Errorf("could not get lndAliceC.ContainerIP %w", err)
 	}
 
-	_, getInfoBobReader, err := LndBobC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "getinfo"})
+	getInfoBobCmd := []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "getinfo"}
+	err = execContainerCommandWithRetry(ctx, LndBobC, getInfoBobCmd)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
 	}
-
-	buf = make([]byte, 3024)
+	getInfoBobOutput, err := execContainerCommand(ctx, LndBobC, getInfoBobCmd)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not read nodeInfo output  %w ", err)
+	}
 
 	type NodeInfo struct {
 		IdentityPubkey      string `json:"identity_pubkey"`
@@ -192,30 +196,20 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	}
 
 	var bobInfo NodeInfo
-	for {
-		n, err := getInfoBobReader.Read(buf)
-		if n > 0 {
-			index := strings.Index(string(buf[:n]), "{")
-			err := json.Unmarshal(buf[index:n], &bobInfo)
-			if err != nil {
-				log.Fatalln("json.Unmarshal: ", err)
-			}
-		}
-		if err != nil {
-			break
-		}
+	if err := unmarshalContainerJSONOutput(getInfoBobOutput, &bobInfo); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not parse nodeInfo output: %w", err)
 	}
 
 	// peer connect between Alice and Bob
 	connectionStr := bobInfo.IdentityPubkey + "@" + lndBobIp + ":" + "9736"
-	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "connect", connectionStr})
+	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "connect", connectionStr})
 
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
 	}
 
 	// open channel between Alice and Bob
-	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "openchannel", "--node_key", bobInfo.IdentityPubkey, "--fundmax", "--push_amt", "10000000"})
+	_, _, err = lndAliceC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "openchannel", "--node_key", bobInfo.IdentityPubkey, "--fundmax", "--push_amt", "10000000"})
 
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
@@ -227,30 +221,24 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		return nil, nil, nil, nil, fmt.Errorf("could not create blocks  %w", err)
 	}
 
-	// Get info of bob
-	_, getInfoBobReaderTwo, err := LndBobC.Exec(ctx, []string{"lncli", "--tlscertpath", "/home/lnd/.lnd/tls.cert", "--macaroonpath", "home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon", "getinfo"})
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not get nodeInfo  %w ", err)
-	}
-
-	buf = make([]byte, 3024)
+	deadline := time.Now().Add(30 * time.Second)
 	var bobInfoTwo NodeInfo
-	for {
-		n, err := getInfoBobReaderTwo.Read(buf)
-		if n > 0 {
-			index := strings.Index(string(buf[:n]), "{")
-			err := json.Unmarshal(buf[index:n], &bobInfoTwo)
-			if err != nil {
-				log.Fatalln("json.Unmarshal: ", err)
+	for time.Now().Before(deadline) {
+		err = execContainerCommandWithRetry(ctx, LndBobC, getInfoBobCmd)
+		if err == nil {
+			getInfoBobOutputTwo, readErr := execContainerCommand(ctx, LndBobC, getInfoBobCmd)
+			if readErr == nil {
+				parseErr := unmarshalContainerJSONOutput(getInfoBobOutputTwo, &bobInfoTwo)
+				if parseErr == nil && (bobInfoTwo.NumPendingChannels > 0 || bobInfoTwo.NumActiveChannels > 0) {
+					break
+				}
 			}
 		}
-		if err != nil {
-			break
-		}
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	if bobInfoTwo.NumActiveChannels == 0 {
-		return nil, nil, nil, nil, fmt.Errorf("could not open channel  %w", err)
+	if bobInfoTwo.NumPendingChannels == 0 && bobInfoTwo.NumActiveChannels == 0 {
+		return nil, nil, nil, nil, fmt.Errorf("timed out waiting for channel open to be observed")
 	}
 	// connect mint to Alice
 	macaroon, err := ExtractInternalFile(ctx, lndAliceC, "/home/lnd/.lnd/data/chain/bitcoin/regtest/admin.macaroon")
@@ -277,18 +265,9 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	tlsCertPath := "/.lnd/tls.cert"
 
-	err = os.Setenv(LND_HOST, lndAliceIp+":"+alicePort)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not set env LND_HOST: %w", err)
-	}
-	err = os.Setenv(LND_TLS_CERT, tlsCert)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not set env LND_TLS_CERT: %w", err)
-	}
-	err = os.Setenv(LND_MACAROON, macaroonHex)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not set env LND_MACAROON: %w", err)
-	}
+	t.Setenv(LND_HOST, lndAliceIp+":"+alicePort)
+	t.Setenv(LND_TLS_CERT, tlsCert)
+	t.Setenv(LND_MACAROON, macaroonHex)
 
 	aliceLnbitsEnvVariables := make(map[string]string)
 
@@ -315,7 +294,6 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 			},
 		},
 		ExposedPorts: []string{"5000/tcp"},
-		Name:         "aliceLNBITS" + names,
 		Env:          aliceLnbitsEnvVariables,
 		Networks:     []string{net.Name},
 	}
@@ -323,20 +301,18 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	aliceLnbitsC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct
 		ContainerRequest: aliceLnbitsContainerReq,
 		Started:          true,
-		Reuse:            true,
 	})
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get aliceLnbitsC %w", err)
 	}
+	t.Cleanup(func() {
+		_ = aliceLnbitsC.Terminate(cleanupCtx)
+	})
 
 	if err := aliceLnbitsC.CopyToContainer(ctx, []byte(tlsCert), tlsCertPath, 0o700); err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not copy to container %w", err)
 	}
 
-	aliceLnbitsIp, err := aliceLnbitsC.ContainerIP(ctx)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not get aliceLnbitsC.ContainerIP %w", err)
-	}
 	mappedPort, err := aliceLnbitsC.MappedPort(ctx, "5000")
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not get mapped port: %w", err)
@@ -391,6 +367,9 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("ioutil.ReadAll: %w", err)
 	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, nil, nil, nil, fmt.Errorf("LNbits first install returned %s: %s", resp.Status, string(body))
+	}
 	var response struct {
 		AccessToken string `json:"access_token"`
 	}
@@ -401,21 +380,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		return nil, nil, nil, nil, fmt.Errorf("json.Unmarshal: %w", err)
 	}
 
-	// get auth settings
-	authBody := struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}{
-		Username: "admin",
-		Password: "password",
-	}
-
-	_, err = json.Marshal(authBody)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("json.Marshal: %w", err)
-	}
-
-	walletsRequest, err := http.NewRequest("GET", "http://"+aliceLnbitsIp+":5000/api/v1/wallets", nil)
+	walletsRequest, err := http.NewRequest("GET", baseURL+"/api/v1/wallets", nil)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could not make request %w", err)
 	}
@@ -445,6 +410,9 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("ioutil.ReadAll: %w", err)
 	}
+	if respWallet.StatusCode < http.StatusOK || respWallet.StatusCode >= http.StatusMultipleChoices {
+		return nil, nil, nil, nil, fmt.Errorf("LNbits wallet list returned %s: %s", respWallet.Status, string(body))
+	}
 	var responseWallet []struct {
 		AdminKey string `json:"adminkey"`
 	}
@@ -459,14 +427,8 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		return nil, nil, nil, nil, fmt.Errorf("no wallet found")
 	}
 
-	err = os.Setenv(MINT_LNBITS_KEY, responseWallet[0].AdminKey)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not set env MINT_LNBITS_KEY: %w", err)
-	}
-	err = os.Setenv(MINT_LNBITS_ENDPOINT, "http://"+aliceLnbitsIp+":5000")
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not set env MINT_LNBITS_ENDPOINT: %w", err)
-	}
+	t.Setenv(MINT_LNBITS_KEY, responseWallet[0].AdminKey)
+	t.Setenv(MINT_LNBITS_ENDPOINT, baseURL)
 
 	// generate wallet
 
@@ -514,4 +476,17 @@ func ReadDataFromReader(reader io.Reader) (string, error) {
 	}
 
 	return data, nil
+}
+
+func unmarshalContainerJSONOutput(output string, dst any) error {
+	jsonStart := strings.IndexByte(output, '{')
+	if jsonStart == -1 {
+		return fmt.Errorf("output did not contain json: %s", strings.TrimSpace(output))
+	}
+
+	if err := json.Unmarshal([]byte(output[jsonStart:]), dst); err != nil {
+		return fmt.Errorf("json.Unmarshal(...): %w", err)
+	}
+
+	return nil
 }

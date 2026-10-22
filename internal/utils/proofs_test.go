@@ -38,6 +38,16 @@ func TestParseErrorUnitMismatchCodes(t *testing.T) {
 	}
 }
 
+func TestParseMeltingDisabledError(t *testing.T) {
+	code, detail := ParseErrorToCashuErrorCode(fmt.Errorf("wrapped: %w", cashu.ErrMeltingDisabled))
+	if code != cashu.LIGHTNING_PAYMENT_FAILED {
+		t.Fatalf("code = %d, want %d", code, cashu.LIGHTNING_PAYMENT_FAILED)
+	}
+	if detail == nil || *detail != "melting is temporarily disabled" {
+		t.Fatalf("detail = %v, want melting is temporarily disabled", detail)
+	}
+}
+
 func setListofEmptyBlindMessages(amounts int) []cashu.BlindedMessage {
 	var messages []cashu.BlindedMessage
 	for i := 0; i < amounts; i++ {

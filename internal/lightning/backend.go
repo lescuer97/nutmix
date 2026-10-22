@@ -25,6 +25,7 @@ const FAKEWALLET Backend = iota + 4
 
 // Deprecated: Strike backend will be removed in v0.7.0.
 const STRIKE Backend = iota + 5
+const LDKNODE Backend = iota + 6
 
 // Check what is the current status of a node.
 type NodeStatus string
@@ -79,6 +80,7 @@ type PaymentResponse struct {
 	PaymentState   PaymentStatus
 	PaidFee        cashu.Amount
 }
+
 type FeesResponse struct {
 	CheckingId   string
 	Fees         cashu.Amount

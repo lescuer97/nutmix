@@ -8,7 +8,7 @@ BUILD_DIR := "build"
 RUN_ARGS := ""  # Additional arguments for running the app locally
 RELEASE_DIR := "release"
 
-PLATFORMS := "linux/amd64 linux/arm64 darwin/arm64"
+PLATFORMS := "linux/amd64"
 # Read current version from VERSION file
 MODULE := "github.com/lescuer97/nutmix"
 VERSION := `cat VERSION 2>/dev/null || echo "0.0.0"`
@@ -29,7 +29,7 @@ run: build
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running {{APP_NAME}} v{{VERSION}} locally..."
-    ./{{BUILD_DIR}}/{{APP_NAME}} {{RUN_ARGS}}
+     ./{{BUILD_DIR}}/{{APP_NAME}} {{RUN_ARGS}}
 
 # Run recipe with local dev enviroment
 run-dev: build-dev
@@ -44,7 +44,8 @@ build: gen-proto gen-templ web-build-prod
     set -euo pipefail
     echo "Building {{APP_NAME}} v{{VERSION}}..."
     mkdir -p {{BUILD_DIR}}
-    go build -ldflags="-s -w \
+
+    CGO_ENABLED=1   go build -ldflags="-s -w \
         -X '{{MODULE}}/internal/utils.AppVersion={{VERSION}}' \
         -X '{{MODULE}}/internal/utils.BuildTime={{BUILD_TIME}}' \
         -X '{{MODULE}}/internal/utils.GitCommit={{COMMIT_HASH}}'" \
@@ -164,11 +165,19 @@ gen-test-keys:
     echo "MINT_PRIVATE_KEY=$(openssl rand -hex 32)"
 
 # Test recipe
-test:
+# Examples:
+#   just test
+#   just test ./internal/utils/...
+#   just test ./internal/utils/... -run TestCheckChainParams
+test *args:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running tests..."
-    go test -v ./...
+    if [ -z "{{args}}" ]; then
+        CGO_ENABLED=1 go test -v ./...
+    else
+        CGO_ENABLED=1 go test -v {{args}}
+    fi
 
 # Lint prerequisites
 ensure-golangci-lint:
@@ -184,7 +193,7 @@ lint *flags: ensure-golangci-lint
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running linter..."
-    golangci-lint run {{flags}}
+    GOTOOLCHAIN=go1.26.7 golangci-lint run {{flags}}
 
 # Clean recipe
 clean:

@@ -24,6 +24,11 @@ type quoteAmountBackend struct {
 	feesResponse lightning.FeesResponse
 }
 
+type meltingDisabledBackend struct {
+	lightning.FakeWallet
+	checkPayedCalls atomic.Int32
+}
+
 type firstCallBlockingSigner struct {
 	signer.Signer
 	started chan struct{}
@@ -41,6 +46,15 @@ func (s *firstCallBlockingSigner) SignBlindMessages(messages []cashu.BlindedMess
 
 func (b quoteAmountBackend) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (lightning.FeesResponse, error) {
 	return b.feesResponse, nil
+}
+
+func (b *meltingDisabledBackend) PayInvoice(cashu.MeltRequestDB, *zpay32.Invoice, cashu.Amount, bool, cashu.Amount) (lightning.PaymentResponse, error) {
+	return lightning.PaymentResponse{}, cashu.ErrMeltingDisabled
+}
+
+func (b *meltingDisabledBackend) CheckPayed(string, *zpay32.Invoice, string) (lightning.PaymentStatus, string, cashu.Amount, error) {
+	b.checkPayedCalls.Add(1)
+	return lightning.PENDING, "", cashu.NewAmount(cashu.Sat, 0), nil
 }
 
 func createMintTestBlindedMessagesWithSecrets(t *testing.T, amount uint64, activeKeys signer.GetKeysResponse) (cashu.BlindedMessages, []string, []*secp256k1.PrivateKey) {
@@ -730,6 +744,90 @@ func TestExecuteMeltRejectsStrikeBeforeReservingInputs(t *testing.T) {
 	}
 	if len(savedProofs) != 0 {
 		t.Fatalf("expected no reserved proofs, got %d", len(savedProofs))
+	}
+}
+
+func TestExecuteMeltReleasesInputsWhenMeltingDisabled(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	mint := SetupMintWithLightningMockPostgres(t)
+	ctx := context.Background()
+	activeKeys, err := mint.Signer.GetActiveKeys()
+	if err != nil {
+		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
+	}
+	quote := cashu.MeltRequestDB{ //nolint:exhaustruct // Only persisted rejection fields are relevant.
+		Amount: 2, Quote: "melting-disabled-melt", Request: RegtestRequest,
+		Unit: cashu.Sat.String(), Expiry: time.Now().Add(time.Minute).Unix(),
+		FeeReserve: 1, State: cashu.UNPAID, CheckingId: "original-checking-id",
+	}
+	tx, err := mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx: %v", err)
+	}
+	if err := mint.MintDB.SaveMeltRequest(tx, quote); err != nil {
+		t.Fatalf("mint.MintDB.SaveMeltRequest: %v", err)
+	}
+	if err := mint.MintDB.Commit(ctx, tx); err != nil {
+		t.Fatalf("mint.MintDB.Commit: %v", err)
+	}
+
+	request := cashu.PostMeltBolt11Request{
+		Quote:   quote.Quote,
+		Inputs:  createSpendableProofs(t, mint, activeKeys),
+		Outputs: createMintTestBlindedMessages(t, 1, activeKeys),
+	}
+	backend := &meltingDisabledBackend{FakeWallet: lightning.FakeWallet{
+		NodeStatus:      lightning.ONLINE_STATUS,
+		UnpurposeErrors: []lightning.FakeWalletError{},
+		Network:         *mint.LightningBackend.GetNetwork(),
+		InvoiceFee:      0,
+	}}
+	mint.LightningBackend = backend
+
+	_, err = mint.ExecuteMelt(ctx, request, Bolt11)
+	if !errors.Is(err, cashu.ErrMeltingDisabled) {
+		t.Fatalf("ExecuteMelt error = %v, want ErrMeltingDisabled", err)
+	}
+	if calls := backend.checkPayedCalls.Load(); calls != 0 {
+		t.Fatalf("CheckPayed calls = %d, want 0", calls)
+	}
+
+	tx, err = mint.MintDB.GetTx(ctx)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetTx: %v", err)
+	}
+	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, quote.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltRequestById: %v", err)
+	}
+	if savedQuote.State != cashu.UNPAID || savedQuote.CheckingId != quote.CheckingId {
+		t.Fatalf("melt quote was not restored: %+v", savedQuote)
+	}
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, quote.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetProofsFromQuote: %v", err)
+	}
+	if len(savedProofs) != 0 {
+		t.Fatalf("reserved proofs = %d, want 0", len(savedProofs))
+	}
+	savedChange, err := mint.MintDB.GetMeltChangeByQuote(tx, quote.Quote)
+	if err != nil {
+		t.Fatalf("mint.MintDB.GetMeltChangeByQuote: %v", err)
+	}
+	if len(savedChange) != 0 {
+		t.Fatalf("saved change outputs = %d, want 0", len(savedChange))
+	}
+	if err := mint.MintDB.Commit(ctx, tx); err != nil {
+		t.Fatalf("mint.MintDB.Commit: %v", err)
+	}
+
+	mint.LightningBackend = backend.FakeWallet
+	response, err := mint.ExecuteMelt(ctx, request, Bolt11)
+	if err != nil {
+		t.Fatalf("retry ExecuteMelt: %v", err)
+	}
+	if response.State != cashu.PAID {
+		t.Fatalf("retry state = %s, want %s", response.State, cashu.PAID)
 	}
 }
 

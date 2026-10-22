@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -33,6 +34,7 @@ const sessionTTL = time.Hour
 
 func handleUnauthorized(c *gin.Context, secure bool) {
 	slog.Debug("Handling unauthorized request", slog.String("path", c.Request.URL.Path), slog.String("method", c.Request.Method))
+	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie(AdminAuthKey, "", -1, "/", "", secure, true)
 	if c.GetHeader("HX-Request") == "true" {
 		c.Header("HX-Redirect", "/admin/login")
@@ -41,6 +43,30 @@ func handleUnauthorized(c *gin.Context, secure bool) {
 		c.Redirect(http.StatusFound, "/admin/login")
 	}
 	c.Abort()
+}
+
+func adminSameOriginMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		switch c.Request.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			c.Next()
+			return
+		}
+
+		// Login is authorized by a signed, single-use Nostr challenge, not the admin cookie.
+		if c.Request.URL.Path == "/admin/login" {
+			c.Next()
+			return
+		}
+
+		origin, err := url.Parse(c.GetHeader("Origin"))
+		if err != nil || origin.Scheme == "" || origin.Host != c.Request.Host {
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+
+		c.Next()
+	}
 }
 
 func AuthMiddleware(secret []byte, blacklist *TokenBlacklist, secure bool) gin.HandlerFunc {
@@ -226,6 +252,7 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 			return
 		}
 
+		c.SetSameSite(http.SameSiteStrictMode)
 		c.SetCookie(AdminAuthKey, token, int(sessionTTL.Seconds()), "/", "", secure, true)
 		c.Header("HX-Redirect", "/admin")
 		c.JSON(200, nil)

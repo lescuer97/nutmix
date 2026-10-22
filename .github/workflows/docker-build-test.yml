@@ -24,13 +24,11 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          load: true
           platforms: linux/amd64
           tags: nutmix:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Verify build succeeded
-        run: |
-          echo "Docker build completed successfully"
-          docker images nutmix:test
-
+      - name: Verify runtime dependencies
+        run: docker run --rm --entrypoint /lib64/ld-linux-x86-64.so.2 nutmix:test --list /app/main

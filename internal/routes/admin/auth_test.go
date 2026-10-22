@@ -139,5 +139,48 @@ func TestHandleUnauthorizedSecureCookieFlag(t *testing.T) {
 		if hasSecure != secure {
 			t.Errorf("secure=%v: Set-Cookie %q has Secure=%v", secure, setCookie, hasSecure)
 		}
+		cookies := w.Result().Cookies()
+		if len(cookies) != 1 || cookies[0].SameSite != http.SameSiteStrictMode {
+			t.Errorf("secure=%v: expected SameSite=Strict, got %+v", secure, cookies)
+		}
+	}
+}
+
+func TestAdminSameOriginMiddleware(t *testing.T) {
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		origin     string
+		wantStatus int
+	}{
+		{name: "same origin", method: http.MethodPost, path: "/admin/protected", origin: "http://example.com", wantStatus: http.StatusOK},
+		{name: "cross origin", method: http.MethodPost, path: "/admin/protected", origin: "http://attacker.example", wantStatus: http.StatusForbidden},
+		{name: "missing origin", method: http.MethodPost, path: "/admin/protected", wantStatus: http.StatusForbidden},
+		{name: "malformed origin", method: http.MethodPost, path: "/admin/protected", origin: "://bad", wantStatus: http.StatusForbidden},
+		{name: "null origin", method: http.MethodPost, path: "/admin/protected", origin: "null", wantStatus: http.StatusForbidden},
+		{name: "safe method", method: http.MethodGet, path: "/admin/protected", wantStatus: http.StatusOK},
+		{name: "login", method: http.MethodPost, path: "/admin/login", wantStatus: http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := gin.New()
+			r.Use(adminSameOriginMiddleware())
+			r.Any(tt.path, func(c *gin.Context) {
+				c.Status(http.StatusOK)
+			})
+
+			req := httptest.NewRequest(tt.method, "http://example.com"+tt.path, nil)
+			if tt.origin != "" {
+				req.Header.Set("Origin", tt.origin)
+			}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", w.Code, tt.wantStatus)
+			}
+		})
 	}
 }

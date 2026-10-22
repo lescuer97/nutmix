@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/database/postgresql"
+	"github.com/lescuer97/nutmix/internal/lightning/ldk"
 	"github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/routes"
 	"github.com/lescuer97/nutmix/internal/routes/admin"
@@ -40,22 +42,29 @@ var (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Printf("nutmix stopped: %v", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	logsdir, err := utils.GetLogsDirectory()
 	if err != nil {
-		log.Panicln("Could not get Logs directory")
+		return fmt.Errorf("get logs directory: %w", err)
 	}
 
-	err = utils.CreateDirectoryAndPath(logsdir, mint.LogFileName)
+	err = utils.CreateDirectoryAndPath(logsdir, utils.LogFileName)
 	if err != nil {
-		log.Panicf("utils.CreateDirectoryAndPath(pathToProjectDir, logFileName ) %+v", err)
+		return fmt.Errorf("create log directory and file: %w", err)
 	}
 
-	pathToConfigFile := logsdir + "/" + mint.LogFileName
+	pathToConfigFile := logsdir + "/" + utils.LogFileName
 
 	// Manipulate Config file
 	logFile, err := os.OpenFile(pathToConfigFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
-		log.Panicf("os.OpenFile(pathToProjectLogFile, os.O_RDWR|os.O_CREATE, 0764) %+v", err)
+		return fmt.Errorf("open log file: %w", err)
 	}
 	defer func() {
 		err := logFile.Close()
@@ -91,28 +100,48 @@ func main() {
 
 	db, err := postgresql.DatabaseSetup(startupCtx, "migrations")
 	if err != nil {
-		slog.Error("Error conecting to db", slog.Any("error", err))
-		log.Panic()
+		return fmt.Errorf("set up database: %w", err)
 	}
 	defer db.Close()
 
 	config, nostrNotificationConfig, err := mint.SetUpConfigDB(startupCtx, db)
 	if err != nil {
-		log.Fatalf("mint.SetUpConfigDB(ctx, db): %+v ", err)
+		return fmt.Errorf("set up mint config: %w", err)
 	}
 
 	signer, err := GetSignerFromValue(os.Getenv("SIGNER_TYPE"), db)
 	if err != nil {
-		log.Fatalf("signer.GetSignerFromValue(os.Getenv(), db): %+v ", err)
+		return fmt.Errorf("set up signer: %w", err)
 	}
 
 	// remove mint private key from variable
 	mint, err := mint.SetUpMint(startupCtx, config, nostrNotificationConfig, db, signer)
 
 	if err != nil {
-		slog.Warn("SetUpMint", slog.Any("error", err))
-		return
+		return fmt.Errorf("set up mint: %w", err)
 	}
+
+	var srv *http.Server
+	var statsWG sync.WaitGroup
+	var shutdownOnce sync.Once
+	shutdown := func() {
+		shutdownOnce.Do(func() {
+			slog.Info("shutdown started")
+
+			// Stop background work before its database dependency is closed.
+			stop()
+
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutdownCancel()
+
+			if err := shutdownServerAndBackend(shutdownCtx, srv, mint); err != nil {
+				slog.Warn("shutdown finished with errors", slog.Any("error", err))
+			}
+
+			statsWG.Wait()
+		})
+	}
+	defer shutdown()
 
 	logger := slog.New(admin.NewNostrErrorNotifyHandler(baseJSONHandler, mint))
 	slog.SetDefault(logger)
@@ -136,8 +165,7 @@ func main() {
 
 	err = mint.ReconcilePendingMeltQuotes()
 	if err != nil {
-		slog.Error("SetUpMint", slog.Any("error", err))
-		return
+		return fmt.Errorf("reconcile pending melt quotes: %w", err)
 	}
 
 	statsService := stats.Service{
@@ -156,8 +184,6 @@ func main() {
 			return uint64(invoice.MilliSat.ToSatoshis()), nil
 		},
 	}
-	go statsService.Run(appCtx, 15*time.Minute)
-
 	routes.V1Routes(r, mint)
 
 	// Admin session cookies are Secure by default; ADMIN_INSECURE_COOKIE=true
@@ -169,37 +195,78 @@ func main() {
 	if PORTStr != "" {
 		portInt, err := strconv.ParseUint(PORTStr, 10, 64)
 		if err != nil {
-			slog.Error("Your picked port is not correct", slog.Any("error", err))
-			return
+			return fmt.Errorf("parse port: %w", err)
 		}
 		PORT = fmt.Sprintf(":%v", portInt)
 	}
 
 	slog.Info("Nutmix started in port", slog.String("port", PORT))
 
-	// Define a custom http.Server
-	srv := new(http.Server)
-	srv.Addr = PORT
-	srv.Handler = r
-	srv.ReadTimeout = 3 * time.Second
-	srv.WriteTimeout = 4 * time.Second
-	srv.IdleTimeout = 3 * time.Minute
+	srv = &http.Server{ //nolint:exhaustruct // zero values are fine for the remaining server fields
+		Addr:         PORT,
+		Handler:      r,
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 4 * time.Second,
+		IdleTimeout:  3 * time.Minute,
+	}
+
+	statsWG.Add(1)
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server failed", slog.Any("error", err))
-			os.Exit(1)
-		}
+		defer statsWG.Done()
+		statsService.Run(appCtx, 15*time.Minute)
 	}()
 
-	<-appCtx.Done()
-	slog.Info("Shutting down server...")
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		slog.Error("server forced to shutdown", slog.Any("error", err))
+	go func() {
+		<-appCtx.Done()
+		shutdown()
+	}()
+	// Start the server
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("server failed: %w", err)
 	}
+
+	return nil
+}
+
+func shutdownServerAndBackend(ctx context.Context, srv *http.Server, mintInstance *mint.Mint) error {
+	var shutdownErr error
+
+	if srv != nil {
+		slog.Info("shutting down http server")
+		if err := srv.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
+			shutdownErr = err
+		}
+	}
+
+	if err := stopLDKBackend(ctx, mintInstance); err != nil {
+		if shutdownErr != nil {
+			shutdownErr = fmt.Errorf("http shutdown: %w; ldk shutdown: %w", shutdownErr, err)
+		} else {
+			shutdownErr = err
+		}
+		return shutdownErr
+	}
+
+	slog.Info("shutdown complete")
+	return shutdownErr
+}
+
+func stopLDKBackend(ctx context.Context, mintInstance *mint.Mint) error {
+	if mintInstance == nil {
+		return nil
+	}
+
+	ldkBackend, ok := mintInstance.LightningBackend.(*ldk.LDK)
+	if !ok {
+		return nil
+	}
+
+	slog.Info("stopping ldk backend")
+	if err := ldkBackend.Stop(ctx, ldk.StopImmediately); err != nil {
+		return fmt.Errorf("failed to stop ldk backend: %w", err)
+	}
+
+	return nil
 }
 
 const MemorySigner = "memory"
