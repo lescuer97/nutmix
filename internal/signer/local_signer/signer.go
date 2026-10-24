@@ -281,7 +281,7 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 			return nil, nil, cashu.ErrInvalidBlindMessage
 		}
 
-		keysetsByAmount, exists := l.activeKeysets[output.Id]
+		keysetsByAmount, exists := l.keysets[output.Id]
 		if !exists {
 			return nil, nil, cashu.ErrKeysetNotKnow
 		}
