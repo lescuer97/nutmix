@@ -284,12 +284,13 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 	recoverySigs := []cashu.RecoverSigDB{}
 	now := time.Now().Unix()
 	// make recovery signatures
-	for i, val := range blindSigs {
+	for i, message := range messages {
+		val := blindSigs[i]
 		recoverySigs = append(recoverySigs, cashu.RecoverSigDB{
 			Amount:    val.Amount,
 			Id:        val.Id,
 			C_:        val.C_,
-			B_:        messages[i].B_,
+			B_:        message.B_,
 			CreatedAt: now,
 			Dleq:      val.Dleq,
 			MeltQuote: "",

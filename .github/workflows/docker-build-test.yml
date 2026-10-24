@@ -24,6 +24,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          load: true
+          pull: true
           platforms: linux/amd64
           tags: nutmix:test
           cache-from: type=gha
@@ -33,4 +35,3 @@ jobs:
         run: |
           echo "Docker build completed successfully"
           docker images nutmix:test
-
