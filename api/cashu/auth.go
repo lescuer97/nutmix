@@ -80,7 +80,7 @@ type Nut22Info struct {
 }
 
 func ConvertRouteListToProtectedRouteList(list []string) []ProtectedRoute {
-	routes := []ProtectedRoute{}
+	routes := make([]ProtectedRoute, 0, 2*len(list))
 
 	for _, v := range list {
 		routes = append(routes, ProtectedRoute{

@@ -5,8 +5,31 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
+
+func TestGetFeatureBits(t *testing.T) {
+	for _, bits := range [][]lnwire.FeatureBit{
+		{},
+		{lnwire.TLVOnionPayloadOptional},
+		{lnwire.TLVOnionPayloadOptional, lnwire.PaymentAddrOptional},
+	} {
+		features := lnwire.NewFeatureVector(lnwire.NewRawFeatureVector(bits...), lnwire.Features)
+		got := getFeatureBits(features)
+		if len(got) != len(bits) {
+			t.Fatalf("getFeatureBits(%v) returned %d entries, want %d", bits, len(got), len(bits))
+		}
+		seen := make(map[lnwire.FeatureBit]bool, len(bits))
+		for _, bit := range got {
+			feature := lnwire.FeatureBit(bit)
+			if !features.IsSet(feature) || seen[feature] {
+				t.Errorf("unexpected or duplicate feature bit: %v", bit)
+			}
+			seen[feature] = true
+		}
+	}
+}
 
 func TestUseMinimumFeeOnInvoice(t *testing.T) {
 	chainParam := chaincfg.MainNetParams
