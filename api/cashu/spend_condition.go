@@ -116,7 +116,7 @@ func (sc *SpendCondition) CheckValid() error {
 		}
 	}
 
-	if len(sc.Data.Tags.Refund) > 0 && sc.Data.Tags.NSigRefund > uint(len(sc.Data.Tags.Refund)) {
+	if sc.Data.Tags.NSigRefund > uint(len(sc.Data.Tags.Refund)) {
 		return fmt.Errorf("n_sigs_refund exceeds available refund pubkeys: %w", ErrInvalidSpendCondition)
 	}
 
@@ -313,6 +313,9 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 			if err != nil {
 				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
 			}
+			if nSigs == 0 {
+				return fmt.Errorf("n_sigs must be positive: %w", ErrInvalidSpendCondition)
+			}
 
 			tags.NSigs = uint(nSigs)
 
@@ -324,6 +327,9 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 			nSigsRefund, err := strconv.ParseUint(tagInfo[0], 10, 64)
 			if err != nil {
 				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
+			}
+			if nSigsRefund == 0 {
+				return fmt.Errorf("n_sigs_refund must be positive: %w", ErrInvalidSpendCondition)
 			}
 
 			tags.NSigRefund = uint(nSigsRefund)

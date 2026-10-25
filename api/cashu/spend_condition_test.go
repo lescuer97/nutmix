@@ -965,6 +965,16 @@ func TestInvalidNumericValues(t *testing.T) {
 			json:      `[["n_sigs","-1"]]`,
 			expectErr: true, // strconv.ParseUint fails on negative numbers
 		},
+		{
+			name:      "n_sigs must be positive",
+			json:      `[["n_sigs","0"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "n_sigs_refund must be positive",
+			json:      `[["n_sigs_refund","0"]]`,
+			expectErr: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1098,6 +1108,22 @@ func TestCheckValidWithTooManyPubkeys(t *testing.T) {
 	}
 	if !errors.Is(err, ErrInvalidSpendCondition) {
 		t.Errorf("expected ErrInvalidSpendCondition, got %v", err)
+	}
+}
+
+func TestCheckValidRefundSignatureThreshold(t *testing.T) {
+	withoutRefundKeys := SpendCondition{Data: SpendConditionData{Tags: TagsInfo{NSigRefund: 1}}}
+	if err := withoutRefundKeys.CheckValid(); !errors.Is(err, ErrInvalidSpendCondition) {
+		t.Fatalf("CheckValid() error = %v, want ErrInvalidSpendCondition", err)
+	}
+
+	_, refundKey := btcec.PrivKeyFromBytes([]byte{1})
+	withRefundKey := SpendCondition{Data: SpendConditionData{Tags: TagsInfo{
+		Refund:     []*btcec.PublicKey{refundKey},
+		NSigRefund: 1,
+	}}}
+	if err := withRefundKey.CheckValid(); err != nil {
+		t.Fatalf("CheckValid() with one refund key and threshold one: %v", err)
 	}
 }
 
