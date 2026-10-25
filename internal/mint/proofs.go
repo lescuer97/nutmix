@@ -5,13 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"slices"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
 func CheckProofState(ctx context.Context, mint *Mint, Ys []cashu.WrappedPublicKey) ([]cashu.CheckState, error) {
+	for _, y := range Ys {
+		if y.PublicKey == nil {
+			return nil, fmt.Errorf("proof state Y cannot be nil")
+		}
+	}
+
 	tx, err := mint.MintDB.GetTx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
@@ -36,31 +41,25 @@ func CheckProofState(ctx context.Context, mint *Mint, Ys []cashu.WrappedPublicKe
 		return nil, fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err)
 	}
 
-	proofsForRemoval := make([]cashu.Proof, 0)
+	proofsByY := make(map[string]cashu.Proof, len(proofs))
+	for _, proof := range proofs {
+		proofsByY[proof.Y.ToHex()] = proof
+	}
 
 	var states = make([]cashu.CheckState, len(Ys))
 	for i, state := range Ys {
-		pendingAndSpent := false
-
 		checkState := cashu.CheckState{
 			Y:       state,
 			State:   cashu.PROOF_UNSPENT,
 			Witness: nil,
 		}
 
-		switch {
-		// Check if is in list of spents and if its also pending add it for removal of pending list
-		case slices.ContainsFunc(proofs, func(p cashu.Proof) bool {
-			compare := p.Y.ToHex() == state.ToHex()
-			if p.Witness != "" {
-				checkState.Witness = &p.Witness
+		if proof, ok := proofsByY[state.ToHex()]; ok {
+			checkState.State = proof.State
+			if proof.Witness != "" {
+				witness := proof.Witness
+				checkState.Witness = &witness
 			}
-			checkState.State = p.State
-			if compare && pendingAndSpent {
-				proofsForRemoval = append(proofsForRemoval, p)
-			}
-			return compare
-		}):
 		}
 
 		states[i] = checkState
