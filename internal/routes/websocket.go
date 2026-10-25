@@ -26,10 +26,10 @@ const (
 )
 
 type subscription struct {
-	owner   string
-	filters int
 	done    chan struct{}
 	stopped chan struct{}
+	owner   string
+	filters int
 }
 
 func checkOrigin(r *http.Request) bool { return true }
@@ -178,17 +178,17 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 					case <-s.done:
 						return
 					case v := <-p:
-						if send(cashu.WsNotification{JsonRpc: "2.0", Method: cashu.Subcribe, Params: cashu.WebRequestParams{SubId: id, Payload: cashu.CheckState{Y: v.Y, State: v.State, Witness: &v.Witness}}}) != nil {
+						if send(cashu.WsNotification{JsonRpc: "2.0", Method: cashu.Subcribe, Params: cashu.WebRequestParams{Payload: cashu.CheckState{Y: v.Y, State: v.State, Witness: &v.Witness}, Kind: "", SubId: id, Filters: nil}, Id: 0}) != nil {
 							_ = conn.Close()
 							return
 						}
 					case v := <-mi:
-						if send(cashu.WsNotification{JsonRpc: "2.0", Method: cashu.Subcribe, Params: cashu.WebRequestParams{SubId: id, Payload: v.PostMintQuoteBolt11Response()}}) != nil {
+						if send(cashu.WsNotification{JsonRpc: "2.0", Method: cashu.Subcribe, Params: cashu.WebRequestParams{Payload: v.PostMintQuoteBolt11Response(), Kind: "", SubId: id, Filters: nil}, Id: 0}) != nil {
 							_ = conn.Close()
 							return
 						}
 					case v := <-me:
-						if send(cashu.WsNotification{JsonRpc: "2.0", Method: cashu.Subcribe, Params: cashu.WebRequestParams{SubId: id, Payload: v.GetPostMeltQuoteResponse()}}) != nil {
+						if send(cashu.WsNotification{JsonRpc: "2.0", Method: cashu.Subcribe, Params: cashu.WebRequestParams{Payload: v.GetPostMeltQuoteResponse(), Kind: "", SubId: id, Filters: nil}, Id: 0}) != nil {
 							_ = conn.Close()
 							return
 						}
@@ -209,7 +209,7 @@ func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 				return
 			}
 			for _, payload := range payloads {
-				if send(cashu.WsNotification{JsonRpc: "2.0", Method: cashu.Subcribe, Params: cashu.WebRequestParams{SubId: id, Payload: payload}}) != nil {
+				if send(cashu.WsNotification{JsonRpc: "2.0", Method: cashu.Subcribe, Params: cashu.WebRequestParams{Payload: payload, Kind: "", SubId: id, Filters: nil}, Id: 0}) != nil {
 					return
 				}
 			}

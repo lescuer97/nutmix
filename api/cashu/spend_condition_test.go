@@ -1113,13 +1113,14 @@ func TestCheckValidWithTooManyPubkeys(t *testing.T) {
 }
 
 func TestCheckValidRefundSignatureThreshold(t *testing.T) {
-	withoutRefundKeys := SpendCondition{Data: SpendConditionData{Tags: TagsInfo{NSigRefund: 1}}}
+	withoutRefundKeys := SpendCondition{Data: SpendConditionData{Nonce: "", Data: "", Tags: TagsInfo{NSigRefund: 1}}} //nolint:exhaustruct // Type is intentionally zero to isolate refund threshold validation.
 	if err := withoutRefundKeys.CheckValid(); !errors.Is(err, ErrInvalidSpendCondition) {
 		t.Fatalf("CheckValid() error = %v, want ErrInvalidSpendCondition", err)
 	}
 
 	_, refundKey := btcec.PrivKeyFromBytes([]byte{1})
-	withRefundKey := SpendCondition{Data: SpendConditionData{Tags: TagsInfo{
+	withRefundKey := SpendCondition{Data: SpendConditionData{Nonce: "", Data: "", Tags: TagsInfo{ //nolint:exhaustruct // Type is intentionally zero to isolate refund threshold validation.
+		originalTag: "", Pubkeys: nil, Sigflag: 0, NSigs: 0, Locktime: 0,
 		Refund:     []*btcec.PublicKey{refundKey},
 		NSigRefund: 1,
 	}}}
@@ -1141,19 +1142,19 @@ func TestCheckValidPublicKeyPathwayDuplicates(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		tags    TagsInfo
 		data    string
+		tags    TagsInfo
 		wantErr bool
 	}{
-		{name: "data duplicated in pubkeys", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{key}}, wantErr: true},
-		{name: "opposite parity duplicate", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{mustParsePubKey(t, flipped)}}, wantErr: true},
-		{name: "refund may overlap spend pathway", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{otherKey}, Refund: []*btcec.PublicKey{key}}},
-		{name: "nil pubkey", tags: TagsInfo{Pubkeys: []*btcec.PublicKey{nil}}, wantErr: true},
-		{name: "nil refund key", tags: TagsInfo{Refund: []*btcec.PublicKey{nil}}, wantErr: true},
+		{name: "data duplicated in pubkeys", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{key}}, wantErr: true},                                              //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+		{name: "opposite parity duplicate", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{mustParsePubKey(t, flipped)}}, wantErr: true},                       //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+		{name: "refund may overlap spend pathway", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{otherKey}, Refund: []*btcec.PublicKey{key}}, wantErr: false}, //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+		{name: "nil pubkey", data: "", tags: TagsInfo{Pubkeys: []*btcec.PublicKey{nil}}, wantErr: true},                                                                                          //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+		{name: "nil refund key", data: "", tags: TagsInfo{Refund: []*btcec.PublicKey{nil}}, wantErr: true},                                                                                       //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			condition := SpendCondition{Type: P2PK, Data: SpendConditionData{Data: tt.data, Tags: tt.tags}}
+			condition := SpendCondition{Type: P2PK, Data: SpendConditionData{Data: tt.data, Tags: tt.tags, Nonce: ""}}
 			err := condition.CheckValid()
 			if tt.wantErr && !errors.Is(err, ErrInvalidSpendCondition) {
 				t.Fatalf("CheckValid() error = %v, want ErrInvalidSpendCondition", err)
@@ -1181,17 +1182,17 @@ func TestCheckValidHTLCHash(t *testing.T) {
 		withRefund bool
 		wantErr    bool
 	}{
-		{name: "valid hash", hash: strings.Repeat("ab", 32)},
-		{name: "valid hash with refund", hash: strings.Repeat("ab", 32), withRefund: true},
-		{name: "non-hex", hash: strings.Repeat("g", 64), wantErr: true},
-		{name: "odd-length", hash: strings.Repeat("a", 63), wantErr: true},
-		{name: "short", hash: strings.Repeat("ab", 31), wantErr: true},
-		{name: "long", hash: strings.Repeat("ab", 33), wantErr: true},
-		{name: "32 characters", hash: strings.Repeat("ab", 16), wantErr: true},
+		{name: "valid hash", hash: strings.Repeat("ab", 32), withRefund: false, wantErr: false},
+		{name: "valid hash with refund", hash: strings.Repeat("ab", 32), withRefund: true, wantErr: false},
+		{name: "non-hex", hash: strings.Repeat("g", 64), withRefund: false, wantErr: true},
+		{name: "odd-length", hash: strings.Repeat("a", 63), withRefund: false, wantErr: true},
+		{name: "short", hash: strings.Repeat("ab", 31), withRefund: false, wantErr: true},
+		{name: "long", hash: strings.Repeat("ab", 33), withRefund: false, wantErr: true},
+		{name: "32 characters", hash: strings.Repeat("ab", 16), withRefund: false, wantErr: true},
 		{name: "invalid with refund", hash: "x", withRefund: true, wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			condition := SpendCondition{Type: HTLC, Data: SpendConditionData{Data: tc.hash}}
+			condition := SpendCondition{Type: HTLC, Data: SpendConditionData{Data: tc.hash, Nonce: "", Tags: TagsInfo{}}} //nolint:exhaustruct // Tags are populated only for refund cases.
 			if tc.withRefund {
 				_, refundKey := btcec.PrivKeyFromBytes([]byte{1})
 				condition.Data.Tags.Refund = []*btcec.PublicKey{refundKey}

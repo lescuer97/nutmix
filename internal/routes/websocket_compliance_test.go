@@ -29,15 +29,18 @@ func (websocketComplianceDB) GetProofsFromSecretCurve(pgx.Tx, []cashu.WrappedPub
 func newWebsocketComplianceServer(t *testing.T) (func() *websocket.Conn, *m.Mint) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
-	observer := &m.Observer{Proofs: map[string][]m.ProofWatchChannel{}, MintQuote: map[string][]m.MintQuoteChannel{}, MeltQuote: map[string][]m.MeltQuoteChannel{}}
-	mint := &m.Mint{MintDB: websocketComplianceDB{}, Observer: observer}
+	observer := &m.Observer{Proofs: map[string][]m.ProofWatchChannel{}, MintQuote: map[string][]m.MintQuoteChannel{}, MeltQuote: map[string][]m.MeltQuoteChannel{}} //nolint:exhaustruct // Other observer maps are unrelated to websocket subscriptions.
+	mint := &m.Mint{MintDB: websocketComplianceDB{}, Observer: observer}                                                                                            //nolint:exhaustruct // Only the database and observer are used by these route tests.
 	router := gin.New()
 	v1WebSocketRoute(router, mint)
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
 	url := "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/ws"
 	dial := func() *websocket.Conn {
-		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+		conn, response, err := websocket.DefaultDialer.Dial(url, nil)
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -48,7 +51,7 @@ func newWebsocketComplianceServer(t *testing.T) (func() *websocket.Conn, *m.Mint
 }
 
 func wsRequest(id, sub string, filters []string) cashu.WsRequest {
-	return cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Subcribe, Id: idInt(id), Params: cashu.WebRequestParams{Kind: cashu.ProofStateWs, SubId: sub, Filters: filters}}
+	return cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Subcribe, Id: idInt(id), Params: cashu.WebRequestParams{Payload: nil, Kind: cashu.ProofStateWs, SubId: sub, Filters: filters}}
 }
 
 func idInt(s string) int { var n int; _, _ = fmt.Sscanf(s, "%d", &n); return n }
@@ -89,15 +92,24 @@ func TestWebsocketMultipleSubscriptionsAndUnsubscribe(t *testing.T) {
 	}
 	// Identically filtered subscriptions each receive their own update.
 	_, pub := btcec.PrivKeyFromBytes([]byte{1})
-	mint.Observer.SendProofsEvent(cashu.Proofs{{Y: cashu.WrappedPublicKey{PublicKey: pub}}})
+	mint.Observer.SendProofsEvent(cashu.Proofs{{Y: cashu.WrappedPublicKey{PublicKey: pub}, C: cashu.WrappedPublicKey{PublicKey: nil}, Quote: nil, Id: "", Secret: "", Witness: "", State: "", Amount: 0, SeenAt: 0}})
 	ids := map[string]bool{}
 	for i := 0; i < 2; i++ {
-		ids[readWSMessage(t, conn)["params"].(map[string]any)["subId"].(string)] = true
+		msg := readWSMessage(t, conn)
+		params, ok := msg["params"].(map[string]any)
+		if !ok {
+			t.Fatalf("event params have unexpected type: %#v", msg["params"])
+		}
+		subID, ok := params["subId"].(string)
+		if !ok {
+			t.Fatalf("event subscription ID has unexpected type: %#v", params["subId"])
+		}
+		ids[subID] = true
 	}
 	if !ids["one"] || !ids["two"] {
 		t.Fatalf("events missing subscriptions: %#v", ids)
 	}
-	writeWSRequest(t, conn, cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Unsubcribe, Id: 3, Params: cashu.WebRequestParams{SubId: "one"}})
+	writeWSRequest(t, conn, cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Unsubcribe, Id: 3, Params: cashu.WebRequestParams{Payload: nil, Kind: "", SubId: "one", Filters: nil}})
 	if readWSMessage(t, conn)["id"] != float64(3) {
 		t.Fatal("unsubscribe not acknowledged")
 	}
@@ -133,7 +145,7 @@ func TestWebsocketConnectionScopedIDsAndLimits(t *testing.T) {
 	if readWSMessage(t, first)["error"] == nil {
 		t.Fatal("subscription limit not enforced")
 	}
-	writeWSRequest(t, first, cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Unsubcribe, Id: 41, Params: cashu.WebRequestParams{SubId: "same"}})
+	writeWSRequest(t, first, cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Unsubcribe, Id: 41, Params: cashu.WebRequestParams{Payload: nil, Kind: "", SubId: "same", Filters: nil}})
 	readWSMessage(t, first)
 	writeWSRequest(t, first, wsRequest("42", "replacement", []string{filter}))
 	if readWSMessage(t, first)["error"] != nil {
@@ -176,7 +188,7 @@ func TestWebsocketFilterLimitAndUnsubscribeRelease(t *testing.T) {
 		if i == 0 {
 			batch = append(batch, batch[0])
 		}
-		req := cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Subcribe, Id: i + 1, Params: cashu.WebRequestParams{Kind: cashu.ProofStateWs, SubId: fmt.Sprintf("batch-%d", i), Filters: batch}}
+		req := cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Subcribe, Id: i + 1, Params: cashu.WebRequestParams{Payload: nil, Kind: cashu.ProofStateWs, SubId: fmt.Sprintf("batch-%d", i), Filters: batch}}
 		writeWSRequest(t, conn, req)
 		if got := readWSMessage(t, conn); got["error"] != nil {
 			t.Fatalf("valid filter batch rejected: %#v", got)
@@ -190,7 +202,7 @@ func TestWebsocketFilterLimitAndUnsubscribeRelease(t *testing.T) {
 	if got := readWSMessage(t, conn); got["error"] == nil {
 		t.Fatal("filter limit was not enforced")
 	}
-	writeWSRequest(t, conn, cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Unsubcribe, Id: 91, Params: cashu.WebRequestParams{SubId: "batch-0"}})
+	writeWSRequest(t, conn, cashu.WsRequest{JsonRpc: "2.0", Method: cashu.Unsubcribe, Id: 91, Params: cashu.WebRequestParams{Payload: nil, Kind: "", SubId: "batch-0", Filters: nil}})
 	readWSMessage(t, conn)
 	rejected.Params.SubId = "replacement"
 	writeWSRequest(t, conn, rejected)
@@ -233,8 +245,14 @@ func TestWebsocketDisconnectDetachesOnlyThatConnection(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 	_, pub := btcec.PrivKeyFromBytes([]byte{1})
-	mint.Observer.SendProofsEvent(cashu.Proofs{{Y: cashu.WrappedPublicKey{PublicKey: pub}}})
-	if got := readWSMessage(t, second)["params"].(map[string]any)["subId"]; got != "same" {
+	mint.Observer.SendProofsEvent(cashu.Proofs{{Y: cashu.WrappedPublicKey{PublicKey: pub}, C: cashu.WrappedPublicKey{PublicKey: nil}, Quote: nil, Id: "", Secret: "", Witness: "", State: "", Amount: 0, SeenAt: 0}})
+	msg := readWSMessage(t, second)
+	params, ok := msg["params"].(map[string]any)
+	if !ok {
+		t.Fatalf("event params have unexpected type: %#v", msg["params"])
+	}
+	got, ok := params["subId"].(string)
+	if !ok || got != "same" {
 		t.Fatalf("other connection lost subscription: %v", got)
 	}
 }

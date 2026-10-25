@@ -32,9 +32,9 @@ func TestCheckProofState(t *testing.T) {
 	y2 := cashu.WrappedPublicKey{PublicKey: key2.PubKey()}
 	y3 := cashu.WrappedPublicKey{PublicKey: key3.PubKey()}
 	witness := "spent witness"
-	db := &checkProofStateDB{proofs: cashu.Proofs{
-		{Y: y1, State: cashu.PROOF_SPENT, Witness: witness},
-		{Y: y2, State: cashu.PROOF_PENDING},
+	db := &checkProofStateDB{proofs: cashu.Proofs{ //nolint:exhaustruct // Only stored proof state and Y fields are used by this fixture.
+		{C: cashu.WrappedPublicKey{PublicKey: nil}, Y: y1, Quote: nil, Id: "", Secret: "", Witness: witness, State: cashu.PROOF_SPENT, Amount: 0, SeenAt: 0},
+		{C: cashu.WrappedPublicKey{PublicKey: nil}, Y: y2, Quote: nil, Id: "", Secret: "", Witness: "", State: cashu.PROOF_PENDING, Amount: 0, SeenAt: 0},
 	}}
 	m := Mint{MintDB: db} //nolint:exhaustruct
 
@@ -57,9 +57,9 @@ func TestCheckProofState(t *testing.T) {
 }
 
 func TestCheckProofStateRejectsNilY(t *testing.T) {
-	db := &checkProofStateDB{}
-	m := Mint{MintDB: db} //nolint:exhaustruct
-	if _, err := CheckProofState(context.Background(), &m, []cashu.WrappedPublicKey{{}}); err == nil {
+	db := &checkProofStateDB{} //nolint:exhaustruct // Zero values are required for the no-query assertion.
+	m := Mint{MintDB: db}      //nolint:exhaustruct
+	if _, err := CheckProofState(context.Background(), &m, []cashu.WrappedPublicKey{{PublicKey: nil}}); err == nil {
 		t.Fatal("CheckProofState() error = nil, want nil-Y error")
 	}
 	if db.gotYs != nil {
