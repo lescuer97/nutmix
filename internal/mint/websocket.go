@@ -73,33 +73,30 @@ func (o *Observer) RemoveWatch(subId string) {
 	defer o.Unlock()
 
 	for key, proofWatchArray := range o.Proofs {
-		o.Proofs[key] = slices.DeleteFunc(proofWatchArray, func(proofWatchChan ProofWatchChannel) bool {
-			if proofWatchChan.SubId == subId {
-				close(proofWatchChan.Channel)
-				return true
-			}
-			return false
-		})
+		kept := slices.DeleteFunc(proofWatchArray, func(w ProofWatchChannel) bool { return w.SubId == subId })
+		if len(kept) == 0 {
+			delete(o.Proofs, key)
+		} else {
+			o.Proofs[key] = kept
+		}
 	}
 
 	for key, mintWatchArray := range o.MintQuote {
-		o.MintQuote[key] = slices.DeleteFunc(mintWatchArray, func(mintWatchChannel MintQuoteChannel) bool {
-			if mintWatchChannel.SubId == subId {
-				close(mintWatchChannel.Channel)
-				return true
-			}
-			return false
-		})
+		kept := slices.DeleteFunc(mintWatchArray, func(w MintQuoteChannel) bool { return w.SubId == subId })
+		if len(kept) == 0 {
+			delete(o.MintQuote, key)
+		} else {
+			o.MintQuote[key] = kept
+		}
 	}
 
 	for key, meltWatchArray := range o.MeltQuote {
-		o.MeltQuote[key] = slices.DeleteFunc(meltWatchArray, func(meltWatchChannel MeltQuoteChannel) bool {
-			if meltWatchChannel.SubId == subId {
-				close(meltWatchChannel.Channel)
-				return true
-			}
-			return false
-		})
+		kept := slices.DeleteFunc(meltWatchArray, func(w MeltQuoteChannel) bool { return w.SubId == subId })
+		if len(kept) == 0 {
+			delete(o.MeltQuote, key)
+		} else {
+			o.MeltQuote[key] = kept
+		}
 	}
 }
 
