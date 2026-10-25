@@ -89,11 +89,24 @@ func (sc *SpendCondition) CheckValid() error {
 
 	// NUT-11: a key may appear at most once per pathway (compared by
 	// x-coordinate). A duplicate makes the secret malformed.
-	dedup := make(map[string]struct{}, len(sc.Data.Tags.Pubkeys))
+	dedup := make(map[string]struct{}, len(sc.Data.Tags.Pubkeys)+1)
 	seenX := make(map[string]struct{}, len(sc.Data.Tags.Pubkeys))
+	if sc.Type == P2PK {
+		dataPubkeyBytes, err := hex.DecodeString(sc.Data.Data)
+		if err != nil || len(dataPubkeyBytes) != 33 || (dataPubkeyBytes[0] != 0x02 && dataPubkeyBytes[0] != 0x03) {
+			return fmt.Errorf("invalid P2PK data public key: %w", ErrInvalidSpendCondition)
+		}
+		dataPubkey, err := btcec.ParsePubKey(dataPubkeyBytes)
+		if err != nil {
+			return fmt.Errorf("invalid P2PK data public key: %w", ErrInvalidSpendCondition)
+		}
+		if err := addCanonicalKey(dedup, seenX, dataPubkey); err != nil {
+			return err
+		}
+	}
 	for _, pubkey := range sc.Data.Tags.Pubkeys {
 		if pubkey == nil {
-			continue
+			return fmt.Errorf("nil public key in pubkeys pathway: %w", ErrInvalidSpendCondition)
 		}
 		if err := addCanonicalKey(dedup, seenX, pubkey); err != nil {
 			return err
@@ -103,7 +116,7 @@ func (sc *SpendCondition) CheckValid() error {
 	seenX = make(map[string]struct{}, len(sc.Data.Tags.Refund))
 	for _, pubkey := range sc.Data.Tags.Refund {
 		if pubkey == nil {
-			continue
+			return fmt.Errorf("nil public key in refund pathway: %w", ErrInvalidSpendCondition)
 		}
 		if err := addCanonicalKey(dedup, seenX, pubkey); err != nil {
 			return err

@@ -1128,6 +1128,52 @@ func TestCheckValidRefundSignatureThreshold(t *testing.T) {
 	}
 }
 
+func TestCheckValidPublicKeyPathwayDuplicates(t *testing.T) {
+	_, key := btcec.PrivKeyFromBytes([]byte{1})
+	compressed := key.SerializeCompressed()
+	flipped := append([]byte(nil), compressed...)
+	if flipped[0] == 0x02 {
+		flipped[0] = 0x03
+	} else {
+		flipped[0] = 0x02
+	}
+	_, otherKey := btcec.PrivKeyFromBytes([]byte{2})
+
+	tests := []struct {
+		name    string
+		tags    TagsInfo
+		data    string
+		wantErr bool
+	}{
+		{name: "data duplicated in pubkeys", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{key}}, wantErr: true},
+		{name: "opposite parity duplicate", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{mustParsePubKey(t, flipped)}}, wantErr: true},
+		{name: "refund may overlap spend pathway", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{otherKey}, Refund: []*btcec.PublicKey{key}}},
+		{name: "nil pubkey", tags: TagsInfo{Pubkeys: []*btcec.PublicKey{nil}}, wantErr: true},
+		{name: "nil refund key", tags: TagsInfo{Refund: []*btcec.PublicKey{nil}}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			condition := SpendCondition{Type: P2PK, Data: SpendConditionData{Data: tt.data, Tags: tt.tags}}
+			err := condition.CheckValid()
+			if tt.wantErr && !errors.Is(err, ErrInvalidSpendCondition) {
+				t.Fatalf("CheckValid() error = %v, want ErrInvalidSpendCondition", err)
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("CheckValid() error = %v", err)
+			}
+		})
+	}
+}
+
+func mustParsePubKey(t *testing.T, serialized []byte) *btcec.PublicKey {
+	t.Helper()
+	key, err := btcec.ParsePubKey(serialized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
+}
+
 func TestCheckValidHTLCHash(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
