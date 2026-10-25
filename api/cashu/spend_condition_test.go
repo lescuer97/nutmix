@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -1124,6 +1125,39 @@ func TestCheckValidRefundSignatureThreshold(t *testing.T) {
 	}}}
 	if err := withRefundKey.CheckValid(); err != nil {
 		t.Fatalf("CheckValid() with one refund key and threshold one: %v", err)
+	}
+}
+
+func TestCheckValidHTLCHash(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		hash       string
+		withRefund bool
+		wantErr    bool
+	}{
+		{name: "valid hash", hash: strings.Repeat("ab", 32)},
+		{name: "valid hash with refund", hash: strings.Repeat("ab", 32), withRefund: true},
+		{name: "non-hex", hash: strings.Repeat("g", 64), wantErr: true},
+		{name: "odd-length", hash: strings.Repeat("a", 63), wantErr: true},
+		{name: "short", hash: strings.Repeat("ab", 31), wantErr: true},
+		{name: "long", hash: strings.Repeat("ab", 33), wantErr: true},
+		{name: "32 characters", hash: strings.Repeat("ab", 16), wantErr: true},
+		{name: "invalid with refund", hash: "x", withRefund: true, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			condition := SpendCondition{Type: HTLC, Data: SpendConditionData{Data: tc.hash}}
+			if tc.withRefund {
+				_, refundKey := btcec.PrivKeyFromBytes([]byte{1})
+				condition.Data.Tags.Refund = []*btcec.PublicKey{refundKey}
+			}
+			err := condition.CheckValid()
+			if tc.wantErr && !errors.Is(err, ErrInvalidSpendCondition) {
+				t.Fatalf("CheckValid() error = %v, want ErrInvalidSpendCondition", err)
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("CheckValid() error = %v", err)
+			}
+		})
 	}
 }
 
