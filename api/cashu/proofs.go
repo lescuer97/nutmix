@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"time"
+	"unicode/utf8"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -364,18 +365,20 @@ func (p Proof) IsProofSpendConditioned() (bool, *SpendCondition, error) {
 		return false, nil, nil
 	}
 
-	// Well-known secret should have a length of at least 2
-	if len(rawJsonSecret) < 2 {
-		return false, nil, errors.New("invalid secret: length < 2")
+	if len(rawJsonSecret) == 0 {
+		return false, nil, nil
 	}
 
 	var kind string
 	if err := json.Unmarshal(rawJsonSecret[0], &kind); err != nil {
-		return false, nil, fmt.Errorf("json.Unmarshal(rawJsonSecret[0], &kind);%w", err)
+		return false, nil, nil
 	}
 
 	if kind != "P2PK" && kind != "HTLC" {
 		return false, nil, nil
+	}
+	if len(rawJsonSecret) != 2 {
+		return false, nil, fmt.Errorf("invalid %s secret: expected 2 elements. %w", kind, ErrCouldNotParseSpendCondition)
 	}
 
 	spendCondition, err := p.parseSpendCondition()
@@ -520,7 +523,7 @@ func VerifyProofCondition(proof Proof) error {
 		}
 	}
 	if !isLocked {
-		if len(proof.Secret) != 64 {
+		if !utf8.ValidString(proof.Secret) || len([]byte(proof.Secret)) > 512 {
 			return ErrCommonSecretNotCorrectSize
 		}
 	}
