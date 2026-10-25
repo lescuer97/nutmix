@@ -1,6 +1,7 @@
 package cashu
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -395,9 +396,16 @@ func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 	if err != nil {
 		return errors.Join(ErrInvalidHexPreimage, err)
 	}
+	if len(preImageBytes) != sha256.Size {
+		return ErrInvalidPreimage
+	}
+	hashBytes, err := hex.DecodeString(sc.Data.Data)
+	if err != nil || len(hashBytes) != sha256.Size {
+		return ErrInvalidPreimage
+	}
 
 	parsedPreimage := sha256.Sum256(preImageBytes)
-	if hex.EncodeToString(parsedPreimage[:]) != sc.Data.Data {
+	if !bytes.Equal(parsedPreimage[:], hashBytes) {
 		return ErrInvalidPreimage
 	}
 

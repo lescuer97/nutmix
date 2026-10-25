@@ -34,6 +34,34 @@ func init() {
 	IncorrectPreimage = hex.EncodeToString(sum2[:])
 }
 
+func TestVerifyPreimageRequires32Bytes(t *testing.T) {
+	for _, size := range []int{31, 33} {
+		preimage := make([]byte, size)
+		hash := sha256.Sum256(preimage)
+		condition := &SpendCondition{Type: HTLC, Data: SpendConditionData{Nonce: "", Data: hex.EncodeToString(hash[:]), Tags: TagsInfo{originalTag: "", Pubkeys: nil, Refund: nil, Sigflag: 0, NSigs: 0, Locktime: 0, NSigRefund: 0}}}
+		if err := condition.VerifyPreimage(&Witness{Preimage: hex.EncodeToString(preimage), Signatures: nil}); !errors.Is(err, ErrInvalidPreimage) {
+			t.Errorf("preimage with %d bytes: got %v, want ErrInvalidPreimage", size, err)
+		}
+	}
+}
+
+func TestVerifyPreimageDecodesHashBytes(t *testing.T) {
+	preimage := make([]byte, sha256.Size)
+	hash := sha256.Sum256(preimage)
+	condition := &SpendCondition{Type: HTLC, Data: SpendConditionData{Nonce: "", Data: strings.ToUpper(hex.EncodeToString(hash[:])), Tags: TagsInfo{originalTag: "", Pubkeys: nil, Refund: nil, Sigflag: 0, NSigs: 0, Locktime: 0, NSigRefund: 0}}}
+	if err := condition.VerifyPreimage(&Witness{Preimage: hex.EncodeToString(preimage), Signatures: nil}); err != nil {
+		t.Fatalf("uppercase hash should match by decoded bytes: %v", err)
+	}
+
+	condition.Data.Data = "not-hex"
+	if err := condition.VerifyPreimage(&Witness{Preimage: hex.EncodeToString(preimage), Signatures: nil}); !errors.Is(err, ErrInvalidPreimage) {
+		t.Errorf("malformed hash: got %v, want ErrInvalidPreimage", err)
+	}
+	if err := condition.VerifyPreimage(&Witness{Preimage: "not-hex", Signatures: nil}); !errors.Is(err, ErrInvalidHexPreimage) {
+		t.Errorf("malformed preimage: got %v, want ErrInvalidHexPreimage", err)
+	}
+}
+
 func TestParseProofWithP2PK(t *testing.T) {
 	var proof Proof
 	err := json.Unmarshal([]byte(singleProofWithP2PK), &proof)
