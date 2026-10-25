@@ -1182,6 +1182,9 @@ func TestCheckValidHTLCHash(t *testing.T) {
 		withRefund bool
 		wantErr    bool
 	}{
+		// Published NUT-11 HTLC vector from cashubtc/nuts@1363de413294e2ef3a57b16950f9506af38fffc2/tests/11-test.md:
+		// SHA256(32 zero bytes followed by 0x01).
+		{name: "published NUT-11 HTLC hash", hash: "ec4916dd28fc4c10d78e287ca5d9cc51ee1ae73cbfde08c6b37324cbfaac8bc5", withRefund: false, wantErr: false},
 		{name: "valid hash", hash: strings.Repeat("ab", 32), withRefund: false, wantErr: false},
 		{name: "valid hash with refund", hash: strings.Repeat("ab", 32), withRefund: true, wantErr: false},
 		{name: "non-hex", hash: strings.Repeat("g", 64), withRefund: false, wantErr: true},

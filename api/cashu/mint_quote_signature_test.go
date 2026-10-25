@@ -2,13 +2,18 @@ package cashu
 
 import (
 	"crypto/sha256"
+	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
+
+//go:embed testdata/nut20/mint_quote.json
+var nut20MintQuoteVector embed.FS
 
 func TestMintQuoteSignatureMessage(t *testing.T) {
 	pubkey := secp256k1.PrivKeyFromBytes([]byte{1}).PubKey()
@@ -78,5 +83,44 @@ func TestVerifyPubkeyBindsQuoteOutputsAndOrder(t *testing.T) {
 func TestMintQuoteSignatureMessageRejectsNilBlindedPoint(t *testing.T) {
 	if _, err := MintQuoteSignatureMessage("quote", BlindedMessages{{Amount: 1}}); err != ErrInvalidBlindMessage { //nolint:exhaustruct // Missing point is the invalid input under test.
 		t.Fatalf("expected ErrInvalidBlindMessage, got %v", err)
+	}
+}
+
+// TestNut20PublishedMintQuoteVector is the NUT-20 signature vector from
+// cashubtc/nuts@1363de413294e2ef3a57b16950f9506af38fffc2/tests/20-test.md.
+// Keep the published signature and digest intact so this tests
+// interoperability rather than self-signing.
+func TestNut20PublishedMintQuoteVector(t *testing.T) {
+	data, err := nut20MintQuoteVector.ReadFile("testdata/nut20/mint_quote.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vector struct {
+		ExpectedSHA256 string                `json:"expected_sha256"`
+		Pubkey         string                `json:"pubkey"`
+		Request        PostMintBolt11Request `json:"request"`
+	}
+	if err := json.Unmarshal(data, &vector); err != nil {
+		t.Fatal(err)
+	}
+	pubkeyBytes, err := hex.DecodeString(vector.Pubkey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	message, err := MintQuoteSignatureMessage(vector.Request.Quote, vector.Request.Outputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(message)
+	if got := hex.EncodeToString(digest[:]); got != vector.ExpectedSHA256 {
+		t.Fatalf("published NUT-20 digest mismatch: got %s, want %s", got, vector.ExpectedSHA256)
+	}
+	valid, err := vector.Request.VerifyPubkey(pubkey)
+	if err != nil || !valid {
+		t.Fatalf("published NUT-20 signature rejected: valid=%v err=%v", valid, err)
 	}
 }
