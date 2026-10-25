@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
-	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
@@ -65,10 +64,11 @@ func (m *Mint) createBolt11MintQuote(ctx context.Context, request cashu.PostMint
 	if err != nil {
 		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" m.LightningBackend.RequestInvoice. %w", err)
 	}
-	quoteId, err := utils.RandomHash()
+	quoteUUID, err := newQuoteUUID()
 	if err != nil {
-		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" utils.RandomHash() %w ", err)
+		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("newQuoteUUID(). %w", err)
 	}
+	quoteId := quoteUUID.String()
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
 	now := time.Now().Unix()

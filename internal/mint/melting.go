@@ -44,10 +44,11 @@ func (m *Mint) createBolt11MeltQuote(ctx context.Context, meltRequest cashu.Post
 }
 
 func (m *Mint) createAndStoreBolt11MeltQuote(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request, requestData bolt11MeltReqData) (cashu.MeltRequestDB, error) {
-	quoteId, err := utils.RandomHash()
+	quoteUUID, err := newQuoteUUID()
 	if err != nil {
-		return cashu.MeltRequestDB{}, fmt.Errorf("utils.RandomHash(). %w", err)
+		return cashu.MeltRequestDB{}, fmt.Errorf("newQuoteUUID(). %w", err)
 	}
+	quoteId := quoteUUID.String()
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
 	now := time.Now().Unix()
