@@ -360,12 +360,18 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
-			locktime, err := strconv.ParseUint(tagInfo[0], 10, 64)
+			// NUT-11 treats a locktime that is not a valid Unix timestamp as
+			// a permanent lock. Parse only timestamps representable by Unix
+			// time; ignoring an invalid value leaves Locktime unset (zero).
+			locktime, err := strconv.ParseInt(tagInfo[0], 10, 64)
 			if err != nil {
-				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
+				continue
 			}
 
-			tags.Locktime = locktime
+			if locktime < 0 {
+				continue
+			}
+			tags.Locktime = uint64(locktime)
 		}
 	}
 	tags.originalTag = string(b)

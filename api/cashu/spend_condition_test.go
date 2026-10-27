@@ -653,7 +653,7 @@ func TestTagsInfoMarshalJSON(t *testing.T) {
 }
 
 func TestTagsInfoLocktimeUint64RoundTrip(t *testing.T) {
-	for _, locktime := range []uint64{math.MaxInt64, math.MaxInt64 + 1, math.MaxUint64} {
+	for _, locktime := range []uint64{1, math.MaxInt64} {
 		t.Run(strconv.FormatUint(locktime, 10), func(t *testing.T) {
 			encoded := fmt.Sprintf(`[["locktime","%d"]]`, locktime)
 			var tags TagsInfo
@@ -987,7 +987,17 @@ func TestInvalidNumericValues(t *testing.T) {
 		{
 			name:      "locktime with non-numeric value",
 			json:      `[["locktime","not_a_number"]]`,
-			expectErr: true,
+			expectErr: false,
+		},
+		{
+			name:      "locktime above signed unix timestamp range",
+			json:      `[["locktime","9223372036854775808"]]`,
+			expectErr: false,
+		},
+		{
+			name:      "negative locktime",
+			json:      `[["locktime","-1"]]`,
+			expectErr: false,
 		},
 		{
 			name:      "n_sigs with negative number string",
