@@ -1151,19 +1151,41 @@ func TestCheckValidWithTooManyPubkeys(t *testing.T) {
 }
 
 func TestCheckValidRefundSignatureThreshold(t *testing.T) {
-	withoutRefundKeys := SpendCondition{Data: SpendConditionData{Nonce: "", Data: "", Tags: TagsInfo{NSigRefund: 1}}} //nolint:exhaustruct // Type is intentionally zero to isolate refund threshold validation.
+	_, dataKey := btcec.PrivKeyFromBytes([]byte{2})
+	data := hex.EncodeToString(dataKey.SerializeCompressed())
+	withoutRefundKeys := SpendCondition{Type: P2PK, Data: SpendConditionData{Nonce: "", Data: data, Tags: TagsInfo{NSigRefund: 1}}} //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
 	if err := withoutRefundKeys.CheckValid(); !errors.Is(err, ErrInvalidSpendCondition) {
 		t.Fatalf("CheckValid() error = %v, want ErrInvalidSpendCondition", err)
 	}
 
 	_, refundKey := btcec.PrivKeyFromBytes([]byte{1})
-	withRefundKey := SpendCondition{Data: SpendConditionData{Nonce: "", Data: "", Tags: TagsInfo{ //nolint:exhaustruct // Type is intentionally zero to isolate refund threshold validation.
+	withRefundKey := SpendCondition{Type: P2PK, Data: SpendConditionData{Nonce: "", Data: data, Tags: TagsInfo{ //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
 		originalTag: "", Pubkeys: nil, Sigflag: 0, NSigs: 0, Locktime: 0,
 		Refund:     []*btcec.PublicKey{refundKey},
 		NSigRefund: 1,
 	}}}
 	if err := withRefundKey.CheckValid(); err != nil {
 		t.Fatalf("CheckValid() with one refund key and threshold one: %v", err)
+	}
+}
+
+func TestCheckValidRejectsUnsupportedTypes(t *testing.T) {
+	for _, conditionType := range []SpendConditionType{AnyOneCanSpend, SpendConditionType(999)} {
+		condition := SpendCondition{Type: conditionType} //nolint:exhaustruct // This test isolates the unsupported type guard.
+		if err := condition.CheckValid(); !errors.Is(err, ErrInvalidSpendCondition) {
+			t.Errorf("CheckValid() for type %d = %v, want ErrInvalidSpendCondition", conditionType, err)
+		}
+	}
+
+	_, key := btcec.PrivKeyFromBytes([]byte{1})
+	validConditions := []SpendCondition{
+		{Type: P2PK, Data: SpendConditionData{Data: hex.EncodeToString(key.SerializeCompressed())}}, //nolint:exhaustruct // Empty tags are valid.
+		{Type: HTLC, Data: SpendConditionData{Data: strings.Repeat("ab", 32)}},                      //nolint:exhaustruct // Empty tags are valid.
+	}
+	for _, condition := range validConditions {
+		if err := condition.CheckValid(); err != nil {
+			t.Errorf("CheckValid() for supported type %d = %v", condition.Type, err)
+		}
 	}
 }
 

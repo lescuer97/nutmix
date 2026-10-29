@@ -77,6 +77,10 @@ func (sc *SpendCondition) String() (string, error) {
 }
 
 func (sc *SpendCondition) CheckValid() error {
+	if sc.Type != P2PK && sc.Type != HTLC {
+		return ErrInvalidSpendCondition
+	}
+
 	if sc.Type == HTLC {
 		hashBytes, err := hex.DecodeString(sc.Data.Data)
 		if err != nil || len(hashBytes) != sha256.Size {
