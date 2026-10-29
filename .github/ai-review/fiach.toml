@@ -1,0 +1,22 @@
+[review]
+provider = "openai"
+model = "moonshotai/kimi-k3"
+verifier_provider = "openai"
+verifier_model = "moonshotai/kimi-k3"
+persona = "/etc/nutmix-review/personas/nutmix.md"
+with_skill = "nutmix"
+review_lanes = ["correctness", "concurrency"]
+max_review_lanes = 2
+max_turns = 60
+timeout_mins = 15
+max_retries = 0
+max_cost_usd = 5.0
+verify_findings = true
+dedupe_existing_comments = true
+report_mode = "local"
+output = "/output/report.md"
+db_path = "/tmp/fiach.redb"
+
+[review.review_lane_prompts]
+correctness = "Trace concrete PR-introduced correctness, API compatibility, authorization and accounting regressions through callers and persistence. Inspect relevant unchanged code before concluding."
+concurrency = "Trace quote, proof and payment state transitions, transactions, retries, observer cleanup and asynchronous settlement for concrete races, lost updates and resource leaks introduced or worsened by this PR."

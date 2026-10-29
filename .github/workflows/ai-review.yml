@@ -1,0 +1,178 @@
+name: AI Review
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+concurrency:
+  # Unrelated/untrusted comments must not evict an owner's queued request.
+  group: ai-review-${{ github.actor == 'lescuer97' && github.triggering_actor == 'lescuer97' && github.event.comment.body == '/ai-review' && github.event.issue.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      github.repository == 'lescuer97/nutmix' &&
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/ai-review' &&
+      github.event.comment.user.login == 'lescuer97' &&
+      github.actor == 'lescuer97' &&
+      github.triggering_actor == 'lescuer97'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      request-artifact: ${{ steps.request.outputs.artifact-id }}
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      checks: read
+      statuses: read
+    steps:
+      # issue_comment runs trusted default-branch code, never the PR branch.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Authorize owner and current CI; prepare immutable request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REVIEW_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: python3 .github/scripts/ai_review.py prepare
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: request
+        with:
+          name: ai-review-input
+          path: ai-review-input.json
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
+
+  build-reviewer:
+    needs: prepare
+    if: github.actor == 'lescuer97' && github.triggering_actor == 'lescuer97'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    outputs:
+      image: ${{ steps.identity.outputs.image }}
+      image-artifact: ${{ steps.image-artifact.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Build and test pinned upstream Fiach (no model credentials)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .github/ai-review
+          load: true
+          tags: nutmix-fiach:trusted
+          cache-from: type=gha,scope=fiach-owner
+          cache-to: type=gha,scope=fiach-owner,mode=max
+      - name: Exercise trusted runtime sandbox without credentials
+        run: |
+          image=$(docker image inspect --format '{{.Id}}' nutmix-fiach:trusted)
+          python3 .github/scripts/ai_review.py sandbox-smoke "$image"
+      - name: Record exact image identity and save trusted image
+        id: identity
+        run: |
+          echo "image=$(docker image inspect --format '{{.Id}}' nutmix-fiach:trusted)" >> "$GITHUB_OUTPUT"
+          docker save nutmix-fiach:trusted --output fiach-image.tar
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: image-artifact
+        with:
+          name: fiach-trusted-image
+          path: fiach-image.tar
+          compression-level: 0
+          retention-days: 1
+          overwrite: true
+          if-no-files-found: error
+
+  review:
+    needs: [prepare, build-reviewer]
+    if: github.actor == 'lescuer97' && github.triggering_actor == 'lescuer97'
+    # Configure this environment with lescuer97 as its only required reviewer.
+    environment: ai-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      result-artifact: ${{ steps.result.outputs.artifact-id }}
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      checks: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.request-artifact }}
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.build-reviewer.outputs.image-artifact }}
+          merge-multiple: true
+      - name: Load image from trusted build job, never PR artifacts
+        run: docker load --input fiach-image.tar
+      - name: Recheck gates and run isolated Fiach through PPQ
+        env:
+          PPQ_API_KEY: ${{ secrets.PPQ_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REVIEW_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          REVIEW_IMAGE: ${{ needs.build-reviewer.outputs.image }}
+        run: python3 .github/scripts/ai_review.py run "$REVIEW_IMAGE"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: result
+        with:
+          name: ai-review-result
+          path: ai-review-result/
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
+
+  publish:
+    needs: [prepare, build-reviewer, review]
+    if: github.actor == 'lescuer97' && github.triggering_actor == 'lescuer97'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+      checks: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.request-artifact }}
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.build-reviewer.outputs.image-artifact }}
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.review.outputs.result-artifact }}
+          path: ai-review-result
+          merge-multiple: true
+      - name: Load the same trusted image (not a model-produced executable)
+        run: docker load --input fiach-image.tar
+      - name: Recheck authorization, revision, and CI before reporting
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REVIEW_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          REVIEW_IMAGE: ${{ needs.build-reviewer.outputs.image }}
+        run: python3 .github/scripts/ai_review.py publish "$REVIEW_IMAGE"
