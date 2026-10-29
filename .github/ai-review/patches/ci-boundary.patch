@@ -1,0 +1,32 @@
+diff --git a/src/review.rs b/src/review.rs
+--- a/src/review.rs
++++ b/src/review.rs
+@@ -310,2 +310,12 @@ async fn resolve_price_overrides(
+ ) -> (Option<f64>, Option<f64>) {
++    // CI's trusted entrypoint supplies PPQ pricing to ALL phases, including the
++    // verifier, whose call site does not pass the CLI's explicit overrides.
++    let ci_price = |name: &str| {
++        std::env::var(name).ok()
++            .and_then(|value| value.parse::<f64>().ok())
++            .filter(|value| value.is_finite() && *value > 0.0)
++    };
++    let input_override = input_override.or_else(|| ci_price("NUTMIX_INPUT_PRICE"));
++    let output_override = output_override.or_else(|| ci_price("NUTMIX_OUTPUT_PRICE"));
++
+     let mut input_price_per_m = input_override;
+@@ -1296,4 +1306,15 @@ pub async fn run_review(
+     let context_group = params.context_groups.get(&params.repo);
+     let workspace = workspace::prepare(&params.repo, params.pr_number, None, context_group).await?;
++    // Bind this worker to the revision authorized and tested by the host before
++    // creating any model provider (including skill discovery).
++    if std::env::var_os("NUTMIX_CI").is_some() {
++        let head = std::env::var("NUTMIX_EXPECTED_HEAD")
++            .context("Missing CI expected head")?;
++        let base = std::env::var("NUTMIX_EXPECTED_BASE")
++            .context("Missing CI expected base")?;
++        if head != workspace.commit_hash || base != workspace.base_commit {
++            bail!("PR changed since CI authorization; refusing model execution.");
++        }
++    }
+
+     if !params.execution.skip_state_check {

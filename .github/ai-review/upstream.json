@@ -1,0 +1,7 @@
+{
+  "repository": "https://git.cashu.dev/thesimplekid/fiach.git",
+  "revision": "af2100c5f187b475865b2090979be13af2483939",
+  "license": "MIT OR Apache-2.0",
+  "rust": "1.98.1",
+  "model": "moonshotai/kimi-k3"
+}
