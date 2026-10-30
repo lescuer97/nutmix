@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
-	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
@@ -65,12 +64,17 @@ func (m *Mint) createBolt11MintQuote(ctx context.Context, request cashu.PostMint
 	if err != nil {
 		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" m.LightningBackend.RequestInvoice. %w", err)
 	}
-	quoteId, err := utils.RandomHash()
+	quoteUUID, err := newQuoteUUID()
 	if err != nil {
-		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" utils.RandomHash() %w ", err)
+		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("newQuoteUUID(). %w", err)
 	}
+	quoteId := quoteUUID.String()
 
-	expireTime := cashu.ExpiryTimeMinUnit(15)
+	invoice, err := zpay32.Decode(resInvoice.PaymentRequest, m.LightningBackend.GetNetwork())
+	if err != nil {
+		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("zpay32.Decode(resInvoice.PaymentRequest, m.LightningBackend.GetNetwork()). %w", err)
+	}
+	expireTime := invoice.Timestamp.Add(invoice.Expiry()).Unix()
 	now := time.Now().Unix()
 
 	mintRequestDB := cashu.MintRequestDB{
@@ -432,7 +436,7 @@ func (m *Mint) validateMintIssuanceAuth(request cashu.PostMintBolt11Request, min
 		}
 
 		if !valid {
-			return fmt.Errorf("invalid pubkey signature. %w", err)
+			return cashu.ErrMintQuoteNoValidSignature
 		}
 	}
 	return nil

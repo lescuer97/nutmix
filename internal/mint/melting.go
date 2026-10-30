@@ -44,10 +44,11 @@ func (m *Mint) createBolt11MeltQuote(ctx context.Context, meltRequest cashu.Post
 }
 
 func (m *Mint) createAndStoreBolt11MeltQuote(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request, requestData bolt11MeltReqData) (cashu.MeltRequestDB, error) {
-	quoteId, err := utils.RandomHash()
+	quoteUUID, err := newQuoteUUID()
 	if err != nil {
-		return cashu.MeltRequestDB{}, fmt.Errorf("utils.RandomHash(). %w", err)
+		return cashu.MeltRequestDB{}, fmt.Errorf("newQuoteUUID(). %w", err)
 	}
+	quoteId := quoteUUID.String()
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
 	now := time.Now().Unix()
@@ -432,9 +433,6 @@ type bolt11MeltData struct {
 }
 
 func (m *Mint) validateBolt11MeltInputs(meltRequest cashu.PostMeltBolt11Request, quote cashu.MeltRequestDB) (bolt11MeltData, error) {
-	if len(meltRequest.Inputs) == 0 {
-		return bolt11MeltData{}, fmt.Errorf("inputs or outputs are empty")
-	}
 	if quote.State == cashu.PENDING {
 		slog.Warn("Quote is pending")
 		return bolt11MeltData{}, cashu.ErrQuoteIsPending
@@ -443,6 +441,12 @@ func (m *Mint) validateBolt11MeltInputs(meltRequest cashu.PostMeltBolt11Request,
 	if quote.Melted {
 		slog.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
 		return bolt11MeltData{}, cashu.ErrMeltAlreadyPaid
+	}
+	if quote.Expiry > 0 && time.Now().Unix() >= quote.Expiry {
+		return bolt11MeltData{}, cashu.ErrQuoteExpired
+	}
+	if len(meltRequest.Inputs) == 0 {
+		return bolt11MeltData{}, fmt.Errorf("inputs or outputs are empty")
 	}
 
 	proofsAmount, err := meltRequest.Inputs.Amount()
@@ -549,6 +553,9 @@ func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest 
 	if quote.Melted {
 		slog.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
 		return cashu.MeltRequestDB{}, cashu.ErrMeltAlreadyPaid
+	}
+	if quote.Expiry > 0 && time.Now().Unix() >= quote.Expiry {
+		return cashu.MeltRequestDB{}, cashu.ErrQuoteExpired
 	}
 
 	proofs, err := m.validateProofsUnspent(sizeCheckTx, meltRequest.Inputs)

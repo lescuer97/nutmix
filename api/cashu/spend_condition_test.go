@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -31,6 +32,34 @@ func init() {
 
 	sum2 := sha256.Sum256([]byte("54321"))
 	IncorrectPreimage = hex.EncodeToString(sum2[:])
+}
+
+func TestVerifyPreimageRequires32Bytes(t *testing.T) {
+	for _, size := range []int{31, 33} {
+		preimage := make([]byte, size)
+		hash := sha256.Sum256(preimage)
+		condition := &SpendCondition{Type: HTLC, Data: SpendConditionData{Nonce: "", Data: hex.EncodeToString(hash[:]), Tags: TagsInfo{originalTag: "", Pubkeys: nil, Refund: nil, Sigflag: 0, NSigs: 0, Locktime: 0, NSigRefund: 0}}}
+		if err := condition.VerifyPreimage(&Witness{Preimage: hex.EncodeToString(preimage), Signatures: nil}); !errors.Is(err, ErrInvalidPreimage) {
+			t.Errorf("preimage with %d bytes: got %v, want ErrInvalidPreimage", size, err)
+		}
+	}
+}
+
+func TestVerifyPreimageDecodesHashBytes(t *testing.T) {
+	preimage := make([]byte, sha256.Size)
+	hash := sha256.Sum256(preimage)
+	condition := &SpendCondition{Type: HTLC, Data: SpendConditionData{Nonce: "", Data: strings.ToUpper(hex.EncodeToString(hash[:])), Tags: TagsInfo{originalTag: "", Pubkeys: nil, Refund: nil, Sigflag: 0, NSigs: 0, Locktime: 0, NSigRefund: 0}}}
+	if err := condition.VerifyPreimage(&Witness{Preimage: hex.EncodeToString(preimage), Signatures: nil}); err != nil {
+		t.Fatalf("uppercase hash should match by decoded bytes: %v", err)
+	}
+
+	condition.Data.Data = "not-hex"
+	if err := condition.VerifyPreimage(&Witness{Preimage: hex.EncodeToString(preimage), Signatures: nil}); !errors.Is(err, ErrInvalidPreimage) {
+		t.Errorf("malformed hash: got %v, want ErrInvalidPreimage", err)
+	}
+	if err := condition.VerifyPreimage(&Witness{Preimage: "not-hex", Signatures: nil}); !errors.Is(err, ErrInvalidHexPreimage) {
+		t.Errorf("malformed preimage: got %v, want ErrInvalidHexPreimage", err)
+	}
 }
 
 func TestParseProofWithP2PK(t *testing.T) {
@@ -624,7 +653,7 @@ func TestTagsInfoMarshalJSON(t *testing.T) {
 }
 
 func TestTagsInfoLocktimeUint64RoundTrip(t *testing.T) {
-	for _, locktime := range []uint64{math.MaxInt64, math.MaxInt64 + 1, math.MaxUint64} {
+	for _, locktime := range []uint64{1, math.MaxInt64} {
 		t.Run(strconv.FormatUint(locktime, 10), func(t *testing.T) {
 			encoded := fmt.Sprintf(`[["locktime","%d"]]`, locktime)
 			var tags TagsInfo
@@ -958,12 +987,32 @@ func TestInvalidNumericValues(t *testing.T) {
 		{
 			name:      "locktime with non-numeric value",
 			json:      `[["locktime","not_a_number"]]`,
-			expectErr: true,
+			expectErr: false,
+		},
+		{
+			name:      "locktime above signed unix timestamp range",
+			json:      `[["locktime","9223372036854775808"]]`,
+			expectErr: false,
+		},
+		{
+			name:      "negative locktime",
+			json:      `[["locktime","-1"]]`,
+			expectErr: false,
 		},
 		{
 			name:      "n_sigs with negative number string",
 			json:      `[["n_sigs","-1"]]`,
 			expectErr: true, // strconv.ParseUint fails on negative numbers
+		},
+		{
+			name:      "n_sigs must be positive",
+			json:      `[["n_sigs","0"]]`,
+			expectErr: true,
+		},
+		{
+			name:      "n_sigs_refund must be positive",
+			json:      `[["n_sigs_refund","0"]]`,
+			expectErr: true,
 		},
 	}
 
@@ -1098,6 +1147,127 @@ func TestCheckValidWithTooManyPubkeys(t *testing.T) {
 	}
 	if !errors.Is(err, ErrInvalidSpendCondition) {
 		t.Errorf("expected ErrInvalidSpendCondition, got %v", err)
+	}
+}
+
+func TestCheckValidRefundSignatureThreshold(t *testing.T) {
+	_, dataKey := btcec.PrivKeyFromBytes([]byte{2})
+	data := hex.EncodeToString(dataKey.SerializeCompressed())
+	withoutRefundKeys := SpendCondition{Type: P2PK, Data: SpendConditionData{Nonce: "", Data: data, Tags: TagsInfo{NSigRefund: 1}}} //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+	if err := withoutRefundKeys.CheckValid(); !errors.Is(err, ErrInvalidSpendCondition) {
+		t.Fatalf("CheckValid() error = %v, want ErrInvalidSpendCondition", err)
+	}
+
+	_, refundKey := btcec.PrivKeyFromBytes([]byte{1})
+	withRefundKey := SpendCondition{Type: P2PK, Data: SpendConditionData{Nonce: "", Data: data, Tags: TagsInfo{ //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+		originalTag: "", Pubkeys: nil, Sigflag: 0, NSigs: 0, Locktime: 0,
+		Refund:     []*btcec.PublicKey{refundKey},
+		NSigRefund: 1,
+	}}}
+	if err := withRefundKey.CheckValid(); err != nil {
+		t.Fatalf("CheckValid() with one refund key and threshold one: %v", err)
+	}
+}
+
+func TestCheckValidRejectsUnsupportedTypes(t *testing.T) {
+	for _, conditionType := range []SpendConditionType{AnyOneCanSpend, SpendConditionType(999)} {
+		condition := SpendCondition{Type: conditionType} //nolint:exhaustruct // This test isolates the unsupported type guard.
+		if err := condition.CheckValid(); !errors.Is(err, ErrInvalidSpendCondition) {
+			t.Errorf("CheckValid() for type %d = %v, want ErrInvalidSpendCondition", conditionType, err)
+		}
+	}
+
+	_, key := btcec.PrivKeyFromBytes([]byte{1})
+	validConditions := []SpendCondition{
+		{Type: P2PK, Data: SpendConditionData{Data: hex.EncodeToString(key.SerializeCompressed())}}, //nolint:exhaustruct // Empty tags are valid.
+		{Type: HTLC, Data: SpendConditionData{Data: strings.Repeat("ab", 32)}},                      //nolint:exhaustruct // Empty tags are valid.
+	}
+	for _, condition := range validConditions {
+		if err := condition.CheckValid(); err != nil {
+			t.Errorf("CheckValid() for supported type %d = %v", condition.Type, err)
+		}
+	}
+}
+
+func TestCheckValidPublicKeyPathwayDuplicates(t *testing.T) {
+	_, key := btcec.PrivKeyFromBytes([]byte{1})
+	compressed := key.SerializeCompressed()
+	flipped := append([]byte(nil), compressed...)
+	if flipped[0] == 0x02 {
+		flipped[0] = 0x03
+	} else {
+		flipped[0] = 0x02
+	}
+	_, otherKey := btcec.PrivKeyFromBytes([]byte{2})
+
+	tests := []struct {
+		name    string
+		data    string
+		tags    TagsInfo
+		wantErr bool
+	}{
+		{name: "data duplicated in pubkeys", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{key}}, wantErr: true},                                              //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+		{name: "opposite parity duplicate", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{mustParsePubKey(t, flipped)}}, wantErr: true},                       //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+		{name: "refund may overlap spend pathway", data: hex.EncodeToString(compressed), tags: TagsInfo{Pubkeys: []*btcec.PublicKey{otherKey}, Refund: []*btcec.PublicKey{key}}, wantErr: false}, //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+		{name: "nil pubkey", data: "", tags: TagsInfo{Pubkeys: []*btcec.PublicKey{nil}}, wantErr: true},                                                                                          //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+		{name: "nil refund key", data: "", tags: TagsInfo{Refund: []*btcec.PublicKey{nil}}, wantErr: true},                                                                                       //nolint:exhaustruct // Unset tag fields represent their zero-value absence.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			condition := SpendCondition{Type: P2PK, Data: SpendConditionData{Data: tt.data, Tags: tt.tags, Nonce: ""}}
+			err := condition.CheckValid()
+			if tt.wantErr && !errors.Is(err, ErrInvalidSpendCondition) {
+				t.Fatalf("CheckValid() error = %v, want ErrInvalidSpendCondition", err)
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("CheckValid() error = %v", err)
+			}
+		})
+	}
+}
+
+func mustParsePubKey(t *testing.T, serialized []byte) *btcec.PublicKey {
+	t.Helper()
+	key, err := btcec.ParsePubKey(serialized)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
+}
+
+func TestCheckValidHTLCHash(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		hash       string
+		withRefund bool
+		wantErr    bool
+	}{
+		// Published NUT-11 HTLC vector from cashubtc/nuts@1363de413294e2ef3a57b16950f9506af38fffc2/tests/11-test.md:
+		// SHA256(32 zero bytes followed by 0x01).
+		{name: "published NUT-11 HTLC hash", hash: "ec4916dd28fc4c10d78e287ca5d9cc51ee1ae73cbfde08c6b37324cbfaac8bc5", withRefund: false, wantErr: false},
+		{name: "valid hash", hash: strings.Repeat("ab", 32), withRefund: false, wantErr: false},
+		{name: "valid hash with refund", hash: strings.Repeat("ab", 32), withRefund: true, wantErr: false},
+		{name: "non-hex", hash: strings.Repeat("g", 64), withRefund: false, wantErr: true},
+		{name: "odd-length", hash: strings.Repeat("a", 63), withRefund: false, wantErr: true},
+		{name: "short", hash: strings.Repeat("ab", 31), withRefund: false, wantErr: true},
+		{name: "long", hash: strings.Repeat("ab", 33), withRefund: false, wantErr: true},
+		{name: "32 characters", hash: strings.Repeat("ab", 16), withRefund: false, wantErr: true},
+		{name: "invalid with refund", hash: "x", withRefund: true, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			condition := SpendCondition{Type: HTLC, Data: SpendConditionData{Data: tc.hash, Nonce: "", Tags: TagsInfo{}}} //nolint:exhaustruct // Tags are populated only for refund cases.
+			if tc.withRefund {
+				_, refundKey := btcec.PrivKeyFromBytes([]byte{1})
+				condition.Data.Tags.Refund = []*btcec.PublicKey{refundKey}
+			}
+			err := condition.CheckValid()
+			if tc.wantErr && !errors.Is(err, ErrInvalidSpendCondition) {
+				t.Fatalf("CheckValid() error = %v, want ErrInvalidSpendCondition", err)
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("CheckValid() error = %v", err)
+			}
+		})
 	}
 }
 

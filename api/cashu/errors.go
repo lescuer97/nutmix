@@ -7,6 +7,7 @@ import (
 var (
 	ErrMeltAlreadyPaid            = errors.New("melt already paid")
 	ErrQuoteIsPending             = errors.New("quote is pending")
+	ErrQuoteExpired               = errors.New("quote expired")
 	ErrUnitNotSupported           = errors.New("unit not supported")
 	ErrDifferentInputOutputUnit   = errors.New("different input output unit")
 	ErrNotEnoughtProofs           = errors.New("not enough proofs")
@@ -58,6 +59,7 @@ const (
 	LIGHTNING_PAYMENT_FAILED ErrorCode = 20004
 	QUOTE_PENDING            ErrorCode = 20005
 	INVOICE_ALREADY_PAID     ErrorCode = 20006
+	QUOTE_EXPIRED            ErrorCode = 20007
 
 	MINT_QUOTE_INVALID_SIG     ErrorCode = 20008
 	MINT_QUOTE_INVALID_PUB_KEY ErrorCode = 20009
@@ -125,6 +127,8 @@ func (e ErrorCode) String() string {
 		error = "Quote is pending"
 	case INVOICE_ALREADY_PAID:
 		error = "Invoice already paid"
+	case QUOTE_EXPIRED:
+		error = "Quote is expired"
 
 	case ENDPOINT_REQUIRES_CLEAR_AUTH:
 		error = "Endpoint requires clear auth"

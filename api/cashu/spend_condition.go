@@ -1,6 +1,7 @@
 package cashu
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -76,17 +77,41 @@ func (sc *SpendCondition) String() (string, error) {
 }
 
 func (sc *SpendCondition) CheckValid() error {
+	if sc.Type != P2PK && sc.Type != HTLC {
+		return ErrInvalidSpendCondition
+	}
+
+	if sc.Type == HTLC {
+		hashBytes, err := hex.DecodeString(sc.Data.Data)
+		if err != nil || len(hashBytes) != sha256.Size {
+			return fmt.Errorf("invalid HTLC hash: %w", ErrInvalidSpendCondition)
+		}
+	}
+
 	if len(sc.Data.Tags.Pubkeys)+len(sc.Data.Tags.Refund) > maxSpendConditionTagKeys {
 		return ErrInvalidSpendCondition
 	}
 
 	// NUT-11: a key may appear at most once per pathway (compared by
 	// x-coordinate). A duplicate makes the secret malformed.
-	dedup := make(map[string]struct{}, len(sc.Data.Tags.Pubkeys))
+	dedup := make(map[string]struct{}, len(sc.Data.Tags.Pubkeys)+1)
 	seenX := make(map[string]struct{}, len(sc.Data.Tags.Pubkeys))
+	if sc.Type == P2PK {
+		dataPubkeyBytes, err := hex.DecodeString(sc.Data.Data)
+		if err != nil || len(dataPubkeyBytes) != 33 || (dataPubkeyBytes[0] != 0x02 && dataPubkeyBytes[0] != 0x03) {
+			return fmt.Errorf("invalid P2PK data public key: %w", ErrInvalidSpendCondition)
+		}
+		dataPubkey, err := btcec.ParsePubKey(dataPubkeyBytes)
+		if err != nil {
+			return fmt.Errorf("invalid P2PK data public key: %w", ErrInvalidSpendCondition)
+		}
+		if err := addCanonicalKey(dedup, seenX, dataPubkey); err != nil {
+			return err
+		}
+	}
 	for _, pubkey := range sc.Data.Tags.Pubkeys {
 		if pubkey == nil {
-			continue
+			return fmt.Errorf("nil public key in pubkeys pathway: %w", ErrInvalidSpendCondition)
 		}
 		if err := addCanonicalKey(dedup, seenX, pubkey); err != nil {
 			return err
@@ -96,7 +121,7 @@ func (sc *SpendCondition) CheckValid() error {
 	seenX = make(map[string]struct{}, len(sc.Data.Tags.Refund))
 	for _, pubkey := range sc.Data.Tags.Refund {
 		if pubkey == nil {
-			continue
+			return fmt.Errorf("nil public key in refund pathway: %w", ErrInvalidSpendCondition)
 		}
 		if err := addCanonicalKey(dedup, seenX, pubkey); err != nil {
 			return err
@@ -116,7 +141,7 @@ func (sc *SpendCondition) CheckValid() error {
 		}
 	}
 
-	if len(sc.Data.Tags.Refund) > 0 && sc.Data.Tags.NSigRefund > uint(len(sc.Data.Tags.Refund)) {
+	if sc.Data.Tags.NSigRefund > uint(len(sc.Data.Tags.Refund)) {
 		return fmt.Errorf("n_sigs_refund exceeds available refund pubkeys: %w", ErrInvalidSpendCondition)
 	}
 
@@ -313,6 +338,9 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 			if err != nil {
 				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
 			}
+			if nSigs == 0 {
+				return fmt.Errorf("n_sigs must be positive: %w", ErrInvalidSpendCondition)
+			}
 
 			tags.NSigs = uint(nSigs)
 
@@ -325,6 +353,9 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 			if err != nil {
 				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
 			}
+			if nSigsRefund == 0 {
+				return fmt.Errorf("n_sigs_refund must be positive: %w", ErrInvalidSpendCondition)
+			}
 
 			tags.NSigRefund = uint(nSigsRefund)
 
@@ -333,12 +364,18 @@ func (tags *TagsInfo) UnmarshalJSON(b []byte) error {
 				return fmt.Errorf("%w: %s", ErrMalformedTag, tag)
 			}
 
-			locktime, err := strconv.ParseUint(tagInfo[0], 10, 64)
+			// NUT-11 treats a locktime that is not a valid Unix timestamp as
+			// a permanent lock. Parse only timestamps representable by Unix
+			// time; ignoring an invalid value leaves Locktime unset (zero).
+			locktime, err := strconv.ParseInt(tagInfo[0], 10, 64)
 			if err != nil {
-				return fmt.Errorf("strconv.ParseUint: %s: %w", tagInfo[0], err)
+				continue
 			}
 
-			tags.Locktime = locktime
+			if locktime < 0 {
+				continue
+			}
+			tags.Locktime = uint64(locktime)
 		}
 	}
 	tags.originalTag = string(b)
@@ -369,9 +406,16 @@ func (sc *SpendCondition) VerifyPreimage(witness *Witness) error {
 	if err != nil {
 		return errors.Join(ErrInvalidHexPreimage, err)
 	}
+	if len(preImageBytes) != sha256.Size {
+		return ErrInvalidPreimage
+	}
+	hashBytes, err := hex.DecodeString(sc.Data.Data)
+	if err != nil || len(hashBytes) != sha256.Size {
+		return ErrInvalidPreimage
+	}
 
 	parsedPreimage := sha256.Sum256(preImageBytes)
-	if hex.EncodeToString(parsedPreimage[:]) != sc.Data.Data {
+	if !bytes.Equal(parsedPreimage[:], hashBytes) {
 		return ErrInvalidPreimage
 	}
 

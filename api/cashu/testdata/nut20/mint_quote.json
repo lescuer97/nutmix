@@ -1,0 +1,22 @@
+{
+  "source": "https://github.com/cashubtc/nuts/blob/1363de413294e2ef3a57b16950f9506af38fffc2/tests/20-test.md",
+  "source_sha256": "7c178b14e4fad68b8e38fd7265cb3eb8ac7cb6ce58882f27697de71e91ca8231",
+  "pubkey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "request": {
+    "quote": "0192d3c0-7e8a-7c3d-8e9f-1a2b3c4d5e6f",
+    "outputs": [
+      {
+        "amount": 1,
+        "id": "009a1f293253e41e",
+        "B_": "036d6caac248af96f6afa7f904f550253a0f3ef3f5aa2fe6838a95b216691468e2"
+      },
+      {
+        "amount": 1,
+        "id": "009a1f293253e41e",
+        "B_": "021f8a566c205633d029094747d2e18f44e05993dda7a5f88f496078205f656e59"
+      }
+    ],
+    "signature": "4881093a332ff7c79f3e598ce5b249d64978b47165a0b19c18adf0ced0246228e61e702f0abaf1bf27b92be4336bdbabacfbe4c914076386b3c66fdcd0b3480e"
+  },
+  "expected_sha256": "c164fd384879f74ab6ea2e7cf13d90ed42e6df9d5de607eeb5c9cc7d36fb1c21"
+}
