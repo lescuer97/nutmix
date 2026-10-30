@@ -187,6 +187,16 @@ func changeAuthSettings(mint *m.Mint, c *gin.Context) error {
 
 	authBlindArray := c.PostFormArray("MINT_AUTH_BLIND_AUTH_URLS")
 	authClearArray := c.PostFormArray("MINT_AUTH_CLEAR_AUTH_URLS")
+	for _, pattern := range authBlindArray {
+		if err := cashu.ValidateAuthEndpointPattern(pattern); err != nil {
+			return fmt.Errorf("invalid blind auth endpoint pattern: %w", err)
+		}
+	}
+	for _, pattern := range authClearArray {
+		if err := cashu.ValidateAuthEndpointPattern(pattern); err != nil {
+			return fmt.Errorf("invalid clear auth endpoint pattern: %w", err)
+		}
+	}
 
 	rateLimitPerMinute, err := strconv.ParseUint(rateLimitPerMinuteStr, 10, 64)
 	if err != nil {

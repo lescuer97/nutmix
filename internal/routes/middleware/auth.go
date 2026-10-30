@@ -3,9 +3,8 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
-	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,15 +21,27 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 		if mint.Config.MINT_REQUIRE_AUTH {
 			// Check if current path matches any of the patterns
 			for _, pattern := range mint.Config.MINT_AUTH_CLEAR_AUTH_URLS {
-				if !mint.Config.MINT_REQUIRE_AUTH {
-					log.Panicf("mint require auth should always be on when using the middleware")
+				if err := cashu.ValidateAuthEndpointPattern(pattern); err != nil {
+					slog.Error("Invalid clear auth endpoint configuration", slog.Any("error", err))
+					c.JSON(500, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
+					c.Abort()
+					return
 				}
-
 				matches, err := matchesPattern(requestPath, pattern)
 				if err != nil {
-					log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
+					slog.Error("Invalid clear auth endpoint configuration", slog.String("pattern", pattern), slog.Any("error", err))
+					c.JSON(500, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
+					c.Abort()
+					return
 				}
 				if matches {
+					clearAuth := c.GetHeader("Clear-auth")
+					if clearAuth == "" {
+						slog.Warn("Tried to do a clear auth without token.")
+						c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
+						c.Abort()
+						return
+					}
 					if mint.OICDClient == nil {
 						ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 						defer cancel()
@@ -45,13 +56,6 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 					}
 					slog.Info("Trying to access restricted route")
 					// For paths matching the pattern, check for the "clear auth" header
-					clearAuth := c.GetHeader("Clear-auth")
-					if clearAuth == "" {
-						slog.Warn("Tried to do a clear auth without token.")
-						c.JSON(401, cashu.ErrorCodeToResponse(cashu.ENDPOINT_REQUIRES_CLEAR_AUTH, nil))
-						c.Abort()
-						return
-					}
 					// check if it's valid token
 					token := c.GetHeader("Clear-auth")
 					err := mint.VerifyAuthClearToken(token)
@@ -80,16 +84,23 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 
 		if !mint.Config.MINT_REQUIRE_AUTH {
 			c.Next()
+			return
 		}
 		if mint.Config.MINT_REQUIRE_AUTH {
 			// Check if current path matches any of the patterns
 			for _, pattern := range mint.Config.MINT_AUTH_BLIND_AUTH_URLS {
-				if !mint.Config.MINT_REQUIRE_AUTH {
-					log.Panicf("mint require auth should always be on when using the middleware")
+				if err := cashu.ValidateAuthEndpointPattern(pattern); err != nil {
+					slog.Error("Invalid blind auth endpoint configuration", slog.Any("error", err))
+					c.JSON(500, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
+					c.Abort()
+					return
 				}
 				matches, err := matchesPattern(requestPath, pattern)
 				if err != nil {
-					log.Panicf("This should not happen and something went wrong %+v. Patten: %s", err, pattern)
+					slog.Error("Invalid blind auth endpoint configuration", slog.String("pattern", pattern), slog.Any("error", err))
+					c.JSON(500, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
+					c.Abort()
+					return
 				}
 				if matches {
 					slog.Info("Trying to access restricted route")
@@ -131,9 +142,11 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 // matchesPattern checks if a path matches a pattern
 // Simple implementation that handles wildcards at the end of paths (e.g., /v1/mint/*)
 func matchesPattern(path, pattern string) (bool, error) {
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return false, fmt.Errorf("regexp.Compile(pattern). %w", err)
+	if strings.Contains(pattern, "*") && (!strings.HasSuffix(pattern, "*") || strings.Count(pattern, "*") != 1) {
+		return false, fmt.Errorf("wildcard must appear only once at the end")
 	}
-	return regex.MatchString(path), nil
+	if strings.HasSuffix(pattern, "*") {
+		return strings.HasPrefix(path, strings.TrimSuffix(pattern, "*")), nil
+	}
+	return path == pattern, nil
 }

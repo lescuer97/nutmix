@@ -5,10 +5,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	gonutsCrypto "github.com/elnosh/gonuts/crypto"
 )
+
+// ValidateAuthEndpointPattern accepts literal NUT-21 endpoint paths and a
+// single trailing wildcard. Patterns are never rewritten.
+func ValidateAuthEndpointPattern(pattern string) error {
+	if pattern == "" || pattern[0] != '/' || strings.ContainsAny(pattern, "^$()[]{}+?|\\") {
+		return fmt.Errorf("unsupported auth endpoint pattern %q", pattern)
+	}
+	if strings.Contains(pattern, "*") && (!strings.HasSuffix(pattern, "*") || strings.Count(pattern, "*") != 1) {
+		return fmt.Errorf("wildcard must appear only once at the end")
+	}
+	return nil
+}
 
 var (
 	ErrInvalidAuthToken  = errors.New("invalid auth token")

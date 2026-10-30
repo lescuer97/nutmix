@@ -2,8 +2,30 @@ package middleware
 
 import "testing"
 
+func TestMatchesPatternUsesLiteralAndTrailingWildcard(t *testing.T) {
+	tests := []struct {
+		path, pattern string
+		want          bool
+	}{
+		{"/v1/mint/bolt11", "/v1/mint/bolt11", true},
+		{"/v1/mint/bolt11/123", "/v1/mint/bolt11", false},
+		{"/v1/mint/quote/bolt11", "/v1/mint/*", true},
+		{"/v1Xmint/bolt11", "/v1.mint/*", false},
+		{"/v1.mint/bolt11", "/v1.mint/*", true},
+	}
+	for _, test := range tests {
+		got, err := matchesPattern(test.path, test.pattern)
+		if err != nil || got != test.want {
+			t.Errorf("matchesPattern(%q, %q) = %v, %v; want %v", test.path, test.pattern, got, err, test.want)
+		}
+	}
+	if _, err := matchesPattern("/v1/mint/x", "/v1/*/x"); err == nil {
+		t.Fatal("expected non-trailing wildcard to fail")
+	}
+}
+
 func TestMintMatchPattern(t *testing.T) {
-	mintRegexPattern := "^/v1/mint/.*"
+	mintRegexPattern := "/v1/mint/*"
 
 	matches, err := matchesPattern("/v1/mint/quote/bolt11", mintRegexPattern)
 	if err != nil {
@@ -105,7 +127,7 @@ func TestMintMatchPattern(t *testing.T) {
 }
 
 func TestMeltMatchPattern(t *testing.T) {
-	meltRegexPattern := "^/v1/melt/.*"
+	meltRegexPattern := "/v1/melt/*"
 
 	matches, err := matchesPattern("/v1/melt/quote/bolt11", meltRegexPattern)
 	if err != nil {

@@ -47,8 +47,8 @@ func TestValidateBolt11MeltInputsPreservesExpiredQuoteStateErrors(t *testing.T) 
 
 	for _, test := range []struct {
 		name  string
-		quote cashu.MeltRequestDB
 		want  error
+		quote cashu.MeltRequestDB
 	}{
 		{
 			name:  "pending",
