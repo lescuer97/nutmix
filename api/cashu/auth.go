@@ -96,6 +96,9 @@ func ConvertRouteListToProtectedRouteList(list []string) []ProtectedRoute {
 }
 
 func DecodeAuthToken(tokenstr string) (AuthProof, error) {
+	if len(tokenstr) < len("authA") {
+		return AuthProof{}, ErrInvalidAuthToken
+	}
 	prefixVersion := tokenstr[:5]
 	base64Token := tokenstr[5:]
 	if prefixVersion != "authA" {
