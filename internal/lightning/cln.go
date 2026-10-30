@@ -6,11 +6,13 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"math"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/google/uuid"
 	"github.com/lescuer97/nutmix/api/cashu"
 	cln_grpc "github.com/lescuer97/nutmix/internal/lightning/proto"
+	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/zpay32"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -102,24 +104,20 @@ func (l *CLNGRPCWallet) clnGrpcPayInvoice(invoice string, feeReserve cashu.Amoun
 		Msat: feeMsat.Amount,
 	}
 
-	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee} //nolint:exhaustruct
+	sendRequest := cln_grpc.XpayRequest{Invstring: invoice, Maxfee: &max_fee} //nolint:exhaustruct
 
-	res, err := client.Pay(ctx, &sendRequest)
+	res, err := client.Xpay(ctx, &sendRequest)
 
 	if err != nil {
 		return err
 	}
 
-	if res.Status == cln_grpc.PayResponse_FAILED {
-		return fmt.Errorf("payment failed")
+	// Xpay returns a preimage on success, rather than a payment status.
+	if res.AmountMsat == nil || res.AmountSentMsat == nil || res.AmountSentMsat.Msat < res.AmountMsat.Msat {
+		return fmt.Errorf("invalid xpay amounts")
 	}
-	switch res.Status {
-	case cln_grpc.PayResponse_FAILED:
-		lightningResponse.PaymentState = FAILED
-		return fmt.Errorf("payment failed")
-	case cln_grpc.PayResponse_PENDING:
-		lightningResponse.PaymentState = PENDING
-		return nil
+	if len(res.PaymentPreimage) != 32 {
+		return fmt.Errorf("invalid xpay preimage")
 	}
 
 	lightningResponse.PaymentRequest = invoice
@@ -147,36 +145,32 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 	if err != nil {
 		return fmt.Errorf(`amount.To(cashu.Msat) %w`, err)
 	}
-	err = feeReserve.To(cashu.Msat)
+	feeMsat := feeReserve
+	err = feeMsat.To(cashu.Msat)
 	if err != nil {
 		return fmt.Errorf(`feeReserve.To(cashu.Msat) %w`, err)
 	}
 
 	max_fee := cln_grpc.Amount{
-		Msat: feeReserve.Amount,
+		Msat: feeMsat.Amount,
 	}
 
 	partialSats := cln_grpc.Amount{
 		Msat: amount.Amount,
 	}
-	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee, PartialMsat: &partialSats} //nolint:exhaustruct
+	sendRequest := cln_grpc.XpayRequest{Invstring: invoice, Maxfee: &max_fee, PartialMsat: &partialSats} //nolint:exhaustruct
 
-	res, err := client.Pay(ctx, &sendRequest)
+	res, err := client.Xpay(ctx, &sendRequest)
 
 	if err != nil {
 		return err
 	}
 
-	if res.Status == cln_grpc.PayResponse_FAILED {
-		return fmt.Errorf("payment failed")
+	if res.AmountMsat == nil || res.AmountSentMsat == nil || res.AmountSentMsat.Msat < res.AmountMsat.Msat {
+		return fmt.Errorf("invalid xpay amounts")
 	}
-	switch res.Status {
-	case cln_grpc.PayResponse_FAILED:
-		lightningResponse.PaymentState = FAILED
-		return fmt.Errorf("payment failed")
-	case cln_grpc.PayResponse_PENDING:
-		lightningResponse.PaymentState = PENDING
-		return nil
+	if len(res.PaymentPreimage) != 32 {
+		return fmt.Errorf("invalid xpay preimage")
 	}
 
 	lightningResponse.PaymentRequest = invoice
@@ -305,14 +299,32 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 		Msat: queryAmount.Amount,
 	}
 
+	info, err := client.Getinfo(ctx, &cln_grpc.GetinfoRequest{})
+	if err != nil {
+		return feesResponse, fmt.Errorf("client.Getinfo(ctx): %w", err)
+	}
+	finalCLTV := zpayInvoice.MinFinalCLTVExpiry()
+	if finalCLTV > 2016 {
+		return feesResponse, fmt.Errorf("invoice final CLTV exceeds 2016 blocks")
+	}
+	// This is a fee estimate, not a payment. Do not introduce a fee cap;
+	// leave room for the payment amount without overflowing CLN's msat total.
+	maxFee := cln_grpc.Amount{Msat: math.MaxUint64 - amountGrpc.Msat}
 	//nolint:exhaustruct
-	queryRoutes := cln_grpc.GetrouteRequest{
-		Id:         zpayInvoice.Destination.SerializeCompressed(),
-		AmountMsat: &amountGrpc,
-		Riskfactor: 10,
+	queryRoutes := cln_grpc.GetroutesRequest{
+		Source:      info.Id,
+		Destination: zpayInvoice.Destination.SerializeCompressed(),
+		AmountMsat:  &amountGrpc,
+		Layers:      []string{"auto.localchans", "auto.sourcefree"},
+		MaxfeeMsat:  &maxFee,
+		FinalCltv:   uint32(finalCLTV),
+	}
+	if zpayInvoice.Features == nil || !zpayInvoice.Features.HasFeature(lnwire.MPPOptional) {
+		maxParts := uint32(1)
+		queryRoutes.Maxparts = &maxParts
 	}
 
-	res, err := client.GetRoute(ctx, &queryRoutes)
+	res, err := client.GetRoutes(ctx, &queryRoutes)
 
 	if err != nil {
 		return feesResponse, err
@@ -321,11 +333,27 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 		return feesResponse, fmt.Errorf("no routes found")
 	}
 
-	if len(res.Route) == 0 {
+	if len(res.Routes) == 0 {
 		return feesResponse, fmt.Errorf("no routes found")
 	}
 
-	feeMsat := amountGrpc.Msat - res.Route[len(res.Route)-1].AmountMsat.Msat
+	// GetRoutes returns parts of one payment, not alternative routes. Each
+	// part's fee is its first-hop input minus the amount delivered.
+	var feeMsat uint64
+	for _, route := range res.Routes {
+		if route == nil || route.AmountMsat == nil || len(route.Path) == 0 || route.Path[0] == nil || route.Path[0].AmountInMsat == nil {
+			return feesResponse, fmt.Errorf("invalid getroutes route")
+		}
+		sent := route.Path[0].AmountInMsat.Msat
+		if sent < route.AmountMsat.Msat {
+			return feesResponse, fmt.Errorf("invalid getroutes amounts")
+		}
+		partFee := sent - route.AmountMsat.Msat
+		if partFee > math.MaxUint64-feeMsat {
+			return feesResponse, fmt.Errorf("getroutes fee overflow")
+		}
+		feeMsat += partFee
+	}
 
 	// Create fee Amount in Msat (what CLN returns) and convert to requested unit
 	feesResponse.Fees = cashu.NewAmount(cashu.Msat, feeMsat)

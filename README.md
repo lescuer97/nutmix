@@ -44,6 +44,12 @@ If you have this correctly setup it should be as easy as running a simple docker
 docker compose up -d 
 ```
 
+### Core Lightning backend
+
+The CLN gRPC backend requires Core Lightning v26.06 or newer, with the `xpay`
+and `askrene` plugins enabled. Its rune must allow `xpay`, `getroutes`, and
+`getinfo`, in addition to the invoice and payment-listing RPCs.
+
 ## Setting up a remote signer.
 
 Right now there are two remote signer implementations. 
@@ -153,5 +159,4 @@ bc1qp7lswgftpgrkt00vszrm63dmkq3nuxjv60czk6
 ```
 84yCRZY6BXebs8xWE6Yzj6S6cE17uLhkTSynneVPmejjWAcgBtnV7UEUiZqJNLE4pXaPmXNkJuhcAYbpu49zAdVsEZqqxac
 ```
-
 
