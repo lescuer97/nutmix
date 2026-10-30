@@ -432,7 +432,7 @@ func (m *Mint) validateMintIssuanceAuth(request cashu.PostMintBolt11Request, min
 		}
 
 		if !valid {
-			return fmt.Errorf("invalid pubkey signature. %w", err)
+			return cashu.ErrMintQuoteNoValidSignature
 		}
 	}
 	return nil
