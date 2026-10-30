@@ -15,7 +15,7 @@ import (
 func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 	ctx := context.Background()
 
-	if clams.ClientId != m.Config.MINT_AUTH_OICD_CLIENT_ID {
+	if clams.Sub == "" {
 		return cashu.ErrInvalidAuthToken
 	}
 	tx, err := m.MintDB.GetTx(ctx)
@@ -59,7 +59,7 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 }
 
 func (m *Mint) VerifyAuthClearToken(token string) error {
-	verifier := m.OICDClient.Verifier(&oidc.Config{ClientID: m.Config.MINT_AUTH_OICD_CLIENT_ID, Now: time.Now, SkipClientIDCheck: false}) //nolint:exhaustruct
+	verifier := m.OICDClient.Verifier(&oidc.Config{ClientID: m.Config.MINT_AUTH_OICD_CLIENT_ID, Now: time.Now, SkipClientIDCheck: true}) //nolint:exhaustruct
 
 	ctx := context.Background()
 	idToken, err := verifier.Verify(ctx, token)
@@ -70,16 +70,29 @@ func (m *Mint) VerifyAuthClearToken(token string) error {
 	if now.Unix() >= idToken.Expiry.Unix() {
 		return cashu.ErrClearTokenExpired
 	}
-	clams := cashu.AuthClams{
-		Aud:      nil,
-		Sub:      "",
-		ClientId: "",
+	var claims struct {
+		Sub string `json:"sub"`
 	}
-	err = idToken.Claims(&clams)
+	err = idToken.Claims(&claims)
 	if err != nil {
-		return fmt.Errorf("idToken.Claims(&clams). %w", err)
+		return fmt.Errorf("idToken.Claims(&claims). %w", err)
 	}
-	err = m.verifyClams(clams)
+	if len(idToken.Audience) > 0 {
+		audienceMatches := false
+		for _, audience := range idToken.Audience {
+			if audience == m.MintPubkey || audience == m.Config.MINT_AUTH_OICD_CLIENT_ID {
+				audienceMatches = true
+				break
+			}
+		}
+		if !audienceMatches {
+			return cashu.ErrInvalidAuthToken
+		}
+	}
+	if claims.Sub == "" {
+		return cashu.ErrInvalidAuthToken
+	}
+	err = m.verifyClams(cashu.AuthClams{Sub: claims.Sub}) //nolint:exhaustruct
 	if err != nil {
 		return fmt.Errorf("m.verifyClams(clams). %w", err)
 	}
