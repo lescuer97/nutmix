@@ -457,6 +457,7 @@ type RecoverSigDB struct {
 	Dleq      *BlindSignatureDLEQ `json:"dleq,omitempty"`
 	Id        string              `json:"id"`
 	MeltQuote string              `json:"melt_quote" db:"melt_quote"`
+	MintQuote string              `json:"-" db:"mint_quote_id"`
 	Amount    uint64              `json:"amount"`
 	CreatedAt int64               `json:"created_at" db:"created_at"`
 }

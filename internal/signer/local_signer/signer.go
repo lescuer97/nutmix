@@ -305,6 +305,7 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 			Dleq:      blindSignature.Dleq,
 			CreatedAt: time.Now().Unix(),
 			MeltQuote: "",
+			MintQuote: "",
 		}
 
 		if err != nil {

@@ -141,10 +141,11 @@ func (pql Postgresql) GetProofStatsRows(ctx context.Context, tx pgx.Tx, startDat
 }
 
 func (pql Postgresql) GetBlindSigStatsRows(ctx context.Context, tx pgx.Tx, startDate, endDate int64) ([]database.KeysetStatsRow, error) {
-	rows, err := tx.Query(ctx, `SELECT recovery_signature.id AS keyset_id, recovery_signature.amount, COALESCE(seeds.unit, '') AS unit
-		FROM recovery_signature
-		LEFT JOIN seeds ON seeds.id = recovery_signature.id
-		WHERE recovery_signature.created_at >= $1 AND recovery_signature.created_at <= $2`, startDate, endDate)
+	rows, err := tx.Query(ctx, `SELECT m.keyset_id, m.amount, COALESCE(seeds.unit, '') AS unit
+		FROM blind_signatures s
+		JOIN blind_messages m ON m.signature_id = s.id
+		LEFT JOIN seeds ON seeds.id = m.keyset_id
+		WHERE m.state = 'SIGNED' AND s.created_at >= $1 AND s.created_at <= $2`, startDate, endDate)
 	if err != nil {
 		return nil, databaseError(fmt.Errorf("GetBlindSigStatsRows query error: %w", err))
 	}

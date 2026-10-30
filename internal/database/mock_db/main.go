@@ -149,7 +149,14 @@ func (m *MockDB) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, 
 		return cashu.MeltRequestDB{}, pgx.ErrNoRows
 	}
 
-	return meltRequests[0], nil
+	quote := meltRequests[0]
+	quote.Change = nil
+	for _, sig := range m.RecoverSigDB {
+		if sig.MeltQuote == id {
+			quote.Change = append(quote.Change, sig.GetBlindSignature())
+		}
+	}
+	return quote, nil
 }
 func (m *MockDB) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
 	var meltRequests []cashu.MeltRequestDB
@@ -171,7 +178,7 @@ func (m *MockDB) SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error {
 	return nil
 }
 
-func (m *MockDB) AddPreimageMeltRequest(tx pgx.Tx, preimage string, quote string) error {
+func (m *MockDB) AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage string) error {
 	for i := 0; i < len(m.MeltRequest); i++ {
 		if m.MeltRequest[i].Quote == quote {
 			m.MeltRequest[i].PaymentPreimage = preimage
@@ -284,6 +291,43 @@ func (m *MockDB) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.Wrapped
 }
 
 func (m *MockDB) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error {
+	seen := make(map[string]bool, len(recover_sigs))
+	points := make([]cashu.WrappedPublicKey, len(recover_sigs))
+	for i, sig := range recover_sigs {
+		if sig.B_.PublicKey == nil || sig.C_.PublicKey == nil || sig.Amount == 0 || sig.Id == "" || sig.MeltQuote != "" ||
+			(sig.Dleq != nil && (sig.Dleq.E == nil || sig.Dleq.S == nil)) {
+			return cashu.ErrInvalidBlindMessage
+		}
+		key := sig.B_.ToHex()
+		if seen[key] {
+			return cashu.ErrRepeatedOutput
+		}
+		seen[key] = true
+		points[i] = sig.B_
+	}
+	if err := m.CheckBlindMessagesAvailable(tx, points); err != nil {
+		return err
+	}
 	m.RecoverSigDB = append(m.RecoverSigDB, recover_sigs...)
+	return nil
+}
+
+func (m *MockDB) CheckBlindMessagesAvailable(_ pgx.Tx, points []cashu.WrappedPublicKey) error {
+	for _, point := range points {
+		if point.PublicKey == nil {
+			return cashu.ErrInvalidBlindMessage
+		}
+		key := point.ToHex()
+		for _, stored := range m.RecoverSigDB {
+			if stored.B_.ToHex() == key {
+				return cashu.ErrBlindMessageAlreadySigned
+			}
+		}
+		for _, pending := range m.MeltChange {
+			if pending.B_.ToHex() == key {
+				return cashu.ErrOutputPending
+			}
+		}
+	}
 	return nil
 }

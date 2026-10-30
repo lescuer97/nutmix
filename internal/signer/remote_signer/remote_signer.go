@@ -294,6 +294,7 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 			CreatedAt: now,
 			Dleq:      val.Dleq,
 			MeltQuote: "",
+			MintQuote: "",
 		})
 	}
 

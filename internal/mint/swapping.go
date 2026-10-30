@@ -272,14 +272,5 @@ func (m *Mint) ValidateOutputsNotSpent(tx pgx.Tx, blindedMessages cashu.BlindedM
 		blindingFactors = append(blindingFactors, output.B_)
 	}
 
-	blindRecoverySigs, err := m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)
-	if err != nil {
-		return fmt.Errorf("m.GetRestorySigsFromBlindFactor(blindingFactors). %w", err)
-	}
-
-	if len(blindRecoverySigs) != 0 {
-		return fmt.Errorf("blind message already has been signed: %w", cashu.ErrBlindMessageAlreadySigned)
-	}
-
-	return nil
+	return m.MintDB.CheckBlindMessagesAvailable(tx, blindingFactors)
 }

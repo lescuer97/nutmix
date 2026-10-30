@@ -23,10 +23,6 @@ type Postgresql struct {
 	pool *pgxpool.Pool
 }
 
-func databaseError(err error) error {
-	return errors.Join(ErrDB, err)
-}
-
 func DatabaseSetup(ctx context.Context, migrationDir string) (Postgresql, error) {
 	var postgresql Postgresql
 
@@ -60,7 +56,10 @@ func (pql Postgresql) GetTx(ctx context.Context) (pgx.Tx, error) {
 }
 
 func (pql Postgresql) Commit(ctx context.Context, tx pgx.Tx) error {
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return databaseError(err)
+	}
+	return nil
 }
 func (pql Postgresql) Rollback(ctx context.Context, tx pgx.Tx) error {
 	return tx.Rollback(ctx)
@@ -236,6 +235,13 @@ func (pql Postgresql) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltReques
 
 	if err != nil {
 		return quote, databaseError(fmt.Errorf("pgx.CollectOneRow(rows, pgx.RowToStructByName[cashu.MeltRequestDB]): %w", err))
+	}
+	change, err := pql.loadRecoverySignatures(tx, recoverySignatureSelect+"m.melt_quote_id = $1 ORDER BY m.output_position", id)
+	if err != nil {
+		return quote, err
+	}
+	for _, sig := range change {
+		quote.Change = append(quote.Change, sig.GetBlindSignature())
 	}
 
 	return quote, nil
@@ -453,14 +459,23 @@ func privateKeysToDleq(s_key []byte, e_key []byte, sig *cashu.RecoverSigDB) {
 }
 
 func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error) {
+	return pql.loadRecoverySignatures(tx, recoverySignatureSelect+"m.blinded_message = ANY($1)", B_)
+}
+
+const recoverySignatureSelect = `SELECT m.keyset_id, m.amount, s.signature, m.blinded_message,
+	s.created_at, s.dleq_e, s.dleq_s, COALESCE(m.mint_quote_id, ''), COALESCE(m.melt_quote_id, '')
+	FROM blind_messages m JOIN blind_signatures s ON s.id = m.signature_id
+	WHERE m.state = 'SIGNED' AND `
+
+func (pql Postgresql) loadRecoverySignatures(tx pgx.Tx, query string, arg any) ([]cashu.RecoverSigDB, error) {
 	signaturesList := make([]cashu.RecoverSigDB, 0)
 
-	rows, err := tx.Query(context.Background(), `SELECT id, amount, "C_", "B_", created_at, dleq_e, dleq_s FROM recovery_signature WHERE "B_" = ANY($1)`, B_)
+	rows, err := tx.Query(context.Background(), query, arg)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return signaturesList, nil
 		}
-		return signaturesList, databaseError(fmt.Errorf("error checking for recovery_signature: %w", err))
+		return signaturesList, databaseError(fmt.Errorf("error checking for blind signatures: %w", err))
 	}
 	defer rows.Close()
 
@@ -471,7 +486,7 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.Wr
 
 		var dleq_s_bytes []byte
 		var dleq_e_bytes []byte
-		err := rows.Scan(&sig.Id, &sig.Amount, &sig.C_, &sig.B_, &sig.CreatedAt, &dleq_e_bytes, &dleq_s_bytes)
+		err := rows.Scan(&sig.Id, &sig.Amount, &sig.C_, &sig.B_, &sig.CreatedAt, &dleq_e_bytes, &dleq_s_bytes, &sig.MintQuote, &sig.MeltQuote)
 		if err != nil {
 			return nil, databaseError(fmt.Errorf("row.Scan(&sig.Amount, &sig.Id, &sig.B_, &sig.C_, &sig.CreatedAt, &sig.Dleq.E, &sig.Dleq.S): %w", err))
 		}
@@ -480,42 +495,13 @@ func (pql Postgresql) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.Wr
 
 		signatures = append(signatures, sig)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, databaseError(err)
+	}
 
 	signaturesList = signatures
 
 	return signaturesList, nil
-}
-
-func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error {
-	entries := make([][]any, 0, len(recover_sigs))
-	columns := []string{"id", "amount", "B_", "C_", "created_at", "dleq_e", "dleq_s"}
-	tableName := "recovery_signature"
-	tries := 0
-
-	for _, sig := range recover_sigs {
-		var dleq_e_bytes, dleq_s_bytes []byte
-		if sig.Dleq != nil {
-			dleq_e := sig.Dleq.E.Key.Bytes()
-			dleq_s := sig.Dleq.S.Key.Bytes()
-			dleq_e_bytes = dleq_e[:]
-			dleq_s_bytes = dleq_s[:]
-		}
-		entries = append(entries, []any{sig.Id, sig.Amount, sig.B_, sig.C_, sig.CreatedAt, dleq_e_bytes, dleq_s_bytes})
-	}
-
-	for {
-		tries += 1
-		_, err := tx.CopyFrom(context.Background(), pgx.Identifier{tableName}, columns, pgx.CopyFromRows(entries))
-
-		switch {
-		case err != nil && tries < 3:
-			continue
-		case err != nil && tries >= 3:
-			return databaseError(fmt.Errorf("inserting to DB: %w", err))
-		case err == nil:
-			return nil
-		}
-	}
 }
 
 func (pql Postgresql) Close() {

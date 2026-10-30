@@ -309,10 +309,14 @@ func TestGetBlindSigStatsRowsUsesInclusiveRangeAndReturnsResolvedUnits(t *testin
 	ctx := context.Background()
 	db := setupTestDatabase(t, ctx)
 	saveSeed(t, ctx, db, "blind-keyset", "sat")
-	if _, err := db.pool.Exec(ctx, `INSERT INTO recovery_signature (id, amount, "B_", "C_", created_at, dleq_e, dleq_s) VALUES
-		('blind-keyset', 3, decode('01','hex'), decode('02','hex'), 10, NULL, NULL),
-		('blind-keyset', 4, decode('03','hex'), decode('04','hex'), 20, NULL, NULL)`); err != nil {
-		t.Fatalf("insert recovery_signature: %v", err)
+	if _, err := db.pool.Exec(ctx, `WITH s AS (
+		INSERT INTO blind_signatures (signature, created_at) VALUES (decode('02','hex'), 10), (decode('04','hex'), 20)
+		RETURNING id, created_at
+	)
+	INSERT INTO blind_messages (blinded_message, keyset_id, amount, state, signature_id, created_at)
+	SELECT CASE created_at WHEN 10 THEN decode('01','hex') ELSE decode('03','hex') END,
+		'blind-keyset', CASE created_at WHEN 10 THEN 3 ELSE 4 END, 'SIGNED', id, created_at FROM s`); err != nil {
+		t.Fatalf("insert blind signatures: %v", err)
 	}
 	tx, err := db.GetTx(ctx)
 	if err != nil {
@@ -352,9 +356,12 @@ func TestGetProofStatsRowsExposesUnresolvedKeysetIDs(t *testing.T) {
 func TestGetBlindSigStatsRowsExposesUnresolvedKeysetIDs(t *testing.T) {
 	ctx := context.Background()
 	db := setupTestDatabase(t, ctx)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO recovery_signature (id, amount, "B_", "C_", created_at, dleq_e, dleq_s)
-		VALUES ('missing-blind', 3, decode('01','hex'), decode('02','hex'), 10, NULL, NULL)`); err != nil {
-		t.Fatalf("insert recovery_signature: %v", err)
+	if _, err := db.pool.Exec(ctx, `WITH s AS (
+		INSERT INTO blind_signatures (signature, created_at) VALUES (decode('02','hex'), 10) RETURNING id
+	)
+	INSERT INTO blind_messages (blinded_message, keyset_id, amount, state, signature_id, created_at)
+	SELECT decode('01','hex'), 'missing-blind', 3, 'SIGNED', id, 10 FROM s`); err != nil {
+		t.Fatalf("insert blind signatures: %v", err)
 	}
 	tx, err := db.GetTx(ctx)
 	if err != nil {
