@@ -109,7 +109,7 @@ func TestReconcilePendingMeltQuotesIgnoresStrikeEndOfLife(t *testing.T) {
 
 // setupPendingMeltWithChange stores a PENDING melt quote, pending proofs and
 // blank change outputs. FakeWallet.CheckPayed settles with a flat 10 sat fee.
-func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, quoteAmount uint64, proofAmounts []uint64, numBlanks int) []cashu.WrappedPublicKey {
+func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, proofAmounts []uint64, numBlanks int) []cashu.WrappedPublicKey {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Now().Unix()
@@ -122,7 +122,7 @@ func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, quoteA
 		Quote:           quoteId,
 		CheckingId:      "",
 		Expiry:          now,
-		Amount:          quoteAmount,
+		Amount:          2,
 		FeeReserve:      2,
 		FeePaid:         0,
 		SeenAt:          now,
@@ -195,7 +195,7 @@ func TestRefreshMeltQuoteReturnsChangeOnSettle(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 
 	// 15 sats of proofs, 2 sat invoice, 10 sat fake fee -> overpaid = 3 -> change [1, 2]
-	blankKeys := setupPendingMeltWithChange(t, mint, "quote-change-ok", 2, []uint64{8, 4, 2, 1}, 2)
+	blankKeys := setupPendingMeltWithChange(t, mint, "quote-change-ok", []uint64{8, 4, 2, 1}, 2)
 
 	quote, err := mint.RefreshMeltQuoteState(context.Background(), "quote-change-ok")
 	if err != nil {
@@ -209,11 +209,8 @@ func TestRefreshMeltQuoteReturnsChangeOnSettle(t *testing.T) {
 	if len(quote.Change) != 2 {
 		t.Fatalf("expected 2 change signatures, got: %d", len(quote.Change))
 	}
-	// ponytail: row order from melt_change_message is not guaranteed (no ordinal
-	// column) — assert the multiset of amounts, not positions.
-	changeAmounts := map[uint64]bool{quote.Change[0].Amount: true, quote.Change[1].Amount: true}
-	if !changeAmounts[1] || !changeAmounts[2] {
-		t.Errorf("change amounts should be {1, 2}, got: [%d %d]", quote.Change[0].Amount, quote.Change[1].Amount)
+	if quote.Change[0].Amount != 1 || quote.Change[1].Amount != 2 {
+		t.Errorf("change amounts should preserve wallet order [1, 2], got: [%d %d]", quote.Change[0].Amount, quote.Change[1].Amount)
 	}
 
 	// signatures must have been persisted for both blank outputs
@@ -237,7 +234,11 @@ func TestRefreshMeltQuoteReturnsChangeOnSettle(t *testing.T) {
 		t.Fatalf("GetMeltChangeByQuote: %v", err)
 	}
 	if len(remainingChange) != 0 {
-		t.Errorf("change messages should be deleted after signing, got: %d", len(remainingChange))
+		t.Errorf("signed change must no longer be pending, got: %d", len(remainingChange))
+	}
+	reloaded, err := mint.MintDB.GetMeltRequestById(tx, "quote-change-ok")
+	if err != nil || len(reloaded.Change) != 2 {
+		t.Fatalf("reloaded quote lost change: %+v %v", reloaded, err)
 	}
 }
 
@@ -246,7 +247,7 @@ func TestRefreshMeltQuoteNoChangeWhenFeeExceedsProofs(t *testing.T) {
 
 	// 4 sats of proofs, 2 sat invoice, 10 sat fake fee -> totalExpent (12) > proofs (4).
 	// Without the comparison guard this underflows uint64 and signs huge change.
-	setupPendingMeltWithChange(t, mint, "quote-underflow", 2, []uint64{2, 2}, 2)
+	setupPendingMeltWithChange(t, mint, "quote-underflow", []uint64{2, 2}, 2)
 
 	quote, err := mint.RefreshMeltQuoteState(context.Background(), "quote-underflow")
 	if err != nil {
@@ -266,6 +267,10 @@ func TestRefreshMeltQuoteNoChangeWhenFeeExceedsProofs(t *testing.T) {
 		t.Fatalf("mint.MintDB.GetTx: %v", err)
 	}
 	defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
+	remainingChange, err := mint.MintDB.GetMeltChangeByQuote(tx, "quote-underflow")
+	if err != nil || len(remainingChange) != 0 {
+		t.Fatalf("zero-refund settlement retained blanks: %v %v", remainingChange, err)
+	}
 
 	proofs, err := mint.MintDB.GetProofsFromQuote(tx, "quote-underflow")
 	if err != nil {
@@ -275,5 +280,83 @@ func TestRefreshMeltQuoteNoChangeWhenFeeExceedsProofs(t *testing.T) {
 		if proof.State != cashu.PROOF_SPENT {
 			t.Errorf("proof should be spent, got: %v", proof.State)
 		}
+	}
+}
+
+func TestMeltFinalizationAuthoritativeStatePostgres(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+	ctx := context.Background()
+	for _, scenario := range []string{"concurrent refund", "concurrent zero refund", "internal preparation"} {
+		t.Run(scenario, func(t *testing.T) {
+			amounts := []uint64{8, 4, 2, 1}
+			wantChange, wantFee := 2, uint64(10)
+			if scenario == "concurrent zero refund" {
+				amounts, wantChange = []uint64{8, 4}, 0
+			}
+			if scenario == "internal preparation" {
+				wantChange, wantFee = 3, 0
+			}
+			keys := setupPendingMeltWithChange(t, mint, scenario, amounts, 3) //nolint:contextcheck // Fixture setup intentionally uses its own transaction context.
+			tx, err := mint.MintDB.GetTx(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
+			if scenario == "internal preparation" {
+				if err := mint.MintDB.ChangeMeltRequestState(tx, scenario, cashu.PAID, true, 0); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cached, err := mint.MintDB.GetMeltRequestById(tx, scenario)
+			if err != nil {
+				t.Fatal(err)
+			}
+			inputs, err := mint.MintDB.GetProofsFromQuote(tx, scenario)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := mint.MintDB.Commit(ctx, tx); err != nil {
+				t.Fatal(err)
+			}
+			if scenario != "internal preparation" {
+				// Force the quote-poll commit before the original HTTP finalizer.
+				if _, err := mint.RefreshMeltQuoteState(ctx, scenario); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cached.State, cached.Melted, cached.FeePaid, cached.PaymentPreimage = cashu.PAID, true, 99, "stale-preimage"
+			amount, err := inputs.Amount()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for range 2 {
+				quote, response, spent, err := mint.finalizePaidBolt11Melt(ctx, bolt11MeltData{
+					AmountProofs: cashu.NewAmount(cashu.Sat, amount), Fee: cashu.NewAmount(cashu.Sat, 0), Unit: cashu.Sat,
+				}, cashu.PostMeltBolt11Request{Quote: scenario, Inputs: inputs, Outputs: nil}, cached, cashu.NewAmount(cashu.Sat, 99))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(response.Change) != wantChange || quote.FeePaid != wantFee || quote.PaymentPreimage == "stale-preimage" {
+					t.Fatalf("wrong authoritative response: %+v", quote)
+				}
+				for _, proof := range spent {
+					if proof.State != cashu.PROOF_SPENT {
+						t.Fatal("proof remains pending")
+					}
+				}
+			}
+			read, err := mint.MintDB.GetTx(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = mint.MintDB.Rollback(ctx, read) }()
+			restored, err := mint.MintDB.GetRestoreSigsFromBlindedMessages(read, keys)
+			if err != nil || len(restored) != wantChange {
+				t.Fatalf("refund lost or duplicated: %v %v", restored, err)
+			}
+			if err := mint.MintDB.Commit(ctx, read); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

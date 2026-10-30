@@ -124,6 +124,7 @@ type MintDB interface {
 	DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error
 
 	GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error)
+	CheckBlindMessagesAvailable(tx pgx.Tx, B_ []cashu.WrappedPublicKey) error
 	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
 
 	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
@@ -137,6 +138,7 @@ type MintDB interface {
 	SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error
 	GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error)
 	DeleteChangeByQuote(tx pgx.Tx, quote string) error
+	FinalizeMeltChange(tx pgx.Tx, quote string, signatures []cashu.RecoverSigDB) error
 
 	SaveNostrAuth(auth NostrLoginAuth) error
 	UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error

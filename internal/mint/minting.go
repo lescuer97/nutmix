@@ -405,6 +405,9 @@ func (m *Mint) signMintOutputsAndMarkIssued(ctx context.Context, request cashu.P
 	}
 
 	slog.Debug(fmt.Sprintf("Saving restore sigs for quote: id %v", mintRequestDB.Quote))
+	for i := range recoverySigsDb {
+		recoverySigsDb[i].MintQuote = mintRequestDB.Quote
+	}
 	err = m.MintDB.SaveRestoreSigs(afterMintingTx, recoverySigsDb)
 	if err != nil {
 		return nil, fmt.Errorf("m.MintDB.SaveRestoreSigs. %w", err)

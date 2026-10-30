@@ -7,6 +7,7 @@ import (
 var (
 	ErrMeltAlreadyPaid            = errors.New("melt already paid")
 	ErrQuoteIsPending             = errors.New("quote is pending")
+	ErrOutputPending              = errors.New("output is pending")
 	ErrUnitNotSupported           = errors.New("unit not supported")
 	ErrDifferentInputOutputUnit   = errors.New("different input output unit")
 	ErrNotEnoughtProofs           = errors.New("not enough proofs")

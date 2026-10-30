@@ -21,6 +21,26 @@ func TestParseErrorLockConflictMapsToProofsPending(t *testing.T) {
 	}
 }
 
+func TestParseErrorSeparatesPendingOutputsQuotesAndProofs(t *testing.T) {
+	for _, tt := range []struct {
+		err  error
+		code cashu.ErrorCode
+	}{
+		{cashu.ErrOutputPending, cashu.OUTPUTS_PENDING},
+		{cashu.ErrQuoteIsPending, cashu.QUOTE_PENDING},
+		{cashu.ErrProofPending, cashu.PROOFS_PENDING},
+		{cashu.ErrBlindMessageAlreadySigned, cashu.OUTPUTS_ALREADY_SIGNED},
+	} {
+		t.Run(tt.err.Error(), func(t *testing.T) {
+			wrapped := fmt.Errorf("operation: %w", tt.err)
+			code, detail := ParseErrorToCashuErrorCode(wrapped)
+			if !errors.Is(wrapped, tt.err) || code != tt.code || detail == nil || *detail != tt.err.Error() {
+				t.Fatalf("error=%v code=%d detail=%v", wrapped, code, detail)
+			}
+		})
+	}
+}
+
 // 10.4: unit-mismatch sentinels map to the precise codes 11009/11010.
 func TestParseErrorUnitMismatchCodes(t *testing.T) {
 	code, _ := ParseErrorToCashuErrorCode(fmt.Errorf("wrap. %w", cashu.ErrMultipleUnits))

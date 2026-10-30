@@ -456,6 +456,7 @@ func TestSaveRestoreSigsAndGet_WithoutDLEQ(t *testing.T) {
 		Dleq:      nil,
 		Id:        "test_keyset_id",
 		MeltQuote: "",
+		MintQuote: "",
 		Amount:    100,
 		CreatedAt: now,
 	}
@@ -566,6 +567,7 @@ func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
 		Dleq:      dleq,
 		Id:        "keyset1",
 		MeltQuote: "",
+		MintQuote: "",
 		Amount:    100,
 		CreatedAt: now,
 	}
@@ -576,6 +578,7 @@ func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
 		Dleq:      dleq,
 		Id:        "keyset2",
 		MeltQuote: "",
+		MintQuote: "",
 		Amount:    200,
 		CreatedAt: now,
 	}

@@ -153,10 +153,15 @@ func seedStatsIntegrationFixtures(t *testing.T, ctx context.Context, db postgres
 		t.Fatalf("insert proofs: %v", err)
 	}
 
-	if _, err := tx.Exec(ctx, `INSERT INTO recovery_signature (id, amount, "B_", "C_", created_at, dleq_e, dleq_s) VALUES
-		('ks-sat', 12, decode('07', 'hex'), decode('08', 'hex'), 14, NULL, NULL),
-		('ks-usd', 13, decode('09', 'hex'), decode('0a', 'hex'), 24, NULL, NULL)`); err != nil {
-		t.Fatalf("insert recovery_signature: %v", err)
+	if _, err := tx.Exec(ctx, `WITH s AS (
+		INSERT INTO blind_signatures (signature, created_at) VALUES (decode('08','hex'), 14), (decode('0a','hex'), 24)
+		RETURNING id, created_at
+	)
+	INSERT INTO blind_messages (blinded_message, keyset_id, amount, state, signature_id, created_at)
+	SELECT CASE created_at WHEN 14 THEN decode('07','hex') ELSE decode('09','hex') END,
+		CASE created_at WHEN 14 THEN 'ks-sat' ELSE 'ks-usd' END,
+		CASE created_at WHEN 14 THEN 12 ELSE 13 END, 'SIGNED', id, created_at FROM s`); err != nil {
+		t.Fatalf("insert blind signatures: %v", err)
 	}
 
 	if err := db.Commit(ctx, tx); err != nil {
