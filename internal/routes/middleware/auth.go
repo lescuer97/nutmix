@@ -120,16 +120,28 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 						return
 					}
 
-					authProof.Amount = 1
-					err = mint.VerifyAuthBlindToken(authProof)
+					reservation, err := mint.ReserveAuthBlindToken(authProof)
 					if err != nil {
-						slog.Warn("mint.VerifyAuthBlindToken(authProof)", slog.Any("error", err))
+						slog.Warn("mint.ReserveAuthBlindToken(authProof)", slog.Any("error", err))
 						c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))
 						c.Abort()
 						return
 					}
-					// Header exists, continue processing
-					break
+					finished := false
+					defer func() {
+						if !finished {
+							if err := mint.FinishAuthBlindToken(reservation, false); err != nil {
+								slog.Error("mint.FinishAuthBlindToken(reservation, false)", slog.Any("error", err))
+							}
+						}
+					}()
+					c.Next()
+					success := c.Writer.Status() >= 200 && c.Writer.Status() < 300 && len(c.Errors) == 0
+					finished = true
+					if err := mint.FinishAuthBlindToken(reservation, success); err != nil {
+						slog.Error("mint.FinishAuthBlindToken(reservation)", slog.Any("error", err))
+					}
+					return
 				}
 			}
 		}
