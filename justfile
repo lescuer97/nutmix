@@ -109,9 +109,12 @@ install-deps:
 # Generate protobuf code
 gen-proto:
     #!/usr/bin/env bash
+    set -euo pipefail
     echo "Generating protobuf code..."
     protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/gen/signer.proto
     protoc-go-inject-tag -input="./internal/gen/*.pb.go"
+    # Core Lightning v26.06.9: cln-grpc/proto/{node,primitives}.proto, retaining local names and Go package.
+    protoc -I internal/lightning/proto --go_out=internal/lightning/proto --go_opt=paths=source_relative --go-grpc_out=internal/lightning/proto --go-grpc_opt=paths=source_relative --experimental_allow_proto3_optional internal/lightning/proto/cln_node.proto internal/lightning/proto/cln_primitives.proto
 # ============================
 # Web Dashaboard
 # ============================
@@ -146,7 +149,7 @@ web-build-dev:
     cd internal/routes/admin/static
     rm -rf dist/js
     mkdir -p dist/js dist/css
-    bun build src/index.js src/modules/chart.js --outdir=dist/js --target=browser --minify --format=esm --sourcemap=inline
+    bun build src/index.js src/modules/chart.js --outdir=dist/js --target=browser --format=esm --sourcemap=inline
     cp *.css dist/css/
 
 # Dev recipe
