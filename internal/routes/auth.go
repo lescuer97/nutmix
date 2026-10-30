@@ -83,6 +83,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		tx, err := mint.MintDB.GetTx(c.Request.Context())
 		if err != nil {
 			_ = c.Error(fmt.Errorf("m.MintDB.GetTx(ctx). %w", err))
+			c.JSON(500, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
 		defer func() {
@@ -133,12 +134,15 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 		if err != nil {
 			slog.Error("SetRecoverySigs on minting", slog.Any("error", err))
 			slog.Error("recoverySigsDb", slog.Any("recovery_sigs", recoverySigsDb))
+			_ = c.Error(fmt.Errorf("mint.MintDB.SaveRestoreSigs(tx). %w", err))
+			c.JSON(500, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
 
 		err = mint.MintDB.Commit(c.Request.Context(), tx)
 		if err != nil {
 			_ = c.Error(fmt.Errorf("mint.MintDB.Commit(ctx tx). %w", err))
+			c.JSON(500, cashu.ErrorCodeToResponse(cashu.UNKNOWN, nil))
 			return
 		}
 
