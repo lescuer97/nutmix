@@ -29,6 +29,62 @@ func TestValidateBolt11MeltInputsRejectsAggregateOverflow(t *testing.T) {
 	}
 }
 
+func TestValidateBolt11MeltInputsRejectsExpiredQuoteBeforeInputs(t *testing.T) {
+	mint := Mint{}                                              //nolint:exhaustruct // expiry is rejected before dependencies are used
+	request := cashu.PostMeltBolt11Request{}                    //nolint:exhaustruct // empty inputs prove expiry is checked first
+	quote := cashu.MeltRequestDB{Expiry: time.Now().Unix() - 1} //nolint:exhaustruct // only expiry matters
+
+	_, err := mint.validateBolt11MeltInputs(request, quote)
+	if !errors.Is(err, cashu.ErrQuoteExpired) {
+		t.Fatalf("validateBolt11MeltInputs() error = %v, want ErrQuoteExpired", err)
+	}
+}
+
+func TestValidateBolt11MeltInputsPreservesExpiredQuoteStateErrors(t *testing.T) {
+	mint := Mint{}                           //nolint:exhaustruct // quote state errors are returned before dependencies are used
+	request := cashu.PostMeltBolt11Request{} //nolint:exhaustruct // empty inputs confirm state errors take precedence
+	expiredAt := time.Now().Unix() - 1
+
+	for _, test := range []struct {
+		name  string
+		quote cashu.MeltRequestDB
+		want  error
+	}{
+		{
+			name:  "pending",
+			quote: cashu.MeltRequestDB{Expiry: expiredAt, State: cashu.PENDING}, //nolint:exhaustruct
+			want:  cashu.ErrQuoteIsPending,
+		},
+		{
+			name:  "paid",
+			quote: cashu.MeltRequestDB{Expiry: expiredAt, Melted: true}, //nolint:exhaustruct
+			want:  cashu.ErrMeltAlreadyPaid,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := mint.validateBolt11MeltInputs(request, test.quote)
+			if !errors.Is(err, test.want) {
+				t.Fatalf("validateBolt11MeltInputs() error = %v, want %v", err, test.want)
+			}
+		})
+	}
+}
+
+func TestReserveMeltInputsRejectsExpiredReloadedQuote(t *testing.T) {
+	quote := cashu.MeltRequestDB{Quote: "expired-quote", Expiry: time.Now().Unix() - 1} //nolint:exhaustruct // only lookup and expiry matter
+	db := &mockdb.MockDB{MeltRequest: []cashu.MeltRequestDB{quote}}                     //nolint:exhaustruct
+	mint := Mint{MintDB: db}                                                            //nolint:exhaustruct // expiry is rejected before proof dependencies are used
+	request := cashu.PostMeltBolt11Request{Quote: quote.Quote}                          //nolint:exhaustruct // no proofs are processed after rejection
+
+	_, err := mint.reserveMeltInputsAndMarkPending(context.Background(), request)
+	if !errors.Is(err, cashu.ErrQuoteExpired) {
+		t.Fatalf("reserveMeltInputsAndMarkPending() error = %v, want ErrQuoteExpired", err)
+	}
+	if db.MeltRequest[0].State != quote.State {
+		t.Fatalf("expired quote state changed: got %q, want %q", db.MeltRequest[0].State, quote.State)
+	}
+}
+
 func TestValidateBolt11MeltInputsRejectsRequiredTotalOverflow(t *testing.T) {
 	keyset := cashu.BasicKeysetResponse{Id: "keyset", Unit: cashu.Sat.String()}                                               //nolint:exhaustruct // only ID and unit matter
 	mint := Mint{Signer: fixedKeysetSigner{keysets: signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{keyset}}}} //nolint:exhaustruct // only signer is reached

@@ -38,6 +38,17 @@ func TestParseErrorUnitMismatchCodes(t *testing.T) {
 	}
 }
 
+func TestParseErrorQuoteExpired(t *testing.T) {
+	err := fmt.Errorf("wrapped: %w", cashu.ErrQuoteExpired)
+	code, detail := ParseErrorToCashuErrorCode(err)
+	if code != cashu.QUOTE_EXPIRED {
+		t.Fatalf("expected QUOTE_EXPIRED (20007), got %v", uint(code))
+	}
+	if detail == nil || *detail != cashu.ErrQuoteExpired.Error() {
+		t.Fatalf("expected detail %q, got %v", cashu.ErrQuoteExpired.Error(), detail)
+	}
+}
+
 func setListofEmptyBlindMessages(amounts int) []cashu.BlindedMessage {
 	var messages []cashu.BlindedMessage
 	for i := 0; i < amounts; i++ {
