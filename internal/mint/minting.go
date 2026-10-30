@@ -70,7 +70,11 @@ func (m *Mint) createBolt11MintQuote(ctx context.Context, request cashu.PostMint
 	}
 	quoteId := quoteUUID.String()
 
-	expireTime := cashu.ExpiryTimeMinUnit(15)
+	invoice, err := zpay32.Decode(resInvoice.PaymentRequest, m.LightningBackend.GetNetwork())
+	if err != nil {
+		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("zpay32.Decode(resInvoice.PaymentRequest, m.LightningBackend.GetNetwork()). %w", err)
+	}
+	expireTime := invoice.Timestamp.Add(invoice.Expiry()).Unix()
 	now := time.Now().Unix()
 
 	mintRequestDB := cashu.MintRequestDB{
