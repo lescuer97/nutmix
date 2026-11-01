@@ -16,8 +16,8 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
-func lifecycleSignature(n byte) cashu.RecoverSigDB {
-	return cashu.RecoverSigDB{
+func lifecycleSignature(n byte) cashu.SignedOutput {
+	return cashu.SignedOutput{
 		B_: cashu.WrappedPublicKey{PublicKey: secp256k1.PrivKeyFromBytes([]byte{n}).PubKey()},
 		C_: cashu.WrappedPublicKey{PublicKey: secp256k1.PrivKeyFromBytes([]byte{n + 1}).PubKey()},
 		Id: "keyset", Amount: 1, CreatedAt: 123,
@@ -86,20 +86,20 @@ func TestBlindMessagePersistenceValidatesBeforeWriting(t *testing.T) {
 	valid := lifecycleSignature(1)
 	for _, tt := range []struct { //nolint:govet // Table layout favors readable fixtures over packing.
 		name string
-		sigs []cashu.RecoverSigDB
+		sigs []cashu.SignedOutput
 		want error
 	}{
 		{"empty", nil, nil},
-		{"missing message", []cashu.RecoverSigDB{{C_: valid.C_, Amount: 1, Id: valid.Id}}, cashu.ErrInvalidBlindMessage},
-		{"missing signature", []cashu.RecoverSigDB{{B_: valid.B_, Amount: 1, Id: valid.Id}}, cashu.ErrInvalidBlindMessage},
-		{"zero amount", []cashu.RecoverSigDB{{B_: valid.B_, C_: valid.C_, Id: valid.Id}}, cashu.ErrInvalidBlindMessage},
-		{"missing keyset", []cashu.RecoverSigDB{{B_: valid.B_, C_: valid.C_, Amount: 1}}, cashu.ErrInvalidBlindMessage},
-		{"incomplete dleq", []cashu.RecoverSigDB{{B_: valid.B_, C_: valid.C_, Amount: 1, Id: valid.Id, Dleq: &cashu.BlindSignatureDLEQ{}}}, cashu.ErrInvalidBlindMessage},
-		{"duplicates", []cashu.RecoverSigDB{valid, valid}, cashu.ErrRepeatedOutput},
+		{"missing message", []cashu.SignedOutput{{C_: valid.C_, Amount: 1, Id: valid.Id}}, cashu.ErrInvalidBlindMessage},
+		{"missing signature", []cashu.SignedOutput{{B_: valid.B_, Amount: 1, Id: valid.Id}}, cashu.ErrInvalidBlindMessage},
+		{"zero amount", []cashu.SignedOutput{{B_: valid.B_, C_: valid.C_, Id: valid.Id}}, cashu.ErrInvalidBlindMessage},
+		{"missing keyset", []cashu.SignedOutput{{B_: valid.B_, C_: valid.C_, Amount: 1}}, cashu.ErrInvalidBlindMessage},
+		{"incomplete dleq", []cashu.SignedOutput{{B_: valid.B_, C_: valid.C_, Amount: 1, Id: valid.Id, Dleq: &cashu.BlindSignatureDLEQ{}}}, cashu.ErrInvalidBlindMessage},
+		{"duplicates", []cashu.SignedOutput{valid, valid}, cashu.ErrRepeatedOutput},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			tx := &lifecycleTx{}
-			err := (Postgresql{}).SaveRestoreSigs(tx, tt.sigs)
+			err := (Postgresql{}).InsertSignedOutputs(context.Background(), tx, tt.sigs)
 			if !errors.Is(err, tt.want) || len(tx.locked) != 0 || tx.batch != nil {
 				t.Fatalf("error=%v, locks=%v, batch=%v", err, tx.locked, tx.batch)
 			}
@@ -107,13 +107,20 @@ func TestBlindMessagePersistenceValidatesBeforeWriting(t *testing.T) {
 	}
 }
 
+func TestMintSignedOutputsRequiresQuote(t *testing.T) {
+	tx := &lifecycleTx{}
+	err := (Postgresql{}).InsertMintSignedOutputs(context.Background(), tx, "", []cashu.SignedOutput{lifecycleSignature(1)})
+	if !errors.Is(err, cashu.ErrInvalidBlindMessage) || tx.batch != nil || len(tx.locked) != 0 {
+		t.Fatalf("empty quote error=%v, locks=%v, batch=%v", err, tx.locked, tx.batch)
+	}
+}
+
 func TestBlindMessagePersistenceLocksAndLinksInBatch(t *testing.T) {
-	sigs := []cashu.RecoverSigDB{lifecycleSignature(2), lifecycleSignature(1)}
-	sigs[0].MintQuote = "mint-quote"
+	sigs := []cashu.SignedOutput{lifecycleSignature(2), lifecycleSignature(1)}
 	sigs[0].Amount = math.MaxUint64
 	sigs[0].Dleq = &cashu.BlindSignatureDLEQ{E: secp256k1.PrivKeyFromBytes([]byte{1}), S: secp256k1.PrivKeyFromBytes([]byte{2})}
 	tx := &lifecycleTx{}
-	if err := (Postgresql{}).SaveRestoreSigs(tx, sigs); err != nil {
+	if err := (Postgresql{}).InsertMintSignedOutputs(context.Background(), tx, "mint-quote", sigs); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{sigs[0].B_.ToHex(), sigs[1].B_.ToHex()}
@@ -124,7 +131,7 @@ func TestBlindMessagePersistenceLocksAndLinksInBatch(t *testing.T) {
 	for i, query := range tx.batch.QueuedQueries {
 		if !strings.Contains(query.SQL, "INSERT INTO blind_signatures") ||
 			!strings.Contains(query.SQL, "INSERT INTO blind_messages") ||
-			query.Arguments[7] != sigs[i].MintQuote || query.Arguments[5] != sigs[i].Amount {
+			query.Arguments[5] != sigs[i].Amount || query.Arguments[7] != "mint-quote" {
 			t.Fatalf("incorrect message/signature association: %+v", query)
 		}
 	}
@@ -147,7 +154,7 @@ func TestBlindMessagePersistenceRejectsExistingOutputsAndErrors(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			tx := &lifecycleTx{states: tt.states, queryErr: tt.queryErr, batchErr: tt.batchErr, lockErr: tt.lockErr}
-			if err := (Postgresql{}).SaveRestoreSigs(tx, []cashu.RecoverSigDB{lifecycleSignature(1)}); !errors.Is(err, tt.want) {
+			if err := (Postgresql{}).InsertSignedOutputs(context.Background(), tx, []cashu.SignedOutput{lifecycleSignature(1)}); !errors.Is(err, tt.want) {
 				t.Fatalf("error=%v, want %v", err, tt.want)
 			}
 			if tt.batchErr == nil && tx.batch != nil {

@@ -2,11 +2,8 @@ package mint
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log/slog"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
@@ -21,14 +18,9 @@ func (m *Mint) Restore(ctx context.Context, request cashu.PostRestoreRequest) (c
 	if err != nil {
 		return cashu.PostRestoreResponse{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, tx)
-		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			slog.Warn("rollback error", slog.Any("error", rollbackErr))
-		}
-	}()
+	defer m.rollbackIndependent(ctx, tx)
 
-	blindRecoverySigs, err := m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors)
+	blindRecoverySigs, err := m.MintDB.GetRestoreSigsFromBlindedMessages(ctx, tx, blindingFactors)
 	if err != nil {
 		return cashu.PostRestoreResponse{}, fmt.Errorf("m.MintDB.GetRestoreSigsFromBlindedMessages(tx, blindingFactors) %w", err)
 	}

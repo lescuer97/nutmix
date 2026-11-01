@@ -27,15 +27,15 @@ func (db *transactionCleanupDB) Rollback(context.Context, pgx.Tx) error {
 	return nil
 }
 
-func (db *transactionCleanupDB) GetMeltRequestById(pgx.Tx, string) (cashu.MeltRequestDB, error) {
+func (db *transactionCleanupDB) GetMeltRequestById(context.Context, pgx.Tx, string) (cashu.MeltRequestDB, error) {
 	return db.meltRequest, nil
 }
 
-func (db *transactionCleanupDB) GetRestoreSigsFromBlindedMessages(pgx.Tx, []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error) {
+func (db *transactionCleanupDB) GetRestoreSigsFromBlindedMessages(context.Context, pgx.Tx, []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error) {
 	return nil, db.restoreErr
 }
 
-func (db *transactionCleanupDB) GetProofsFromSecretCurve(pgx.Tx, []cashu.WrappedPublicKey) (cashu.Proofs, error) {
+func (db *transactionCleanupDB) GetProofsFromSecretCurve(context.Context, pgx.Tx, []cashu.WrappedPublicKey) (cashu.Proofs, error) {
 	return db.proofs, nil
 }
 
@@ -70,7 +70,7 @@ func TestTransactionCleanupOnEarlyReturns(t *testing.T) {
 		db := &transactionCleanupDB{proofs: cashu.Proofs{{}}} //nolint:exhaustruct // Only proof presence matters.
 		mint := Mint{MintDB: db}                              //nolint:exhaustruct // Only the database is used.
 
-		err := mint.VerifyAuthBlindToken(cashu.AuthProof{Secret: "used"}) //nolint:exhaustruct // Only the secret is used.
+		err := mint.VerifyAuthBlindToken(context.Background(), cashu.AuthProof{Secret: "used"}) //nolint:exhaustruct // Only the secret is used.
 		if err == nil || err.Error() != "authProof already used" {
 			t.Fatalf("VerifyAuthBlindToken() error = %v, want authProof already used", err)
 		}

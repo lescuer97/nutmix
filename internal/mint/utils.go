@@ -11,19 +11,19 @@ import (
 	"github.com/lescuer97/nutmix/internal/utils"
 )
 
-func (m *Mint) GetChangeOutput(messages []cashu.BlindedMessage, overPaidFees uint64, unit string) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
+func (m *Mint) GetChangeOutput(ctx context.Context, messages []cashu.BlindedMessage, overPaidFees uint64, unit string) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
 	if overPaidFees > 0 && len(messages) > 0 {
 		change := utils.GetMessagesForChange(overPaidFees, messages)
 
-		blindSigs, recoverySigsDb, err := m.Signer.SignBlindMessages(change)
+		blindSigs, signedOutputs, err := m.Signer.SignBlindMessages(ctx, change)
 
 		if err != nil {
-			return blindSigs, recoverySigsDb, fmt.Errorf("m.Signer.SignBlindMessages(change). %w", err)
+			return blindSigs, signedOutputs, fmt.Errorf("m.Signer.SignBlindMessages(change). %w", err)
 		}
 
-		return blindSigs, recoverySigsDb, nil
+		return blindSigs, signedOutputs, nil
 	}
-	return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, nil
+	return []cashu.BlindSignature{}, []cashu.SignedOutput{}, nil
 }
 
 func (m *Mint) VerifyUnitSupport(unitStr string) error {

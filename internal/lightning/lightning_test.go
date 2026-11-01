@@ -1,6 +1,8 @@
 package lightning
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -8,6 +10,15 @@ import (
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
+
+func TestFakeWalletCheckPayedHonorsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, _, err := (FakeWallet{NodeStatus: "", UnpurposeErrors: nil, Network: chaincfg.MainNetParams, InvoiceFee: 0}).CheckPayed(ctx, "", nil, "")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("CheckPayed() error = %v, want context.Canceled", err)
+	}
+}
 
 func TestGetFeatureBits(t *testing.T) {
 	for _, bits := range [][]lnwire.FeatureBit{

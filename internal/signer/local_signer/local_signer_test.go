@@ -318,7 +318,7 @@ func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
 		t.Fatalf("secp256k1.GeneratePrivateKey() %+v", err)
 	}
 
-	_, _, err = localsigner.SignBlindMessages([]cashu.BlindedMessage{{
+	_, _, err = localsigner.SignBlindMessages(context.Background(), []cashu.BlindedMessage{{
 		B_:      cashu.WrappedPublicKey{PublicKey: blindedKey.PubKey()},
 		Id:      "missing-keyset",
 		Witness: "",
@@ -329,6 +329,21 @@ func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
 	}
 	if !errors.Is(err, cashu.ErrKeysetNotKnow) {
 		t.Errorf("Error should be keyset not known. %v", err)
+	}
+}
+
+func TestSignBlindMessagesHonorsCanceledContext(t *testing.T) {
+	db := mockdb.MockDB{} //nolint:exhaustruct
+	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
+	localsigner, err := SetupLocalSigner(&db)
+	if err != nil {
+		t.Fatalf("SetupLocalSigner(&db) %+v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, err = localsigner.SignBlindMessages(ctx, nil)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("SignBlindMessages() error = %v, want context.Canceled", err)
 	}
 }
 
@@ -351,7 +366,7 @@ func TestSignBlindMessagesRejectsNilB(t *testing.T) {
 		t.Fatal("expected at least one active keyset")
 	}
 
-	_, _, err = localsigner.SignBlindMessages([]cashu.BlindedMessage{{
+	_, _, err = localsigner.SignBlindMessages(context.Background(), []cashu.BlindedMessage{{
 		B_:      cashu.WrappedPublicKey{PublicKey: nil},
 		Id:      activeKeys.Keysets[0].Id,
 		Witness: "",

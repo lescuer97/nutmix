@@ -21,10 +21,10 @@ func TestLifecycleConstraintAndTriggerErrorMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	signed, blank := lifecycleSignature(1), lifecycleSignature(2)
-	if err := db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{signed}); err != nil {
+	if err := db.InsertSignedOutputs(ctx, tx, []cashu.SignedOutput{signed}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SaveMeltChange(tx, []cashu.BlindedMessage{blank.GetBlindedMessage()}, "q"); err != nil {
+	if err := db.ReserveMeltChangeOutputs(ctx, tx, []cashu.BlindedMessage{blank.GetBlindedMessage()}, "q"); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

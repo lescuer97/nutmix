@@ -19,7 +19,7 @@ func TestStrikeTombstone(t *testing.T) {
 			_, err := strike.PayInvoice(cashu.MeltRequestDB{}, nil, cashu.Amount{}, false, cashu.Amount{}) //nolint:exhaustruct // Tombstone ignores request values.
 			return err
 		}},
-		{name: "check paid", call: func() error { _, _, _, err := strike.CheckPayed("", nil, ""); return err }},
+		{name: "check paid", call: func() error { _, _, _, err := strike.CheckPayed(context.Background(), "", nil, ""); return err }},
 		{name: "check received", call: func() error { _, _, err := strike.CheckReceived(cashu.MintRequestDB{}, nil); return err }}, //nolint:exhaustruct // Tombstone ignores request values.
 		{name: "query fees", call: func() error { _, err := strike.QueryFees("", nil, false, cashu.Amount{}); return err }},        //nolint:exhaustruct // Tombstone ignores request values.
 		{name: "request invoice", call: func() error { _, err := strike.RequestInvoice(cashu.Amount{}, nil); return err }},         //nolint:exhaustruct // Tombstone ignores request values.

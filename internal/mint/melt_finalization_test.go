@@ -4,10 +4,14 @@ package mint
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 	mockdb "github.com/lescuer97/nutmix/internal/database/mock_db"
 	"github.com/lescuer97/nutmix/internal/lightning"
 )
@@ -96,10 +100,10 @@ func TestMeltFinalizationCompletesInternallyPaidPendingProofs(t *testing.T) {
 }
 
 func TestMeltFinalizationRejectsInconsistentStateWithoutWrites(t *testing.T) {
-	for _, state := range []string{"unpaid", "missing proofs", "replaced inputs", "mixed proofs", "spent with blanks"} {
+	for _, state := range []string{"unpaid", "missing proofs", "replaced inputs", "mixed proofs", "spent with blanks", "pending marked melted", "pending quote has change"} {
 		t.Run(state, func(t *testing.T) {
 			db := &mockdb.MockDB{}
-			mint := &Mint{MintDB: db, Signer: changeLifecycleSigner{}}
+			mint := &Mint{MintDB: db, Signer: failingSigner{signBlindMessagesErr: errors.New("should not sign")}}
 			setupPendingMeltWithChange(t, mint, "melt", []uint64{8, 7}, 3)
 			request := cashu.PostMeltBolt11Request{Inputs: append(cashu.Proofs(nil), db.Proofs...)}
 			cached := db.MeltRequest[0]
@@ -118,8 +122,14 @@ func TestMeltFinalizationRejectsInconsistentStateWithoutWrites(t *testing.T) {
 				for i := range db.Proofs {
 					db.Proofs[i].State = cashu.PROOF_SPENT
 				}
+			case "pending marked melted":
+				db.MeltRequest[0].Melted = true
+			case "pending quote has change":
+				pending := db.MeltChange[0]
+				db.RecoverSigDB = append(db.RecoverSigDB, cashu.RecoverSigDB{B_: pending.B_, C_: pending.B_, Id: pending.Id, Amount: 1, MeltQuote: "melt"})
 			}
 			before := append(cashu.Proofs(nil), db.Proofs...)
+			beforeSignatures := len(db.RecoverSigDB)
 			originalState := db.MeltRequest[0].State
 			_, response, _, err := mint.finalizePaidBolt11Melt(context.Background(), bolt11MeltData{
 				AmountProofs: cashu.NewAmount(cashu.Sat, 15), Fee: cashu.NewAmount(cashu.Sat, 0), Unit: cashu.Sat,
@@ -127,7 +137,7 @@ func TestMeltFinalizationRejectsInconsistentStateWithoutWrites(t *testing.T) {
 			if !errors.Is(err, errMeltFinalizationState) {
 				t.Fatalf("error=%v", err)
 			}
-			if len(response.Change) != 0 || len(db.RecoverSigDB) != 0 || len(db.MeltChange) != 3 || db.MeltRequest[0].State != originalState {
+			if len(response.Change) != 0 || len(db.RecoverSigDB) != beforeSignatures || len(db.MeltChange) != 3 || db.MeltRequest[0].State != originalState {
 				t.Fatal("inconsistent settlement mutated output/quote records")
 			}
 			for i, proof := range db.Proofs {
@@ -163,5 +173,168 @@ func TestMeltFinalizationProofSetValidation(t *testing.T) {
 				t.Fatalf("spent=%v err=%v", spent, err)
 			}
 		})
+	}
+}
+
+type mismatchedChangeSigner struct{ lifecycleSigner }
+
+func (s mismatchedChangeSigner) SignBlindMessages(ctx context.Context, messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
+	sigs, outputs, err := s.lifecycleSigner.SignBlindMessages(ctx, messages)
+	if err == nil && len(outputs) > 0 {
+		outputs[0].B_ = outputs[len(outputs)-1].B_
+	}
+	return sigs, outputs, err
+}
+
+type canceledChangeSigner struct{ lifecycleSigner }
+
+func (s canceledChangeSigner) SignBlindMessages(ctx context.Context, _ []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
+	return nil, nil, ctx.Err()
+}
+
+type settlementCountingDB struct {
+	*mockdb.MockDB
+	completions int
+}
+
+func (db *settlementCountingDB) CompleteMeltSettlement(ctx context.Context, tx pgx.Tx, command database.MeltSettlementCommand) (database.MeltSettlementResult, error) {
+	db.completions++
+	return db.MockDB.CompleteMeltSettlement(ctx, tx, command)
+}
+
+type mutatingChangeSigner struct{ lifecycleSigner }
+
+func (s mutatingChangeSigner) SignBlindMessages(ctx context.Context, messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
+	for i := range messages {
+		if messages[i].Amount > 1 {
+			messages[i].Amount = 1
+			break
+		}
+	}
+	return s.lifecycleSigner.SignBlindMessages(ctx, messages)
+}
+
+type clonedKeyChangeSigner struct{ lifecycleSigner }
+
+func (s clonedKeyChangeSigner) SignBlindMessages(ctx context.Context, messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
+	sigs, outputs, err := s.lifecycleSigner.SignBlindMessages(ctx, messages)
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := range outputs {
+		b, parseErr := secp256k1.ParsePubKey(outputs[i].B_.SerializeCompressed())
+		if parseErr != nil {
+			return nil, nil, parseErr
+		}
+		c, parseErr := secp256k1.ParsePubKey(outputs[i].C_.SerializeCompressed())
+		if parseErr != nil {
+			return nil, nil, parseErr
+		}
+		outputs[i].B_, outputs[i].C_ = cashu.WrappedPublicKey{PublicKey: b}, cashu.WrappedPublicKey{PublicKey: c}
+		c, parseErr = secp256k1.ParsePubKey(sigs[i].C_.SerializeCompressed())
+		if parseErr != nil {
+			return nil, nil, parseErr
+		}
+		sigs[i].C_ = cashu.WrappedPublicKey{PublicKey: c}
+	}
+	return sigs, outputs, nil
+}
+
+func TestMeltFinalizationRejectsMismatchedSignerPlan(t *testing.T) {
+	db := &mockdb.MockDB{}
+	mint := &Mint{MintDB: db, Signer: mismatchedChangeSigner{}}
+	setupPendingMeltWithChange(t, mint, "melt", []uint64{15}, 3)
+	request := cashu.PostMeltBolt11Request{Inputs: append(cashu.Proofs(nil), db.Proofs...)}
+	_, _, _, err := mint.finalizePaidBolt11Melt(context.Background(), bolt11MeltData{
+		AmountProofs: cashu.NewAmount(cashu.Sat, 15), Fee: cashu.NewAmount(cashu.Sat, 0), Unit: cashu.Sat,
+	}, request, db.MeltRequest[0], cashu.NewAmount(cashu.Sat, 0))
+	if !errors.Is(err, errMeltFinalizationState) {
+		t.Fatalf("error=%v, want mismatched signer output rejected", err)
+	}
+	if len(db.MeltChange) != 3 || len(db.RecoverSigDB) != 0 || db.Proofs[0].State != cashu.PROOF_PENDING {
+		t.Fatal("mismatched signer output changed a committed reservation")
+	}
+}
+
+func TestMeltFinalizationRejectsSignerMutationOfSelectedPlan(t *testing.T) {
+	db := &settlementCountingDB{MockDB: &mockdb.MockDB{}}
+	mint := &Mint{MintDB: db, Signer: mutatingChangeSigner{}}
+	setupPendingMeltWithChange(t, mint, "melt", []uint64{15}, 3)
+	request := cashu.PostMeltBolt11Request{Inputs: append(cashu.Proofs(nil), db.Proofs...)}
+	_, _, _, err := mint.finalizePaidBolt11Melt(context.Background(), bolt11MeltData{
+		AmountProofs: cashu.NewAmount(cashu.Sat, 15), Fee: cashu.NewAmount(cashu.Sat, 0), Unit: cashu.Sat,
+	}, request, db.MeltRequest[0], cashu.NewAmount(cashu.Sat, 0))
+	if !errors.Is(err, errMeltFinalizationState) {
+		t.Fatalf("error=%v, want signer plan mutation rejected", err)
+	}
+	if db.completions != 0 || len(db.MeltChange) != 3 || len(db.RecoverSigDB) != 0 || db.Proofs[0].State != cashu.PROOF_PENDING {
+		t.Fatal("mutated signer plan reached settlement persistence or changed reservations")
+	}
+}
+
+func TestMeltFinalizationAcceptsEquivalentClonedKeyValues(t *testing.T) {
+	db := &mockdb.MockDB{}
+	mint := &Mint{MintDB: db, Signer: clonedKeyChangeSigner{}}
+	setupPendingMeltWithChange(t, mint, "melt", []uint64{15}, 3)
+	request := cashu.PostMeltBolt11Request{Inputs: append(cashu.Proofs(nil), db.Proofs...)}
+	_, response, _, err := mint.finalizePaidBolt11Melt(context.Background(), bolt11MeltData{
+		AmountProofs: cashu.NewAmount(cashu.Sat, 15), Fee: cashu.NewAmount(cashu.Sat, 0), Unit: cashu.Sat,
+	}, request, db.MeltRequest[0], cashu.NewAmount(cashu.Sat, 0))
+	if err != nil || len(response.Change) != 3 {
+		t.Fatalf("change=%d error=%v; equivalent cloned key values should be accepted", len(response.Change), err)
+	}
+}
+
+func TestMeltFinalizationCompletedPollDoesNotUseSigner(t *testing.T) {
+	for _, amount := range []uint64{12, 15} {
+		t.Run(fmt.Sprintf("amount-%d", amount), func(t *testing.T) {
+			db := &mockdb.MockDB{}
+			mint := &Mint{
+				MintDB:           db,
+				Signer:           changeLifecycleSigner{},
+				LightningBackend: lightning.FakeWallet{Network: chaincfg.RegressionNetParams},
+			}
+			setupPendingMeltWithChange(t, mint, "melt", []uint64{amount}, 3)
+			committed, err := mint.RefreshMeltQuoteState(context.Background(), "melt")
+			if err != nil {
+				t.Fatal(err)
+			}
+			beforeSignatures := append([]cashu.RecoverSigDB(nil), db.RecoverSigDB...)
+			beforeProofs := append(cashu.Proofs(nil), db.Proofs...)
+			mint.Signer = nil
+			polled, err := mint.RefreshMeltQuoteState(context.Background(), "melt")
+			if err != nil {
+				t.Fatalf("completed poll attempted signer work: %v", err)
+			}
+			if polled.FeePaid != committed.FeePaid || polled.PaymentPreimage != committed.PaymentPreimage || len(polled.Change) != len(committed.Change) {
+				t.Fatalf("poll did not return durable settlement: committed=%+v polled=%+v", committed, polled)
+			}
+			if len(db.RecoverSigDB) != len(beforeSignatures) || len(db.MeltChange) != 0 || len(db.Proofs) != len(beforeProofs) {
+				t.Fatal("completed poll rewrote settlement records")
+			}
+			for i := range beforeProofs {
+				if db.Proofs[i].State != cashu.PROOF_SPENT {
+					t.Fatal("completed poll changed finalized proof state")
+				}
+			}
+		})
+	}
+}
+
+func TestMeltFinalizationCancellationRetainsReservations(t *testing.T) {
+	db := &mockdb.MockDB{}
+	mint := &Mint{MintDB: db, Signer: canceledChangeSigner{}}
+	setupPendingMeltWithChange(t, mint, "melt", []uint64{15}, 3)
+	request := cashu.PostMeltBolt11Request{Inputs: append(cashu.Proofs(nil), db.Proofs...)}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, _, err := mint.finalizePaidBolt11Melt(ctx, bolt11MeltData{
+		AmountProofs: cashu.NewAmount(cashu.Sat, 15), Fee: cashu.NewAmount(cashu.Sat, 0), Unit: cashu.Sat,
+	}, request, db.MeltRequest[0], cashu.NewAmount(cashu.Sat, 0))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error=%v, want context cancellation", err)
+	}
+	if len(db.MeltChange) != 3 || len(db.RecoverSigDB) != 0 || db.Proofs[0].State != cashu.PROOF_PENDING {
+		t.Fatal("cancellation released or consumed committed reservations")
 	}
 }

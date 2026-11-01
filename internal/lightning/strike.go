@@ -19,7 +19,7 @@ func (Strike) PayInvoice(cashu.MeltRequestDB, *zpay32.Invoice, cashu.Amount, boo
 	return PaymentResponse{}, ErrLNBackendEndOfLife
 }
 
-func (Strike) CheckPayed(string, *zpay32.Invoice, string) (PaymentStatus, string, cashu.Amount, error) {
+func (Strike) CheckPayed(context.Context, string, *zpay32.Invoice, string) (PaymentStatus, string, cashu.Amount, error) {
 	return UNKNOWN, "", cashu.Amount{}, ErrLNBackendEndOfLife
 }
 

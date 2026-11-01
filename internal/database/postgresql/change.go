@@ -8,24 +8,25 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lescuer97/nutmix/api/cashu"
+	"github.com/lescuer97/nutmix/internal/database"
 )
 
-func lockMeltChangeQuote(tx pgx.Tx, quote string) (cashu.ACTION_STATE, error) {
+func lockMeltChangeQuote(ctx context.Context, tx pgx.Tx, quote string) (cashu.ACTION_STATE, error) {
 	var state cashu.ACTION_STATE
-	err := tx.QueryRow(context.Background(), "SELECT state FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", quote).Scan(&state)
+	err := tx.QueryRow(ctx, "SELECT state FROM melt_request WHERE quote = $1 FOR UPDATE NOWAIT", quote).Scan(&state)
 	if err != nil {
 		return state, databaseError(err)
 	}
 	return state, nil
 }
 
-// SaveMeltChange claims blank outputs in the same transaction as melt inputs.
+// ReserveMeltChangeOutputs claims blank outputs in the same transaction as melt inputs.
 // A blank's denomination is unknown until settlement, so its stored amount is NULL.
-func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error {
+func (pql Postgresql) ReserveMeltChangeOutputs(ctx context.Context, tx pgx.Tx, change []cashu.BlindedMessage, quote string) error {
 	if len(change) == 0 {
 		return nil
 	}
-	state, err := lockMeltChangeQuote(tx, quote)
+	state, err := lockMeltChangeQuote(ctx, tx, quote)
 	if err != nil {
 		return err
 	}
@@ -39,10 +40,10 @@ func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, q
 		}
 		points[i] = output.B_
 	}
-	if err := lockBlindMessagePoints(tx, points); err != nil {
+	if err := lockBlindMessagePoints(ctx, tx, points); err != nil {
 		return err
 	}
-	if err := pql.CheckBlindMessagesAvailable(tx, points); err != nil {
+	if err := pql.CheckBlindMessagesAvailable(ctx, tx, points); err != nil {
 		return err
 	}
 	entries := make([][]any, len(change))
@@ -50,7 +51,7 @@ func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, q
 	for i, output := range change {
 		entries[i] = []any{output.B_, output.Id, "PENDING", quote, i, now}
 	}
-	_, err = tx.CopyFrom(context.Background(), pgx.Identifier{"blind_messages"},
+	_, err = tx.CopyFrom(ctx, pgx.Identifier{"blind_messages"},
 		[]string{"blinded_message", "keyset_id", "state", "melt_quote_id", "output_position", "created_at"}, pgx.CopyFromRows(entries))
 	if err != nil {
 		return databaseError(fmt.Errorf("reserve melt change messages: %w", err))
@@ -58,31 +59,20 @@ func (pql Postgresql) SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, q
 	return nil
 }
 
-func (pql Postgresql) GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error) {
-	if _, err := lockMeltChangeQuote(tx, quote); err != nil {
+func (pql Postgresql) LoadPendingMeltChangeForUpdate(ctx context.Context, tx pgx.Tx, quote string) ([]cashu.MeltChange, error) {
+	if _, err := lockMeltChangeQuote(ctx, tx, quote); err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(context.Background(), `SELECT blinded_message AS "B_", keyset_id AS id,
-		melt_quote_id AS quote, created_at FROM blind_messages
-		WHERE melt_quote_id = $1 AND state = 'PENDING'
-		ORDER BY output_position FOR UPDATE`, quote)
-	if err != nil {
-		return nil, databaseError(err)
-	}
-	change, err := pgx.CollectRows(rows, pgx.RowToStructByName[cashu.MeltChange])
-	if err != nil {
-		return nil, databaseError(err)
-	}
-	return change, nil
+	return loadPendingMeltChangeForSettlement(ctx, tx, quote)
 }
 
-// DeleteChangeByQuote releases only unsigned blanks. Signed change remains
+// ReleasePendingMeltChangeOutputs releases only unsigned blanks. Signed change remains
 // linked to the melt quote permanently, for recovery and repeated quote reads.
-func (pql Postgresql) DeleteChangeByQuote(tx pgx.Tx, quote string) error {
-	if _, err := lockMeltChangeQuote(tx, quote); err != nil {
+func (pql Postgresql) ReleasePendingMeltChangeOutputs(ctx context.Context, tx pgx.Tx, quote string) error {
+	if _, err := lockMeltChangeQuote(ctx, tx, quote); err != nil {
 		return err
 	}
-	_, err := tx.Exec(context.Background(), `DELETE FROM blind_messages
+	_, err := tx.Exec(ctx, `DELETE FROM blind_messages
 		WHERE melt_quote_id = $1 AND state = 'PENDING' AND signature_id IS NULL`, quote)
 	if err != nil {
 		return databaseError(err)
@@ -90,38 +80,21 @@ func (pql Postgresql) DeleteChangeByQuote(tx pgx.Tx, quote string) error {
 	return nil
 }
 
-// FinalizeMeltChange signs only the selected prefix of this quote's ordered
+// finalizeMeltChange signs only the selected prefix of this quote's ordered
 // blanks and releases the unused suffix, including all blanks for zero refund.
 // Quote/proof settlement and this operation must share the caller's transaction.
-func (pql Postgresql) FinalizeMeltChange(tx pgx.Tx, quote string, signatures []cashu.RecoverSigDB) error {
-	state, err := lockMeltChangeQuote(tx, quote)
-	if err != nil {
-		return err
-	}
-	if state != cashu.PENDING && state != cashu.PAID {
-		return cashu.ErrQuoteIsPending
-	}
-	pending, err := pql.GetMeltChangeByQuote(tx, quote)
-	if err != nil {
-		return err
-	}
+func (pql Postgresql) finalizeMeltChange(ctx context.Context, tx pgx.Tx, quote string, pending []cashu.MeltChange, signatures []cashu.SignedOutput) error {
 	if len(signatures) > len(pending) {
 		return cashu.ErrQuoteIsPending
 	}
-	points := make([]cashu.WrappedPublicKey, len(signatures))
 	for i, sig := range signatures {
-		if sig.B_.PublicKey == nil || sig.C_.PublicKey == nil || sig.Amount == 0 || sig.MintQuote != "" ||
-			(sig.MeltQuote != "" && sig.MeltQuote != quote) ||
+		if sig.B_.PublicKey == nil || sig.C_.PublicKey == nil || sig.Amount == 0 ||
 			(sig.Dleq != nil && (sig.Dleq.E == nil || sig.Dleq.S == nil)) {
 			return cashu.ErrInvalidBlindMessage
 		}
 		if sig.B_.ToHex() != pending[i].B_.ToHex() || sig.Id != pending[i].Id {
 			return cashu.ErrInvalidBlindMessage
 		}
-		points[i] = sig.B_
-	}
-	if err := lockBlindMessagePoints(tx, points); err != nil {
-		return err
 	}
 	var batch pgx.Batch
 	for _, sig := range signatures {
@@ -144,9 +117,20 @@ func (pql Postgresql) FinalizeMeltChange(tx pgx.Tx, quote string, signatures []c
 		})
 	}
 	if len(signatures) > 0 {
-		if err := tx.SendBatch(context.Background(), &batch).Close(); err != nil {
+		if err := tx.SendBatch(ctx, &batch).Close(); err != nil {
 			return databaseError(err)
 		}
 	}
-	return pql.DeleteChangeByQuote(tx, quote)
+	return pql.releasePendingMeltChangeOutputs(ctx, tx, quote, len(pending)-len(signatures))
+}
+
+func (pql Postgresql) releasePendingMeltChangeOutputs(ctx context.Context, tx pgx.Tx, quote string, expected int) error {
+	tag, err := tx.Exec(ctx, `DELETE FROM blind_messages WHERE melt_quote_id = $1 AND state = 'PENDING' AND signature_id IS NULL`, quote)
+	if err != nil {
+		return databaseError(err)
+	}
+	if tag.RowsAffected() != int64(expected) {
+		return database.ErrMeltSettlementState
+	}
+	return nil
 }

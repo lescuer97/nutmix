@@ -239,21 +239,25 @@ func (s *RemoteSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hour
 	return nil
 }
 
-func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
-	ctx := context.Background()
+func (s *RemoteSigner) SignBlindMessages(parent context.Context, messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
+	ctx, cancel := signer.SignBlindMessagesContext(parent)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	blindedMessageRequest := sig.BlindedMessages{
 		BlindedMessages: make([]*sig.BlindedMessage, len(messages)),
 	}
 
 	for i := range messages {
 		if messages[i].B_.PublicKey == nil {
-			return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, cashu.ErrInvalidBlindMessage
+			return []cashu.BlindSignature{}, []cashu.SignedOutput{}, cashu.ErrInvalidBlindMessage
 		}
 		B_ := messages[i].B_.SerializeCompressed()
 
 		bytesId, err := hex.DecodeString(messages[i].Id)
 		if err != nil {
-			return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("hex.DecodeString(val.Id). %w", err)
+			return []cashu.BlindSignature{}, []cashu.SignedOutput{}, fmt.Errorf("hex.DecodeString(val.Id). %w", err)
 		}
 
 		blindedMessageRequest.BlindedMessages[i] = &sig.BlindedMessage{
@@ -265,40 +269,38 @@ func (s *RemoteSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cas
 
 	blindSigsResponse, err := s.grpcClient.BlindSign(ctx, &blindedMessageRequest)
 	if err != nil {
-		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("s.grpcClient.BlindSign(ctx, &blindedMessageRequest). %w", err)
+		return []cashu.BlindSignature{}, []cashu.SignedOutput{}, fmt.Errorf("s.grpcClient.BlindSign(ctx, &blindedMessageRequest). %w", err)
 	}
 	err = CheckIfSignerErrorExists(blindSigsResponse.GetError())
 	if err != nil {
-		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("CheckIfSignerErrorExists(blindSigsResponse.GetError()). %w", err)
+		return []cashu.BlindSignature{}, []cashu.SignedOutput{}, fmt.Errorf("CheckIfSignerErrorExists(blindSigsResponse.GetError()). %w", err)
 	}
 
 	blindSigs, err := ConvertSigBlindSignaturesToCashuBlindSigs(blindSigsResponse)
 	if err != nil {
-		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("CheckIfSignerErrorExists(blindSigsResponse.GetError()). %w", err)
+		return []cashu.BlindSignature{}, []cashu.SignedOutput{}, fmt.Errorf("CheckIfSignerErrorExists(blindSigsResponse.GetError()). %w", err)
 	}
 	// verify we have the same amount of blindedmessages than BlindSignatures
 	if len(blindSigs) != len(messages) {
-		return []cashu.BlindSignature{}, []cashu.RecoverSigDB{}, fmt.Errorf("not the correct amount of blind signatures")
+		return []cashu.BlindSignature{}, []cashu.SignedOutput{}, fmt.Errorf("not the correct amount of blind signatures")
 	}
 
-	recoverySigs := []cashu.RecoverSigDB{}
+	signedOutputs := make([]cashu.SignedOutput, len(messages))
 	now := time.Now().Unix()
 	// make recovery signatures
 	for i, message := range messages {
 		val := blindSigs[i]
-		recoverySigs = append(recoverySigs, cashu.RecoverSigDB{
+		signedOutputs[i] = cashu.SignedOutput{
 			Amount:    val.Amount,
 			Id:        val.Id,
 			C_:        val.C_,
 			B_:        message.B_,
 			CreatedAt: now,
 			Dleq:      val.Dleq,
-			MeltQuote: "",
-			MintQuote: "",
-		})
+		}
 	}
 
-	return blindSigs, recoverySigs, nil
+	return blindSigs, signedOutputs, nil
 }
 
 func (s *RemoteSigner) VerifyProofs(proofs []cashu.Proof) error {

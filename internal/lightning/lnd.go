@@ -268,8 +268,8 @@ type LndPayStatus struct {
 	Status   PaymentStatus
 }
 
-func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
+func (l LndGrpcWallet) getPaymentStatus(ctx context.Context, invoice *zpay32.Invoice) (LndPayStatus, error) {
+	ctx = metadata.AppendToOutgoingContext(ctx, "macaroon", l.macaroon)
 
 	routerClient := routerrpc.NewRouterClient(l.grpcClient)
 
@@ -310,8 +310,8 @@ func (l LndGrpcWallet) getPaymentStatus(invoice *zpay32.Invoice) (LndPayStatus, 
 	}
 }
 
-func (l LndGrpcWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
-	payStatus, err := l.getPaymentStatus(invoice)
+func (l LndGrpcWallet) CheckPayed(ctx context.Context, quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
+	payStatus, err := l.getPaymentStatus(ctx, invoice)
 	if err != nil {
 		return FAILED, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, fmt.Errorf(`l.getPaymentStatus(quote) %w`, err)
 	}

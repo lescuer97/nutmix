@@ -1,4 +1,4 @@
-//nolint:exhaustruct,contextcheck // Minimal fixtures exercise the existing context-free database interface.
+//nolint:exhaustruct // Fixtures specify only fields relevant to the lifecycle scenario.
 package postgresql
 
 import (
@@ -9,126 +9,6 @@ import (
 
 	"github.com/lescuer97/nutmix/api/cashu"
 )
-
-func TestMeltChangeMessageTransactions(t *testing.T) {
-	db, ctx := setupTestDB(t)
-	t.Cleanup(db.Close)
-	tx, err := db.GetTx(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	for _, quote := range []string{"q1", "q2"} {
-		if err := db.SaveMeltRequest(tx, cashu.MeltRequestDB{Quote: quote, Request: quote + "-invoice", Unit: "sat", State: cashu.PENDING}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	first, second, unused := lifecycleSignature(3), lifecycleSignature(1), lifecycleSignature(2)
-	second.Amount = 2
-	outputs := []cashu.BlindedMessage{first.GetBlindedMessage(), second.GetBlindedMessage(), unused.GetBlindedMessage()}
-	if err := db.SaveMeltChange(tx, outputs, "q1"); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-	var unknown int
-	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM blind_messages WHERE melt_quote_id = 'q1' AND amount IS NULL AND signature_id IS NULL").Scan(&unknown); err != nil || unknown != 3 {
-		t.Fatalf("blank amounts known prematurely: %d %v", unknown, err)
-	}
-
-	check, err := db.GetTx(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = check.Rollback(ctx) }()
-	pending, err := db.GetMeltChangeByQuote(check, "q1")
-	if err != nil || len(pending) != 3 || pending[0].B_.ToHex() != first.B_.ToHex() || pending[1].B_.ToHex() != second.B_.ToHex() {
-		t.Fatalf("wallet order changed: %v %v", pending, err)
-	}
-	if err := db.SaveRestoreSigs(check, []cashu.RecoverSigDB{first}); !errors.Is(err, cashu.ErrOutputPending) {
-		t.Fatalf("generic writer signed pending blank: %v", err)
-	}
-	if err := db.FinalizeMeltChange(check, "q2", []cashu.RecoverSigDB{first}); !errors.Is(err, cashu.ErrQuoteIsPending) {
-		t.Fatalf("wrong quote signed blank: %v", err)
-	}
-	changed := first
-	changed.Id = "other-keyset"
-	if err := db.FinalizeMeltChange(check, "q1", []cashu.RecoverSigDB{changed}); !errors.Is(err, cashu.ErrInvalidBlindMessage) {
-		t.Fatalf("keyset substitution accepted: %v", err)
-	}
-	if err := db.FinalizeMeltChange(check, "q1", []cashu.RecoverSigDB{first, second}); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.ChangeMeltRequestState(check, "q1", cashu.PAID, true, 0); err != nil {
-		t.Fatal(err)
-	}
-	if err := check.Rollback(ctx); err != nil {
-		t.Fatal(err)
-	}
-	var signatures int
-	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM blind_signatures").Scan(&signatures); err != nil || signatures != 0 {
-		t.Fatalf("rollback leaked signatures: %d %v", signatures, err)
-	}
-
-	finish, err := db.GetTx(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = finish.Rollback(ctx) }()
-	quote, err := db.GetMeltRequestById(finish, "q1")
-	if err != nil || quote.State != cashu.PENDING {
-		t.Fatalf("rollback lost pending quote: %+v %v", quote, err)
-	}
-	pending, err = db.GetMeltChangeByQuote(finish, "q1")
-	if err != nil || len(pending) != 3 {
-		t.Fatalf("rollback lost blanks: %v %v", pending, err)
-	}
-	if err := db.FinalizeMeltChange(finish, "q1", []cashu.RecoverSigDB{first, second}); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.ChangeMeltRequestState(finish, "q1", cashu.PAID, true, 0); err != nil {
-		t.Fatal(err)
-	}
-	if err := finish.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	read, err := db.GetTx(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = read.Rollback(ctx) }()
-	quote, err = db.GetMeltRequestById(read, "q1")
-	if err != nil || len(quote.Change) != 2 || quote.Change[0].Amount != 1 || quote.Change[1].Amount != 2 {
-		t.Fatalf("reloaded quote lost ordered change: %+v %v", quote, err)
-	}
-	recovered, err := db.GetRestoreSigsFromBlindedMessages(read, []cashu.WrappedPublicKey{first.B_, second.B_, unused.B_})
-	if err != nil || len(recovered) != 2 {
-		t.Fatalf("recovery=%v err=%v", recovered, err)
-	}
-	for _, sig := range recovered {
-		if sig.MeltQuote != "q1" {
-			t.Fatal("change provenance lost")
-		}
-	}
-	if err := db.DeleteChangeByQuote(read, "q1"); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.SaveMeltChange(read, []cashu.BlindedMessage{unused.GetBlindedMessage()}, "q2"); err != nil {
-		t.Fatalf("unused blank not released: %v", err)
-	}
-	if err := db.FinalizeMeltChange(read, "q2", nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.CheckBlindMessagesAvailable(read, []cashu.WrappedPublicKey{unused.B_}); err != nil {
-		t.Fatalf("zero refund retained blank: %v", err)
-	}
-	if err := read.Commit(ctx); err != nil {
-		t.Fatal(err)
-	}
-	assertLifecycleCounts(t, ctx, db, 2)
-}
 
 func TestMeltChangeConcurrentClaimAndSignature(t *testing.T) {
 	db, baseCtx := setupTestDB(t)
@@ -151,19 +31,19 @@ func TestMeltChangeConcurrentClaimAndSignature(t *testing.T) {
 	for _, reserve := range []bool{true, false} {
 		go func(reserve bool) {
 			<-start
-			tx, err := db.GetTx(ctx)
+			workerTx, err := db.GetTx(ctx)
 			if err != nil {
 				results <- err
 				return
 			}
-			defer func() { _ = tx.Rollback(baseCtx) }()
+			defer func() { _ = workerTx.Rollback(baseCtx) }()
 			if reserve {
-				err = db.SaveMeltChange(tx, []cashu.BlindedMessage{second.GetBlindedMessage(), first.GetBlindedMessage()}, "q")
+				err = db.ReserveMeltChangeOutputs(ctx, workerTx, []cashu.BlindedMessage{second.GetBlindedMessage(), first.GetBlindedMessage()}, "q")
 			} else {
-				err = db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{first, second})
+				err = db.InsertSignedOutputs(ctx, workerTx, []cashu.SignedOutput{first, second})
 			}
 			if err == nil {
-				err = tx.Commit(ctx)
+				err = workerTx.Commit(ctx)
 			}
 			results <- err
 		}(reserve)
@@ -222,7 +102,7 @@ func TestMeltChangeMessageMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = read.Rollback(ctx) }()
-	pending, err := db.GetMeltChangeByQuote(read, "q")
+	pending, err := db.LoadPendingMeltChangeForUpdate(ctx, read, "q")
 	if err != nil || len(pending) != 2 || pending[0].B_.ToHex() != second.B_.ToHex() || pending[0].CreatedAt != 10 {
 		t.Fatalf("legacy blanks not preserved deterministically: %v %v", pending, err)
 	}
@@ -237,7 +117,7 @@ func TestMeltChangeMessageMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = clear.Rollback(ctx) }()
-	if err := db.DeleteChangeByQuote(clear, "q"); err != nil {
+	if err := db.ReleasePendingMeltChangeOutputs(ctx, clear, "q"); err != nil {
 		t.Fatal(err)
 	}
 	if err := clear.Commit(ctx); err != nil {
@@ -263,7 +143,7 @@ func TestMeltChangeMessageMigration(t *testing.T) {
 					t.Fatal(err)
 				}
 				defer func() { _ = tx.Rollback(ctx) }()
-				if err := db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{first}); err != nil {
+				if err := db.InsertSignedOutputs(ctx, tx, []cashu.SignedOutput{first}); err != nil {
 					t.Fatal(err)
 				}
 				if err := tx.Commit(ctx); err != nil {

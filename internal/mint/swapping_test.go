@@ -43,20 +43,20 @@ type swapFailingDB struct {
 	setProofsStateErr  error
 }
 
-func (s swapFailingDB) SaveRestoreSigs(tx pgx.Tx, recoverSigs []cashu.RecoverSigDB) error {
+func (s swapFailingDB) InsertSignedOutputs(ctx context.Context, tx pgx.Tx, recoverSigs []cashu.SignedOutput) error {
 	if s.saveRestoreSigsErr != nil {
 		return s.saveRestoreSigsErr
 	}
 
-	return s.MintDB.SaveRestoreSigs(tx, recoverSigs)
+	return s.MintDB.InsertSignedOutputs(ctx, tx, recoverSigs)
 }
 
-func (s swapFailingDB) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error {
+func (s swapFailingDB) SetProofsState(ctx context.Context, tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error {
 	if s.setProofsStateErr != nil {
 		return s.setProofsStateErr
 	}
 
-	return s.MintDB.SetProofsState(tx, proofs, state)
+	return s.MintDB.SetProofsState(ctx, tx, proofs, state)
 }
 
 type failingSigner struct {
@@ -64,12 +64,12 @@ type failingSigner struct {
 	signBlindMessagesErr error
 }
 
-func (s failingSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
+func (s failingSigner) SignBlindMessages(ctx context.Context, messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
 	if s.signBlindMessagesErr != nil {
 		return nil, nil, s.signBlindMessagesErr
 	}
 
-	return s.Signer.SignBlindMessages(messages)
+	return s.Signer.SignBlindMessages(ctx, messages)
 }
 
 func TestExecuteSwapDoesNotRequireLightningBackend(t *testing.T) {
@@ -91,8 +91,8 @@ func TestExecuteSwapDoesNotRequireLightningBackend(t *testing.T) {
 	}
 }
 
-func TestExecuteSwapRemovesPendingProofsWhenSaveRestoreSigsFails(t *testing.T) {
-	runSwapCleanupFailureTest(t, "SaveRestoreSigs", func(mint *Mint) {
+func TestExecuteSwapRemovesPendingProofsWhenInsertSignedOutputsFails(t *testing.T) {
+	runSwapCleanupFailureTest(t, "InsertSignedOutputs", func(mint *Mint) {
 		mint.MintDB = swapFailingDB{MintDB: mint.MintDB, saveRestoreSigsErr: errors.New("save restore sigs failed"), setProofsStateErr: nil}
 	})
 }
@@ -158,9 +158,9 @@ func assertProofsMissing(t *testing.T, mint *Mint, proofYs []cashu.WrappedPublic
 		_ = mint.MintDB.Rollback(context.Background(), tx)
 	}()
 
-	proofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, proofYs)
+	proofs, err := mint.MintDB.GetProofsFromSecretCurve(context.Background(), tx, proofYs)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetProofsFromSecretCurve(tx, proofYs): %v", err)
+		t.Fatalf("mint.MintDB.GetProofsFromSecretCurve(context.Background(), tx, proofYs): %v", err)
 	}
 	if len(proofs) != 0 {
 		t.Fatalf("expected pending proofs cleanup, found %d proofs", len(proofs))

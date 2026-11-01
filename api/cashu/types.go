@@ -462,6 +462,25 @@ type RecoverSigDB struct {
 	CreatedAt int64               `json:"created_at" db:"created_at"`
 }
 
+// SignedOutput is a newly signed output before its operation-specific ownership
+// is assigned by persistence.
+type SignedOutput struct {
+	B_        WrappedPublicKey    `json:"B_" db:"B_"`
+	C_        WrappedPublicKey    `json:"C_" db:"C_"`
+	Dleq      *BlindSignatureDLEQ `json:"dleq,omitempty"`
+	Id        string              `json:"id"`
+	Amount    uint64              `json:"amount"`
+	CreatedAt int64               `json:"created_at" db:"created_at"`
+}
+
+func (r SignedOutput) GetBlindedMessage() BlindedMessage {
+	return BlindedMessage{B_: r.B_, Id: r.Id, Witness: "", Amount: r.Amount}
+}
+
+func (r SignedOutput) GetBlindSignature() BlindSignature {
+	return BlindSignature{Amount: r.Amount, Id: r.Id, C_: r.C_, Dleq: r.Dleq}
+}
+
 func (r RecoverSigDB) GetSigAndMessage() (BlindSignature, BlindedMessage) {
 	return r.GetBlindSignature(), r.GetBlindedMessage()
 }

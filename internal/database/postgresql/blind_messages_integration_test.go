@@ -28,9 +28,9 @@ func TestBlindMessageLifecycleStorage(t *testing.T) {
 	if err := db.SaveMintRequest(tx, cashu.MintRequestDB{Quote: "mint-origin", Request: "invoice", Unit: "sat", State: cashu.ISSUED, Minted: true}); err != nil {
 		t.Fatal(err)
 	}
-	base.MintQuote, base.Amount = "mint-origin", math.MaxUint64
+	base.Amount = math.MaxUint64
 	base.Dleq = &cashu.BlindSignatureDLEQ{E: secp256k1.PrivKeyFromBytes([]byte{1}), S: secp256k1.PrivKeyFromBytes([]byte{2})}
-	if err := db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{base}); err != nil {
+	if err := db.InsertMintSignedOutputs(ctx, tx, "mint-origin", []cashu.SignedOutput{base}); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -43,19 +43,19 @@ func TestBlindMessageLifecycleStorage(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = tx.Rollback(ctx) }()
-		sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []cashu.WrappedPublicKey{base.B_})
+		sigs, err := db.GetRestoreSigsFromBlindedMessages(ctx, tx, []cashu.WrappedPublicKey{base.B_})
 		if err != nil || len(sigs) != 1 {
 			t.Fatalf("recovery=%v err=%v", sigs, err)
 		}
 		got := sigs[0]
-		if got.Amount != base.Amount || got.Id != base.Id || got.MintQuote != base.MintQuote || got.CreatedAt != base.CreatedAt || got.C_.ToHex() != base.C_.ToHex() || got.Dleq == nil || !bytes.Equal(got.Dleq.E.Serialize(), base.Dleq.E.Serialize()) || !bytes.Equal(got.Dleq.S.Serialize(), base.Dleq.S.Serialize()) {
+		if got.Amount != base.Amount || got.Id != base.Id || got.MintQuote != "mint-origin" || got.CreatedAt != base.CreatedAt || got.C_.ToHex() != base.C_.ToHex() || got.Dleq == nil || !bytes.Equal(got.Dleq.E.Serialize(), base.Dleq.E.Serialize()) || !bytes.Equal(got.Dleq.S.Serialize(), base.Dleq.S.Serialize()) {
 			t.Fatalf("recovery changed metadata: %+v", got)
 		}
 		stats, err := db.GetBlindSigStatsRows(ctx, tx, base.CreatedAt, base.CreatedAt)
 		if err != nil || len(stats) != 1 || stats[0].Amount != base.Amount {
 			t.Fatalf("stats=%v err=%v", stats, err)
 		}
-		if err := db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{base}); !errors.Is(err, cashu.ErrBlindMessageAlreadySigned) {
+		if err := db.InsertSignedOutputs(ctx, tx, []cashu.SignedOutput{base}); !errors.Is(err, cashu.ErrBlindMessageAlreadySigned) {
 			t.Fatalf("signed output reserved again: %v", err)
 		}
 	})
@@ -103,7 +103,7 @@ func TestBlindMessageLifecycleStorage(t *testing.T) {
 		 VALUES ($1, 1, 'keyset', 'PENDING', 123)`, pending.B_); err != nil {
 			t.Fatal(err)
 		}
-		sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []cashu.WrappedPublicKey{pending.B_})
+		sigs, err := db.GetRestoreSigsFromBlindedMessages(ctx, tx, []cashu.WrappedPublicKey{pending.B_})
 		if err != nil || len(sigs) != 0 {
 			t.Fatalf("pending recovery=%v err=%v", sigs, err)
 		}
@@ -111,7 +111,7 @@ func TestBlindMessageLifecycleStorage(t *testing.T) {
 		if err != nil || len(stats) != 1 {
 			t.Fatalf("pending counted: %v err=%v", stats, err)
 		}
-		if err := db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{pending}); !errors.Is(err, cashu.ErrOutputPending) {
+		if err := db.InsertSignedOutputs(ctx, tx, []cashu.SignedOutput{pending}); !errors.Is(err, cashu.ErrOutputPending) {
 			t.Fatalf("pending signed through generic writer: %v", err)
 		}
 	})
@@ -122,7 +122,7 @@ func TestBlindMessageLifecycleStorage(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = tx.Rollback(ctx) }()
-		if err := db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{lifecycleSignature(4)}); err != nil {
+		if err := db.InsertSignedOutputs(ctx, tx, []cashu.SignedOutput{lifecycleSignature(4)}); err != nil {
 			t.Fatal(err)
 		}
 		if err := tx.Rollback(ctx); err != nil {
@@ -138,8 +138,10 @@ func TestBlindMessageLifecycleStorage(t *testing.T) {
 		}
 		defer func() { _ = tx.Rollback(ctx) }()
 		valid, invalid := lifecycleSignature(5), lifecycleSignature(6)
-		invalid.MintQuote = "missing-quote"
-		if err := db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{valid, invalid}); err == nil {
+		if err := db.InsertSignedOutputs(ctx, tx, []cashu.SignedOutput{valid}); err != nil {
+			t.Fatalf("insert valid output before failing mint write: %v", err)
+		}
+		if err := db.InsertMintSignedOutputs(ctx, tx, "missing-quote", []cashu.SignedOutput{invalid}); err == nil {
 			t.Fatal("missing quote accepted")
 		}
 		if err := tx.Commit(ctx); !errors.Is(err, pgx.ErrTxCommitRollback) {
@@ -168,8 +170,8 @@ func TestBlindMessageLifecycleConcurrentWriters(t *testing.T) {
 	first, second := lifecycleSignature(1), lifecycleSignature(2)
 	start := make(chan struct{})
 	results := make(chan error, 2)
-	for _, sigs := range [][]cashu.RecoverSigDB{{first, second}, {second, first}} {
-		go func(sigs []cashu.RecoverSigDB) {
+	for _, sigs := range [][]cashu.SignedOutput{{first, second}, {second, first}} {
+		go func(sigs []cashu.SignedOutput) {
 			<-start
 			tx, err := db.GetTx(ctx)
 			if err != nil {
@@ -177,7 +179,7 @@ func TestBlindMessageLifecycleConcurrentWriters(t *testing.T) {
 				return
 			}
 			defer func() { _ = tx.Rollback(baseCtx) }()
-			err = db.SaveRestoreSigs(tx, sigs)
+			err = db.InsertSignedOutputs(ctx, tx, sigs)
 			if err == nil {
 				err = tx.Commit(ctx)
 			}
@@ -254,7 +256,7 @@ func TestBlindMessageLifecycleMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []cashu.WrappedPublicKey{legacy.B_})
+	sigs, err := db.GetRestoreSigsFromBlindedMessages(ctx, tx, []cashu.WrappedPublicKey{legacy.B_})
 	if err != nil || len(sigs) != 1 {
 		t.Fatalf("migrated recovery=%v err=%v", sigs, err)
 	}
@@ -262,7 +264,7 @@ func TestBlindMessageLifecycleMigration(t *testing.T) {
 	if got.Amount != 7 || got.Id != legacy.Id || got.CreatedAt != legacy.CreatedAt || got.C_.ToHex() != legacy.C_.ToHex() || got.MintQuote != "" || got.Dleq == nil {
 		t.Fatalf("migration lost metadata: %+v", got)
 	}
-	if err := db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{lifecycleSignature(3)}); err != nil {
+	if err := db.InsertSignedOutputs(ctx, tx, []cashu.SignedOutput{lifecycleSignature(3)}); err != nil {
 		t.Fatalf("identity sequence was not advanced: %v", err)
 	}
 	if err := tx.Rollback(ctx); err != nil {

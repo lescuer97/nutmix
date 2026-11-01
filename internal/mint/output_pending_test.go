@@ -30,7 +30,7 @@ func TestOutputAvailabilityErrorsAcrossReservationPaths(t *testing.T) {
 				}
 				if signed {
 					db.RecoverSigDB = []cashu.RecoverSigDB{{B_: key, C_: key, Id: "keyset", Amount: 1}}
-				} else if err := db.SaveMeltChange(nil, outputs, "owner"); err != nil {
+				} else if err := db.ReserveMeltChangeOutputs(context.Background(), nil, outputs, "owner"); err != nil {
 					t.Fatal(err)
 				}
 				mint := &Mint{MintDB: db}
@@ -43,7 +43,7 @@ func TestOutputAvailabilityErrorsAcrossReservationPaths(t *testing.T) {
 						Quote: "melt", Outputs: outputs, Inputs: cashu.Proofs{{Secret: "unspent", Id: "keyset", Amount: 1}},
 					})
 				case "swap availability":
-					err = mint.ValidateOutputsNotSpent(nil, outputs)
+					err = mint.ValidateOutputsNotSpent(context.Background(), nil, outputs)
 				}
 				if !errors.Is(err, want) || errors.Is(err, cashu.ErrQuoteIsPending) {
 					t.Fatalf("wrong availability error: %v", err)

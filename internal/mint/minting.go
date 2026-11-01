@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
 	"github.com/lescuer97/nutmix/internal/utils"
@@ -90,14 +89,7 @@ func (m *Mint) createBolt11MintQuote(ctx context.Context, request cashu.PostMint
 	if err != nil {
 		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, tx)
-		if rollbackErr != nil {
-			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
-		}
-	}()
+	defer m.rollbackIndependent(ctx, tx)
 
 	err = m.MintDB.SaveMintRequest(tx, mintRequestDB)
 	if err != nil {
@@ -117,14 +109,7 @@ func (m *Mint) RefreshMintQuoteStatus(ctx context.Context, quoteId string, metho
 	if err != nil {
 		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, tx)
-		if rollbackErr != nil {
-			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
-		}
-	}()
+	defer m.rollbackIndependent(ctx, tx)
 	quote, err := m.MintDB.GetMintRequestById(tx, quoteId)
 	if err != nil {
 		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" m.MintDB.GetMintRequestById(tx, quoteId). %w", err)
@@ -166,14 +151,7 @@ func (m *Mint) reconcileBolt11MintQuoteState(ctx context.Context, request cashu.
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf(" m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, stateChangeTX)
-		if rollbackErr != nil {
-			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
-		}
-	}()
+	defer m.rollbackIndependent(ctx, stateChangeTX)
 	current, err := m.MintDB.GetMintRequestById(stateChangeTX, request.Quote)
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.GetMintRequestById(stateChangeTX, request.Quote). %w", err)
@@ -236,14 +214,7 @@ func (m *Mint) loadAndValidateMintQuoteForIssuance(ctx context.Context, request 
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf(" m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, preparationTx)
-		if rollbackErr != nil {
-			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
-		}
-	}()
+	defer m.rollbackIndependent(ctx, preparationTx)
 	quote, err := m.MintDB.GetMintRequestById(preparationTx, request.Quote)
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.GetMintRequestById(preparationTx, request.Quote). %w", err)
@@ -339,12 +310,7 @@ func (m *Mint) reserveMintQuoteForIssuance(ctx context.Context, request cashu.Po
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, tx)
-		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			slog.Warn("rollback error", slog.Any("error", rollbackErr))
-		}
-	}()
+	defer m.rollbackIndependent(ctx, tx)
 
 	quote, err := m.MintDB.GetMintRequestById(tx, request.Quote)
 	if err != nil {
@@ -356,8 +322,8 @@ func (m *Mint) reserveMintQuoteForIssuance(ctx context.Context, request cashu.Po
 	if quote.State != cashu.PAID {
 		return cashu.MintRequestDB{}, cashu.ErrRequestNotPaid
 	}
-	if err = m.ValidateOutputsNotSpent(tx, request.Outputs); err != nil {
-		return cashu.MintRequestDB{}, fmt.Errorf("m.ValidateOutputsNotSpent(tx, request.Outputs). %w", err)
+	if err = m.ValidateOutputsNotSpent(ctx, tx, request.Outputs); err != nil {
+		return cashu.MintRequestDB{}, fmt.Errorf("m.ValidateOutputsNotSpent(ctx, tx, request.Outputs). %w", err)
 	}
 
 	quote.State = cashu.PENDING
@@ -371,7 +337,7 @@ func (m *Mint) reserveMintQuoteForIssuance(ctx context.Context, request cashu.Po
 }
 
 func (m *Mint) signMintOutputsAndMarkIssued(ctx context.Context, request cashu.PostMintBolt11Request, mintRequestDB cashu.MintRequestDB) ([]cashu.BlindSignature, error) {
-	blindedSignatures, recoverySigsDb, err := m.Signer.SignBlindMessages(request.Outputs)
+	blindedSignatures, signedOutputs, err := m.Signer.SignBlindMessages(ctx, request.Outputs)
 	if err != nil {
 		return nil, fmt.Errorf("m.Signer.SignBlindMessages(request.Outputs) %w", err)
 	}
@@ -379,14 +345,7 @@ func (m *Mint) signMintOutputsAndMarkIssued(ctx context.Context, request cashu.P
 	if err != nil {
 		return nil, fmt.Errorf(" m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, afterMintingTx)
-		if rollbackErr != nil {
-			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
-		}
-	}()
+	defer m.rollbackIndependent(ctx, afterMintingTx)
 	mintRequestDB, err = m.MintDB.GetMintRequestById(afterMintingTx, mintRequestDB.Quote)
 	if err != nil {
 		return nil, fmt.Errorf("m.MintDB.GetMintRequestById(afterMintingTx, mintRequestDB.Quote). %w", err)
@@ -405,12 +364,9 @@ func (m *Mint) signMintOutputsAndMarkIssued(ctx context.Context, request cashu.P
 	}
 
 	slog.Debug(fmt.Sprintf("Saving restore sigs for quote: id %v", mintRequestDB.Quote))
-	for i := range recoverySigsDb {
-		recoverySigsDb[i].MintQuote = mintRequestDB.Quote
-	}
-	err = m.MintDB.SaveRestoreSigs(afterMintingTx, recoverySigsDb)
+	err = m.MintDB.InsertMintSignedOutputs(ctx, afterMintingTx, mintRequestDB.Quote, signedOutputs)
 	if err != nil {
-		return nil, fmt.Errorf("m.MintDB.SaveRestoreSigs. %w", err)
+		return nil, fmt.Errorf("m.MintDB.InsertSignedOutputs. %w", err)
 	}
 	err = m.MintDB.Commit(ctx, afterMintingTx)
 	if err != nil {

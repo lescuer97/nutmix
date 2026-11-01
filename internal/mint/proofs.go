@@ -26,7 +26,7 @@ func CheckProofState(ctx context.Context, mint *Mint, Ys []cashu.WrappedPublicKe
 	}()
 
 	// set as unspent
-	proofs, err := mint.MintDB.GetProofsFromSecretCurve(tx, Ys)
+	proofs, err := mint.MintDB.GetProofsFromSecretCurve(ctx, tx, Ys)
 	if err != nil {
 		return nil, fmt.Errorf("database.CheckListOfProofsBySecretCurve(pool, Ys). %w", err)
 	}

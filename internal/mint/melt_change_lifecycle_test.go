@@ -73,7 +73,7 @@ func TestMeltChangeImmediateAndReconciledSettlement(t *testing.T) {
 				if err != nil || len(reloaded.Change) != want {
 					t.Fatalf("repeated quote read lost change: %+v %v", reloaded, err)
 				}
-				if err := db.CheckBlindMessagesAvailable(nil, []cashu.WrappedPublicKey{keys[2]}); err != nil {
+				if err := db.CheckBlindMessagesAvailable(context.Background(), nil, []cashu.WrappedPublicKey{keys[2]}); err != nil {
 					t.Fatalf("unused blank remains reserved: %v", err)
 				}
 			})
@@ -104,7 +104,7 @@ func TestMeltChangeUncertaintyRetainsBlanksAndFailureReleasesThem(t *testing.T) 
 				if quote.State != cashu.PENDING || len(db.MeltChange) != 2 || len(db.Proofs) != 1 {
 					t.Fatal("uncertain payment released ownership")
 				}
-				if err := db.CheckBlindMessagesAvailable(nil, keys); !errors.Is(err, cashu.ErrOutputPending) {
+				if err := db.CheckBlindMessagesAvailable(context.Background(), nil, keys); !errors.Is(err, cashu.ErrOutputPending) {
 					t.Fatalf("uncertain blanks became available: %v", err)
 				}
 			}

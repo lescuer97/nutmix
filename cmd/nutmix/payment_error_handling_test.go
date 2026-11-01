@@ -161,9 +161,9 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		_ = mint.MintDB.Rollback(ctx, tx)
 	}()
 
-	proofs, err := mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
+	proofs, err := mint.MintDB.GetProofsFromSecret(ctx, tx, []string{meltProofs[0].Secret})
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret}): %+v", err)
+		t.Fatalf("mint.MintDB.GetProofsFromSecret(ctx, tx, []string{meltProofs[0].Secret}): %+v", err)
 	}
 
 	if proofs[0].State != cashu.PROOF_PENDING {
@@ -190,7 +190,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		secreList = append(secreList, p.Secret)
 	}
 
-	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(ctx, tx, secreList)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
 	}
@@ -321,9 +321,9 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		_ = mintInstance.MintDB.Rollback(ctx, tx)
 	}()
 
-	proofs, err := mintInstance.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret})
+	proofs, err := mintInstance.MintDB.GetProofsFromSecret(ctx, tx, []string{meltProofs[0].Secret})
 	if err != nil {
-		t.Fatalf("mintInstance.MintDB.GetProofsFromSecret(tx, []string{meltProofs[0].Secret}): %+v", err)
+		t.Fatalf("mintInstance.MintDB.GetProofsFromSecret(ctx, tx, []string{meltProofs[0].Secret}): %+v", err)
 	}
 
 	if proofs[0].State != cashu.PROOF_PENDING {
@@ -352,7 +352,7 @@ func TestPaymentFailureButPendingCheckPaymentPostgresFakeWallet(t *testing.T) {
 		_ = mintInstance.MintDB.Rollback(ctx, tx)
 	}()
 
-	proofsDB, err := mintInstance.MintDB.GetProofsFromSecret(tx, secreList)
+	proofsDB, err := mintInstance.MintDB.GetProofsFromSecret(ctx, tx, secreList)
 	if err != nil {
 		t.Fatalf("mintInstance.MintDB.GetProofsFromSecret(): %+v", err)
 	}
@@ -516,7 +516,7 @@ func TestPaymentPendingButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 		_ = mint.MintDB.Rollback(ctx, tx)
 	}()
 
-	proofsDB, err := mint.MintDB.GetProofsFromSecret(tx, secreList)
+	proofsDB, err := mint.MintDB.GetProofsFromSecret(ctx, tx, secreList)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromSecret() %s", w.Body.String())
 	}

@@ -1,9 +1,11 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -11,6 +13,8 @@ import (
 	m "github.com/lescuer97/nutmix/internal/mint"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
+
+const authRollbackCleanupTimeout = 2 * time.Second
 
 func AuthActivatedMiddleware(mint *m.Mint) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -86,7 +90,9 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 		defer func() {
-			rollbackErr := mint.MintDB.Rollback(c.Request.Context(), tx)
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), authRollbackCleanupTimeout)
+			defer cancel()
+			rollbackErr := mint.MintDB.Rollback(cleanupCtx, tx)
 			if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 				slog.Warn("rollback error", slog.Any("error", rollbackErr))
 			}
@@ -107,7 +113,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		err = mint.ValidateOutputsNotSpent(tx, mintRequest.Outputs)
+		err = mint.ValidateOutputsNotSpent(c.Request.Context(), tx, mintRequest.Outputs)
 		if err != nil {
 			slog.Warn("mint.VerifyOutputs(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -121,7 +127,7 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		blindedSignatures, recoverySigsDb, err := mint.Signer.SignBlindMessages(mintRequest.Outputs)
+		blindedSignatures, signedOutputs, err := mint.Signer.SignBlindMessages(c.Request.Context(), mintRequest.Outputs)
 		if err != nil {
 			slog.Warn("mint.Signer.SignBlindMessages(mintRequest.Outputs)", slog.Any("error", err))
 			errorCode, details := utils.ParseErrorToCashuErrorCode(err)
@@ -129,10 +135,10 @@ func v1AuthRoutes(r *gin.Engine, mint *m.Mint) {
 			return
 		}
 
-		err = mint.MintDB.SaveRestoreSigs(tx, recoverySigsDb)
+		err = mint.MintDB.InsertSignedOutputs(c.Request.Context(), tx, signedOutputs)
 		if err != nil {
 			slog.Error("SetRecoverySigs on minting", slog.Any("error", err))
-			slog.Error("recoverySigsDb", slog.Any("recovery_sigs", recoverySigsDb))
+			slog.Error("signedOutputs", slog.Any("signed_outputs", signedOutputs))
 			return
 		}
 

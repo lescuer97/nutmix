@@ -15,12 +15,12 @@ import (
 
 type lifecycleSigner struct{ signer.Signer }
 
-func (lifecycleSigner) SignBlindMessages(outputs []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
+func (lifecycleSigner) SignBlindMessages(_ context.Context, outputs []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
 	signatures := make([]cashu.BlindSignature, len(outputs))
-	recovery := make([]cashu.RecoverSigDB, len(outputs))
+	recovery := make([]cashu.SignedOutput, len(outputs))
 	for i, output := range outputs {
 		signatures[i] = cashu.BlindSignature{C_: output.B_, Amount: output.Amount, Id: output.Id}
-		recovery[i] = cashu.RecoverSigDB{B_: output.B_, C_: output.B_, Amount: output.Amount, Id: output.Id}
+		recovery[i] = cashu.SignedOutput{B_: output.B_, C_: output.B_, Amount: output.Amount, Id: output.Id}
 	}
 	return signatures, recovery, nil
 }

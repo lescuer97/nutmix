@@ -263,7 +263,7 @@ func TestSaveProofAndGetBySecret_ValidPubkey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	err = db.SaveProof(tx, []cashu.Proof{proof})
+	err = db.SaveProof(ctx, tx, []cashu.Proof{proof})
 	if err != nil {
 		t.Fatalf("db.SaveProof failed: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestSaveProofAndGetBySecret_ValidPubkey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	proofs, err := db.GetProofsFromSecret(tx, []string{secret})
+	proofs, err := db.GetProofsFromSecret(ctx, tx, []string{secret})
 	if err != nil {
 		t.Fatalf("db.GetProofsFromSecret failed: %v", err)
 	}
@@ -367,7 +367,7 @@ func TestSaveProofAndGetBySecretCurve_ValidPubkey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	err = db.SaveProof(tx, []cashu.Proof{proof})
+	err = db.SaveProof(ctx, tx, []cashu.Proof{proof})
 	if err != nil {
 		t.Fatalf("db.SaveProof failed: %v", err)
 	}
@@ -381,7 +381,7 @@ func TestSaveProofAndGetBySecretCurve_ValidPubkey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	proofs, err := db.GetProofsFromSecretCurve(tx, []cashu.WrappedPublicKey{wrappedY})
+	proofs, err := db.GetProofsFromSecretCurve(ctx, tx, []cashu.WrappedPublicKey{wrappedY})
 	if err != nil {
 		t.Fatalf("db.GetProofsFromSecretCurve failed: %v", err)
 	}
@@ -421,7 +421,7 @@ func TestSaveProofAndGetBySecretCurve_ValidPubkey(t *testing.T) {
 	}
 }
 
-func TestSaveRestoreSigsAndGet_WithoutDLEQ(t *testing.T) {
+func TestInsertSignedOutputsAndGet_WithoutDLEQ(t *testing.T) {
 	db, ctx := setupTestDB(t)
 
 	// Create valid public keys for B_ and C_ fields (using different keys)
@@ -450,15 +450,8 @@ func TestSaveRestoreSigsAndGet_WithoutDLEQ(t *testing.T) {
 
 	now := time.Now().Unix()
 
-	recoverSig := cashu.RecoverSigDB{
-		B_:        wrappedB,
-		C_:        wrappedC,
-		Dleq:      nil,
-		Id:        "test_keyset_id",
-		MeltQuote: "",
-		MintQuote: "",
-		Amount:    100,
-		CreatedAt: now,
+	recoverSig := cashu.SignedOutput{
+		B_: wrappedB, C_: wrappedC, Dleq: nil, Id: "test_keyset_id", Amount: 100, CreatedAt: now,
 	}
 
 	// Save the recovery signature
@@ -466,9 +459,9 @@ func TestSaveRestoreSigsAndGet_WithoutDLEQ(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	err = db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{recoverSig})
+	err = db.InsertSignedOutputs(ctx, tx, []cashu.SignedOutput{recoverSig})
 	if err != nil {
-		t.Fatalf("db.SaveRestoreSigs failed: %v", err)
+		t.Fatalf("db.InsertSignedOutputs failed: %v", err)
 	}
 	err = tx.Commit(ctx)
 	if err != nil {
@@ -480,7 +473,7 @@ func TestSaveRestoreSigsAndGet_WithoutDLEQ(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []cashu.WrappedPublicKey{wrappedB})
+	sigs, err := db.GetRestoreSigsFromBlindedMessages(ctx, tx, []cashu.WrappedPublicKey{wrappedB})
 	if err != nil {
 		t.Fatalf("db.GetRestoreSigsFromBlindedMessages failed: %v", err)
 	}
@@ -526,7 +519,7 @@ func TestSaveRestoreSigsAndGet_WithoutDLEQ(t *testing.T) {
 	}
 }
 
-func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
+func TestInsertSignedOutputsAndGet_MultipleSigs(t *testing.T) {
 	db, ctx := setupTestDB(t)
 
 	// Create first signature with its own B_ and C_
@@ -561,24 +554,20 @@ func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
 
 	now := time.Now().Unix()
 
-	sig1 := cashu.RecoverSigDB{
+	sig1 := cashu.SignedOutput{
 		B_:        wrappedB1,
 		C_:        wrappedC1,
 		Dleq:      dleq,
 		Id:        "keyset1",
-		MeltQuote: "",
-		MintQuote: "",
 		Amount:    100,
 		CreatedAt: now,
 	}
 
-	sig2 := cashu.RecoverSigDB{
+	sig2 := cashu.SignedOutput{
 		B_:        wrappedB2,
 		C_:        wrappedC2,
 		Dleq:      dleq,
 		Id:        "keyset2",
-		MeltQuote: "",
-		MintQuote: "",
 		Amount:    200,
 		CreatedAt: now,
 	}
@@ -588,9 +577,9 @@ func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	err = db.SaveRestoreSigs(tx, []cashu.RecoverSigDB{sig1, sig2})
+	err = db.InsertSignedOutputs(ctx, tx, []cashu.SignedOutput{sig1, sig2})
 	if err != nil {
-		t.Fatalf("db.SaveRestoreSigs failed: %v", err)
+		t.Fatalf("db.InsertSignedOutputs failed: %v", err)
 	}
 	err = tx.Commit(ctx)
 	if err != nil {
@@ -602,7 +591,7 @@ func TestSaveRestoreSigsAndGet_MultipleSigs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not get transaction. %v", err)
 	}
-	sigs, err := db.GetRestoreSigsFromBlindedMessages(tx, []cashu.WrappedPublicKey{wrappedB1, wrappedB2})
+	sigs, err := db.GetRestoreSigsFromBlindedMessages(ctx, tx, []cashu.WrappedPublicKey{wrappedB1, wrappedB2})
 	if err != nil {
 		t.Fatalf("db.GetRestoreSigsFromBlindedMessages failed: %v", err)
 	}

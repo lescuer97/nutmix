@@ -527,7 +527,7 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 		// Hardened error handling
 		if err != nil || payment.PaymentState == lightning.FAILED || payment.PaymentState == lightning.UNKNOWN || payment.PaymentState == lightning.PENDING {
 			// if exception of lightning payment says fail do a payment status recheck.
-			status, _, _, err := mint.LightningBackend.CheckPayed(swapRequest.LightningInvoice, decodedInvoice, swapRequest.CheckingId)
+			status, _, _, err := mint.LightningBackend.CheckPayed(ctx, swapRequest.LightningInvoice, decodedInvoice, swapRequest.CheckingId)
 
 			// if error on checking payement we will save as pending and returns status
 			if err != nil {

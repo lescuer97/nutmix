@@ -186,9 +186,9 @@ func SetupDataOnDB(mint *Mint) error {
 		return fmt.Errorf("mint.MintDB.SaveMeltRequest(tx, melt_quote): %w", err)
 	}
 
-	err = mint.MintDB.SaveProof(tx, proofs)
+	err = mint.MintDB.SaveProof(ctx, tx, proofs)
 	if err != nil {
-		return fmt.Errorf("mint.MintDB.SaveProof(tx, proofs): %w", err)
+		return fmt.Errorf("mint.MintDB.SaveProof(ctx, tx, proofs): %w", err)
 	}
 	//
 	err = mint.MintDB.Commit(ctx, tx)
@@ -231,9 +231,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 		_ = mint.MintDB.Rollback(ctx, tx)
 	}()
 
-	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
+	savedQuote, err := mint.MintDB.GetMeltRequestById(ctx, tx, meltRequest.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+		t.Fatalf("mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote): %+v ", err)
 	}
 	if savedQuote.Quote != quoteId {
 		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
@@ -245,18 +245,18 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNSuccess(t *testing.T) {
 		t.Errorf("saved quote should be marked melted: %+v ", savedQuote)
 	}
 
-	meltChange, err := mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote)
+	meltChange, err := mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+		t.Fatalf("mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote): %+v ", err)
 	}
 
 	if len(meltChange) > 0 {
 		t.Errorf("\n There should be 0 change.  %+v \n ", len(meltChange))
 	}
 
-	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, meltRequest.Quote)
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(ctx, tx, meltRequest.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+		t.Fatalf("mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote): %+v ", err)
 	}
 
 	totalProof := 0
@@ -315,9 +315,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 		_ = mint.MintDB.Rollback(ctx, tx)
 	}()
 
-	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
+	savedQuote, err := mint.MintDB.GetMeltRequestById(ctx, tx, meltRequest.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+		t.Fatalf("mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote): %+v ", err)
 	}
 	if savedQuote.Quote != quoteId {
 		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
@@ -326,18 +326,18 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNFail(t *testing.T) {
 		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
 	}
 
-	meltChange, err := mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote)
+	meltChange, err := mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+		t.Fatalf("mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote): %+v ", err)
 	}
 
 	if len(meltChange) != 0 {
 		t.Errorf("\n There should be 0 change.  %+v \n ", len(meltChange))
 	}
 
-	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, meltRequest.Quote)
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(ctx, tx, meltRequest.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+		t.Fatalf("mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote): %+v ", err)
 	}
 
 	if len(savedProofs) > 0 {
@@ -389,9 +389,9 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNPending(t *testing.T) {
 		_ = mint.MintDB.Rollback(ctx, tx)
 	}()
 
-	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, meltRequest.Quote)
+	savedQuote, err := mint.MintDB.GetMeltRequestById(ctx, tx, meltRequest.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+		t.Fatalf("mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote): %+v ", err)
 	}
 	if savedQuote.Quote != quoteId {
 		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
@@ -400,18 +400,18 @@ func TestPendingQuotesAndProofsWithPostgresAndMockLNPending(t *testing.T) {
 		t.Errorf("melt quote id: %+v ", meltRequest.Quote)
 	}
 
-	meltChange, err := mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote)
+	meltChange, err := mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+		t.Fatalf("mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote): %+v ", err)
 	}
 
 	if len(meltChange) > 0 {
 		t.Errorf("\n There should be 0 change.  %+v \n ", len(meltChange))
 	}
 
-	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, meltRequest.Quote)
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(ctx, tx, meltRequest.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltChangeByQuote(tx, meltRequest.Quote): %+v ", err)
+		t.Fatalf("mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, meltRequest.Quote): %+v ", err)
 	}
 
 	totalProof := 0

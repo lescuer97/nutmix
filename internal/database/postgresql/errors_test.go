@@ -113,7 +113,7 @@ func TestLifecycleCommitAndBatchErrorsKeepClassification(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := &lifecycleTx{batchErr: pgErr}
-	err = (Postgresql{}).SaveRestoreSigs(tx, []cashu.RecoverSigDB{lifecycleSignature(1)})
+	err = (Postgresql{}).InsertSignedOutputs(context.Background(), tx, []cashu.SignedOutput{lifecycleSignature(1)})
 	if !errors.Is(err, ErrOutputReference) || !errors.As(err, &recovered) || recovered != pgErr {
 		t.Fatalf("batch error was not classified: %v", err)
 	}

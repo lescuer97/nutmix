@@ -123,6 +123,21 @@ The project uses just for building the project and development.
 
 ` just run-dev `
 
+### PostgreSQL settlement verification
+
+Run the database and application settlement checks with:
+
+```bash
+go test -race -count=1 -timeout=15m ./internal/database/postgresql
+go test -tags=integration -race -count=1 -timeout=15m ./internal/mint
+```
+
+Docker must be running with an accessible Docker socket. Testcontainers provisions
+an isolated `postgres:16.2` instance and overrides `DATABASE_URL` only for these
+tests; no running development database is required. The `integration` tag enables
+application-level cancellation, rollback, and concurrent-finalizer tests. The
+full `./internal/mint` package also runs its existing PostgreSQL tests.
+
 ### Blinded-message storage
 
 Migration 42 replaces `recovery_signature` with `blind_messages` and `blind_signatures`. Recovery starts at the globally unique blinded point (`B_`) in `blind_messages` and follows its nullable, unique signature reference. `PENDING` messages have no signature; `SIGNED` messages must reference one. Signed messages and signatures are immutable. All signing paths persist both records in the caller's transaction and must return signatures only after commit. Shared sorted transaction-scoped output locks prevent competing writers from claiming the same blinded point.
@@ -137,7 +152,11 @@ Legacy change rows have no ordinal, so migration 43 assigns a deterministic orde
 
 Lifecycle database errors are classified by SQLSTATE and stable constraint identifiers, not localized error messages. Application code can use `errors.Is` with the PostgreSQL adapter's `ErrOutputConflict`, `ErrOutputReference`, `ErrOutputInvariant`, `ErrSignedOutputImmutable`, and `ErrUnsafeMigration`; malformed output data uses `cashu.ErrInvalidBlindMessage`. `errors.As` still exposes the original `*pgconn.PgError` for diagnostics. Unique-key failures are not guessed to mean signed versus pending; normal availability checks make that distinction. Internal invariant and migration failures remain generic public errors rather than leaking SQL diagnostics. Migration 43 also updates the reviewed migration 42's trigger functions to provide this metadata on an existing database.
 
-Pending outputs use `cashu.ErrOutputPending` / Cashu code `11004`; pending quotes retain code `20005`. Immediate melt finalization locks and reloads the quote and its complete input set before issuing change. If quote polling already completed settlement, it returns the committed change, fees, and preimage without writing again. Internally paid quotes with pending proofs still complete normal finalization. Missing, replaced, or mixed-state inputs fail without issuing change. Migration 43 includes a partial `proofs(quote)` index for these authoritative input lookups.
+Pending outputs use `cashu.ErrOutputPending` / Cashu code `11004`; pending quotes retain code `20005`. Immediate and reconciled melt settlement share a fresh workflow that locks and reloads the quote and its complete input set before issuing change. If quote polling already completed settlement, it returns the committed change, fees, and preimage without writing again. Internally paid quotes with pending proofs still complete normal finalization. Missing, replaced, or mixed-state inputs fail without issuing change. Migration 43 includes a partial `proofs(quote)` index for these authoritative input lookups.
+
+Startup reconciliation includes pending melt quotes and internally paid quotes whose owned proofs remain pending, allowing recovery after preparation commits but before finalization. Fully completed paid quotes are excluded.
+
+New writes use `cashu.SignedOutput`; `cashu.RecoverSigDB` remains a recovery read model. `InsertSignedOutputs` stores unowned outputs, while `InsertMintSignedOutputs` records explicit mint-quote ownership. `CompleteMeltSettlement` stages change signatures, unused-blank release, proof spending, and paid state, fees, and preimage in the caller-owned transaction. On any error the transaction owner must roll back; expose signatures only after commit.
 
 ### Support 
 

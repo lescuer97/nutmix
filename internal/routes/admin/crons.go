@@ -156,7 +156,7 @@ func CheckStatusOfLiquiditySwaps(mint *m.Mint, newLiquidity chan string) {
 
 					case utils.LiquidityOut:
 						slog.Debug("Checking out swap", slog.String("swap_id", swap.Id))
-						status, _, _, err := mint.LightningBackend.CheckPayed(payHash, decodedInvoice, swap.CheckingId)
+						status, _, _, err := mint.LightningBackend.CheckPayed(ctx, payHash, decodedInvoice, swap.CheckingId)
 						if err != nil {
 							slog.Warn(
 								"mint.LightningBackend.CheckPayed(payHash)",

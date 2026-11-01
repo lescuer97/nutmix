@@ -1,6 +1,10 @@
 package signer
 
-import "github.com/lescuer97/nutmix/api/cashu"
+import (
+	"context"
+
+	"github.com/lescuer97/nutmix/api/cashu"
+)
 
 type Signer interface {
 	GetKeysets() (GetKeysetsResponse, error)
@@ -14,6 +18,6 @@ type Signer interface {
 	RotateKeyset(unit cashu.Unit, fee uint, expiry_limit uint) error
 	GetSignerPubkey() (string, error)
 
-	SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error)
+	SignBlindMessages(ctx context.Context, messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error)
 	VerifyProofs(proofs []cashu.Proof) error
 }

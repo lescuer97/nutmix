@@ -138,7 +138,10 @@ func (m *MockDB) GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintR
 	return mintRequests[0], nil
 }
 
-func (m *MockDB) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, error) {
+func (m *MockDB) GetMeltRequestById(ctx context.Context, tx pgx.Tx, id string) (cashu.MeltRequestDB, error) {
+	if err := ctx.Err(); err != nil {
+		return cashu.MeltRequestDB{}, err
+	}
 	var meltRequests []cashu.MeltRequestDB
 	for i := 0; i < len(m.MeltRequest); i++ {
 		if m.MeltRequest[i].Quote == id {
@@ -158,17 +161,27 @@ func (m *MockDB) GetMeltRequestById(tx pgx.Tx, id string) (cashu.MeltRequestDB, 
 	}
 	return quote, nil
 }
-func (m *MockDB) GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error) {
+func (m *MockDB) ListMeltQuotesForReconciliation(ctx context.Context) ([]cashu.MeltRequestDB, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var meltRequests []cashu.MeltRequestDB
-	for i := 0; i < len(m.MeltRequest); i++ {
-		if m.MeltRequest[i].State == state {
-			meltRequests = append(meltRequests, m.MeltRequest[i])
+	for i := range m.MeltRequest {
+		quote := m.MeltRequest[i]
+		if quote.State == cashu.PENDING {
+			meltRequests = append(meltRequests, quote)
+			continue
+		}
+		if quote.State != cashu.PAID || !quote.Melted {
+			continue
+		}
+		for _, proof := range m.Proofs {
+			if proof.Quote != nil && *proof.Quote == quote.Quote && proof.State == cashu.PROOF_PENDING {
+				meltRequests = append(meltRequests, quote)
+				break
+			}
 		}
 	}
-	if len(meltRequests) == 0 {
-		return meltRequests, pgx.ErrNoRows
-	}
-
 	return meltRequests, nil
 }
 
@@ -178,7 +191,10 @@ func (m *MockDB) SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error {
 	return nil
 }
 
-func (m *MockDB) AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage string) error {
+func (m *MockDB) AddPreimageMeltRequest(ctx context.Context, tx pgx.Tx, quote string, preimage string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	for i := 0; i < len(m.MeltRequest); i++ {
 		if m.MeltRequest[i].Quote == quote {
 			m.MeltRequest[i].PaymentPreimage = preimage
@@ -186,7 +202,10 @@ func (m *MockDB) AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage string
 	}
 	return nil
 }
-func (m *MockDB) ChangeMeltRequestState(tx pgx.Tx, quote string, state cashu.ACTION_STATE, melted bool, paid_fee uint64) error {
+func (m *MockDB) ChangeMeltRequestState(ctx context.Context, tx pgx.Tx, quote string, state cashu.ACTION_STATE, melted bool, paid_fee uint64) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	for i := 0; i < len(m.MeltRequest); i++ {
 		if m.MeltRequest[i].Quote == quote {
 			m.MeltRequest[i].State = state
@@ -196,7 +215,10 @@ func (m *MockDB) ChangeMeltRequestState(tx pgx.Tx, quote string, state cashu.ACT
 	}
 	return nil
 }
-func (m *MockDB) ChangeCheckingId(tx pgx.Tx, quote string, checking_id string) error {
+func (m *MockDB) ChangeCheckingId(ctx context.Context, tx pgx.Tx, quote string, checking_id string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	for i := 0; i < len(m.MeltRequest); i++ {
 		if m.MeltRequest[i].Quote == quote {
 			m.MeltRequest[i].CheckingId = checking_id
@@ -205,7 +227,10 @@ func (m *MockDB) ChangeCheckingId(tx pgx.Tx, quote string, checking_id string) e
 	return nil
 }
 
-func (m *MockDB) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu.Proofs, error) {
+func (m *MockDB) GetProofsFromSecret(ctx context.Context, tx pgx.Tx, SecretList []string) (cashu.Proofs, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var proofs cashu.Proofs
 	for i := 0; i < len(SecretList); i++ {
 		secret := SecretList[i]
@@ -219,7 +244,10 @@ func (m *MockDB) GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu.Proo
 
 	return proofs, nil
 }
-func (m *MockDB) GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs, error) {
+func (m *MockDB) GetProofsFromQuote(ctx context.Context, tx pgx.Tx, quote string) (cashu.Proofs, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var proofs cashu.Proofs
 
 	for j := 0; j < len(m.Proofs); j++ {
@@ -233,12 +261,18 @@ func (m *MockDB) GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs, erro
 	return proofs, nil
 }
 
-func (m *MockDB) SaveProof(tx pgx.Tx, proofs []cashu.Proof) error {
+func (m *MockDB) SaveProof(ctx context.Context, tx pgx.Tx, proofs []cashu.Proof) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.Proofs = append(m.Proofs, proofs...)
 	return nil
 }
 
-func (m *MockDB) GetProofsFromSecretCurve(tx pgx.Tx, Ys []cashu.WrappedPublicKey) (cashu.Proofs, error) {
+func (m *MockDB) GetProofsFromSecretCurve(ctx context.Context, tx pgx.Tx, Ys []cashu.WrappedPublicKey) (cashu.Proofs, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var proofs cashu.Proofs
 	for i := 0; i < len(Ys); i++ {
 		secretCurve := Ys[i]
@@ -253,7 +287,10 @@ func (m *MockDB) GetProofsFromSecretCurve(tx pgx.Tx, Ys []cashu.WrappedPublicKey
 	return proofs, nil
 }
 
-func (m *MockDB) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
+func (m *MockDB) DeleteProofs(ctx context.Context, tx pgx.Tx, proofs cashu.Proofs) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	for i := 0; i < len(m.Proofs); i++ {
 		for j := 0; j < len(proofs); j++ {
 			if proofs[j].Y == m.Proofs[i].Y {
@@ -265,7 +302,10 @@ func (m *MockDB) DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error {
 	return nil
 }
 
-func (m *MockDB) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error {
+func (m *MockDB) SetProofsState(ctx context.Context, tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	for i := 0; i < len(m.Proofs); i++ {
 		for j := 0; j < len(proofs); j++ {
 			if proofs[j].Secret == m.Proofs[i].Secret {
@@ -277,7 +317,10 @@ func (m *MockDB) SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.Proo
 	return nil
 }
 
-func (m *MockDB) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error) {
+func (m *MockDB) GetRestoreSigsFromBlindedMessages(ctx context.Context, tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var restore []cashu.RecoverSigDB
 	for _, blindMessage := range B_ {
 		for _, record := range m.RecoverSigDB {
@@ -290,11 +333,25 @@ func (m *MockDB) GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.Wrapped
 	return restore, nil
 }
 
-func (m *MockDB) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error {
+func (m *MockDB) InsertSignedOutputs(ctx context.Context, tx pgx.Tx, recover_sigs []cashu.SignedOutput) error {
+	return m.insertSignedOutputs(ctx, tx, "", recover_sigs)
+}
+
+func (m *MockDB) InsertMintSignedOutputs(ctx context.Context, tx pgx.Tx, quoteID string, recover_sigs []cashu.SignedOutput) error {
+	if quoteID == "" {
+		return cashu.ErrInvalidBlindMessage
+	}
+	return m.insertSignedOutputs(ctx, tx, quoteID, recover_sigs)
+}
+
+func (m *MockDB) insertSignedOutputs(ctx context.Context, tx pgx.Tx, quoteID string, recover_sigs []cashu.SignedOutput) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	seen := make(map[string]bool, len(recover_sigs))
 	points := make([]cashu.WrappedPublicKey, len(recover_sigs))
 	for i, sig := range recover_sigs {
-		if sig.B_.PublicKey == nil || sig.C_.PublicKey == nil || sig.Amount == 0 || sig.Id == "" || sig.MeltQuote != "" ||
+		if sig.B_.PublicKey == nil || sig.C_.PublicKey == nil || sig.Amount == 0 || sig.Id == "" ||
 			(sig.Dleq != nil && (sig.Dleq.E == nil || sig.Dleq.S == nil)) {
 			return cashu.ErrInvalidBlindMessage
 		}
@@ -305,14 +362,19 @@ func (m *MockDB) SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) e
 		seen[key] = true
 		points[i] = sig.B_
 	}
-	if err := m.CheckBlindMessagesAvailable(tx, points); err != nil {
+	if err := m.CheckBlindMessagesAvailable(ctx, tx, points); err != nil {
 		return err
 	}
-	m.RecoverSigDB = append(m.RecoverSigDB, recover_sigs...)
+	for _, sig := range recover_sigs {
+		m.RecoverSigDB = append(m.RecoverSigDB, cashu.RecoverSigDB{B_: sig.B_, C_: sig.C_, Dleq: sig.Dleq, Id: sig.Id, Amount: sig.Amount, CreatedAt: sig.CreatedAt, MeltQuote: "", MintQuote: quoteID})
+	}
 	return nil
 }
 
-func (m *MockDB) CheckBlindMessagesAvailable(_ pgx.Tx, points []cashu.WrappedPublicKey) error {
+func (m *MockDB) CheckBlindMessagesAvailable(ctx context.Context, _ pgx.Tx, points []cashu.WrappedPublicKey) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	for _, point := range points {
 		if point.PublicKey == nil {
 			return cashu.ErrInvalidBlindMessage

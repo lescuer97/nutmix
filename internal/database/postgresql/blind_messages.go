@@ -9,26 +9,38 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
-// SaveRestoreSigs persists newly signed outputs for every signing path. It does
-// not finalize existing PENDING messages: mint-owner finalization is separate.
-// The caller must commit the transaction before returning signatures.
-func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, signatures []cashu.RecoverSigDB) error {
+// InsertSignedOutputs atomically creates signed messages and signatures without
+// assigning quote provenance. Use InsertMintSignedOutputs for mint ownership.
+// Existing pending outputs cannot be finalized here; callers must commit before
+// exposing signatures.
+func (pql Postgresql) InsertSignedOutputs(ctx context.Context, tx pgx.Tx, signatures []cashu.SignedOutput) error {
+	return pql.insertSignedOutputs(ctx, tx, "", signatures)
+}
+
+// InsertMintSignedOutputs atomically creates signed outputs owned by quoteID.
+func (pql Postgresql) InsertMintSignedOutputs(ctx context.Context, tx pgx.Tx, quoteID string, signatures []cashu.SignedOutput) error {
+	if quoteID == "" {
+		return cashu.ErrInvalidBlindMessage
+	}
+	return pql.insertSignedOutputs(ctx, tx, quoteID, signatures)
+}
+
+func (pql Postgresql) insertSignedOutputs(ctx context.Context, tx pgx.Tx, quoteID string, signatures []cashu.SignedOutput) error {
 	if len(signatures) == 0 {
 		return nil
 	}
-	ctx := context.Background()
 	points := make([]cashu.WrappedPublicKey, len(signatures))
 	for i, sig := range signatures {
-		if sig.B_.PublicKey == nil || sig.C_.PublicKey == nil || sig.Amount == 0 || sig.Id == "" || sig.MeltQuote != "" ||
+		if sig.B_.PublicKey == nil || sig.C_.PublicKey == nil || sig.Amount == 0 || sig.Id == "" ||
 			(sig.Dleq != nil && (sig.Dleq.E == nil || sig.Dleq.S == nil)) {
 			return cashu.ErrInvalidBlindMessage
 		}
 		points[i] = sig.B_
 	}
-	if err := lockBlindMessagePoints(tx, points); err != nil {
+	if err := lockBlindMessagePoints(ctx, tx, points); err != nil {
 		return err
 	}
-	if err := pql.CheckBlindMessagesAvailable(tx, points); err != nil {
+	if err := pql.CheckBlindMessagesAvailable(ctx, tx, points); err != nil {
 		return err
 	}
 
@@ -42,8 +54,8 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, signatures []cashu.RecoverSigDB
 			VALUES ($1, $2, $3, $4) RETURNING id
 		)
 		INSERT INTO blind_messages (blinded_message, amount, keyset_id, state, signature_id, mint_quote_id, created_at)
-		SELECT $5, $6, $7, 'SIGNED', id, NULLIF($8, ''), $4 FROM signature`,
-			sig.C_, e, s, sig.CreatedAt, sig.B_, sig.Amount, sig.Id, sig.MintQuote)
+			SELECT $5, $6, $7, 'SIGNED', id, NULLIF($8, ''), $4 FROM signature`,
+			sig.C_, e, s, sig.CreatedAt, sig.B_, sig.Amount, sig.Id, quoteID)
 	}
 	if err := tx.SendBatch(ctx, &batch).Close(); err != nil {
 		return databaseError(fmt.Errorf("persist signed blinded messages: %w", err))
@@ -51,7 +63,7 @@ func (pql Postgresql) SaveRestoreSigs(tx pgx.Tx, signatures []cashu.RecoverSigDB
 	return nil
 }
 
-func recoveryDLEQBytes(sig cashu.RecoverSigDB) ([]byte, []byte) {
+func recoveryDLEQBytes(sig cashu.SignedOutput) ([]byte, []byte) {
 	if sig.Dleq == nil {
 		return nil, nil
 	}
@@ -59,7 +71,7 @@ func recoveryDLEQBytes(sig cashu.RecoverSigDB) ([]byte, []byte) {
 	return e[:], s[:]
 }
 
-func lockBlindMessagePoints(tx pgx.Tx, points []cashu.WrappedPublicKey) error {
+func lockBlindMessagePoints(ctx context.Context, tx pgx.Tx, points []cashu.WrappedPublicKey) error {
 	if len(points) == 0 {
 		return nil
 	}
@@ -82,7 +94,7 @@ func lockBlindMessagePoints(tx pgx.Tx, points []cashu.WrappedPublicKey) error {
 	for _, key := range keys {
 		locks.Queue("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", key)
 	}
-	if err := tx.SendBatch(context.Background(), &locks).Close(); err != nil {
+	if err := tx.SendBatch(ctx, &locks).Close(); err != nil {
 		return databaseError(fmt.Errorf("lock blinded messages: %w", err))
 	}
 	return nil
@@ -90,7 +102,7 @@ func lockBlindMessagePoints(tx pgx.Tx, points []cashu.WrappedPublicKey) error {
 
 // Availability checks are advisory reads. Writers must also claim the sorted
 // output locks and recheck before inserting or signing.
-func (pql Postgresql) CheckBlindMessagesAvailable(tx pgx.Tx, points []cashu.WrappedPublicKey) error {
+func (pql Postgresql) CheckBlindMessagesAvailable(ctx context.Context, tx pgx.Tx, points []cashu.WrappedPublicKey) error {
 	if len(points) == 0 {
 		return nil
 	}
@@ -99,7 +111,7 @@ func (pql Postgresql) CheckBlindMessagesAvailable(tx pgx.Tx, points []cashu.Wrap
 			return cashu.ErrInvalidBlindMessage
 		}
 	}
-	rows, err := tx.Query(context.Background(), "SELECT state FROM blind_messages WHERE blinded_message = ANY($1)", points)
+	rows, err := tx.Query(ctx, "SELECT state FROM blind_messages WHERE blinded_message = ANY($1)", points)
 	if err != nil {
 		return databaseError(err)
 	}

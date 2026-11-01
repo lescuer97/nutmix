@@ -1,6 +1,7 @@
 package mint
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"testing"
@@ -18,7 +19,7 @@ type authTestDB struct {
 }
 
 // MockDB compares public-key pointers; PostgreSQL compares their encoded values.
-func (db *authTestDB) GetProofsFromSecretCurve(_ pgx.Tx, ys []cashu.WrappedPublicKey) (cashu.Proofs, error) {
+func (db *authTestDB) GetProofsFromSecretCurve(_ context.Context, _ pgx.Tx, ys []cashu.WrappedPublicKey) (cashu.Proofs, error) {
 	var proofs cashu.Proofs
 	for _, proof := range db.Proofs {
 		for _, y := range ys {
@@ -78,7 +79,7 @@ func TestVerifyAuthBlindToken(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			signatures, _, err := sig.SignBlindMessages([]cashu.BlindedMessage{{
+			signatures, _, err := sig.SignBlindMessages(context.Background(), []cashu.BlindedMessage{{
 				Id: keyset.Id, Amount: 1, B_: cashu.WrappedPublicKey{PublicKey: blinded}, Witness: "",
 			}})
 			if err != nil {
@@ -94,7 +95,7 @@ func TestVerifyAuthBlindToken(t *testing.T) {
 			m := new(Mint)
 			m.MintDB = db
 			m.Signer = &sig
-			err = m.VerifyAuthBlindToken(proof)
+			err = m.VerifyAuthBlindToken(context.Background(), proof)
 			if !errors.Is(err, tc.wantErr) {
 				t.Fatalf("VerifyAuthBlindToken() = %v, want %v", err, tc.wantErr)
 			}
@@ -107,7 +108,7 @@ func TestVerifyAuthBlindToken(t *testing.T) {
 			if len(db.Proofs) != 1 || db.Proofs[0].State != cashu.PROOF_SPENT {
 				t.Fatalf("accepted auth proof not marked spent: %+v", db.Proofs)
 			}
-			if err := m.VerifyAuthBlindToken(proof); err == nil || err.Error() != "authProof already used" {
+			if err := m.VerifyAuthBlindToken(context.Background(), proof); err == nil || err.Error() != "authProof already used" {
 				t.Fatalf("reused auth proof: got %v, want authProof already used", err)
 			}
 		})

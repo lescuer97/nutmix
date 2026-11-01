@@ -29,25 +29,20 @@ func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (
 	if err != nil {
 		return cashu.PostSwapResponse{}, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, sizeCheckTx)
-		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			slog.Warn("rollback error", slog.Any("error", rollbackErr))
-		}
-	}()
+	defer m.rollbackIndependent(ctx, sizeCheckTx)
 
-	proofs, err := m.validateProofsUnspent(sizeCheckTx, request.Inputs)
+	proofs, err := m.validateProofsUnspent(ctx, sizeCheckTx, request.Inputs)
 	if err != nil {
 		return cashu.PostSwapResponse{}, fmt.Errorf("m.validateProofsUnspent(sizeCheckTx, request.Inputs). %w", err)
 	}
 
-	err = m.ValidateOutputsNotSpent(sizeCheckTx, request.Outputs)
+	err = m.ValidateOutputsNotSpent(ctx, sizeCheckTx, request.Outputs)
 	if err != nil {
 		return cashu.PostSwapResponse{}, fmt.Errorf("m.ValidateOutputsNotSpent(sizeCheckTx, request.Outputs). %w", err)
 	}
 
 	proofs.SetProofsState(cashu.PROOF_PENDING)
-	err = m.MintDB.SaveProof(sizeCheckTx, proofs)
+	err = m.MintDB.SaveProof(ctx, sizeCheckTx, proofs)
 	if err != nil {
 		return cashu.PostSwapResponse{}, fmt.Errorf("m.MintDB.SaveProof(sizeCheckTx, proofs). %w", err)
 	}
@@ -79,7 +74,7 @@ func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (
 
 func (m *Mint) signSwapOutputsAndMarkInputsSpent(ctx context.Context, inputs cashu.Proofs, swapRequest cashu.PostSwapRequest) (blindedSignatures []cashu.BlindSignature, shouldRemovePendingProofs bool, err error) {
 	// sign the outputs
-	blindedSignatures, recoverySigsDb, err := m.Signer.SignBlindMessages(swapRequest.Outputs)
+	blindedSignatures, signedOutputs, err := m.Signer.SignBlindMessages(ctx, swapRequest.Outputs)
 	if err != nil {
 		return nil, true, fmt.Errorf("m.Signer.SignBlindMessages(outputs). %w", err)
 	}
@@ -89,28 +84,34 @@ func (m *Mint) signSwapOutputsAndMarkInputsSpent(ctx context.Context, inputs cas
 		return nil, true, fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
 
+	rollbackAttempted := false
 	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, afterSigningTx)
-		if rollbackErr != nil {
-			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-				slog.Warn("could not swap state", slog.Any("error", rollbackErr))
-			}
+		if rollbackAttempted {
 			return
 		}
-
-		shouldRemovePendingProofs = true
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), transactionCleanupTimeout)
+		rollbackErr := m.MintDB.Rollback(cleanupCtx, afterSigningTx)
+		cancel()
+		if rollbackErr == nil && err != nil {
+			shouldRemovePendingProofs = true
+		} else if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("could not rollback failed swap persistence", slog.Any("error", rollbackErr))
+		}
 	}()
-	err = m.MintDB.SetProofsState(afterSigningTx, inputs, cashu.PROOF_SPENT)
+	err = m.MintDB.SetProofsState(ctx, afterSigningTx, inputs, cashu.PROOF_SPENT)
 	if err != nil {
 		return nil, false, fmt.Errorf("m.MintDB.SetProofsState(afterSigningTx, inputs, cashu.PROOF_SPENT). %w", err)
 	}
-	err = m.MintDB.SaveRestoreSigs(afterSigningTx, recoverySigsDb)
+	err = m.MintDB.InsertSignedOutputs(ctx, afterSigningTx, signedOutputs)
 	if err != nil {
-		return nil, false, fmt.Errorf("m.MintDB.SaveRestoreSigs(afterSigningTx, recoverySigsDb). %w", err)
+		return nil, false, fmt.Errorf("m.MintDB.InsertSignedOutputs(ctx, afterSigningTx, signedOutputs). %w", err)
 	}
 	err = m.MintDB.Commit(ctx, afterSigningTx)
 	if err != nil {
-		rollbackErr := m.MintDB.Rollback(ctx, afterSigningTx)
+		rollbackAttempted = true
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), transactionCleanupTimeout)
+		rollbackErr := m.MintDB.Rollback(cleanupCtx, afterSigningTx)
+		cancel()
 		if rollbackErr == nil {
 			return nil, true, fmt.Errorf("m.MintDB.Commit(ctx, afterSigningTx). %w", err)
 		}
@@ -123,25 +124,20 @@ func (m *Mint) signSwapOutputsAndMarkInputsSpent(ctx context.Context, inputs cas
 }
 
 func (m *Mint) removePendingSwapProofs(ctx context.Context, proofs cashu.Proofs) error {
-	tx, err := m.MintDB.GetTx(ctx)
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), transactionCleanupTimeout)
+	defer cancel()
+	tx, err := m.MintDB.GetTx(cleanupCtx)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetTx(cleanupCtx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, tx)
-		if rollbackErr != nil {
-			if !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-				slog.Warn("rollback error", slog.Any("error", rollbackErr))
-			}
-		}
-	}()
+	defer m.rollbackIndependent(cleanupCtx, tx)
 
-	err = m.MintDB.DeleteProofs(tx, proofs)
+	err = m.MintDB.DeleteProofs(cleanupCtx, tx, proofs)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.DeleteProofs(tx, proofs). %w", err)
 	}
 
-	err = m.MintDB.Commit(ctx, tx)
+	err = m.MintDB.Commit(cleanupCtx, tx)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.Commit(cleanupCtx, tx). %w", err)
 	}
@@ -232,7 +228,7 @@ func (m *Mint) validateSwapBalanceAndUnits(request cashu.PostSwapRequest) error 
 }
 
 // returns the proofs with the Y's and seen at.
-func (m *Mint) validateProofsUnspent(tx pgx.Tx, proofs cashu.Proofs) (cashu.Proofs, error) {
+func (m *Mint) validateProofsUnspent(ctx context.Context, tx pgx.Tx, proofs cashu.Proofs) (cashu.Proofs, error) {
 	// gets the list of Y's. You need to calculate
 	YsList, err := utils.GetAndCalculateProofsValues(&proofs)
 	if err != nil {
@@ -240,7 +236,7 @@ func (m *Mint) validateProofsUnspent(tx pgx.Tx, proofs cashu.Proofs) (cashu.Proo
 	}
 
 	// check if we know any of the proofs
-	knownProofs, err := m.MintDB.GetProofsFromSecretCurve(tx, YsList)
+	knownProofs, err := m.MintDB.GetProofsFromSecretCurve(ctx, tx, YsList)
 	if err != nil {
 		return nil, fmt.Errorf("m.MintDB.GetProofsFromSecretCurve(tx, SecretsList). %w", err)
 	}
@@ -256,7 +252,7 @@ func (m *Mint) validateProofsUnspent(tx pgx.Tx, proofs cashu.Proofs) (cashu.Proo
 
 	return proofs, nil
 }
-func (m *Mint) ValidateOutputsNotSpent(tx pgx.Tx, blindedMessages cashu.BlindedMessages) error {
+func (m *Mint) ValidateOutputsNotSpent(ctx context.Context, tx pgx.Tx, blindedMessages cashu.BlindedMessages) error {
 	outputsMap := make(map[string]bool)
 	blindingFactors := []cashu.WrappedPublicKey{}
 
@@ -272,5 +268,5 @@ func (m *Mint) ValidateOutputsNotSpent(tx pgx.Tx, blindedMessages cashu.BlindedM
 		blindingFactors = append(blindingFactors, output.B_)
 	}
 
-	return m.MintDB.CheckBlindMessagesAvailable(tx, blindingFactors)
+	return m.MintDB.CheckBlindMessagesAvailable(ctx, tx, blindingFactors)
 }
