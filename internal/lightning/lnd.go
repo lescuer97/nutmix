@@ -182,7 +182,10 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 
 		routes = queryResponse.Routes
 
-		if routes[0] == nil {
+		// Guard against an empty route list, a nil route and a route with no
+		// hops before any hop is dereferenced below. QueryRoutes can return any
+		// of these shapes, so keep retrying within the bounded attempt loop.
+		if len(routes) == 0 || routes[0] == nil || len(routes[0].Hops) == 0 {
 			log.Printf("No route found for lnd partial payment. Retrying")
 			continue
 		}
@@ -208,17 +211,16 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 			return fmt.Errorf("client.SendPaymentV2(ctx, &sendRequest) %w", err)
 		}
 
-		for {
+		for retryRoute := false; !retryRoute; {
 			switch res.Status {
 			case lnrpc.HTLCAttempt_IN_FLIGHT:
 				lightningResponse.PaymentState = PENDING
 			case lnrpc.HTLCAttempt_FAILED:
 				if res.Failure.GetCode() == lnrpc.Failure_TEMPORARY_CHANNEL_FAILURE {
-					failureIndex := res.Failure.GetFailureSourceIndex()
-					failedSource := routes[0].Hops[failureIndex-1].PubKey
-					failedDestination := routes[0].Hops[failureIndex].PubKey
+					failedSource, failedDestination := routeFailureHops(routes[0], res.Failure.GetFailureSourceIndex())
 
 					slog.Info("partial payment attempt failed", slog.Any("failedSource", failedSource), slog.Any("failedDestination", failedDestination))
+					retryRoute = true
 					continue
 				}
 				lightningResponse.PaymentState = FAILED
@@ -240,6 +242,35 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 		}
 	}
 	return fmt.Errorf("multi nut no route. %w", cashu.ErrPaymentNoRoute)
+}
+
+// routeFailureHops resolves the route hops that surround the node LND blamed
+// for a TEMPORARY_CHANNEL_FAILURE. LND reports that node position in
+// FailureSourceIndex, where position zero is the sending node and a failure at
+// the final node is reported as len(route.Hops) (see the lnrpc.Failure field
+// comment and routerrpc/router_server.go). The value is an unsigned 32-bit
+// index, so it can be zero or one past the end of the hop slice; callers must
+// not subtract from it or index the slice directly. This helper bounds-checks
+// the index and any nil hop entries and returns the pubkeys it could resolve,
+// using the empty string for endpoints that do not exist, instead of panicking.
+func routeFailureHops(route *lnrpc.Route, failureSourceIndex uint32) (sourcePubKey string, destinationPubKey string) {
+	if route == nil || len(route.Hops) == 0 {
+		return "", ""
+	}
+
+	if failureSourceIndex > 0 && int64(failureSourceIndex) <= int64(len(route.Hops)) {
+		if hop := route.Hops[failureSourceIndex-1]; hop != nil {
+			sourcePubKey = hop.PubKey
+		}
+	}
+
+	if int64(failureSourceIndex) < int64(len(route.Hops)) {
+		if hop := route.Hops[failureSourceIndex]; hop != nil {
+			destinationPubKey = hop.PubKey
+		}
+	}
+
+	return sourcePubKey, destinationPubKey
 }
 
 func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
