@@ -532,3 +532,75 @@ func TestLNDMPPPartialResponseStatusHandling(t *testing.T) {
 		})
 	}
 }
+
+// TestLNDMPPAmountlessInvoiceRejectedBeforeRoute pins the early invoice-amount
+// guard in lndGrpcPayPartialInvoice. A nil invoice or an amountless invoice
+// (MilliSat == nil) must be rejected before any QueryRoutes or SendToRouteV2
+// call, so the later *zpayInvoice.MilliSat dereference can never panic and no
+// RPC is issued for a payment that cannot be built. The payment must not be
+// reported as FAILED, because nothing was ever sent.
+func TestLNDMPPAmountlessInvoiceRejectedBeforeRoute(t *testing.T) {
+	invoiceString, err := CreateMockInvoice(cashu.NewAmount(cashu.Sat, 100), "mpp amountless", chaincfg.MainNetParams, cashu.ExpiryTimeMinUnit(15))
+	if err != nil {
+		t.Fatalf("CreateMockInvoice: %v", err)
+	}
+
+	// Decode a real invoice and then clear its amount. Every other field
+	// (Destination, PaymentHash, PaymentAddr) stays populated, which is
+	// exactly the amountless shape that used to reach the MilliSat
+	// dereference below the route query.
+	amountlessInvoice, err := zpay32.Decode(invoiceString, &chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("zpay32.Decode: %v", err)
+	}
+	amountlessInvoice.MilliSat = nil
+
+	twoHopRoute := &lnrpc.Route{ //nolint:exhaustruct
+		Hops: []*lnrpc.Hop{
+			{PubKey: "hop0"}, //nolint:exhaustruct
+			{PubKey: "hop1"}, //nolint:exhaustruct
+		},
+	}
+
+	tests := []struct {
+		invoice        *zpay32.Invoice
+		name           string
+		wantAmountless bool
+	}{
+		{name: "nil invoice", invoice: nil, wantAmountless: false},
+		{name: "amountless invoice", invoice: amountlessInvoice, wantAmountless: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lightningServer := &mppRouteSafetyLightningServer{routes: []*lnrpc.Route{twoHopRoute}} //nolint:exhaustruct
+			routerServer := &mppRouteSafetyRouterServer{}                                           //nolint:exhaustruct
+			conn := startMPPRouteSafetyBackend(t, lightningServer, routerServer)
+
+			response, err := mppPayInvoiceWithinDeadline(t, conn, invoiceString, tt.invoice)
+			if err == nil {
+				t.Fatalf("PayInvoice error = nil, want an error")
+			}
+			if tt.wantAmountless {
+				if !errors.Is(err, cashu.ErrAmountlessInvoiceNotSupported) {
+					t.Errorf("PayInvoice error = %v, want wrapped %v", err, cashu.ErrAmountlessInvoiceNotSupported)
+				}
+			} else if errors.Is(err, cashu.ErrAmountlessInvoiceNotSupported) {
+				t.Errorf("PayInvoice error = %v, want an invalid-invoice error, not %v", err, cashu.ErrAmountlessInvoiceNotSupported)
+			}
+
+			// Nothing was sent, so the payment must stay in its zero
+			// (unsent) state rather than being marked FAILED, which the
+			// caller could use to release the reserved proofs.
+			if response.PaymentState == FAILED {
+				t.Errorf("PaymentState = FAILED, want an unsent (non-FAILED) state")
+			}
+			if got := lightningServer.callCount(); got != 0 {
+				t.Errorf("QueryRoutes calls = %d, want 0", got)
+			}
+			if got := routerServer.callCount(); got != 0 {
+				t.Errorf("SendToRouteV2 calls = %d, want 0", got)
+			}
+		})
+	}
+}

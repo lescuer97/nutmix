@@ -139,6 +139,17 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 	feeReserve cashu.Amount,
 	amount cashu.Amount,
 	lightningResponse *PaymentResponse) error {
+	// A partial MPP payment has to know the invoice total before it can build
+	// the MPPRecord. Validate the invoice before constructing any client or
+	// issuing a route query so a missing invoice or a nil MilliSat can never
+	// be dereferenced and no RPC is sent for a payment we cannot build.
+	if zpayInvoice == nil {
+		return fmt.Errorf("invalid invoice: nil invoice")
+	}
+	if zpayInvoice.MilliSat == nil {
+		return cashu.ErrAmountlessInvoiceNotSupported
+	}
+
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
