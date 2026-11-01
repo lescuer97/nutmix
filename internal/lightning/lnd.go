@@ -211,34 +211,52 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 			return fmt.Errorf("client.SendPaymentV2(ctx, &sendRequest) %w", err)
 		}
 
-		for retryRoute := false; !retryRoute; {
-			switch res.Status {
-			case lnrpc.HTLCAttempt_IN_FLIGHT:
-				lightningResponse.PaymentState = PENDING
-			case lnrpc.HTLCAttempt_FAILED:
-				if res.Failure.GetCode() == lnrpc.Failure_TEMPORARY_CHANNEL_FAILURE {
-					failedSource, failedDestination := routeFailureHops(routes[0], res.Failure.GetFailureSourceIndex())
+		// SendToRouteV2 is unary: this single HTLCAttempt is the only
+		// response for the attempt. Handle it with one switch so every
+		// branch either returns or, for a retryable failure, continues
+		// the bounded outer attempt loop instead of re-reading the same
+		// fixed status forever.
+		switch res.Status {
+		case lnrpc.HTLCAttempt_IN_FLIGHT:
+			// The HTLC has been accepted by the network and may still
+			// settle. Return promptly in an ambiguous PENDING state so the
+			// caller keeps the proofs reserved and re-checks the payment
+			// status. Never retry here: sending the same payment hash again
+			// risks a duplicate payment.
+			lightningResponse.PaymentRequest = invoice
+			lightningResponse.PaymentState = PENDING
+			lightningResponse.PaidFee = cashu.NewAmount(feeReserve.Unit, 0)
+			return nil
+		case lnrpc.HTLCAttempt_FAILED:
+			if res.Failure.GetCode() == lnrpc.Failure_TEMPORARY_CHANNEL_FAILURE {
+				failedSource, failedDestination := routeFailureHops(routes[0], res.Failure.GetFailureSourceIndex())
 
-					slog.Info("partial payment attempt failed", slog.Any("failedSource", failedSource), slog.Any("failedDestination", failedDestination))
-					retryRoute = true
-					continue
-				}
-				lightningResponse.PaymentState = FAILED
-				return fmt.Errorf("PaymentFailed  %+v", res.GetFailure())
-			case lnrpc.HTLCAttempt_SUCCEEDED:
-				lightningResponse.PaymentRequest = invoice
-				lightningResponse.PaymentState = SETTLED
-				lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
-				// LND returns fee in msat, convert to Amount
-				lightningResponse.PaidFee = cashu.Amount{Unit: cashu.Msat, Amount: uint64(res.Route.TotalFeesMsat)}
-				err := lightningResponse.PaidFee.To(feeReserve.Unit)
-				if err != nil {
-					return fmt.Errorf(`feePaidMsat.To(feeReserve.Unit) %w`, err)
-				}
-				return nil
-			default:
+				slog.Info("partial payment attempt failed", slog.Any("failedSource", failedSource), slog.Any("failedDestination", failedDestination))
 				continue
 			}
+			lightningResponse.PaymentState = FAILED
+			return fmt.Errorf("PaymentFailed  %+v", res.GetFailure())
+		case lnrpc.HTLCAttempt_SUCCEEDED:
+			lightningResponse.PaymentRequest = invoice
+			lightningResponse.PaymentState = SETTLED
+			lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
+			// LND returns fee in msat, convert to Amount
+			lightningResponse.PaidFee = cashu.Amount{Unit: cashu.Msat, Amount: uint64(res.Route.TotalFeesMsat)}
+			err := lightningResponse.PaidFee.To(feeReserve.Unit)
+			if err != nil {
+				return fmt.Errorf(`feePaidMsat.To(feeReserve.Unit) %w`, err)
+			}
+			return nil
+		default:
+			// An unrecognized status means we cannot tell whether the
+			// HTLC was dispatched. Keep ownership with a conservative
+			// PENDING state and surface an explicit error so the caller
+			// re-checks instead of freeing proofs for an ambiguous
+			// payment.
+			lightningResponse.PaymentRequest = invoice
+			lightningResponse.PaymentState = PENDING
+			lightningResponse.PaidFee = cashu.NewAmount(feeReserve.Unit, 0)
+			return fmt.Errorf("unknown HTLC attempt status: %s", res.Status.String())
 		}
 	}
 	return fmt.Errorf("multi nut no route. %w", cashu.ErrPaymentNoRoute)

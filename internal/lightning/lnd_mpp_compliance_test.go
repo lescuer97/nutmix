@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -393,6 +394,135 @@ func TestLNDMPPRouteIndexSafetyDoesNotPanicOrSpin(t *testing.T) {
 				}
 			}
 
+			if got := lightningServer.callCount(); got != tt.wantQueryCalls {
+				t.Errorf("QueryRoutes calls = %d, want %d", got, tt.wantQueryCalls)
+			}
+			if got := routerServer.callCount(); got != tt.wantRouterCalls {
+				t.Errorf("SendToRouteV2 calls = %d, want %d", got, tt.wantRouterCalls)
+			}
+		})
+	}
+}
+
+// mppInFlightAttempt is a SendToRouteV2 response for an HTLC that LND has
+// accepted into the network but not yet resolved.
+func mppInFlightAttempt() *lnrpc.HTLCAttempt {
+	return &lnrpc.HTLCAttempt{Status: lnrpc.HTLCAttempt_IN_FLIGHT} //nolint:exhaustruct
+}
+
+// mppUnknownStatusAttempt is a SendToRouteV2 response whose status this build
+// does not recognize. It must be treated as an ambiguous payment, never as a
+// failure, and must not be retried.
+func mppUnknownStatusAttempt() *lnrpc.HTLCAttempt {
+	return &lnrpc.HTLCAttempt{Status: lnrpc.HTLCAttempt_HTLCStatus(99)} //nolint:exhaustruct
+}
+
+// mppTerminalFailureAttempt is a SendToRouteV2 response for a non-retryable
+// failure (not TEMPORARY_CHANNEL_FAILURE).
+func mppTerminalFailureAttempt() *lnrpc.HTLCAttempt {
+	return &lnrpc.HTLCAttempt{ //nolint:exhaustruct
+		Status: lnrpc.HTLCAttempt_FAILED,
+		Failure: &lnrpc.Failure{ //nolint:exhaustruct
+			Code: lnrpc.Failure_INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS,
+		},
+	}
+}
+
+// TestLNDMPPPartialResponseStatusHandling pins the response-status handling of
+// the unary SendToRouteV2 call in lndGrpcPayPartialInvoice. IN_FLIGHT must
+// return promptly as PENDING without retrying (a retry could duplicate the
+// payment), an unknown status must fail closed as an ambiguous PENDING without
+// spinning or re-sending, and a non-retryable failure must report FAILED.
+func TestLNDMPPPartialResponseStatusHandling(t *testing.T) {
+	invoiceString, err := CreateMockInvoice(cashu.NewAmount(cashu.Sat, 100), "mpp response status", chaincfg.MainNetParams, cashu.ExpiryTimeMinUnit(15))
+	if err != nil {
+		t.Fatalf("CreateMockInvoice: %v", err)
+	}
+	invoice, err := zpay32.Decode(invoiceString, &chaincfg.MainNetParams)
+	if err != nil {
+		t.Fatalf("zpay32.Decode: %v", err)
+	}
+
+	twoHopRoute := &lnrpc.Route{ //nolint:exhaustruct
+		Hops: []*lnrpc.Hop{
+			{PubKey: "hop0"}, //nolint:exhaustruct
+			{PubKey: "hop1"}, //nolint:exhaustruct
+		},
+	}
+
+	tests := []struct {
+		name            string
+		wantErrContains string
+		responses       []*lnrpc.HTLCAttempt
+		wantState       PaymentStatus
+		wantQueryCalls  int
+		wantRouterCalls int
+		wantErr         bool
+		wantPaymentReq  bool
+	}{
+		{
+			name:            "in flight returns pending without retry",
+			wantErrContains: "",
+			responses:       []*lnrpc.HTLCAttempt{mppInFlightAttempt()},
+			wantState:       PENDING,
+			wantQueryCalls:  1,
+			wantRouterCalls: 1,
+			wantErr:         false,
+			wantPaymentReq:  true,
+		},
+		{
+			name:            "unknown status fails closed without spin or resend",
+			wantErrContains: "unknown HTLC attempt status",
+			responses:       []*lnrpc.HTLCAttempt{mppUnknownStatusAttempt()},
+			wantState:       PENDING,
+			wantQueryCalls:  1,
+			wantRouterCalls: 1,
+			wantErr:         true,
+			wantPaymentReq:  false,
+		},
+		{
+			name:            "non-retryable failure reports failed",
+			wantErrContains: "PaymentFailed",
+			responses:       []*lnrpc.HTLCAttempt{mppTerminalFailureAttempt()},
+			wantState:       FAILED,
+			wantQueryCalls:  1,
+			wantRouterCalls: 1,
+			wantErr:         true,
+			wantPaymentReq:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lightningServer := &mppRouteSafetyLightningServer{routes: []*lnrpc.Route{twoHopRoute}} //nolint:exhaustruct
+			routerServer := &mppRouteSafetyRouterServer{responses: tt.responses}                   //nolint:exhaustruct
+			conn := startMPPRouteSafetyBackend(t, lightningServer, routerServer)
+
+			response, err := mppPayInvoiceWithinDeadline(t, conn, invoiceString, invoice)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("PayInvoice error = nil, want error")
+				}
+				if tt.wantErrContains != "" && !strings.Contains(err.Error(), tt.wantErrContains) {
+					t.Errorf("PayInvoice error = %q, want it to contain %q", err.Error(), tt.wantErrContains)
+				}
+				// A payment we could not classify must never be reported as
+				// FAILED, otherwise the caller would free the proofs of a
+				// possibly settled payment.
+				if response.PaymentState == FAILED && tt.wantState != FAILED {
+					t.Errorf("PaymentState = %v, want an ambiguous (non-FAILED) state", response.PaymentState)
+				}
+			} else if err != nil {
+				t.Fatalf("PayInvoice error = %v, want nil", err)
+			}
+
+			if response.PaymentState != tt.wantState {
+				t.Errorf("PaymentState = %v, want %v", response.PaymentState, tt.wantState)
+			}
+			if tt.wantPaymentReq && response.PaymentRequest != invoiceString {
+				t.Errorf("PaymentRequest = %q, want %q", response.PaymentRequest, invoiceString)
+			}
 			if got := lightningServer.callCount(); got != tt.wantQueryCalls {
 				t.Errorf("QueryRoutes calls = %d, want %d", got, tt.wantQueryCalls)
 			}
