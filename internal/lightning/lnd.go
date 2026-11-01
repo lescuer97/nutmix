@@ -143,7 +143,7 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
-	// Convert amounts to Sat for LND
+	// Convert the fee reserve to Sat for LND's fixed fee limit.
 	feeSat := cashu.Amount{Unit: feeReserve.Unit, Amount: feeReserve.Amount}
 	err := feeSat.To(cashu.Sat)
 	if err != nil {
@@ -151,9 +151,9 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 	}
 
 	amountMilisat := cashu.Amount{Unit: amount.Unit, Amount: amount.Amount}
-	err = amountMilisat.To(cashu.Sat)
+	err = amountMilisat.To(cashu.Msat)
 	if err != nil {
-		return fmt.Errorf(`amount.To(cashu.Sat) %w`, err)
+		return fmt.Errorf(`amount.To(cashu.Msat) %w`, err)
 	}
 
 	fixedLimit := lnrpc.FeeLimit_Fixed{
@@ -247,7 +247,7 @@ func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 
 	routerClient := routerrpc.NewRouterClient(l.grpcClient)
 	if mpp {
-		err := l.lndGrpcPayPartialInvoice(routerClient, melt_quote.Request, zpayInvoice, feeReserve, feeReserve, &invoiceRes)
+		err := l.lndGrpcPayPartialInvoice(routerClient, melt_quote.Request, zpayInvoice, feeReserve, amount, &invoiceRes)
 		if err != nil {
 			return invoiceRes, fmt.Errorf(`l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes) %w`, err)
 		}
