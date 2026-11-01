@@ -24,7 +24,7 @@ type CLNGRPCWallet struct {
 }
 
 func getTlsConfig(clientCert string, clientKey string, caCert string) (*tls.Config, error) {
-	//nolint:exhaustruct
+	//nolint:exhaustruct_v5
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
@@ -102,7 +102,7 @@ func (l *CLNGRPCWallet) clnGrpcPayInvoice(invoice string, feeReserve cashu.Amoun
 		Msat: feeMsat.Amount,
 	}
 
-	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee} //nolint:exhaustruct
+	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee} //nolint:exhaustruct_v5
 
 	res, err := client.Pay(ctx, &sendRequest)
 
@@ -159,7 +159,7 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 	partialSats := cln_grpc.Amount{
 		Msat: amount.Amount,
 	}
-	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee, PartialMsat: &partialSats} //nolint:exhaustruct
+	sendRequest := cln_grpc.PayRequest{Bolt11: invoice, Maxfee: &max_fee, PartialMsat: &partialSats} //nolint:exhaustruct_v5
 
 	res, err := client.Pay(ctx, &sendRequest)
 
@@ -195,9 +195,10 @@ func (l *CLNGRPCWallet) clnGrpcPayPartialInvoice(invoice string,
 
 func (l CLNGRPCWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
 	var invoiceRes PaymentResponse
+	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
 
 	// first check if invoice is already paid.
-	status, _, _, err := l.CheckPayed(melt_quote.Quote, zpayInvoice, melt_quote.CheckingId)
+	status, _, _, err := l.CheckPayed(ctx, melt_quote.Quote, zpayInvoice, melt_quote.CheckingId)
 	if err != nil {
 		return invoiceRes, fmt.Errorf(`l.CheckPayed(hexHash) %w`, err)
 	}
@@ -221,13 +222,13 @@ func (l CLNGRPCWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 	return invoiceRes, nil
 }
 
-func (l CLNGRPCWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), "rune", l.macaroon)
+func (l CLNGRPCWallet) CheckPayed(ctx context.Context, quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
+	ctx = metadata.AppendToOutgoingContext(ctx, "rune", l.macaroon)
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 	fee := cashu.NewAmount(cashu.Sat, 0)
 
-	//nolint:exhaustruct
+	//nolint:exhaustruct_v5
 	rhash := cln_grpc.ListpaysRequest{
 		PaymentHash: invoice.PaymentHash[:],
 	}
@@ -257,7 +258,7 @@ func (l CLNGRPCWallet) CheckReceived(quote cashu.MintRequestDB, invoice *zpay32.
 
 	client := cln_grpc.NewNodeClient(l.grpcClient)
 
-	//nolint:exhaustruct
+	//nolint:exhaustruct_v5
 	invoiceReq := cln_grpc.ListinvoicesRequest{
 		PaymentHash: invoice.PaymentHash[:],
 	}
@@ -288,7 +289,7 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 		AmountToSend: cashu.Amount{Unit: cashu.Sat, Amount: 0},
 		CheckingId:   "",
 	}
-	_, _, _, err := l.CheckPayed("", zpayInvoice, "")
+	_, _, _, err := l.CheckPayed(ctx, "", zpayInvoice, "")
 
 	if err != nil {
 		return feesResponse, fmt.Errorf(`l.CheckPayed(invoice) %w`, err)
@@ -305,7 +306,7 @@ func (l CLNGRPCWallet) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mp
 		Msat: queryAmount.Amount,
 	}
 
-	//nolint:exhaustruct
+	//nolint:exhaustruct_v5
 	queryRoutes := cln_grpc.GetrouteRequest{
 		Id:         zpayInvoice.Destination.SerializeCompressed(),
 		AmountMsat: &amountGrpc,

@@ -32,7 +32,7 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 				}
 				if matches {
 					if mint.OICDClient == nil {
-						ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+						ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 						defer cancel()
 						err := mint.SetupOidcService(ctx, mint.Config.MINT_AUTH_OICD_URL)
 						if err != nil {
@@ -54,7 +54,7 @@ func ClearAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 					}
 					// check if it's valid token
 					token := c.GetHeader("Clear-auth")
-					err := mint.VerifyAuthClearToken(token)
+					err := mint.VerifyAuthClearToken(c.Request.Context(), token)
 					if err != nil {
 						slog.Warn("mint.VerifyAuthClearToken(token)", slog.Any("error", err))
 						c.JSON(400, cashu.ErrorCodeToResponse(cashu.CLEAR_AUTH_FAILED, nil))
@@ -110,7 +110,7 @@ func BlindAuthMiddleware(mint *mint.Mint) gin.HandlerFunc {
 					}
 
 					authProof.Amount = 1
-					err = mint.VerifyAuthBlindToken(authProof)
+					err = mint.VerifyAuthBlindToken(c.Request.Context(), authProof)
 					if err != nil {
 						slog.Warn("mint.VerifyAuthBlindToken(authProof)", slog.Any("error", err))
 						c.JSON(400, cashu.ErrorCodeToResponse(cashu.BLIND_AUTH_FAILED, nil))

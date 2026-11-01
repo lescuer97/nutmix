@@ -1125,7 +1125,7 @@ func TestCheckForSigAllRejectsTooManyPubkeys(t *testing.T) {
 		t.Fatalf("json.Marshal: %v", err)
 	}
 
-	_, err = checkForSigAll(Proofs{{Secret: string(secret)}}) //nolint:exhaustruct // Other proof fields are irrelevant.
+	_, err = checkForSigAll(Proofs{{Secret: string(secret)}}) //nolint:exhaustruct_v5 // Other proof fields are irrelevant.
 	if !errors.Is(err, ErrInvalidSpendCondition) {
 		t.Fatalf("expected ErrInvalidSpendCondition, got %v", err)
 	}

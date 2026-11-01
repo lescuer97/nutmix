@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -12,9 +11,7 @@ import (
 	"github.com/lescuer97/nutmix/api/cashu"
 )
 
-func (m *Mint) verifyClams(clams cashu.AuthClams) error {
-	ctx := context.Background()
-
+func (m *Mint) verifyClams(ctx context.Context, clams cashu.AuthClams) error {
 	if clams.ClientId != m.Config.MINT_AUTH_OICD_CLIENT_ID {
 		return cashu.ErrInvalidAuthToken
 	}
@@ -22,12 +19,7 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, tx)
-		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			slog.Warn("rollback error", slog.Any("error", rollbackErr))
-		}
-	}()
+	defer m.rollbackIndependent(ctx, tx)
 
 	now := time.Now()
 	authUser, err := m.MintDB.GetAuthUser(tx, clams.Sub)
@@ -58,10 +50,9 @@ func (m *Mint) verifyClams(clams cashu.AuthClams) error {
 	return nil
 }
 
-func (m *Mint) VerifyAuthClearToken(token string) error {
-	verifier := m.OICDClient.Verifier(&oidc.Config{ClientID: m.Config.MINT_AUTH_OICD_CLIENT_ID, Now: time.Now, SkipClientIDCheck: false}) //nolint:exhaustruct
+func (m *Mint) VerifyAuthClearToken(ctx context.Context, token string) error {
+	verifier := m.OICDClient.Verifier(&oidc.Config{ClientID: m.Config.MINT_AUTH_OICD_CLIENT_ID, Now: time.Now, SkipClientIDCheck: false}) //nolint:exhaustruct_v5
 
-	ctx := context.Background()
 	idToken, err := verifier.Verify(ctx, token)
 	if err != nil {
 		return fmt.Errorf("verifier.Verify(ctx,token ). %w", err)
@@ -79,7 +70,7 @@ func (m *Mint) VerifyAuthClearToken(token string) error {
 	if err != nil {
 		return fmt.Errorf("idToken.Claims(&clams). %w", err)
 	}
-	err = m.verifyClams(clams)
+	err = m.verifyClams(ctx, clams)
 	if err != nil {
 		return fmt.Errorf("m.verifyClams(clams). %w", err)
 	}
@@ -87,9 +78,7 @@ func (m *Mint) VerifyAuthClearToken(token string) error {
 	return nil
 }
 
-func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
-	ctx := context.Background()
-
+func (m *Mint) VerifyAuthBlindToken(ctx context.Context, authProof cashu.AuthProof) error {
 	y, err := authProof.Y()
 	if err != nil {
 		return fmt.Errorf("authProof.Y(). %w", err)
@@ -99,14 +88,9 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetTx(ctx). %w", err)
 	}
-	defer func() {
-		rollbackErr := m.MintDB.Rollback(ctx, tx)
-		if rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			slog.Warn("rollback error", slog.Any("error", rollbackErr))
-		}
-	}()
+	defer m.rollbackIndependent(ctx, tx)
 
-	proofsList, err := m.MintDB.GetProofsFromSecretCurve(tx, []cashu.WrappedPublicKey{y})
+	proofsList, err := m.MintDB.GetProofsFromSecretCurve(ctx, tx, []cashu.WrappedPublicKey{y})
 	if err != nil {
 		return fmt.Errorf("m.MintDB.GetProofsFromSecretCurve(tx, []string{y} ). %w", err)
 	}
@@ -128,7 +112,7 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 		return cashu.ErrUnitNotSupported
 	}
 
-	err = m.MintDB.SaveProof(tx, proofArray)
+	err = m.MintDB.SaveProof(ctx, tx, proofArray)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.SaveProof(tx, proofArray). %w", err)
 	}
@@ -140,7 +124,7 @@ func (m *Mint) VerifyAuthBlindToken(authProof cashu.AuthProof) error {
 
 	proofArray.SetProofsState(cashu.PROOF_SPENT)
 
-	err = m.MintDB.SetProofsState(tx, proofArray, cashu.PROOF_SPENT)
+	err = m.MintDB.SetProofsState(ctx, tx, proofArray, cashu.PROOF_SPENT)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.SetProofsState(tx, proofArray, cashu.PROOF_SPENT). %w", err)
 	}

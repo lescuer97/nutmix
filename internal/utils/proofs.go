@@ -16,6 +16,9 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrBlindMessageAlreadySigned):
 		message := cashu.ErrBlindMessageAlreadySigned.Error()
 		return cashu.OUTPUTS_ALREADY_SIGNED, &message
+	case errors.Is(proofError, cashu.ErrOutputPending):
+		message := cashu.ErrOutputPending.Error()
+		return cashu.OUTPUTS_PENDING, &message
 
 	case errors.Is(proofError, cashu.ErrEmptyWitness):
 

@@ -56,8 +56,8 @@ func TestMakeJWTTokenHasExpiry(t *testing.T) {
 
 func TestValidNostrLoginEvent(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
-	validEvent := nostr.Event{Kind: adminLoginEventKind, CreatedAt: nostr.Timestamp(now.Unix())} //nolint:exhaustruct
-	validLogin := database.NostrLoginAuth{Expiry: int(now.Add(adminLoginChallengeTTL).Unix())}   //nolint:exhaustruct
+	validEvent := nostr.Event{Kind: adminLoginEventKind, CreatedAt: nostr.Timestamp(now.Unix())} //nolint:exhaustruct_v5
+	validLogin := database.NostrLoginAuth{Expiry: int(now.Add(adminLoginChallengeTTL).Unix())}   //nolint:exhaustruct_v5
 
 	tests := []struct {
 		name  string
@@ -66,10 +66,10 @@ func TestValidNostrLoginEvent(t *testing.T) {
 		want  bool
 	}{
 		{name: "valid", event: validEvent, login: validLogin, want: true},
-		{name: "wrong kind", event: nostr.Event{Kind: 1, CreatedAt: validEvent.CreatedAt}, login: validLogin, want: false},                                                                      //nolint:exhaustruct
-		{name: "expired challenge", event: validEvent, login: database.NostrLoginAuth{Expiry: int(now.Add(-time.Second).Unix())}, want: false},                                                  //nolint:exhaustruct
-		{name: "stale event", event: nostr.Event{Kind: adminLoginEventKind, CreatedAt: nostr.Timestamp(now.Add(-adminLoginChallengeTTL - time.Second).Unix())}, login: validLogin, want: false}, //nolint:exhaustruct
-		{name: "future event", event: nostr.Event{Kind: adminLoginEventKind, CreatedAt: nostr.Timestamp(now.Add(adminLoginFutureSkew + time.Second).Unix())}, login: validLogin, want: false},   //nolint:exhaustruct
+		{name: "wrong kind", event: nostr.Event{Kind: 1, CreatedAt: validEvent.CreatedAt}, login: validLogin, want: false},                                                                      //nolint:exhaustruct_v5
+		{name: "expired challenge", event: validEvent, login: database.NostrLoginAuth{Expiry: int(now.Add(-time.Second).Unix())}, want: false},                                                  //nolint:exhaustruct_v5
+		{name: "stale event", event: nostr.Event{Kind: adminLoginEventKind, CreatedAt: nostr.Timestamp(now.Add(-adminLoginChallengeTTL - time.Second).Unix())}, login: validLogin, want: false}, //nolint:exhaustruct_v5
+		{name: "future event", event: nostr.Event{Kind: adminLoginEventKind, CreatedAt: nostr.Timestamp(now.Add(adminLoginFutureSkew + time.Second).Unix())}, login: validLogin, want: false},   //nolint:exhaustruct_v5
 	}
 
 	for _, test := range tests {
@@ -84,7 +84,7 @@ func TestValidNostrLoginEvent(t *testing.T) {
 func TestAuthMiddlewareRejectsExpiredToken(t *testing.T) {
 	r, reached, secret := setupMiddlewareEngine(false)
 
-	expired, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{ //nolint:exhaustruct
+	expired, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{ //nolint:exhaustruct_v5
 		IssuedAt:  jwt.NewNumericDate(time.Now().Add(-2 * sessionTTL)),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(-sessionTTL)),
 	}).SignedString(secret)
@@ -93,7 +93,7 @@ func TestAuthMiddlewareRejectsExpiredToken(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/protected", nil)
-	req.AddCookie(&http.Cookie{Name: AdminAuthKey, Value: expired}) //nolint:exhaustruct
+	req.AddCookie(&http.Cookie{Name: AdminAuthKey, Value: expired}) //nolint:exhaustruct_v5
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -114,7 +114,7 @@ func TestAuthMiddlewareAcceptsFreshToken(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/protected", nil)
-	req.AddCookie(&http.Cookie{Name: AdminAuthKey, Value: token}) //nolint:exhaustruct
+	req.AddCookie(&http.Cookie{Name: AdminAuthKey, Value: token}) //nolint:exhaustruct_v5
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

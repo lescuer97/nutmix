@@ -248,11 +248,11 @@ func TestLocktimeBoundariesDoNotBypassAuthorization(t *testing.T) {
 						data = hex.EncodeToString(hash[:])
 					}
 					secret := fmt.Sprintf(`["%s",{"nonce":"abc","data":"%s","tags":[%s["locktime","%d"],["sigflag","%s"]]}]`, proofType, data, pubkeysTag, locktime, sigflag)
-					proof := Proof{Secret: secret, Witness: witness} //nolint:exhaustruct // only authorization fields matter
+					proof := Proof{Secret: secret, Witness: witness} //nolint:exhaustruct_v5 // only authorization fields matter
 
 					var err error
 					if sigflag == "SIG_ALL" {
-						err = (&PostSwapRequest{Inputs: Proofs{proof}}).ValidateSigflag() //nolint:exhaustruct // outputs are irrelevant
+						err = (&PostSwapRequest{Inputs: Proofs{proof}}).ValidateSigflag() //nolint:exhaustruct_v5 // outputs are irrelevant
 					} else {
 						err = VerifyProofCondition(proof)
 					}
@@ -282,7 +282,7 @@ func TestTimelockPassedBoundaries(t *testing.T) {
 		{name: "max uint64", locktime: math.MaxUint64, want: false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			condition := &SpendCondition{Data: SpendConditionData{Tags: TagsInfo{Locktime: test.locktime}}} //nolint:exhaustruct // only locktime matters
+			condition := &SpendCondition{Data: SpendConditionData{Tags: TagsInfo{Locktime: test.locktime}}} //nolint:exhaustruct_v5 // only locktime matters
 			if got := timelockPassed(condition); got != test.want {
 				t.Fatalf("timelockPassed() = %v, want %v", got, test.want)
 			}

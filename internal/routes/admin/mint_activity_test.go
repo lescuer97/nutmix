@@ -1,4 +1,4 @@
-//nolint:exhaustruct
+//nolint:exhaustruct_v5
 package admin
 
 import (
@@ -79,7 +79,7 @@ func TestBalanceFromStatsSnapshotsClampsNeededBalanceAtZero(t *testing.T) {
 
 func TestBalanceFromStatsSnapshotsReturnsZeroBalanceForEmptyInput(t *testing.T) {
 	balance := balanceFromStatsSnapshots(nil)
-	if balance != (templates.Balance{}) { //nolint:exhaustruct
+	if balance != (templates.Balance{}) { //nolint:exhaustruct_v5
 		t.Fatalf("expected zero balance, got %#v", balance)
 	}
 }
@@ -87,12 +87,12 @@ func TestBalanceFromStatsSnapshotsReturnsZeroBalanceForEmptyInput(t *testing.T) 
 func summaryTestMint(db *mockdb.MockDB) *mint.Mint {
 	var m mint.Mint
 	m.MintDB = db
-	m.LightningBackend = lightning.FakeWallet{ //nolint:exhaustruct
+	m.LightningBackend = lightning.FakeWallet{ //nolint:exhaustruct_v5
 		UnpurposeErrors: nil,
 		Network:         chaincfg.RegressionNetParams,
 		InvoiceFee:      0,
 	}
-	m.Config = utils.Config{ //nolint:exhaustruct
+	m.Config = utils.Config{ //nolint:exhaustruct_v5
 		MINT_LIGHTNING_BACKEND: utils.FAKE_WALLET,
 	}
 	return &m

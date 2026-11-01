@@ -64,7 +64,7 @@ func CreateMockInvoice(amountSats cashu.Amount, description string, network chai
 		return "", fmt.Errorf("UnmarshallAmt: %w", err)
 	}
 
-	//nolint:exhaustruct
+	//nolint:exhaustruct_v5
 	invoiceData := invoicesrpc.AddInvoiceData{
 		Memo:     description,
 		Value:    milsats,

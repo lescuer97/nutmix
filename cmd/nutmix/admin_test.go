@@ -119,7 +119,7 @@ func TestSetupMintAdminLoginSuccess(t *testing.T) {
 	}
 
 	// sign nonce with admin nostr privkey
-	eventToSign := nostr.Event{ //nolint:exhaustruct
+	eventToSign := nostr.Event{ //nolint:exhaustruct_v5
 		Kind:      27235,
 		Content:   nonces,
 		CreatedAt: nostr.Timestamp(time.Now().Unix()),
@@ -211,7 +211,7 @@ func TestSetupMintAdminLoginFailure(t *testing.T) {
 	}
 
 	// sign nonce with admin nostr privkey
-	eventToSign := nostr.Event{ //nolint:exhaustruct
+	eventToSign := nostr.Event{ //nolint:exhaustruct_v5
 		Kind:      27235,
 		Content:   nonces,
 		CreatedAt: nostr.Timestamp(time.Now().Unix()),
@@ -312,7 +312,7 @@ func TestRotateKeyUpCall(t *testing.T) {
 	}
 
 	// sign nonce with admin nostr privkey
-	eventToSign := nostr.Event{ //nolint:exhaustruct
+	eventToSign := nostr.Event{ //nolint:exhaustruct_v5
 		Kind:      27235,
 		Content:   nonces,
 		CreatedAt: nostr.Timestamp(time.Now().Unix()),

@@ -12,12 +12,32 @@ import (
 // 10.3: a Postgres row-lock conflict (SQLSTATE 55P03) on the swap path must
 // map to PROOFS_PENDING (11002), not QUOTE_PENDING (20005).
 func TestParseErrorLockConflictMapsToProofsPending(t *testing.T) {
-	pgErr := &pgconn.PgError{Code: "55P03"} //nolint:exhaustruct
+	pgErr := &pgconn.PgError{Code: "55P03"} //nolint:exhaustruct_v5
 	err := fmt.Errorf("m.MintDB.SetProofsPending(tx, proofs). %w", pgErr)
 
 	code, _ := ParseErrorToCashuErrorCode(err)
 	if code != cashu.PROOFS_PENDING {
 		t.Errorf("expected PROOFS_PENDING (11002), got %v", uint(code))
+	}
+}
+
+func TestParseErrorSeparatesPendingOutputsQuotesAndProofs(t *testing.T) {
+	for _, tt := range []struct {
+		err  error
+		code cashu.ErrorCode
+	}{
+		{cashu.ErrOutputPending, cashu.OUTPUTS_PENDING},
+		{cashu.ErrQuoteIsPending, cashu.QUOTE_PENDING},
+		{cashu.ErrProofPending, cashu.PROOFS_PENDING},
+		{cashu.ErrBlindMessageAlreadySigned, cashu.OUTPUTS_ALREADY_SIGNED},
+	} {
+		t.Run(tt.err.Error(), func(t *testing.T) {
+			wrapped := fmt.Errorf("operation: %w", tt.err)
+			code, detail := ParseErrorToCashuErrorCode(wrapped)
+			if !errors.Is(wrapped, tt.err) || code != tt.code || detail == nil || *detail != tt.err.Error() {
+				t.Fatalf("error=%v code=%d detail=%v", wrapped, code, detail)
+			}
+		})
 	}
 }
 

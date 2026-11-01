@@ -21,7 +21,7 @@ func TestSpendConditionDuplicateTagsFieldRejected(t *testing.T) {
 		`"tags":[],"tags":null`,
 	} {
 		t.Run(fields, func(t *testing.T) {
-			proof := Proof{Secret: fmt.Sprintf(`["P2PK",{"nonce":"test","data":"test",%s}]`, fields)} //nolint:exhaustruct // Only secret parsing is exercised.
+			proof := Proof{Secret: fmt.Sprintf(`["P2PK",{"nonce":"test","data":"test",%s}]`, fields)} //nolint:exhaustruct_v5 // Only secret parsing is exercised.
 			_, _, err := proof.IsProofSpendConditioned()
 			if !errors.Is(err, ErrDuplicateTag) {
 				t.Fatalf("IsProofSpendConditioned() = %v, want duplicate tags field rejection", err)
@@ -38,8 +38,8 @@ func TestSigAllDuplicateTagsAttackRejected(t *testing.T) {
 	victimKey := hex.EncodeToString(victim.PubKey().SerializeCompressed())
 	victimTags := fmt.Sprintf(`[["locktime","4102444800"],["refund","%s"]]`, hex.EncodeToString(refund.PubKey().SerializeCompressed()))
 	inputs := Proofs{
-		{Amount: 1, Secret: fmt.Sprintf(`["P2PK",{"nonce":"attacker","data":"%s","tags":[["sigflag","SIG_ALL"],["pubkeys","%s"]],"tags":%s}]`, victimKey, hex.EncodeToString(attacker.PubKey().SerializeCompressed()), victimTags)}, //nolint:exhaustruct // Mint signatures and witness are populated below; persistence fields are unused.
-		{Amount: 1, Secret: fmt.Sprintf(`["P2PK",{"nonce":"victim","data":"%s","tags":%s}]`, victimKey, victimTags)},                                                                                                                //nolint:exhaustruct // Mint signature is populated below; no victim witness is supplied.
+		{Amount: 1, Secret: fmt.Sprintf(`["P2PK",{"nonce":"attacker","data":"%s","tags":[["sigflag","SIG_ALL"],["pubkeys","%s"]],"tags":%s}]`, victimKey, hex.EncodeToString(attacker.PubKey().SerializeCompressed()), victimTags)}, //nolint:exhaustruct_v5 // Mint signatures and witness are populated below; persistence fields are unused.
+		{Amount: 1, Secret: fmt.Sprintf(`["P2PK",{"nonce":"victim","data":"%s","tags":%s}]`, victimKey, victimTags)},                                                                                                                //nolint:exhaustruct_v5 // Mint signature is populated below; no victim witness is supplied.
 	}
 	for i := range inputs {
 		y, err := crypto.HashToCurve([]byte(inputs[i].Secret))
@@ -95,7 +95,7 @@ func TestSigAllRepetitionInvariants(t *testing.T) {
 		{"malformed first secret", `not-json`, secret("P2PK", "second", "data", allTags), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			inputs := Proofs{{Secret: tc.first}, {Secret: tc.second}} //nolint:exhaustruct // Repetition checks only parse secrets.
+			inputs := Proofs{{Secret: tc.first}, {Secret: tc.second}} //nolint:exhaustruct_v5 // Repetition checks only parse secrets.
 			swap := PostSwapRequest{Inputs: inputs, Outputs: nil}
 			melt := PostMeltBolt11Request{Inputs: inputs, Quote: "", Outputs: nil}
 			for _, operation := range []struct {

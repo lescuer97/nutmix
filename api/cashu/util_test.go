@@ -52,8 +52,8 @@ func TestOrderKeysetByUnit(t *testing.T) {
 }
 
 func TestFeesRejectsRoundingOverflow(t *testing.T) {
-	proofs := []cashu.Proof{{Id: "keyset"}}                                                 //nolint:exhaustruct // fees only use the keyset ID
-	keysets := []cashu.BasicKeysetResponse{{Id: "keyset", InputFeePpk: uint(math.MaxUint)}} //nolint:exhaustruct // fees only use ID and rate
+	proofs := []cashu.Proof{{Id: "keyset"}}                                                 //nolint:exhaustruct_v5 // fees only use the keyset ID
+	keysets := []cashu.BasicKeysetResponse{{Id: "keyset", InputFeePpk: uint(math.MaxUint)}} //nolint:exhaustruct_v5 // fees only use ID and rate
 
 	_, err := cashu.Fees(proofs, keysets)
 	if !errors.Is(err, cashu.ErrAmountOverflow) {

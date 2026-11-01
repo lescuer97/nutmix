@@ -25,7 +25,7 @@ func checkOrigin(r *http.Request) bool {
 
 func v1WebSocketRoute(r *gin.Engine, mint *m.Mint) {
 	v1 := r.Group("/v1")
-	//nolint:exhaustruct
+	//nolint:exhaustruct_v5
 	var upgrader = websocket.Upgrader{
 		ReadBufferSize:  4096,
 		WriteBufferSize: 4096,

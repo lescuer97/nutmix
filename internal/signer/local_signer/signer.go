@@ -272,11 +272,17 @@ func (l *LocalSigner) RotateKeyset(unit cashu.Unit, fee uint, expiry_limit_hours
 	return nil
 }
 
-func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
+func (l *LocalSigner) SignBlindMessages(parent context.Context, messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
+	ctx, cancel := signer.SignBlindMessagesContext(parent)
+	defer cancel()
+
 	var blindedSignatures = make([]cashu.BlindSignature, len(messages))
-	var recoverSigDB = make([]cashu.RecoverSigDB, len(messages))
+	var signedOutputs = make([]cashu.SignedOutput, len(messages))
 
 	for i, output := range messages {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
 		if output.B_.PublicKey == nil {
 			return nil, nil, cashu.ErrInvalidBlindMessage
 		}
@@ -297,14 +303,13 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 
 		blindSignature, err := output.GenerateBlindSignature(correctKeyset.PrivKey)
 
-		recoverySig := cashu.RecoverSigDB{
+		signedOutput := cashu.SignedOutput{
 			Amount:    output.Amount,
 			Id:        output.Id,
 			C_:        blindSignature.C_,
 			B_:        output.B_,
 			Dleq:      blindSignature.Dleq,
 			CreatedAt: time.Now().Unix(),
-			MeltQuote: "",
 		}
 
 		if err != nil {
@@ -313,9 +318,12 @@ func (l *LocalSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cash
 		}
 
 		blindedSignatures[i] = blindSignature
-		recoverSigDB[i] = recoverySig
+		signedOutputs[i] = signedOutput
 	}
-	return blindedSignatures, recoverSigDB, nil
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	return blindedSignatures, signedOutputs, nil
 }
 
 func (l *LocalSigner) VerifyProofs(proofs []cashu.Proof) error {

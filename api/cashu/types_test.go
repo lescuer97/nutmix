@@ -110,8 +110,8 @@ func TestBlindedMessagesAmountBoundaries(t *testing.T) {
 		want     uint64
 		wantErr  bool
 	}{
-		{name: "exact max", messages: BlindedMessages{{Amount: math.MaxUint64 - 1}, {Amount: 1}}, want: math.MaxUint64, wantErr: false}, //nolint:exhaustruct // only amounts matter
-		{name: "overflow", messages: BlindedMessages{{Amount: math.MaxUint64}, {Amount: 1}}, want: 0, wantErr: true},                    //nolint:exhaustruct // only amounts matter
+		{name: "exact max", messages: BlindedMessages{{Amount: math.MaxUint64 - 1}, {Amount: 1}}, want: math.MaxUint64, wantErr: false}, //nolint:exhaustruct_v5 // only amounts matter
+		{name: "overflow", messages: BlindedMessages{{Amount: math.MaxUint64}, {Amount: 1}}, want: 0, wantErr: true},                    //nolint:exhaustruct_v5 // only amounts matter
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -136,8 +136,8 @@ func TestProofsAmountBoundaries(t *testing.T) {
 		want    uint64
 		wantErr bool
 	}{
-		{name: "exact max", proofs: Proofs{{Amount: math.MaxUint64 - 1}, {Amount: 1}}, want: math.MaxUint64, wantErr: false}, //nolint:exhaustruct // only amounts matter
-		{name: "overflow", proofs: Proofs{{Amount: math.MaxUint64}, {Amount: 1}}, want: 0, wantErr: true},                    //nolint:exhaustruct // only amounts matter
+		{name: "exact max", proofs: Proofs{{Amount: math.MaxUint64 - 1}, {Amount: 1}}, want: math.MaxUint64, wantErr: false}, //nolint:exhaustruct_v5 // only amounts matter
+		{name: "overflow", proofs: Proofs{{Amount: math.MaxUint64}, {Amount: 1}}, want: 0, wantErr: true},                    //nolint:exhaustruct_v5 // only amounts matter
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -31,12 +31,12 @@ type firstCallBlockingSigner struct {
 	calls   atomic.Int32
 }
 
-func (s *firstCallBlockingSigner) SignBlindMessages(messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.RecoverSigDB, error) {
+func (s *firstCallBlockingSigner) SignBlindMessages(ctx context.Context, messages []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
 	if s.calls.Add(1) == 1 {
 		close(s.started)
 		<-s.release
 	}
-	return s.Signer.SignBlindMessages(messages)
+	return s.Signer.SignBlindMessages(ctx, messages)
 }
 
 func (b quoteAmountBackend) QueryFees(invoice string, zpayInvoice *zpay32.Invoice, mpp bool, amount cashu.Amount) (lightning.FeesResponse, error) {
@@ -92,9 +92,9 @@ func createSpendableProofs(t *testing.T, mint *Mint, activeKeys signer.GetKeysRe
 	t.Helper()
 
 	blindedMessages, secrets, blindingFactors := createMintTestBlindedMessagesWithSecrets(t, 4, activeKeys)
-	blindSignatures, _, err := mint.Signer.SignBlindMessages(blindedMessages)
+	blindSignatures, _, err := mint.Signer.SignBlindMessages(context.Background(), blindedMessages)
 	if err != nil {
-		t.Fatalf("mint.Signer.SignBlindMessages(blindedMessages): %v", err)
+		t.Fatalf("mint.Signer.SignBlindMessages(context.Background(), blindedMessages): %v", err)
 	}
 
 	proofs := make(cashu.Proofs, len(blindSignatures))
@@ -335,9 +335,9 @@ func TestReserveMintQuoteKeepsPaidWhenOutputAlreadySigned(t *testing.T) {
 	}
 	amount := uint64(2)
 	outputs := createMintTestBlindedMessages(t, amount, activeKeys)
-	_, recoverySigs, err := mint.Signer.SignBlindMessages(outputs)
+	_, recoverySigs, err := mint.Signer.SignBlindMessages(context.Background(), outputs)
 	if err != nil {
-		t.Fatalf("mint.Signer.SignBlindMessages(outputs): %v", err)
+		t.Fatalf("mint.Signer.SignBlindMessages(context.Background(), outputs): %v", err)
 	}
 	mintRequest := cashu.MintRequestDB{
 		Amount:      &amount,
@@ -361,9 +361,9 @@ func TestReserveMintQuoteKeepsPaidWhenOutputAlreadySigned(t *testing.T) {
 		_ = mint.MintDB.Rollback(ctx, tx)
 		t.Fatalf("mint.MintDB.SaveMintRequest(tx, mintRequest): %v", err)
 	}
-	if err = mint.MintDB.SaveRestoreSigs(tx, recoverySigs); err != nil {
+	if err = mint.MintDB.InsertSignedOutputs(ctx, tx, recoverySigs); err != nil {
 		_ = mint.MintDB.Rollback(ctx, tx)
-		t.Fatalf("mint.MintDB.SaveRestoreSigs(tx, recoverySigs): %v", err)
+		t.Fatalf("mint.MintDB.InsertSignedOutputs(ctx, tx, recoverySigs): %v", err)
 	}
 	if err = mint.MintDB.Commit(ctx, tx); err != nil {
 		t.Fatalf("mint.MintDB.Commit(ctx, tx): %v", err)
@@ -537,9 +537,9 @@ func TestSettleIfInternalMeltPersistsMintRequestState(t *testing.T) {
 		t.Fatalf("mint.MintDB.SaveMeltRequest(tx, meltQuote): %v", err)
 	}
 
-	settledQuote, err := mint.settleIfInternalMelt(tx, meltQuote)
+	settledQuote, err := mint.settleIfInternalMelt(context.Background(), tx, meltQuote)
 	if err != nil {
-		t.Fatalf("mint.settleIfInternalMelt(tx, meltQuote): %v", err)
+		t.Fatalf("mint.settleIfInternalMelt(context.Background(), tx, meltQuote): %v", err)
 	}
 	if settledQuote.State != cashu.PAID {
 		t.Fatalf("expected settled quote state to be PAID, got %v", settledQuote.State)
@@ -569,9 +569,9 @@ func TestSettleIfInternalMeltPersistsMintRequestState(t *testing.T) {
 		t.Fatalf("expected mint request state to be PAID, got %v", savedMintRequest.State)
 	}
 
-	savedMeltQuote, err := mint.MintDB.GetMeltRequestById(tx, meltQuote.Quote)
+	savedMeltQuote, err := mint.MintDB.GetMeltRequestById(ctx, tx, meltQuote.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetMeltRequestById(tx, meltQuote.Quote): %v", err)
+		t.Fatalf("mint.MintDB.GetMeltRequestById(ctx, tx, meltQuote.Quote): %v", err)
 	}
 	if savedMeltQuote.State != cashu.PAID {
 		t.Fatalf("expected melt quote state to be PAID, got %v", savedMeltQuote.State)
@@ -653,9 +653,9 @@ func TestReserveMeltInputsAndMarkPendingPersistsProofQuoteReference(t *testing.T
 		_ = mint.MintDB.Rollback(ctx, tx)
 	}()
 
-	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, meltQuote.Quote)
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(ctx, tx, meltQuote.Quote)
 	if err != nil {
-		t.Fatalf("mint.MintDB.GetProofsFromQuote(tx, meltQuote.Quote): %v", err)
+		t.Fatalf("mint.MintDB.GetProofsFromQuote(ctx, tx, meltQuote.Quote): %v", err)
 	}
 
 	if len(savedProofs) != len(request.Inputs) {
@@ -685,7 +685,7 @@ func TestExecuteMeltRejectsStrikeBeforeReservingInputs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
 	}
-	quote := cashu.MeltRequestDB{ //nolint:exhaustruct // Only persisted rejection fields are relevant.
+	quote := cashu.MeltRequestDB{ //nolint:exhaustruct_v5 // Only persisted rejection fields are relevant.
 		Amount: 2, Quote: "strike-eol-melt", Request: RegtestRequest,
 		Unit: cashu.Sat.String(), Expiry: time.Now().Add(time.Minute).Unix(),
 		FeeReserve: 1, State: cashu.UNPAID, CheckingId: "legacy-checking-id",
@@ -717,14 +717,14 @@ func TestExecuteMeltRejectsStrikeBeforeReservingInputs(t *testing.T) {
 		t.Fatalf("mint.MintDB.GetTx: %v", err)
 	}
 	defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
-	savedQuote, err := mint.MintDB.GetMeltRequestById(tx, quote.Quote)
+	savedQuote, err := mint.MintDB.GetMeltRequestById(ctx, tx, quote.Quote)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetMeltRequestById: %v", err)
 	}
 	if savedQuote.State != cashu.UNPAID || savedQuote.CheckingId != quote.CheckingId {
 		t.Fatalf("melt quote changed before rejection: %+v", savedQuote)
 	}
-	savedProofs, err := mint.MintDB.GetProofsFromQuote(tx, quote.Quote)
+	savedProofs, err := mint.MintDB.GetProofsFromQuote(ctx, tx, quote.Quote)
 	if err != nil {
 		t.Fatalf("mint.MintDB.GetProofsFromQuote: %v", err)
 	}
@@ -769,17 +769,17 @@ func TestCreateMeltQuoteUsesBackendAmountToSend(t *testing.T) {
 func TestCreateMeltQuoteRejectsFeeReserveOverflow(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	mint.LightningBackend = quoteAmountBackend{
-		FakeWallet: lightning.FakeWallet{ //nolint:exhaustruct // embedded test backend only needs network and errors
+		FakeWallet: lightning.FakeWallet{ //nolint:exhaustruct_v5 // embedded test backend only needs network and errors
 			Network:         *mint.LightningBackend.GetNetwork(),
 			UnpurposeErrors: []lightning.FakeWalletError{},
 		},
-		feesResponse: lightning.FeesResponse{ //nolint:exhaustruct // checking ID is irrelevant before overflow rejection
+		feesResponse: lightning.FeesResponse{ //nolint:exhaustruct_v5 // checking ID is irrelevant before overflow rejection
 			Fees:         cashu.NewAmount(cashu.Sat, math.MaxUint64),
 			AmountToSend: cashu.NewAmount(cashu.Sat, 1),
 		},
 	}
 
-	_, err := mint.CreateMeltQuote(context.Background(), cashu.PostMeltQuoteBolt11Request{ //nolint:exhaustruct // options are irrelevant
+	_, err := mint.CreateMeltQuote(context.Background(), cashu.PostMeltQuoteBolt11Request{ //nolint:exhaustruct_v5 // options are irrelevant
 		Request: RegtestRequest,
 		Unit:    cashu.Sat.String(),
 	}, Bolt11)

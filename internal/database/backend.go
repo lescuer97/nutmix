@@ -23,7 +23,6 @@ type AuthUser struct {
 }
 
 var ErrDB = errors.New("ERROR DATABASE")
-
 var DATABASE_URL_ENV = "DATABASE_URL"
 
 const (
@@ -108,23 +107,25 @@ type MintDB interface {
 	GetMintRequestById(tx pgx.Tx, quote string) (cashu.MintRequestDB, error)
 	GetMintRequestByRequest(tx pgx.Tx, request string) (cashu.MintRequestDB, error)
 
-	GetMeltRequestById(tx pgx.Tx, quote string) (cashu.MeltRequestDB, error)
+	GetMeltRequestById(ctx context.Context, tx pgx.Tx, quote string) (cashu.MeltRequestDB, error)
 	SaveMeltRequest(tx pgx.Tx, request cashu.MeltRequestDB) error
-	ChangeMeltRequestState(tx pgx.Tx, quote string, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
-	AddPreimageMeltRequest(tx pgx.Tx, quote string, preimage string) error
-	ChangeCheckingId(tx pgx.Tx, quote string, checking_id string) error
+	ChangeMeltRequestState(ctx context.Context, tx pgx.Tx, quote string, state cashu.ACTION_STATE, melted bool, fee_paid uint64) error
+	AddPreimageMeltRequest(ctx context.Context, tx pgx.Tx, quote string, preimage string) error
+	ChangeCheckingId(ctx context.Context, tx pgx.Tx, quote string, checking_id string) error
 
-	GetMeltQuotesByState(state cashu.ACTION_STATE) ([]cashu.MeltRequestDB, error)
+	ListMeltQuotesForReconciliation(ctx context.Context) ([]cashu.MeltRequestDB, error)
 
-	SaveProof(tx pgx.Tx, proofs []cashu.Proof) error
-	GetProofsFromSecret(tx pgx.Tx, SecretList []string) (cashu.Proofs, error)
-	GetProofsFromSecretCurve(tx pgx.Tx, Ys []cashu.WrappedPublicKey) (cashu.Proofs, error)
-	GetProofsFromQuote(tx pgx.Tx, quote string) (cashu.Proofs, error)
-	SetProofsState(tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error
-	DeleteProofs(tx pgx.Tx, proofs cashu.Proofs) error
+	SaveProof(ctx context.Context, tx pgx.Tx, proofs []cashu.Proof) error
+	GetProofsFromSecret(ctx context.Context, tx pgx.Tx, SecretList []string) (cashu.Proofs, error)
+	GetProofsFromSecretCurve(ctx context.Context, tx pgx.Tx, Ys []cashu.WrappedPublicKey) (cashu.Proofs, error)
+	GetProofsFromQuote(ctx context.Context, tx pgx.Tx, quote string) (cashu.Proofs, error)
+	SetProofsState(ctx context.Context, tx pgx.Tx, proofs cashu.Proofs, state cashu.ProofState) error
+	DeleteProofs(ctx context.Context, tx pgx.Tx, proofs cashu.Proofs) error
 
-	GetRestoreSigsFromBlindedMessages(tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error)
-	SaveRestoreSigs(tx pgx.Tx, recover_sigs []cashu.RecoverSigDB) error
+	GetRestoreSigsFromBlindedMessages(ctx context.Context, tx pgx.Tx, B_ []cashu.WrappedPublicKey) ([]cashu.RecoverSigDB, error)
+	CheckBlindMessagesAvailable(ctx context.Context, tx pgx.Tx, B_ []cashu.WrappedPublicKey) error
+	InsertSignedOutputs(ctx context.Context, tx pgx.Tx, outputs []cashu.SignedOutput) error
+	InsertMintSignedOutputs(ctx context.Context, tx pgx.Tx, quoteID string, outputs []cashu.SignedOutput) error
 
 	// GetProofsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
 	// GetBlindSigsMintReserve(since time.Time, until *time.Time) (EcashInventory, error)
@@ -134,9 +135,12 @@ type MintDB interface {
 	GetNostrNotificationConfig(tx pgx.Tx) (*utils.NostrNotificationConfig, error)
 	UpdateNostrNotificationConfig(tx pgx.Tx, config utils.NostrNotificationConfig) error
 
-	SaveMeltChange(tx pgx.Tx, change []cashu.BlindedMessage, quote string) error
-	GetMeltChangeByQuote(tx pgx.Tx, quote string) ([]cashu.MeltChange, error)
-	DeleteChangeByQuote(tx pgx.Tx, quote string) error
+	ReserveMeltChangeOutputs(ctx context.Context, tx pgx.Tx, change []cashu.BlindedMessage, quote string) error
+	LoadPendingMeltChangeForUpdate(ctx context.Context, tx pgx.Tx, quote string) ([]cashu.MeltChange, error)
+	ReleasePendingMeltChangeOutputs(ctx context.Context, tx pgx.Tx, quote string) error
+	// CompleteMeltSettlement records settlement in the caller-owned transaction.
+	// The caller must roll back that transaction after any returned error.
+	CompleteMeltSettlement(ctx context.Context, tx pgx.Tx, command MeltSettlementCommand) (MeltSettlementResult, error)
 
 	SaveNostrAuth(auth NostrLoginAuth) error
 	UpdateNostrAuthActivation(tx pgx.Tx, nonce string, activated bool) error

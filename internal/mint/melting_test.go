@@ -1,3 +1,4 @@
+//nolint:exhaustruct_v5 // Tests use focused fixtures with only relevant fields.
 package mint
 
 import (
@@ -19,21 +20,119 @@ import (
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
-func TestValidateBolt11MeltInputsRejectsAggregateOverflow(t *testing.T) {
-	mint := Mint{}                                                                                      //nolint:exhaustruct // overflow is rejected before dependencies are used
-	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Amount: math.MaxUint64}, {Amount: 1}}} //nolint:exhaustruct // only inputs matter
+type noLightningReconciliationWallet struct{ lightning.FakeWallet }
 
-	_, err := mint.validateBolt11MeltInputs(request, cashu.MeltRequestDB{}) //nolint:exhaustruct // quote is unused before rejection
+func (noLightningReconciliationWallet) CheckPayed(context.Context, string, *zpay32.Invoice, string) (lightning.PaymentStatus, string, cashu.Amount, error) {
+	return lightning.UNKNOWN, "", cashu.Amount{}, errors.New("unexpected CheckPayed call")
+}
+
+func (noLightningReconciliationWallet) PayInvoice(cashu.MeltRequestDB, *zpay32.Invoice, cashu.Amount, bool, cashu.Amount) (lightning.PaymentResponse, error) {
+	return lightning.PaymentResponse{}, errors.New("unexpected PayInvoice call")
+}
+
+type reconciliationCountingSigner struct {
+	lifecycleSigner
+	calls int
+}
+
+func (s *reconciliationCountingSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
+	return signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{{Id: testSatKeysetId, Unit: cashu.Sat.String()}}}, nil
+}
+
+func (s *reconciliationCountingSigner) SignBlindMessages(ctx context.Context, outputs []cashu.BlindedMessage) ([]cashu.BlindSignature, []cashu.SignedOutput, error) {
+	s.calls++
+	return s.lifecycleSigner.SignBlindMessages(ctx, outputs)
+}
+
+func TestMeltSettlementStartupRecoversInternalPreparation(t *testing.T) {
+	db := &mockdb.MockDB{}
+	signer := &reconciliationCountingSigner{}
+	mint := &Mint{MintDB: db, Signer: signer, LightningBackend: noLightningReconciliationWallet{}}
+	setupPendingMeltWithChange(t, mint, "startup-internal", []uint64{8, 4, 2, 1}, 3)
+	db.MeltRequest[0].State = cashu.PAID
+	db.MeltRequest[0].Melted = true
+	db.MeltRequest[0].FeePaid = 0
+	db.MeltRequest[0].PaymentPreimage = "durable-preimage"
+
+	if err := mint.ReconcilePendingMeltQuotes(context.Background()); err != nil {
+		t.Fatalf("startup reconciliation: %v", err)
+	}
+	if signer.calls != 1 {
+		t.Fatalf("SignBlindMessages calls = %d, want 1", signer.calls)
+	}
+	if db.MeltRequest[0].PaymentPreimage != "durable-preimage" || db.MeltRequest[0].FeePaid != 0 {
+		t.Fatalf("durable settlement fields changed: %+v", db.MeltRequest[0])
+	}
+	proofs, err := db.GetProofsFromQuote(context.Background(), nil, "startup-internal")
+	if err != nil {
+		t.Fatalf("GetProofsFromQuote: %v", err)
+	}
+	for _, proof := range proofs {
+		if proof.State != cashu.PROOF_SPENT {
+			t.Errorf("proof state = %v, want SPENT", proof.State)
+		}
+	}
+	if len(db.MeltChange) != 0 {
+		t.Fatalf("unused reserved blanks remain: %d", len(db.MeltChange))
+	}
+	for i, want := range []uint64{1, 4, 8} {
+		if i >= len(db.RecoverSigDB) || db.RecoverSigDB[i].Amount != want {
+			t.Fatalf("change signature %d = %+v, want amount %d", i, db.RecoverSigDB, want)
+		}
+	}
+	if err := mint.ReconcilePendingMeltQuotes(context.Background()); err != nil {
+		t.Fatalf("second startup reconciliation: %v", err)
+	}
+	if signer.calls != 1 {
+		t.Fatalf("second startup signed again: %d calls", signer.calls)
+	}
+}
+
+func TestMeltSettlementReconciliationRejectsMixedProofStates(t *testing.T) {
+	db := &mockdb.MockDB{}
+	signer := &reconciliationCountingSigner{}
+	mint := &Mint{MintDB: db, Signer: signer, LightningBackend: noLightningReconciliationWallet{}}
+	setupPendingMeltWithChange(t, mint, "startup-mixed", []uint64{8, 4, 2, 1}, 3)
+	db.MeltRequest[0].State, db.MeltRequest[0].Melted = cashu.PAID, true
+	db.MeltRequest[0].PaymentPreimage = "durable-preimage"
+	db.Proofs[0].State = cashu.PROOF_SPENT
+	before := append(cashu.Proofs(nil), db.Proofs...)
+	quoteBefore := db.MeltRequest[0]
+
+	if err := mint.ReconcilePendingMeltQuotes(context.Background()); err == nil {
+		t.Fatal("mixed proof states reconciled without error")
+	}
+	for i := range before {
+		if db.Proofs[i].State != before[i].State {
+			t.Fatalf("proof %d changed from %v to %v", i, before[i].State, db.Proofs[i].State)
+		}
+	}
+	if len(db.MeltChange) != 3 || len(db.RecoverSigDB) != 0 {
+		t.Fatalf("mixed proof states changed settlement records: pending blanks %d, signatures %d", len(db.MeltChange), len(db.RecoverSigDB))
+	}
+	if signer.calls != 0 {
+		t.Fatalf("mixed proof states invoked signer %d times", signer.calls)
+	}
+	if db.MeltRequest[0].State != quoteBefore.State || db.MeltRequest[0].Melted != quoteBefore.Melted || db.MeltRequest[0].FeePaid != quoteBefore.FeePaid || db.MeltRequest[0].PaymentPreimage != quoteBefore.PaymentPreimage {
+		t.Fatalf("mixed proof states changed quote: before %+v, after %+v", quoteBefore, db.MeltRequest[0])
+	}
+}
+
+func TestValidateBolt11MeltInputsRejectsAggregateOverflow(t *testing.T) {
+	mint := Mint{}                                                                                      //nolint:exhaustruct_v5 // overflow is rejected before dependencies are used
+	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Amount: math.MaxUint64}, {Amount: 1}}} //nolint:exhaustruct_v5 // only inputs matter
+
+	_, err := mint.validateBolt11MeltInputs(request, cashu.MeltRequestDB{}) //nolint:exhaustruct_v5 // quote is unused before rejection
 	if !errors.Is(err, cashu.ErrNotEnoughtProofs) || !errors.Is(err, cashu.ErrAmountOverflow) {
 		t.Fatalf("validateBolt11MeltInputs() error = %v, want insufficient proofs amount overflow", err)
 	}
 }
 
 func TestValidateBolt11MeltInputsRejectsRequiredTotalOverflow(t *testing.T) {
-	keyset := cashu.BasicKeysetResponse{Id: "keyset", Unit: cashu.Sat.String()}                                               //nolint:exhaustruct // only ID and unit matter
-	mint := Mint{Signer: fixedKeysetSigner{keysets: signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{keyset}}}} //nolint:exhaustruct // only signer is reached
-	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Id: keyset.Id, Amount: math.MaxUint64}}}                     //nolint:exhaustruct // only inputs matter
-	quote := cashu.MeltRequestDB{Amount: math.MaxUint64, FeeReserve: 1}                                                       //nolint:exhaustruct // only required totals matter
+	keyset := cashu.BasicKeysetResponse{Id: "keyset", Unit: cashu.Sat.String()}                                               //nolint:exhaustruct_v5 // only ID and unit matter
+	mint := Mint{Signer: fixedKeysetSigner{keysets: signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{keyset}}}} //nolint:exhaustruct_v5 // only signer is reached
+	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Id: keyset.Id, Amount: math.MaxUint64}}}                     //nolint:exhaustruct_v5 // only inputs matter
+	quote := cashu.MeltRequestDB{Amount: math.MaxUint64, FeeReserve: 1}                                                       //nolint:exhaustruct_v5 // only required totals matter
 
 	_, err := mint.validateBolt11MeltInputs(request, quote)
 	if !errors.Is(err, cashu.ErrNotEnoughtProofs) || !errors.Is(err, cashu.ErrAmountOverflow) {
@@ -72,7 +171,7 @@ func makeAmountlessRegtestInvoice(t *testing.T) string {
 }
 
 func TestValidateBolt11MeltQuoteRejectsAmountlessInvoice(t *testing.T) {
-	mint := Mint{ //nolint:exhaustruct // test only needs the LightningBackend; Config has 30+ fields
+	mint := Mint{ //nolint:exhaustruct_v5 // test only needs the LightningBackend; Config has 30+ fields
 		LightningBackend: lightning.FakeWallet{UnpurposeErrors: nil, Network: chaincfg.RegressionNetParams, InvoiceFee: 0, NodeStatus: lightning.ONLINE_STATUS},
 	}
 
@@ -92,14 +191,14 @@ func TestValidateBolt11MeltQuoteRejectsAmountlessInvoice(t *testing.T) {
 }
 
 func TestReconcilePendingMeltQuotesIgnoresStrikeEndOfLife(t *testing.T) {
-	quote := cashu.MeltRequestDB{ //nolint:exhaustruct // Only reconciliation fields are relevant.
+	quote := cashu.MeltRequestDB{ //nolint:exhaustruct_v5 // Only reconciliation fields are relevant.
 		Quote: "legacy-pending", Request: RegtestRequest, State: cashu.PENDING,
 		Unit: cashu.Sat.String(), CheckingId: "legacy-checking-id",
 	}
-	db := &mockdb.MockDB{MeltRequest: []cashu.MeltRequestDB{quote}}                                     //nolint:exhaustruct
-	mint := Mint{MintDB: db, LightningBackend: lightning.Strike{Network: chaincfg.RegressionNetParams}} //nolint:exhaustruct
+	db := &mockdb.MockDB{MeltRequest: []cashu.MeltRequestDB{quote}}                                     //nolint:exhaustruct_v5
+	mint := Mint{MintDB: db, LightningBackend: lightning.Strike{Network: chaincfg.RegressionNetParams}} //nolint:exhaustruct_v5
 
-	if err := mint.ReconcilePendingMeltQuotes(); err != nil {
+	if err := mint.ReconcilePendingMeltQuotes(context.Background()); err != nil {
 		t.Fatalf("ReconcilePendingMeltQuotes: %v", err)
 	}
 	if db.MeltRequest[0].State != cashu.PENDING || db.MeltRequest[0].CheckingId != quote.CheckingId {
@@ -109,7 +208,7 @@ func TestReconcilePendingMeltQuotesIgnoresStrikeEndOfLife(t *testing.T) {
 
 // setupPendingMeltWithChange stores a PENDING melt quote, pending proofs and
 // blank change outputs. FakeWallet.CheckPayed settles with a flat 10 sat fee.
-func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, quoteAmount uint64, proofAmounts []uint64, numBlanks int) []cashu.WrappedPublicKey {
+func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, proofAmounts []uint64, numBlanks int) []cashu.WrappedPublicKey {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Now().Unix()
@@ -122,7 +221,7 @@ func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, quoteA
 		Quote:           quoteId,
 		CheckingId:      "",
 		Expiry:          now,
-		Amount:          quoteAmount,
+		Amount:          2,
 		FeeReserve:      2,
 		FeePaid:         0,
 		SeenAt:          now,
@@ -178,11 +277,11 @@ func setupPendingMeltWithChange(t *testing.T, mint *Mint, quoteId string, quoteA
 	if err := mint.MintDB.SaveMeltRequest(tx, meltQuote); err != nil {
 		t.Fatalf("SaveMeltRequest: %v", err)
 	}
-	if err := mint.MintDB.SaveProof(tx, proofs); err != nil {
+	if err := mint.MintDB.SaveProof(ctx, tx, proofs); err != nil {
 		t.Fatalf("SaveProof: %v", err)
 	}
-	if err := mint.MintDB.SaveMeltChange(tx, blanks, quoteId); err != nil {
-		t.Fatalf("SaveMeltChange: %v", err)
+	if err := mint.MintDB.ReserveMeltChangeOutputs(ctx, tx, blanks, quoteId); err != nil {
+		t.Fatalf("ReserveMeltChangeOutputs: %v", err)
 	}
 	if err := mint.MintDB.Commit(ctx, tx); err != nil {
 		t.Fatalf("Commit: %v", err)
@@ -195,7 +294,7 @@ func TestRefreshMeltQuoteReturnsChangeOnSettle(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 
 	// 15 sats of proofs, 2 sat invoice, 10 sat fake fee -> overpaid = 3 -> change [1, 2]
-	blankKeys := setupPendingMeltWithChange(t, mint, "quote-change-ok", 2, []uint64{8, 4, 2, 1}, 2)
+	blankKeys := setupPendingMeltWithChange(t, mint, "quote-change-ok", []uint64{8, 4, 2, 1}, 2)
 
 	quote, err := mint.RefreshMeltQuoteState(context.Background(), "quote-change-ok")
 	if err != nil {
@@ -209,11 +308,8 @@ func TestRefreshMeltQuoteReturnsChangeOnSettle(t *testing.T) {
 	if len(quote.Change) != 2 {
 		t.Fatalf("expected 2 change signatures, got: %d", len(quote.Change))
 	}
-	// ponytail: row order from melt_change_message is not guaranteed (no ordinal
-	// column) — assert the multiset of amounts, not positions.
-	changeAmounts := map[uint64]bool{quote.Change[0].Amount: true, quote.Change[1].Amount: true}
-	if !changeAmounts[1] || !changeAmounts[2] {
-		t.Errorf("change amounts should be {1, 2}, got: [%d %d]", quote.Change[0].Amount, quote.Change[1].Amount)
+	if quote.Change[0].Amount != 1 || quote.Change[1].Amount != 2 {
+		t.Errorf("change amounts should preserve wallet order [1, 2], got: [%d %d]", quote.Change[0].Amount, quote.Change[1].Amount)
 	}
 
 	// signatures must have been persisted for both blank outputs
@@ -224,7 +320,7 @@ func TestRefreshMeltQuoteReturnsChangeOnSettle(t *testing.T) {
 	}
 	defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
 
-	restoreSigs, err := mint.MintDB.GetRestoreSigsFromBlindedMessages(tx, blankKeys)
+	restoreSigs, err := mint.MintDB.GetRestoreSigsFromBlindedMessages(ctx, tx, blankKeys)
 	if err != nil {
 		t.Fatalf("GetRestoreSigsFromBlindedMessages: %v", err)
 	}
@@ -232,12 +328,16 @@ func TestRefreshMeltQuoteReturnsChangeOnSettle(t *testing.T) {
 		t.Errorf("expected restore sigs for both blank outputs, got: %d", len(restoreSigs))
 	}
 
-	remainingChange, err := mint.MintDB.GetMeltChangeByQuote(tx, "quote-change-ok")
+	remainingChange, err := mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, "quote-change-ok")
 	if err != nil {
-		t.Fatalf("GetMeltChangeByQuote: %v", err)
+		t.Fatalf("LoadPendingMeltChangeForUpdate: %v", err)
 	}
 	if len(remainingChange) != 0 {
-		t.Errorf("change messages should be deleted after signing, got: %d", len(remainingChange))
+		t.Errorf("signed change must no longer be pending, got: %d", len(remainingChange))
+	}
+	reloaded, err := mint.MintDB.GetMeltRequestById(ctx, tx, "quote-change-ok")
+	if err != nil || len(reloaded.Change) != 2 {
+		t.Fatalf("reloaded quote lost change: %+v %v", reloaded, err)
 	}
 }
 
@@ -246,7 +346,7 @@ func TestRefreshMeltQuoteNoChangeWhenFeeExceedsProofs(t *testing.T) {
 
 	// 4 sats of proofs, 2 sat invoice, 10 sat fake fee -> totalExpent (12) > proofs (4).
 	// Without the comparison guard this underflows uint64 and signs huge change.
-	setupPendingMeltWithChange(t, mint, "quote-underflow", 2, []uint64{2, 2}, 2)
+	setupPendingMeltWithChange(t, mint, "quote-underflow", []uint64{2, 2}, 2)
 
 	quote, err := mint.RefreshMeltQuoteState(context.Background(), "quote-underflow")
 	if err != nil {
@@ -266,8 +366,12 @@ func TestRefreshMeltQuoteNoChangeWhenFeeExceedsProofs(t *testing.T) {
 		t.Fatalf("mint.MintDB.GetTx: %v", err)
 	}
 	defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
+	remainingChange, err := mint.MintDB.LoadPendingMeltChangeForUpdate(ctx, tx, "quote-underflow")
+	if err != nil || len(remainingChange) != 0 {
+		t.Fatalf("zero-refund settlement retained blanks: %v %v", remainingChange, err)
+	}
 
-	proofs, err := mint.MintDB.GetProofsFromQuote(tx, "quote-underflow")
+	proofs, err := mint.MintDB.GetProofsFromQuote(ctx, tx, "quote-underflow")
 	if err != nil {
 		t.Fatalf("GetProofsFromQuote: %v", err)
 	}
@@ -275,5 +379,83 @@ func TestRefreshMeltQuoteNoChangeWhenFeeExceedsProofs(t *testing.T) {
 		if proof.State != cashu.PROOF_SPENT {
 			t.Errorf("proof should be spent, got: %v", proof.State)
 		}
+	}
+}
+
+func TestMeltFinalizationAuthoritativeStatePostgres(t *testing.T) {
+	mint := SetupMintWithLightningMockPostgres(t)
+	ctx := context.Background()
+	for _, scenario := range []string{"concurrent refund", "concurrent zero refund", "internal preparation"} {
+		t.Run(scenario, func(t *testing.T) {
+			amounts := []uint64{8, 4, 2, 1}
+			wantChange, wantFee := 2, uint64(10)
+			if scenario == "concurrent zero refund" {
+				amounts, wantChange = []uint64{8, 4}, 0
+			}
+			if scenario == "internal preparation" {
+				wantChange, wantFee = 3, 0
+			}
+			keys := setupPendingMeltWithChange(t, mint, scenario, amounts, 3) //nolint:contextcheck // Fixture setup intentionally uses its own transaction context.
+			tx, err := mint.MintDB.GetTx(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = mint.MintDB.Rollback(ctx, tx) }()
+			if scenario == "internal preparation" {
+				if err := mint.MintDB.ChangeMeltRequestState(ctx, tx, scenario, cashu.PAID, true, 0); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cached, err := mint.MintDB.GetMeltRequestById(ctx, tx, scenario)
+			if err != nil {
+				t.Fatal(err)
+			}
+			inputs, err := mint.MintDB.GetProofsFromQuote(ctx, tx, scenario)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := mint.MintDB.Commit(ctx, tx); err != nil {
+				t.Fatal(err)
+			}
+			if scenario != "internal preparation" {
+				// Force the quote-poll commit before the original HTTP finalizer.
+				if _, err := mint.RefreshMeltQuoteState(ctx, scenario); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cached.State, cached.Melted, cached.FeePaid, cached.PaymentPreimage = cashu.PAID, true, 99, "stale-preimage"
+			amount, err := inputs.Amount()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for range 2 {
+				quote, response, spent, err := mint.finalizePaidBolt11Melt(ctx, bolt11MeltData{
+					AmountProofs: cashu.NewAmount(cashu.Sat, amount), Fee: cashu.NewAmount(cashu.Sat, 0), Unit: cashu.Sat,
+				}, cashu.PostMeltBolt11Request{Quote: scenario, Inputs: inputs, Outputs: nil}, cached, cashu.NewAmount(cashu.Sat, 99))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(response.Change) != wantChange || quote.FeePaid != wantFee || quote.PaymentPreimage == "stale-preimage" {
+					t.Fatalf("wrong authoritative response: %+v", quote)
+				}
+				for _, proof := range spent {
+					if proof.State != cashu.PROOF_SPENT {
+						t.Fatal("proof remains pending")
+					}
+				}
+			}
+			read, err := mint.MintDB.GetTx(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = mint.MintDB.Rollback(ctx, read) }()
+			restored, err := mint.MintDB.GetRestoreSigsFromBlindedMessages(ctx, read, keys)
+			if err != nil || len(restored) != wantChange {
+				t.Fatalf("refund lost or duplicated: %v %v", restored, err)
+			}
+			if err := mint.MintDB.Commit(ctx, read); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

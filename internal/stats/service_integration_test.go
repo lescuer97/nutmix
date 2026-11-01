@@ -1,4 +1,4 @@
-//nolint:exhaustruct,contextcheck
+//nolint:exhaustruct_v5,contextcheck
 package stats
 
 import (
@@ -21,7 +21,7 @@ func TestCreateSnapshotWithRealPostgresPersistsExpectedStatsRow(t *testing.T) {
 
 	seedStatsIntegrationFixtures(t, ctx, db)
 
-	//nolint:exhaustruct // optional service hooks use zero values in this integration test
+	//nolint:exhaustruct_v5 // optional service hooks use zero values in this integration test
 	service := Service{
 		DB:  db,
 		Now: func() time.Time { return time.Unix(110, 0) },
@@ -120,7 +120,7 @@ func seedStatsIntegrationFixtures(t *testing.T, ctx context.Context, db postgres
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
 
-	for _, seed := range []cashu.Seed{ //nolint:exhaustruct // integration fixtures only set needed seed fields
+	for _, seed := range []cashu.Seed{ //nolint:exhaustruct_v5 // integration fixtures only set needed seed fields
 		{Active: true, CreatedAt: 1, Unit: "sat", Id: "ks-sat", Version: 1, InputFeePpk: 1500, DerivationPath: "m/0", Amounts: []uint64{1}, Legacy: false},
 		{Active: true, CreatedAt: 1, Unit: "usd", Id: "ks-usd", Version: 1, InputFeePpk: 2500, DerivationPath: "m/1", Amounts: []uint64{1}, Legacy: false},
 	} {
@@ -153,10 +153,15 @@ func seedStatsIntegrationFixtures(t *testing.T, ctx context.Context, db postgres
 		t.Fatalf("insert proofs: %v", err)
 	}
 
-	if _, err := tx.Exec(ctx, `INSERT INTO recovery_signature (id, amount, "B_", "C_", created_at, dleq_e, dleq_s) VALUES
-		('ks-sat', 12, decode('07', 'hex'), decode('08', 'hex'), 14, NULL, NULL),
-		('ks-usd', 13, decode('09', 'hex'), decode('0a', 'hex'), 24, NULL, NULL)`); err != nil {
-		t.Fatalf("insert recovery_signature: %v", err)
+	if _, err := tx.Exec(ctx, `WITH s AS (
+		INSERT INTO blind_signatures (signature, created_at) VALUES (decode('08','hex'), 14), (decode('0a','hex'), 24)
+		RETURNING id, created_at
+	)
+	INSERT INTO blind_messages (blinded_message, keyset_id, amount, state, signature_id, created_at)
+	SELECT CASE created_at WHEN 14 THEN decode('07','hex') ELSE decode('09','hex') END,
+		CASE created_at WHEN 14 THEN 'ks-sat' ELSE 'ks-usd' END,
+		CASE created_at WHEN 14 THEN 12 ELSE 13 END, 'SIGNED', id, created_at FROM s`); err != nil {
+		t.Fatalf("insert blind signatures: %v", err)
 	}
 
 	if err := db.Commit(ctx, tx); err != nil {

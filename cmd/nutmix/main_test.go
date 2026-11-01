@@ -177,7 +177,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	amountMismatchResponse := cashu.ErrorResponse{} //nolint:exhaustruct
+	amountMismatchResponse := cashu.ErrorResponse{} //nolint:exhaustruct_v5
 	err = json.Unmarshal(w.Body.Bytes(), &amountMismatchResponse)
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
@@ -215,7 +215,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	amountMismatchResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	amountMismatchResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 	err = json.Unmarshal(w.Body.Bytes(), &amountMismatchResponse)
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
@@ -285,7 +285,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.MintRequestDB{} //nolint:exhaustruct
+	postMintQuoteResponseTwo = cashu.MintRequestDB{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -376,7 +376,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5 //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {
@@ -421,7 +421,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5 //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -516,7 +516,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -556,7 +556,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -652,7 +652,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
 	if err != nil {
@@ -704,7 +704,7 @@ func TestMintBolt11FakeWallet(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -768,7 +768,7 @@ func SetupRoutingForTesting(ctx context.Context, adminRoute bool) (*gin.Engine, 
 	return r, mint
 }
 func SetupRoutingForTestingMockDb(ctx context.Context, adminRoute bool) (*gin.Engine, *mint.Mint) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 
 	signer, err := localsigner.SetupLocalSigner(&db)
 	if err != nil {
@@ -1195,7 +1195,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {
@@ -1226,7 +1226,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
@@ -1296,7 +1296,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
-	postMintQuoteResponseTwo = cashu.MintRequestDB{} //nolint:exhaustruct
+	postMintQuoteResponseTwo = cashu.MintRequestDB{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &postMintQuoteResponseTwo)
 
@@ -1326,7 +1326,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1369,7 +1369,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1464,7 +1464,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1504,7 +1504,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1675,7 +1675,7 @@ func LightningBolt11Test(t *testing.T, ctx context.Context, bobLnd testcontainer
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1744,7 +1744,7 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	errorResponse := cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse := cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1771,7 +1771,7 @@ func TestWrongUnitOnMeltAndMint(t *testing.T) {
 	req = httptest.NewRequest("POST", "/v1/melt/quote/bolt11", strings.NewReader(string(jsonRequestBody)))
 
 	router.ServeHTTP(w, req)
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 
@@ -1846,7 +1846,7 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
-	errorResponse := cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse := cashu.ErrorResponse{} //nolint:exhaustruct_v5
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {
 		t.Fatalf("Could not parse error response %s", w.Body.String())
@@ -1872,7 +1872,7 @@ func TestConfigMeltMintLimit(t *testing.T) {
 	if w.Code != 400 {
 		t.Errorf("Expected status code 400, got %d", w.Code)
 	}
-	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct
+	errorResponse = cashu.ErrorResponse{} //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {

@@ -77,7 +77,10 @@ func (f FakeWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay
 	}, nil
 }
 
-func (f FakeWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
+func (f FakeWallet) CheckPayed(ctx context.Context, quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
+	if err := ctx.Err(); err != nil {
+		return UNKNOWN, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, err
+	}
 	switch {
 	case slices.Contains(f.UnpurposeErrors, FailQueryUnknown):
 		return UNKNOWN, "", cashu.Amount{Unit: cashu.Sat, Amount: 0}, nil

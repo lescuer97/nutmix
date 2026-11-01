@@ -78,7 +78,7 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 }
 
 func (l *LnbitsWallet) lnbitsRequest(ctx context.Context, method string, endpoint string, reqBody any, responseType any) error {
-	client := &http.Client{} //nolint:exhaustruct
+	client := &http.Client{} //nolint:exhaustruct_v5
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("json.Marshal: %w", err)
@@ -194,12 +194,12 @@ func (l LnbitsWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zp
 	return invoiceRes, nil
 }
 
-func (l LnbitsWallet) CheckPayed(quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
+func (l LnbitsWallet) CheckPayed(ctx context.Context, quote string, invoice *zpay32.Invoice, checkingId string) (PaymentStatus, string, cashu.Amount, error) {
 	var paymentStatus LNBitsPaymentStatus
 	zeroFee := cashu.Amount{Unit: cashu.Sat, Amount: 0}
 
 	hash := invoice.PaymentHash[:]
-	err := l.LnbitsRequest("GET", "/api/v1/payments/"+hex.EncodeToString(hash), nil, &paymentStatus)
+	err := l.lnbitsRequest(ctx, "GET", "/api/v1/payments/"+hex.EncodeToString(hash), nil, &paymentStatus)
 	if err != nil {
 		return FAILED, "", zeroFee, fmt.Errorf("json.Marshal: %w", err)
 	}

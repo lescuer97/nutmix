@@ -1,4 +1,4 @@
-//nolint:exhaustruct
+//nolint:exhaustruct_v5
 package admin
 
 import (
@@ -159,7 +159,7 @@ func TestLightningBackendStatusHandler(t *testing.T) {
 
 func TestStrikeEndOfLifeAdminUI(t *testing.T) {
 	ctx, recorder := adminTestContext("/admin/ln")
-	config := utils.Config{MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct,staticcheck // Verify legacy Strike UI.
+	config := utils.Config{MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct_v5,staticcheck // Verify legacy Strike UI.
 	if err := templates.LightningBackendPage(config, true).Render(ctx.Request.Context(), recorder); err != nil {
 		t.Fatalf("Render Strike page: %v", err)
 	}

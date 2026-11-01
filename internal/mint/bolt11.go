@@ -43,7 +43,7 @@ func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.Po
 		}
 	}()
 
-	quote, err := mint.MintDB.GetMeltRequestById(tx, quoteId)
+	quote, err := mint.MintDB.GetMeltRequestById(ctx, tx, quoteId)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("database.GetMintQuoteById(pool, quoteId). %w", err)
 	}
@@ -57,7 +57,7 @@ func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.Po
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("zpay32.Decode(quote.Request, mint.LightningBackend.GetNetwork()). %w", err)
 	}
 
-	status, preimage, feesAmount, err := mint.LightningBackend.CheckPayed(quote.Quote, invoice, quote.CheckingId)
+	status, preimage, feesAmount, err := mint.LightningBackend.CheckPayed(ctx, quote.Quote, invoice, quote.CheckingId)
 	if err != nil {
 		if errors.Is(err, invoices.ErrInvoiceNotFound) || strings.Contains(err.Error(), "NotFound") {
 			return quote.GetPostMeltQuoteResponse(), nil
@@ -86,7 +86,7 @@ func CheckMeltRequest(ctx context.Context, mint *Mint, quoteId string) (cashu.Po
 		quote.State = cashu.UNPAID
 	}
 
-	err = mint.MintDB.AddPreimageMeltRequest(tx, quote.Quote, preimage)
+	err = mint.MintDB.AddPreimageMeltRequest(ctx, tx, quote.Quote, preimage)
 	if err != nil {
 		return quote.GetPostMeltQuoteResponse(), fmt.Errorf("database.AddPaymentPreimageToMeltRequest(pool, preimage, quote.Quote) %w", err)
 	}
