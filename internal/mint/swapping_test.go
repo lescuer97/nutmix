@@ -24,11 +24,11 @@ func (s fixedKeysetSigner) GetKeysets() (signer.GetKeysetsResponse, error) {
 }
 
 func TestValidateSwapBalanceRejectsModularBypass(t *testing.T) {
-	keyset := cashu.BasicKeysetResponse{Id: "keyset", Unit: cashu.Sat.String(), InputFeePpk: 1000}                            //nolint:exhaustruct // only balance fields matter
-	mint := Mint{Signer: fixedKeysetSigner{keysets: signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{keyset}}}} //nolint:exhaustruct // only signer is reached
+	keyset := cashu.BasicKeysetResponse{Id: "keyset", Unit: cashu.Sat.String(), InputFeePpk: 1000}                            //nolint:exhaustruct_v5 // only balance fields matter
+	mint := Mint{Signer: fixedKeysetSigner{keysets: signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{keyset}}}} //nolint:exhaustruct_v5 // only signer is reached
 	request := cashu.PostSwapRequest{
-		Inputs:  cashu.Proofs{{Id: keyset.Id, Amount: 0}},                       //nolint:exhaustruct // only balance fields matter
-		Outputs: cashu.BlindedMessages{{Id: keyset.Id, Amount: math.MaxUint64}}, //nolint:exhaustruct // only balance fields matter
+		Inputs:  cashu.Proofs{{Id: keyset.Id, Amount: 0}},                       //nolint:exhaustruct_v5 // only balance fields matter
+		Outputs: cashu.BlindedMessages{{Id: keyset.Id, Amount: math.MaxUint64}}, //nolint:exhaustruct_v5 // only balance fields matter
 	}
 
 	err := mint.validateSwapBalanceAndUnits(request)

@@ -62,8 +62,8 @@ func TestBolt11PostRejectsStrikeBackend(t *testing.T) {
 
 	var config utils.Config
 	config.Default()
-	db := &mockdb.MockDB{Config: config}                  //nolint:exhaustruct
-	mintInstance := mint.Mint{Config: config, MintDB: db} //nolint:exhaustruct
+	db := &mockdb.MockDB{Config: config}                  //nolint:exhaustruct_v5
+	mintInstance := mint.Mint{Config: config, MintDB: db} //nolint:exhaustruct_v5
 	Bolt11Post(&mintInstance)(ctx)
 
 	if !strings.Contains(recorder.Body.String(), "Invalid backend selection") {

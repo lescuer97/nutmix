@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Test fixtures set only fields relevant to settlement deadlines.
+//nolint:exhaustruct_v5 // Test fixtures set only fields relevant to settlement deadlines.
 package mint
 
 import (

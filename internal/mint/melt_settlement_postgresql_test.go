@@ -1,6 +1,6 @@
 //go:build integration
 
-//nolint:exhaustruct // Integration fixtures set only fields relevant to settlement.
+//nolint:exhaustruct_v5 // Integration fixtures set only fields relevant to settlement.
 package mint
 
 import (

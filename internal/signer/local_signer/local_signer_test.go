@@ -19,7 +19,7 @@ import (
 const MintPrivateKey string = "0000000000000000000000000000000000000000000000000000000000000001"
 
 func TestRotateUnexistingSeedUnit(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	localsigner, err := SetupLocalSigner(&db)
 	if err != nil {
@@ -84,7 +84,7 @@ func TestRotateUnexistingSeedUnit(t *testing.T) {
 // 4.4: a DB error from GetSeedsByUnit must abort rotation instead of falling
 // through and creating a duplicate v0 seed.
 func TestRotateKeysetPropagatesDBError(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	localsigner, err := SetupLocalSigner(&db)
 	if err != nil {
@@ -104,7 +104,7 @@ func TestRotateKeysetPropagatesDBError(t *testing.T) {
 }
 
 func TestCreateNewSeed(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	localsigner, err := SetupLocalSigner(&db)
 	if err != nil {
@@ -125,7 +125,7 @@ func TestCreateNewSeed(t *testing.T) {
 	}
 }
 func TestRotateAuthSeedUnit(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	localsigner, err := SetupLocalSigner(&db)
 	if err != nil {
@@ -178,7 +178,7 @@ func TestBackwardCompatibilityV1Keysets(t *testing.T) {
 		CreatedAt:      0,
 		IssuerVersion:  nil,
 	}
-	db := mockdb.MockDB{ //nolint:exhaustruct
+	db := mockdb.MockDB{ //nolint:exhaustruct_v5
 		Seeds: []cashu.Seed{v1Seed},
 	}
 
@@ -228,7 +228,7 @@ func TestMixedV1AndV2Keysets(t *testing.T) {
 		Legacy:         true,
 		IssuerVersion:  nil,
 	}
-	db := mockdb.MockDB{ //nolint:exhaustruct
+	db := mockdb.MockDB{ //nolint:exhaustruct_v5
 		Seeds: []cashu.Seed{v1Seed},
 	}
 
@@ -305,7 +305,7 @@ func TestMixedV1AndV2Keysets(t *testing.T) {
 }
 
 func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 
 	localsigner, err := SetupLocalSigner(&db)
@@ -333,7 +333,7 @@ func TestSignBlindMessagesFailsForUnknownKeyset(t *testing.T) {
 }
 
 func TestSignBlindMessagesHonorsCanceledContext(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 	localsigner, err := SetupLocalSigner(&db)
 	if err != nil {
@@ -350,7 +350,7 @@ func TestSignBlindMessagesHonorsCanceledContext(t *testing.T) {
 // NOTE: Regression test for SECURITY_AUDIT.md finding 3.2 — a nil B_ with a
 // valid active keyset must return ErrInvalidBlindMessage instead of panicking.
 func TestSignBlindMessagesRejectsNilB(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 
 	localsigner, err := SetupLocalSigner(&db)
@@ -378,7 +378,7 @@ func TestSignBlindMessagesRejectsNilB(t *testing.T) {
 }
 
 func TestVerifyProofsFailsForUnknownKeyset(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 
 	localsigner, err := SetupLocalSigner(&db)
@@ -632,7 +632,7 @@ func TestDeriveKeysetAuth(t *testing.T) {
 }
 
 func TestLoadLegacyAndNonLegacySeeds(t *testing.T) {
-	db := mockdb.MockDB{} //nolint:exhaustruct
+	db := mockdb.MockDB{} //nolint:exhaustruct_v5
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
 
 	privateKeyBytes, err := hex.DecodeString(MintPrivateKey)

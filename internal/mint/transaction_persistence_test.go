@@ -685,7 +685,7 @@ func TestExecuteMeltRejectsStrikeBeforeReservingInputs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mint.Signer.GetActiveKeys(): %v", err)
 	}
-	quote := cashu.MeltRequestDB{ //nolint:exhaustruct // Only persisted rejection fields are relevant.
+	quote := cashu.MeltRequestDB{ //nolint:exhaustruct_v5 // Only persisted rejection fields are relevant.
 		Amount: 2, Quote: "strike-eol-melt", Request: RegtestRequest,
 		Unit: cashu.Sat.String(), Expiry: time.Now().Add(time.Minute).Unix(),
 		FeeReserve: 1, State: cashu.UNPAID, CheckingId: "legacy-checking-id",
@@ -769,17 +769,17 @@ func TestCreateMeltQuoteUsesBackendAmountToSend(t *testing.T) {
 func TestCreateMeltQuoteRejectsFeeReserveOverflow(t *testing.T) {
 	mint := SetupMintWithLightningMockPostgres(t)
 	mint.LightningBackend = quoteAmountBackend{
-		FakeWallet: lightning.FakeWallet{ //nolint:exhaustruct // embedded test backend only needs network and errors
+		FakeWallet: lightning.FakeWallet{ //nolint:exhaustruct_v5 // embedded test backend only needs network and errors
 			Network:         *mint.LightningBackend.GetNetwork(),
 			UnpurposeErrors: []lightning.FakeWalletError{},
 		},
-		feesResponse: lightning.FeesResponse{ //nolint:exhaustruct // checking ID is irrelevant before overflow rejection
+		feesResponse: lightning.FeesResponse{ //nolint:exhaustruct_v5 // checking ID is irrelevant before overflow rejection
 			Fees:         cashu.NewAmount(cashu.Sat, math.MaxUint64),
 			AmountToSend: cashu.NewAmount(cashu.Sat, 1),
 		},
 	}
 
-	_, err := mint.CreateMeltQuote(context.Background(), cashu.PostMeltQuoteBolt11Request{ //nolint:exhaustruct // options are irrelevant
+	_, err := mint.CreateMeltQuote(context.Background(), cashu.PostMeltQuoteBolt11Request{ //nolint:exhaustruct_v5 // options are irrelevant
 		Request: RegtestRequest,
 		Unit:    cashu.Sat.String(),
 	}, Bolt11)

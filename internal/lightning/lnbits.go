@@ -78,7 +78,7 @@ func (l *LnbitsWallet) LnbitsRequest(method string, endpoint string, reqBody any
 }
 
 func (l *LnbitsWallet) lnbitsRequest(ctx context.Context, method string, endpoint string, reqBody any, responseType any) error {
-	client := &http.Client{} //nolint:exhaustruct
+	client := &http.Client{} //nolint:exhaustruct_v5
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("json.Marshal: %w", err)

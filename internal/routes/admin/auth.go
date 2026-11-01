@@ -234,7 +234,7 @@ func LoginPost(mint *mint.Mint, loginKey *secp256k1.PrivateKey, adminNostrPubkey
 
 func makeJWTToken(secret []byte) (string, error) {
 	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{ //nolint:exhaustruct // only iat/exp are meaningful for an admin session
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{ //nolint:exhaustruct_v5 // only iat/exp are meaningful for an admin session
 		IssuedAt:  jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(now.Add(sessionTTL)),
 	})

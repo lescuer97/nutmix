@@ -24,12 +24,12 @@ const MintPrivateKey string = "0000000000000000000000000000000000000000000000000
 
 func TestSetUpMintLoadsLegacyStrikeAsTombstone(t *testing.T) {
 	t.Setenv("MINT_PRIVATE_KEY", MintPrivateKey)
-	db := &mockdb.MockDB{} //nolint:exhaustruct
+	db := &mockdb.MockDB{} //nolint:exhaustruct_v5
 	sig, err := localsigner.SetupLocalSigner(db)
 	if err != nil {
 		t.Fatalf("localsigner.SetupLocalSigner: %v", err)
 	}
-	config := utils.Config{NETWORK: "regtest", MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct,staticcheck // Verify legacy Strike configuration.
+	config := utils.Config{NETWORK: "regtest", MINT_LIGHTNING_BACKEND: utils.Strike} //nolint:exhaustruct_v5,staticcheck // Verify legacy Strike configuration.
 
 	mint, err := SetUpMint(context.Background(), config, nil, db, &sig)
 	if err != nil {

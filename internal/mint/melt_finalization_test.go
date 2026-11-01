@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Fixtures specify only fields relevant to the finalization scenario.
+//nolint:exhaustruct_v5 // Fixtures specify only fields relevant to the finalization scenario.
 package mint
 
 import (

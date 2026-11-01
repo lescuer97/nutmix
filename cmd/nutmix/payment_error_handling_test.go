@@ -173,7 +173,7 @@ func TestPaymentFailureButPendingCheckPaymentMockDbFakeWallet(t *testing.T) {
 	req = httptest.NewRequest("POST", "/v1/melt/bolt11", strings.NewReader(string(jsonRequestBody)))
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	var errorResponse cashu.ErrorResponse //nolint:exhaustruct
+	var errorResponse cashu.ErrorResponse //nolint:exhaustruct_v5
 
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 

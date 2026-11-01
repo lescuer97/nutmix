@@ -1,4 +1,4 @@
-//nolint:exhaustruct,govet
+//nolint:exhaustruct_v5,govet
 package stats
 
 import (
@@ -29,12 +29,12 @@ type statsMethodContract interface {
 }
 
 func TestStatsTypesIncludeFees(t *testing.T) {
-	_ = database.StatsSummaryItem{}     //nolint:exhaustruct
-	_ = database.StatsSnapshot{Fees: 1} //nolint:exhaustruct
-	_ = database.MintStatsRow{}         //nolint:exhaustruct
-	_ = database.MeltStatsRow{}         //nolint:exhaustruct
-	_ = database.KeysetStatsRow{}       //nolint:exhaustruct
-	_ = database.KeysetFeeRow{}         //nolint:exhaustruct
+	_ = database.StatsSummaryItem{}     //nolint:exhaustruct_v5
+	_ = database.StatsSnapshot{Fees: 1} //nolint:exhaustruct_v5
+	_ = database.MintStatsRow{}         //nolint:exhaustruct_v5
+	_ = database.MeltStatsRow{}         //nolint:exhaustruct_v5
+	_ = database.KeysetStatsRow{}       //nolint:exhaustruct_v5
+	_ = database.KeysetFeeRow{}         //nolint:exhaustruct_v5
 	var _ statsMethodContract = (database.MintDB)(nil)
 }
 
@@ -108,7 +108,7 @@ func (s *stubStore) InsertStatsSnapshot(_ context.Context, snapshot database.Sta
 }
 
 func newTestService(store Store) Service {
-	return Service{ //nolint:exhaustruct
+	return Service{ //nolint:exhaustruct_v5
 		DB:  store,
 		Now: func() time.Time { return time.Unix(110, 0) },
 		DecodeMintAmount: func(request string) (uint64, error) {
@@ -131,7 +131,7 @@ func filterEvents(events []string, allowed ...string) []string {
 }
 
 func TestCreateSnapshotStartsAtZeroWhenNoPriorSnapshot(t *testing.T) {
-	store := &stubStore{mintRows: []database.MintStatsRow{{Quote: "q1", Unit: "sat", Amount: uint64Ptr(5)}}} //nolint:exhaustruct
+	store := &stubStore{mintRows: []database.MintStatsRow{{Quote: "q1", Unit: "sat", Amount: uint64Ptr(5)}}} //nolint:exhaustruct_v5
 	service := newTestService(store)
 
 	result, err := service.CreateSnapshot(context.Background())
@@ -150,8 +150,8 @@ func TestCreateSnapshotStartsAtZeroWhenNoPriorSnapshot(t *testing.T) {
 }
 
 func TestCreateSnapshotUsesPreviousEndDatePlusOne(t *testing.T) {
-	store := &stubStore{ //nolint:exhaustruct
-		latest:   &database.StatsSnapshot{EndDate: 12}, //nolint:exhaustruct
+	store := &stubStore{ //nolint:exhaustruct_v5
+		latest:   &database.StatsSnapshot{EndDate: 12}, //nolint:exhaustruct_v5
 		meltRows: []database.MeltStatsRow{{Quote: "m1", Unit: "sat", Amount: 9}},
 	}
 	service := newTestService(store)
@@ -166,7 +166,7 @@ func TestCreateSnapshotUsesPreviousEndDatePlusOne(t *testing.T) {
 }
 
 func TestCreateSnapshotReadsLatestSnapshotBeforeOpeningStatsTx(t *testing.T) {
-	store := &stubStore{ //nolint:exhaustruct
+	store := &stubStore{ //nolint:exhaustruct_v5
 		latest:   &database.StatsSnapshot{EndDate: 12},
 		meltRows: []database.MeltStatsRow{{Quote: "m1", Unit: "sat", Amount: 1}},
 	}
@@ -182,7 +182,7 @@ func TestCreateSnapshotReadsLatestSnapshotBeforeOpeningStatsTx(t *testing.T) {
 }
 
 func TestCreateSnapshotReturnsLatestSnapshotErrorWithoutOpeningStatsTx(t *testing.T) {
-	store := &stubStore{latestErr: errors.New("latest down")} //nolint:exhaustruct
+	store := &stubStore{latestErr: errors.New("latest down")} //nolint:exhaustruct_v5
 	service := newTestService(store)
 
 	_, err := service.CreateSnapshot(context.Background())
@@ -195,7 +195,7 @@ func TestCreateSnapshotReturnsLatestSnapshotErrorWithoutOpeningStatsTx(t *testin
 }
 
 func TestCreateSnapshotSkipsBeforeOpeningStatsTxWhenWindowIsEmpty(t *testing.T) {
-	store := &stubStore{latest: &database.StatsSnapshot{EndDate: 100}} //nolint:exhaustruct
+	store := &stubStore{latest: &database.StatsSnapshot{EndDate: 100}} //nolint:exhaustruct_v5
 	service := newTestService(store)
 	service.Now = func() time.Time { return time.Unix(105, 0) }
 
@@ -212,7 +212,7 @@ func TestCreateSnapshotSkipsBeforeOpeningStatsTxWhenWindowIsEmpty(t *testing.T) 
 }
 
 func TestCreateSnapshotClosesStatsTxBeforeInsert(t *testing.T) {
-	store := &stubStore{meltRows: []database.MeltStatsRow{{Quote: "m1", Unit: "sat", Amount: 1}}} //nolint:exhaustruct
+	store := &stubStore{meltRows: []database.MeltStatsRow{{Quote: "m1", Unit: "sat", Amount: 1}}} //nolint:exhaustruct_v5
 	service := newTestService(store)
 
 	_, err := service.CreateSnapshot(context.Background())
@@ -225,7 +225,7 @@ func TestCreateSnapshotClosesStatsTxBeforeInsert(t *testing.T) {
 }
 
 func TestCreateSnapshotRollsBackStatsTxWhenStatsQueryFails(t *testing.T) {
-	store := &stubStore{queryErr: errors.New("boom")} //nolint:exhaustruct
+	store := &stubStore{queryErr: errors.New("boom")} //nolint:exhaustruct_v5
 	service := newTestService(store)
 
 	_, err := service.CreateSnapshot(context.Background())
@@ -238,7 +238,7 @@ func TestCreateSnapshotRollsBackStatsTxWhenStatsQueryFails(t *testing.T) {
 }
 
 func TestCreateSnapshotReturnsGetTxError(t *testing.T) {
-	store := &stubStore{getTxErr: errors.New("tx down")} //nolint:exhaustruct
+	store := &stubStore{getTxErr: errors.New("tx down")} //nolint:exhaustruct_v5
 	service := newTestService(store)
 
 	_, err := service.CreateSnapshot(context.Background())
@@ -248,7 +248,7 @@ func TestCreateSnapshotReturnsGetTxError(t *testing.T) {
 }
 
 func TestCreateSnapshotSkipsWhenEndDateBeforeStartDate(t *testing.T) {
-	store := &stubStore{latest: &database.StatsSnapshot{EndDate: 100}} //nolint:exhaustruct
+	store := &stubStore{latest: &database.StatsSnapshot{EndDate: 100}} //nolint:exhaustruct_v5
 	service := newTestService(store)
 	service.Now = func() time.Time { return time.Unix(105, 0) }
 
@@ -265,7 +265,7 @@ func TestCreateSnapshotSkipsWhenEndDateBeforeStartDate(t *testing.T) {
 }
 
 func TestCreateSnapshotSkipsWhenAllSummariesEmpty(t *testing.T) {
-	store := &stubStore{} //nolint:exhaustruct
+	store := &stubStore{} //nolint:exhaustruct_v5
 	service := newTestService(store)
 
 	result, err := service.CreateSnapshot(context.Background())
@@ -281,7 +281,7 @@ func TestCreateSnapshotSkipsWhenAllSummariesEmpty(t *testing.T) {
 }
 
 func TestCreateSnapshotSortsSummaryItemsByUnit(t *testing.T) {
-	store := &stubStore{ //nolint:exhaustruct
+	store := &stubStore{ //nolint:exhaustruct_v5
 		meltRows: []database.MeltStatsRow{{Quote: "1", Unit: "zsat", Amount: 1}, {Quote: "2", Unit: "asat", Amount: 2}},
 	}
 	service := newTestService(store)
@@ -300,7 +300,7 @@ func TestCreateSnapshotSortsSummaryItemsByUnit(t *testing.T) {
 }
 
 func TestCreateSnapshotAbortsWhenMintFallbackCannotBeResolved(t *testing.T) {
-	store := &stubStore{mintRows: []database.MintStatsRow{{Quote: "q1", Unit: "usd", Amount: nil, Request: "invoice"}}} //nolint:exhaustruct
+	store := &stubStore{mintRows: []database.MintStatsRow{{Quote: "q1", Unit: "usd", Amount: nil, Request: "invoice"}}} //nolint:exhaustruct_v5
 	service := newTestService(store)
 
 	_, err := service.CreateSnapshot(context.Background())
@@ -310,7 +310,7 @@ func TestCreateSnapshotAbortsWhenMintFallbackCannotBeResolved(t *testing.T) {
 }
 
 func TestCreateSnapshotAbortsWhenProofUnitCannotBeResolved(t *testing.T) {
-	store := &stubStore{proofRows: []database.KeysetStatsRow{{KeysetID: "proof-keyset", Amount: 1}}} //nolint:exhaustruct
+	store := &stubStore{proofRows: []database.KeysetStatsRow{{KeysetID: "proof-keyset", Amount: 1}}} //nolint:exhaustruct_v5
 	service := newTestService(store)
 
 	_, err := service.CreateSnapshot(context.Background())
@@ -320,7 +320,7 @@ func TestCreateSnapshotAbortsWhenProofUnitCannotBeResolved(t *testing.T) {
 }
 
 func TestCreateSnapshotAbortsWhenBlindSigUnitCannotBeResolved(t *testing.T) {
-	store := &stubStore{blindSigRows: []database.KeysetStatsRow{{KeysetID: "blind-keyset", Amount: 1}}} //nolint:exhaustruct
+	store := &stubStore{blindSigRows: []database.KeysetStatsRow{{KeysetID: "blind-keyset", Amount: 1}}} //nolint:exhaustruct_v5
 	service := newTestService(store)
 
 	_, err := service.CreateSnapshot(context.Background())
@@ -330,7 +330,7 @@ func TestCreateSnapshotAbortsWhenBlindSigUnitCannotBeResolved(t *testing.T) {
 }
 
 func TestCreateSnapshotUsesMintAmountOrInvoiceFallback(t *testing.T) {
-	store := &stubStore{ //nolint:exhaustruct
+	store := &stubStore{ //nolint:exhaustruct_v5
 		mintRows: []database.MintStatsRow{
 			{Quote: "stored", Unit: "sat", Amount: uint64Ptr(3)},
 			{Quote: "decoded", Unit: "sat", Request: "invoice"},
@@ -349,7 +349,7 @@ func TestCreateSnapshotUsesMintAmountOrInvoiceFallback(t *testing.T) {
 }
 
 func TestCreateSnapshotAggregatesMeltRowsUsingStoredAmount(t *testing.T) {
-	store := &stubStore{ //nolint:exhaustruct
+	store := &stubStore{ //nolint:exhaustruct_v5
 		meltRows: []database.MeltStatsRow{{Quote: "m1", Unit: "sat", Amount: 4}, {Quote: "m2", Unit: "sat", Amount: 6}},
 	}
 	service := newTestService(store)
@@ -365,7 +365,7 @@ func TestCreateSnapshotAggregatesMeltRowsUsingStoredAmount(t *testing.T) {
 }
 
 func TestCreateSnapshotCalculatesFeesLikeAdmin(t *testing.T) {
-	store := &stubStore{ //nolint:exhaustruct
+	store := &stubStore{ //nolint:exhaustruct_v5
 		meltRows: []database.MeltStatsRow{{Quote: "m1", Unit: "sat", Amount: 1}},
 		feeRows: []database.KeysetFeeRow{
 			{KeysetID: "sat-a", Unit: "sat", Quantity: 2, InputFeePpk: 1500},
@@ -384,7 +384,7 @@ func TestCreateSnapshotCalculatesFeesLikeAdmin(t *testing.T) {
 }
 
 func TestCreateSnapshotExcludesAuthFees(t *testing.T) {
-	store := &stubStore{ //nolint:exhaustruct
+	store := &stubStore{ //nolint:exhaustruct_v5
 		meltRows: []database.MeltStatsRow{{Quote: "m1", Unit: "sat", Amount: 1}},
 		feeRows: []database.KeysetFeeRow{
 			{KeysetID: "auth-a", Unit: "auth", Quantity: 9, InputFeePpk: 9999},
@@ -424,11 +424,11 @@ func (f fakeTicker) C() <-chan time.Time { return f.ch }
 func (f fakeTicker) Stop()               {}
 
 func TestRunStartsWithImmediateSnapshotAttempt(t *testing.T) {
-	service := Service{} //nolint:exhaustruct
+	service := Service{} //nolint:exhaustruct_v5
 	called := make(chan struct{}, 1)
 	service.runSnapshot = func(context.Context) (SnapshotResult, error) {
 		called <- struct{}{}
-		return SnapshotResult{}, nil //nolint:exhaustruct
+		return SnapshotResult{}, nil //nolint:exhaustruct_v5
 	}
 	service.NewTicker = func(time.Duration) ticker { return fakeTicker{ch: make(chan time.Time)} }
 
@@ -444,9 +444,9 @@ func TestRunStartsWithImmediateSnapshotAttempt(t *testing.T) {
 }
 
 func TestRunStopsWhenContextCancelled(t *testing.T) {
-	service := Service{} //nolint:exhaustruct
+	service := Service{} //nolint:exhaustruct_v5
 	tickCh := make(chan time.Time)
-	service.runSnapshot = func(context.Context) (SnapshotResult, error) { return SnapshotResult{}, nil } //nolint:exhaustruct
+	service.runSnapshot = func(context.Context) (SnapshotResult, error) { return SnapshotResult{}, nil } //nolint:exhaustruct_v5
 	service.NewTicker = func(time.Duration) ticker { return fakeTicker{ch: tickCh} }
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -465,7 +465,7 @@ func TestRunStopsWhenContextCancelled(t *testing.T) {
 }
 
 func TestRunDoesNotOverlapSnapshotAttempts(t *testing.T) {
-	service := Service{} //nolint:exhaustruct
+	service := Service{} //nolint:exhaustruct_v5
 	tickCh := make(chan time.Time, 2)
 	start := make(chan struct{}, 2)
 	release := make(chan struct{})
@@ -487,7 +487,7 @@ func TestRunDoesNotOverlapSnapshotAttempts(t *testing.T) {
 		running--
 		mu.Unlock()
 		completed <- struct{}{}
-		return SnapshotResult{}, nil //nolint:exhaustruct
+		return SnapshotResult{}, nil //nolint:exhaustruct_v5
 	}
 	service.NewTicker = func(time.Duration) ticker { return fakeTicker{ch: tickCh} }
 
@@ -515,13 +515,13 @@ func TestRunDoesNotOverlapSnapshotAttempts(t *testing.T) {
 }
 
 func TestRunContinuesAfterSnapshotError(t *testing.T) {
-	service := Service{} //nolint:exhaustruct
+	service := Service{} //nolint:exhaustruct_v5
 	tickCh := make(chan time.Time, 1)
 	var calls int
 	service.runSnapshot = func(context.Context) (SnapshotResult, error) {
 		calls++
 		if calls == 1 {
-			return SnapshotResult{StartDate: 0, EndDate: 10}, errors.New("boom") //nolint:exhaustruct
+			return SnapshotResult{StartDate: 0, EndDate: 10}, errors.New("boom") //nolint:exhaustruct_v5
 		}
 		return SnapshotResult{Outcome: SnapshotSkipped, StartDate: 0, EndDate: 10}, nil
 	}

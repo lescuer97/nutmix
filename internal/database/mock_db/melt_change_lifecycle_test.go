@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Fixtures specify only fields relevant to settlement.
+//nolint:exhaustruct_v5 // Fixtures specify only fields relevant to settlement.
 package mockdb
 
 import (

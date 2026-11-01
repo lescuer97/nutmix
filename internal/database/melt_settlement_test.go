@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Fixtures specify only fields relevant to input ownership.
+//nolint:exhaustruct_v5 // Fixtures specify only fields relevant to input ownership.
 package database
 
 import (

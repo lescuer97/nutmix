@@ -521,7 +521,7 @@ func ConfirmSwapOutTransaction(mint *m.Mint, newLiquidity chan string) gin.Handl
 
 		slog.Info("making payment to invoice", slog.String("invoice", swapRequest.LightningInvoice))
 
-		//nolint:exhaustruct
+		//nolint:exhaustruct_v5
 		payment, err := mint.LightningBackend.PayInvoice(cashu.MeltRequestDB{Request: swapRequest.LightningInvoice}, decodedInvoice, fee, false, cashu.Amount{Unit: cashu.Sat, Amount: swapRequest.Amount})
 
 		// Hardened error handling

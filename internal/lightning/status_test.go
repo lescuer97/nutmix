@@ -31,7 +31,7 @@ func TestFakeWalletStatus(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := (FakeWallet{NodeStatus: test.status}).Status(context.Background()) //nolint:exhaustruct
+			got, err := (FakeWallet{NodeStatus: test.status}).Status(context.Background()) //nolint:exhaustruct_v5
 			if err != nil {
 				t.Fatalf("Status() error = %v", err)
 			}
@@ -57,8 +57,8 @@ func TestLnbitsStatus(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	assertStatus(t, LnbitsWallet{Endpoint: server.URL, Key: "valid"}.Status, ONLINE_STATUS, false)   //nolint:exhaustruct
-	assertStatus(t, LnbitsWallet{Endpoint: server.URL, Key: "invalid"}.Status, OFFLINE_STATUS, true) //nolint:exhaustruct
+	assertStatus(t, LnbitsWallet{Endpoint: server.URL, Key: "valid"}.Status, ONLINE_STATUS, false)   //nolint:exhaustruct_v5
+	assertStatus(t, LnbitsWallet{Endpoint: server.URL, Key: "invalid"}.Status, OFFLINE_STATUS, true) //nolint:exhaustruct_v5
 }
 
 func TestLnbitsStatusCancellation(t *testing.T) {
@@ -76,7 +76,7 @@ func TestLnbitsStatusCancellation(t *testing.T) {
 		server.Close()
 	})
 
-	assertStatusCancellation(t, started, LnbitsWallet{Endpoint: server.URL, Key: "valid"}.Status) //nolint:exhaustruct
+	assertStatusCancellation(t, started, LnbitsWallet{Endpoint: server.URL, Key: "valid"}.Status) //nolint:exhaustruct_v5
 }
 
 type lndStatusServer struct {
@@ -116,7 +116,7 @@ func TestLndStatus(t *testing.T) {
 			conn := newStatusTestConn(t, func(server *grpc.Server) {
 				lnrpc.RegisterLightningServer(server, lndStatusServer{UnimplementedLightningServer: lnrpc.UnimplementedLightningServer{}, err: test.err, started: nil, release: nil})
 			})
-			assertStatus(t, (LndGrpcWallet{grpcClient: conn, macaroon: "test"}).Status, test.want, test.wantErr) //nolint:exhaustruct
+			assertStatus(t, (LndGrpcWallet{grpcClient: conn, macaroon: "test"}).Status, test.want, test.wantErr) //nolint:exhaustruct_v5
 		})
 	}
 }
@@ -134,7 +134,7 @@ func TestLndStatusCancellation(t *testing.T) {
 	})
 	t.Cleanup(func() { close(release) })
 
-	assertStatusCancellation(t, started, (LndGrpcWallet{grpcClient: conn, macaroon: "test"}).Status) //nolint:exhaustruct
+	assertStatusCancellation(t, started, (LndGrpcWallet{grpcClient: conn, macaroon: "test"}).Status) //nolint:exhaustruct_v5
 }
 
 type clnStatusServer struct {
@@ -174,7 +174,7 @@ func TestCLNStatus(t *testing.T) {
 			conn := newStatusTestConn(t, func(server *grpc.Server) {
 				cln_grpc.RegisterNodeServer(server, clnStatusServer{UnimplementedNodeServer: cln_grpc.UnimplementedNodeServer{}, err: test.err, started: nil, release: nil})
 			})
-			assertStatus(t, (CLNGRPCWallet{grpcClient: conn, macaroon: "test"}).Status, test.want, test.wantErr) //nolint:exhaustruct
+			assertStatus(t, (CLNGRPCWallet{grpcClient: conn, macaroon: "test"}).Status, test.want, test.wantErr) //nolint:exhaustruct_v5
 		})
 	}
 }
@@ -192,7 +192,7 @@ func TestCLNStatusCancellation(t *testing.T) {
 	})
 	t.Cleanup(func() { close(release) })
 
-	assertStatusCancellation(t, started, (CLNGRPCWallet{grpcClient: conn, macaroon: "test"}).Status) //nolint:exhaustruct
+	assertStatusCancellation(t, started, (CLNGRPCWallet{grpcClient: conn, macaroon: "test"}).Status) //nolint:exhaustruct_v5
 }
 
 func assertStatus(t *testing.T, check func(context.Context) (NodeStatus, error), want NodeStatus, wantErr bool) {

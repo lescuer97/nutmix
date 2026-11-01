@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Fixtures specify only the PostgreSQL diagnostics under test.
+//nolint:exhaustruct_v5 // Fixtures specify only the PostgreSQL diagnostics under test.
 package postgresql
 
 import (

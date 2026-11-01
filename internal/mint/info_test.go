@@ -16,13 +16,13 @@ func TestInfoReportsBolt11Availability(t *testing.T) {
 		mintDisabled bool
 		meltDisabled bool
 	}{
-		{name: "Strike", backend: lightning.Strike{}, pegOutOnly: false, mintDisabled: true, meltDisabled: true},                  //nolint:exhaustruct // Backend metadata only.
-		{name: "supported backend", backend: lightning.FakeWallet{}, pegOutOnly: false, mintDisabled: false, meltDisabled: false}, //nolint:exhaustruct // Backend metadata only.
-		{name: "peg out only", backend: lightning.FakeWallet{}, pegOutOnly: true, mintDisabled: true, meltDisabled: false},        //nolint:exhaustruct // Backend metadata only.
+		{name: "Strike", backend: lightning.Strike{}, pegOutOnly: false, mintDisabled: true, meltDisabled: true},                  //nolint:exhaustruct_v5 // Backend metadata only.
+		{name: "supported backend", backend: lightning.FakeWallet{}, pegOutOnly: false, mintDisabled: false, meltDisabled: false}, //nolint:exhaustruct_v5 // Backend metadata only.
+		{name: "peg out only", backend: lightning.FakeWallet{}, pegOutOnly: true, mintDisabled: true, meltDisabled: false},        //nolint:exhaustruct_v5 // Backend metadata only.
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			mint := Mint{ //nolint:exhaustruct // Info only needs configuration and backend.
-				Config:           utils.Config{PEG_OUT_ONLY: test.pegOutOnly}, //nolint:exhaustruct
+			mint := Mint{ //nolint:exhaustruct_v5 // Info only needs configuration and backend.
+				Config:           utils.Config{PEG_OUT_ONLY: test.pegOutOnly}, //nolint:exhaustruct_v5
 				LightningBackend: test.backend,
 			}
 			info := mint.Info()

@@ -27,7 +27,7 @@ linters:
     - unconvert       # Unnecessary type conversions
     - unparam         # Unused function parameters
     - misspell        # Commonly misspelled words
-    - exhaustruct # [highly recommend to enable] checks if all structure fields are initialized
+    - exhaustruct_v5 # checks if all structure fields are initialized
     - iface # checks the incorrect use of interfaces, helping developers avoid interface pollution
     - sqlclosecheck # checks that sql.Rows and sql.Stmt are closed
     - sloglint # ensure consistent code style when using log/slog

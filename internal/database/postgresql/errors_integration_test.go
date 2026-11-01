@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Fixtures specify only fields relevant to the constraint under test.
+//nolint:exhaustruct_v5 // Fixtures specify only fields relevant to the constraint under test.
 package postgresql
 
 import (

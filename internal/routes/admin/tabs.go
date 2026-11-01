@@ -832,7 +832,7 @@ func Bolt11Post(mint *m.Mint) gin.HandlerFunc {
 		// 2. Check invoice generation (100 sats)
 		// We use a dummy quote ID to avoid messing with real DB if possible.
 		testQuote := "verification-test-" + strconv.FormatInt(time.Now().Unix(), 10)
-		//nolint:exhaustruct
+		//nolint:exhaustruct_v5
 		testDescription := testQuote
 		invoiceResp, err := newBackend.RequestInvoice(
 			cashu.NewAmount(cashu.Sat, 100),

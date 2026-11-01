@@ -49,7 +49,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	}
 
 	// Create bitcoind regtest node
-	reqbtcd := testcontainers.ContainerRequest{ //nolint:exhaustruct
+	reqbtcd := testcontainers.ContainerRequest{ //nolint:exhaustruct_v5
 		Image:        "polarlightning/bitcoind:29.0",
 		Name:         "bitcoindbackend" + names,
 		WaitingFor:   wait.ForLog("Initialized HTTP server"),
@@ -59,7 +59,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Cmd: []string{"bitcoind", "-server=1", "-regtest=1", "-rpcuser=rpcuser", "-rpcpassword=rpcpassword", "-debug=1", "-zmqpubrawblock=tcp://0.0.0.0:28334", "-zmqpubrawtx=tcp://0.0.0.0:28335", "-zmqpubhashblock=tcp://0.0.0.0:28336", "-txindex=1", "-dnsseed=0", "-upnp=0", "-rpcbind=0.0.0.0", "-rpcallowip=0.0.0.0/0", "-rpcport=18443", "-rest", "-listen=1", "-listenonion=0", "-fallbackfee=0.0002", "-blockfilterindex=1", "-peerblockfilters=1"},
 	}
 
-	btcdC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct
+	btcdC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct_v5
 		ContainerRequest: reqbtcd,
 		Started:          true,
 		Reuse:            true,
@@ -86,7 +86,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	}
 
 	// create Alice node LND
-	reqlndAlice := testcontainers.ContainerRequest{ //nolint:exhaustruct
+	reqlndAlice := testcontainers.ContainerRequest{ //nolint:exhaustruct_v5
 		Image:        "polarlightning/lnd:0.19.2-beta",
 		WaitingFor:   wait.ForLog("Server listening on").AsRegexp(),
 		ExposedPorts: []string{"18445/tcp", "10009/tcp", "8080/tcp", "9735/tcp"},
@@ -95,7 +95,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Cmd:          []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=alice" /* "--externalip=alice", */, "--tlsextradomain=alice", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9735", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8080", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
 	}
 
-	lndAliceC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct
+	lndAliceC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct_v5
 		ContainerRequest: reqlndAlice,
 		Reuse:            true,
 		Started:          true,
@@ -151,7 +151,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	// create bob node LND
 
-	reqLndBob := testcontainers.ContainerRequest{ //nolint:exhaustruct
+	reqLndBob := testcontainers.ContainerRequest{ //nolint:exhaustruct_v5
 		Image:        "polarlightning/lnd:0.19.2-beta",
 		WaitingFor:   wait.ForLog("Server listening on").AsRegexp(),
 		ExposedPorts: []string{"18446/tcp", "9736/tcp", "10009/tcp", "8081/tcp"},
@@ -161,7 +161,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Cmd:      []string{"lnd", "--noseedbackup", "--trickledelay=5000", "--alias=bob" /* "--externalip=alice", */, "--tlsextradomain=bob", "--tlsextradomain=host.docker.bridge", "--tlsextradomain=host.docker.internal", "--listen=0.0.0.0:9736", "--rpclisten=0.0.0.0:10009", "--restlisten=0.0.0.0:8081", "--bitcoin.active", "--bitcoin.regtest", "--bitcoin.node=bitcoind", "--bitcoind.rpchost=" + btcdIP, "--bitcoind.rpcuser=rpcuser", "--bitcoind.rpcpass=rpcpassword", "--bitcoind.zmqpubrawblock=tcp://" + btcdIP + ":28334", "--bitcoind.zmqpubrawtx=tcp://" + btcdIP + ":28335"},
 	}
 
-	LndBobC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct
+	LndBobC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct_v5
 		ContainerRequest: reqLndBob,
 		Started:          true,
 		Reuse:            true,
@@ -301,14 +301,14 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 
 	tlscertReader := strings.NewReader(tlsCert)
 
-	aliceLnbitsContainerReq := testcontainers.ContainerRequest{ //nolint:exhaustruct
+	aliceLnbitsContainerReq := testcontainers.ContainerRequest{ //nolint:exhaustruct_v5
 		Image: "lnbits/lnbits:v1.2.1",
 		WaitingFor: wait.ForAll(
 			wait.ForLog("Application startup complete").AsRegexp(),
 			wait.ForHTTP("/api/v1/status").WithPort("5000/tcp"),
 		),
 		Files: []testcontainers.ContainerFile{
-			{ //nolint:exhaustruct
+			{ //nolint:exhaustruct_v5
 				Reader:            tlscertReader,
 				ContainerFilePath: tlsCertPath,
 				FileMode:          0o700,
@@ -320,7 +320,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 		Networks:     []string{net.Name},
 	}
 
-	aliceLnbitsC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct
+	aliceLnbitsC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{ //nolint:exhaustruct_v5
 		ContainerRequest: aliceLnbitsContainerReq,
 		Started:          true,
 		Reuse:            true,
@@ -352,7 +352,7 @@ func SetUpLightingNetworkTestEnviroment(ctx context.Context, names string) (test
 	// Get API key for aliceLnbits
 
 	// make request for first install
-	client := &http.Client{} //nolint:exhaustruct
+	client := &http.Client{} //nolint:exhaustruct_v5
 
 	firstInstallBody := struct {
 		Username       string `json:"username"`

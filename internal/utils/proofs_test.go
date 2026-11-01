@@ -12,7 +12,7 @@ import (
 // 10.3: a Postgres row-lock conflict (SQLSTATE 55P03) on the swap path must
 // map to PROOFS_PENDING (11002), not QUOTE_PENDING (20005).
 func TestParseErrorLockConflictMapsToProofsPending(t *testing.T) {
-	pgErr := &pgconn.PgError{Code: "55P03"} //nolint:exhaustruct
+	pgErr := &pgconn.PgError{Code: "55P03"} //nolint:exhaustruct_v5
 	err := fmt.Errorf("m.MintDB.SetProofsPending(tx, proofs). %w", pgErr)
 
 	code, _ := ParseErrorToCashuErrorCode(err)

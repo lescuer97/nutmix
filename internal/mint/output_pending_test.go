@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Fixtures specify only fields relevant to the error path.
+//nolint:exhaustruct_v5 // Fixtures specify only fields relevant to the error path.
 package mint
 
 import (

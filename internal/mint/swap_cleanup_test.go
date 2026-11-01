@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Fixtures specify only fields used by each cleanup scenario.
+//nolint:exhaustruct_v5 // Fixtures specify only fields used by each cleanup scenario.
 package mint
 
 import (

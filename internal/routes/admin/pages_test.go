@@ -1,4 +1,4 @@
-//nolint:exhaustruct
+//nolint:exhaustruct_v5
 package admin
 
 import (
@@ -18,19 +18,19 @@ import (
 func adminTestMint(db *mockdb.MockDB) *mint.Mint {
 	var m mint.Mint
 	m.MintDB = db
-	m.LightningBackend = lightning.FakeWallet{ //nolint:exhaustruct
+	m.LightningBackend = lightning.FakeWallet{ //nolint:exhaustruct_v5
 		UnpurposeErrors: nil,
 		Network:         chaincfg.RegressionNetParams,
 		InvoiceFee:      0,
 	}
-	m.Config = utils.Config{ //nolint:exhaustruct
+	m.Config = utils.Config{ //nolint:exhaustruct_v5
 		MINT_LIGHTNING_BACKEND: utils.FAKE_WALLET,
 	}
 	return &m
 }
 
 func testStatsRow() database.StatsSnapshot {
-	return database.StatsSnapshot{} //nolint:exhaustruct
+	return database.StatsSnapshot{} //nolint:exhaustruct_v5
 }
 
 func testMockDB() *mockdb.MockDB { return new(mockdb.MockDB) }

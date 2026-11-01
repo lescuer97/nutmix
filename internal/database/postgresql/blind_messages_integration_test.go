@@ -1,4 +1,4 @@
-//nolint:exhaustruct,contextcheck // Minimal fixtures exercise the existing context-free database interface.
+//nolint:exhaustruct_v5,contextcheck // Minimal fixtures exercise the existing context-free database interface.
 package postgresql
 
 import (

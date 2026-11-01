@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Reconciliation tests specify only selection-relevant fields.
+//nolint:exhaustruct_v5 // Reconciliation tests specify only selection-relevant fields.
 package mockdb
 
 import (

@@ -51,7 +51,7 @@ func (m *Mint) verifyClams(ctx context.Context, clams cashu.AuthClams) error {
 }
 
 func (m *Mint) VerifyAuthClearToken(ctx context.Context, token string) error {
-	verifier := m.OICDClient.Verifier(&oidc.Config{ClientID: m.Config.MINT_AUTH_OICD_CLIENT_ID, Now: time.Now, SkipClientIDCheck: false}) //nolint:exhaustruct
+	verifier := m.OICDClient.Verifier(&oidc.Config{ClientID: m.Config.MINT_AUTH_OICD_CLIENT_ID, Now: time.Now, SkipClientIDCheck: false}) //nolint:exhaustruct_v5
 
 	idToken, err := verifier.Verify(ctx, token)
 	if err != nil {

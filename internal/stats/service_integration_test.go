@@ -1,4 +1,4 @@
-//nolint:exhaustruct,contextcheck
+//nolint:exhaustruct_v5,contextcheck
 package stats
 
 import (
@@ -21,7 +21,7 @@ func TestCreateSnapshotWithRealPostgresPersistsExpectedStatsRow(t *testing.T) {
 
 	seedStatsIntegrationFixtures(t, ctx, db)
 
-	//nolint:exhaustruct // optional service hooks use zero values in this integration test
+	//nolint:exhaustruct_v5 // optional service hooks use zero values in this integration test
 	service := Service{
 		DB:  db,
 		Now: func() time.Time { return time.Unix(110, 0) },
@@ -120,7 +120,7 @@ func seedStatsIntegrationFixtures(t *testing.T, ctx context.Context, db postgres
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
 
-	for _, seed := range []cashu.Seed{ //nolint:exhaustruct // integration fixtures only set needed seed fields
+	for _, seed := range []cashu.Seed{ //nolint:exhaustruct_v5 // integration fixtures only set needed seed fields
 		{Active: true, CreatedAt: 1, Unit: "sat", Id: "ks-sat", Version: 1, InputFeePpk: 1500, DerivationPath: "m/0", Amounts: []uint64{1}, Legacy: false},
 		{Active: true, CreatedAt: 1, Unit: "usd", Id: "ks-usd", Version: 1, InputFeePpk: 2500, DerivationPath: "m/1", Amounts: []uint64{1}, Legacy: false},
 	} {

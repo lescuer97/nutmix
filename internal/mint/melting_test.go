@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Tests use focused fixtures with only relevant fields.
+//nolint:exhaustruct_v5 // Tests use focused fixtures with only relevant fields.
 package mint
 
 import (
@@ -119,20 +119,20 @@ func TestMeltSettlementReconciliationRejectsMixedProofStates(t *testing.T) {
 }
 
 func TestValidateBolt11MeltInputsRejectsAggregateOverflow(t *testing.T) {
-	mint := Mint{}                                                                                      //nolint:exhaustruct // overflow is rejected before dependencies are used
-	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Amount: math.MaxUint64}, {Amount: 1}}} //nolint:exhaustruct // only inputs matter
+	mint := Mint{}                                                                                      //nolint:exhaustruct_v5 // overflow is rejected before dependencies are used
+	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Amount: math.MaxUint64}, {Amount: 1}}} //nolint:exhaustruct_v5 // only inputs matter
 
-	_, err := mint.validateBolt11MeltInputs(request, cashu.MeltRequestDB{}) //nolint:exhaustruct // quote is unused before rejection
+	_, err := mint.validateBolt11MeltInputs(request, cashu.MeltRequestDB{}) //nolint:exhaustruct_v5 // quote is unused before rejection
 	if !errors.Is(err, cashu.ErrNotEnoughtProofs) || !errors.Is(err, cashu.ErrAmountOverflow) {
 		t.Fatalf("validateBolt11MeltInputs() error = %v, want insufficient proofs amount overflow", err)
 	}
 }
 
 func TestValidateBolt11MeltInputsRejectsRequiredTotalOverflow(t *testing.T) {
-	keyset := cashu.BasicKeysetResponse{Id: "keyset", Unit: cashu.Sat.String()}                                               //nolint:exhaustruct // only ID and unit matter
-	mint := Mint{Signer: fixedKeysetSigner{keysets: signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{keyset}}}} //nolint:exhaustruct // only signer is reached
-	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Id: keyset.Id, Amount: math.MaxUint64}}}                     //nolint:exhaustruct // only inputs matter
-	quote := cashu.MeltRequestDB{Amount: math.MaxUint64, FeeReserve: 1}                                                       //nolint:exhaustruct // only required totals matter
+	keyset := cashu.BasicKeysetResponse{Id: "keyset", Unit: cashu.Sat.String()}                                               //nolint:exhaustruct_v5 // only ID and unit matter
+	mint := Mint{Signer: fixedKeysetSigner{keysets: signer.GetKeysetsResponse{Keysets: []cashu.BasicKeysetResponse{keyset}}}} //nolint:exhaustruct_v5 // only signer is reached
+	request := cashu.PostMeltBolt11Request{Inputs: cashu.Proofs{{Id: keyset.Id, Amount: math.MaxUint64}}}                     //nolint:exhaustruct_v5 // only inputs matter
+	quote := cashu.MeltRequestDB{Amount: math.MaxUint64, FeeReserve: 1}                                                       //nolint:exhaustruct_v5 // only required totals matter
 
 	_, err := mint.validateBolt11MeltInputs(request, quote)
 	if !errors.Is(err, cashu.ErrNotEnoughtProofs) || !errors.Is(err, cashu.ErrAmountOverflow) {
@@ -171,7 +171,7 @@ func makeAmountlessRegtestInvoice(t *testing.T) string {
 }
 
 func TestValidateBolt11MeltQuoteRejectsAmountlessInvoice(t *testing.T) {
-	mint := Mint{ //nolint:exhaustruct // test only needs the LightningBackend; Config has 30+ fields
+	mint := Mint{ //nolint:exhaustruct_v5 // test only needs the LightningBackend; Config has 30+ fields
 		LightningBackend: lightning.FakeWallet{UnpurposeErrors: nil, Network: chaincfg.RegressionNetParams, InvoiceFee: 0, NodeStatus: lightning.ONLINE_STATUS},
 	}
 
@@ -191,12 +191,12 @@ func TestValidateBolt11MeltQuoteRejectsAmountlessInvoice(t *testing.T) {
 }
 
 func TestReconcilePendingMeltQuotesIgnoresStrikeEndOfLife(t *testing.T) {
-	quote := cashu.MeltRequestDB{ //nolint:exhaustruct // Only reconciliation fields are relevant.
+	quote := cashu.MeltRequestDB{ //nolint:exhaustruct_v5 // Only reconciliation fields are relevant.
 		Quote: "legacy-pending", Request: RegtestRequest, State: cashu.PENDING,
 		Unit: cashu.Sat.String(), CheckingId: "legacy-checking-id",
 	}
-	db := &mockdb.MockDB{MeltRequest: []cashu.MeltRequestDB{quote}}                                     //nolint:exhaustruct
-	mint := Mint{MintDB: db, LightningBackend: lightning.Strike{Network: chaincfg.RegressionNetParams}} //nolint:exhaustruct
+	db := &mockdb.MockDB{MeltRequest: []cashu.MeltRequestDB{quote}}                                     //nolint:exhaustruct_v5
+	mint := Mint{MintDB: db, LightningBackend: lightning.Strike{Network: chaincfg.RegressionNetParams}} //nolint:exhaustruct_v5
 
 	if err := mint.ReconcilePendingMeltQuotes(context.Background()); err != nil {
 		t.Fatalf("ReconcilePendingMeltQuotes: %v", err)

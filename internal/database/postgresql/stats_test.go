@@ -1,4 +1,4 @@
-//nolint:exhaustruct,contextcheck
+//nolint:exhaustruct_v5,contextcheck
 package postgresql
 
 import (
@@ -59,7 +59,7 @@ func saveSeedWithFee(t *testing.T, ctx context.Context, db Postgresql, id, unit 
 		t.Fatalf("GetTx: %v", err)
 	}
 	defer func() { _ = db.Rollback(ctx, tx) }()
-	//nolint:contextcheck,exhaustruct // helper inserts minimal seed fixture shape
+	//nolint:contextcheck,exhaustruct_v5 // helper inserts minimal seed fixture shape
 	if err := db.SaveNewSeed(tx, cashu.Seed{Active: true, CreatedAt: 1, Unit: unit, Id: id, Version: 1, InputFeePpk: inputFeePpk, DerivationPath: "m/0", Amounts: []uint64{1}, Legacy: false}); err != nil {
 		t.Fatalf("SaveNewSeed: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestGetLatestStatsSnapshotSeesLatestCommittedRow(t *testing.T) {
 func TestGetLatestStatsSnapshotRoundTripsJSONBSummaries(t *testing.T) {
 	ctx := context.Background()
 	db := setupTestDatabase(t, ctx)
-	//nolint:exhaustruct // test only sets fields relevant to round-trip assertions
+	//nolint:exhaustruct_v5 // test only sets fields relevant to round-trip assertions
 	expected := database.StatsSnapshot{
 		StartDate:        0,
 		EndDate:          10,
@@ -380,7 +380,7 @@ func TestGetBlindSigStatsRowsExposesUnresolvedKeysetIDs(t *testing.T) {
 func TestInsertStatsSnapshotPersistsJSONBArraysAndNormalizesNilToEmptyArrays(t *testing.T) {
 	ctx := context.Background()
 	db := setupTestDatabase(t, ctx)
-	//nolint:exhaustruct // test only sets fields relevant to insert assertions
+	//nolint:exhaustruct_v5 // test only sets fields relevant to insert assertions
 	snapshot := database.StatsSnapshot{
 		StartDate:        0,
 		EndDate:          10,

@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Settlement fixtures set only relevant fields.
+//nolint:exhaustruct_v5 // Settlement fixtures set only relevant fields.
 package postgresql
 
 import (

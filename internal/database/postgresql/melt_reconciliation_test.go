@@ -1,4 +1,4 @@
-//nolint:exhaustruct // Fixtures specify only reconciliation-relevant fields.
+//nolint:exhaustruct_v5 // Fixtures specify only reconciliation-relevant fields.
 package postgresql
 
 import (
