@@ -45,7 +45,7 @@ type WsNotification struct {
 
 type ErrorMsg struct {
 	Message string `json:"message"`
-	Code    uint64 `json:"code"`
+	Code    int64  `json:"code"`
 }
 type WsError struct {
 	JsonRpc string   `json:"jsonrpc"`

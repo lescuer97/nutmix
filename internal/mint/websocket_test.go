@@ -29,7 +29,9 @@ func TestRemoveWatchKeepOtherSubscription(t *testing.T) {
 
 	observer.RemoveWatch("1")
 
+	observer.Lock()
 	proofs := observer.Proofs["test"]
+	observer.Unlock()
 	if len(proofs) != 1 {
 		t.Fatalf("expected 1 watcher left, got %d", len(proofs))
 	}
@@ -37,14 +39,7 @@ func TestRemoveWatchKeepOtherSubscription(t *testing.T) {
 		t.Fatalf("expected remaining sub id to be 2, got %s", proofs[0].SubId)
 	}
 
-	select {
-	case _, ok := <-proofChan1:
-		if ok {
-			t.Fatal("expected removed channel to be closed")
-		}
-	default:
-		t.Fatal("expected removed channel to be closed and readable")
-	}
+	assertChannelOpen(t, proofChan1)
 }
 
 func TestRemoveWatchDoesNotCloseSameProofChannelTwice(t *testing.T) {
@@ -65,22 +60,18 @@ func TestRemoveWatchDoesNotCloseSameProofChannelTwice(t *testing.T) {
 
 	observer.RemoveWatch("same-sub")
 
+	observer.Lock()
 	remaining := observer.Proofs["filter-1"]
+	observer.Unlock()
 	if len(remaining) != 1 || remaining[0].SubId != "other-sub" {
 		t.Fatalf("unexpected remaining watchers: %+v", remaining)
 	}
 
-	select {
-	case _, ok := <-sharedProofChan:
-		if ok {
-			t.Fatal("expected shared proof channel to be closed")
-		}
-	default:
-		t.Fatal("expected shared proof channel to be closed and readable")
-	}
+	assertChannelOpen(t, sharedProofChan)
+	assertChannelOpen(t, sharedProofChan2)
 }
 
-func TestRemoveWatchClosesMintAndMeltChannels(t *testing.T) {
+func TestRemoveWatchDetachesMintAndMeltChannelsWithoutClosing(t *testing.T) {
 	observer := newObserverForTest()
 
 	mintChan := make(chan cashu.MintRequestDB)
@@ -91,22 +82,19 @@ func TestRemoveWatchClosesMintAndMeltChannels(t *testing.T) {
 
 	observer.RemoveWatch("sub-1")
 
-	select {
-	case _, ok := <-mintChan:
-		if ok {
-			t.Fatal("expected mint channel to be closed")
-		}
-	default:
-		t.Fatal("expected mint channel to be closed and readable")
-	}
+	assertChannelOpen(t, mintChan)
+	assertChannelOpen(t, meltChan)
+}
 
+func assertChannelOpen[T any](t *testing.T, ch <-chan T) {
+	t.Helper()
 	select {
-	case _, ok := <-meltChan:
-		if ok {
-			t.Fatal("expected melt channel to be closed")
+	case _, ok := <-ch:
+		if !ok {
+			t.Fatal("RemoveWatch closed a caller-owned channel")
 		}
+		t.Fatal("unexpected value on empty channel")
 	default:
-		t.Fatal("expected melt channel to be closed and readable")
 	}
 }
 

@@ -104,6 +104,9 @@ func ParseErrorToCashuErrorCode(proofError error) (cashu.ErrorCode, *string) {
 	case errors.Is(proofError, cashu.ErrQuoteIsPending):
 		message := cashu.ErrQuoteIsPending.Error()
 		return cashu.QUOTE_PENDING, &message
+	case errors.Is(proofError, cashu.ErrQuoteExpired):
+		message := cashu.ErrQuoteExpired.Error()
+		return cashu.QUOTE_EXPIRED, &message
 
 	case errors.Is(proofError, cashu.ErrUnitNotSupported):
 		message := cashu.ErrUnitNotSupported.Error()

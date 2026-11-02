@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/database"
 	"github.com/lescuer97/nutmix/internal/utils"
 )
@@ -117,6 +118,15 @@ func SetUpConfigDB(ctx context.Context, db database.MintDB) (utils.Config, *util
 		nostrNotificationConfig, err = db.GetNostrNotificationConfig(tx)
 		if err != nil {
 			return config, nil, fmt.Errorf("db.GetNostrNotificationConfig(tx): %w", err)
+		}
+	}
+	for _, patterns := range []*[]string{&config.MINT_AUTH_CLEAR_AUTH_URLS, &config.MINT_AUTH_BLIND_AUTH_URLS} {
+		for _, pattern := range *patterns {
+			if validateErr := cashu.ValidateAuthEndpointPattern(pattern); validateErr != nil {
+				if config.MINT_REQUIRE_AUTH {
+					return config, nil, fmt.Errorf("invalid auth endpoint configuration: %w", validateErr)
+				}
+			}
 		}
 	}
 

@@ -3,6 +3,7 @@ package cashu
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -387,14 +388,37 @@ func (p *PostMintBolt11Request) VerifyPubkey(pubkey *secp256k1.PublicKey) (bool,
 		return false, fmt.Errorf("signature not available for verification. %w", ErrMintQuoteNoValidSignature)
 	}
 
-	var msg strings.Builder
-	msg.WriteString(p.Quote)
-	for _, output := range p.Outputs {
-		msg.WriteString(output.B_.String())
+	message, err := MintQuoteSignatureMessage(p.Quote, p.Outputs)
+	if err != nil {
+		return false, err
 	}
-	hash := sha256.Sum256([]byte(msg.String()))
+	hash := sha256.Sum256(message)
 
 	return p.Signature.Verify(hash[:], pubkey), nil
+}
+
+// MintQuoteSignatureMessage constructs the NUT-20 signature message.
+func MintQuoteSignatureMessage(quote string, outputs BlindedMessages) ([]byte, error) {
+	message := []byte("Cashu_MintQuoteSig_v1")
+	appendField := func(field []byte) {
+		var length [4]byte
+		binary.BigEndian.PutUint32(length[:], uint32(len(field)))
+		message = append(message, length[:]...)
+		message = append(message, field...)
+	}
+	appendField([]byte(quote))
+	for _, output := range outputs {
+		if output.B_.PublicKey == nil {
+			return nil, ErrInvalidBlindMessage
+		}
+		var amount []byte
+		for value := output.Amount; value > 0; value >>= 8 {
+			amount = append([]byte{byte(value)}, amount...)
+		}
+		appendField(amount)
+		appendField(output.B_.SerializeCompressed())
+	}
+	return message, nil
 }
 
 // parseBIP340SignatureString converts a BIP-340 Schnorr signature hex string to schnorr.Signature

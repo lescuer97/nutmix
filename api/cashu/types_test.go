@@ -1,12 +1,15 @@
 package cashu
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
@@ -385,19 +388,8 @@ func TestNut20SuccessfulSignature(t *testing.T) {
 }`
 	bytes := []byte(jsonStr)
 
-	pubkeyStr := "03d56ce4e446a85bbdaa547b4ec2b073d40ff802831352b8272b7dd7a4de5a7cac"
-	pubkeyBytes, err := hex.DecodeString(pubkeyStr)
-	if err != nil {
-		t.Fatalf("could not decode hex string. %v", err)
-	}
-
-	pubkey, err := secp256k1.ParsePubKey(pubkeyBytes)
-	if err != nil {
-		t.Fatalf("could not parse pubkey bytes correctly. %v", err)
-	}
-
 	var request PostMintBolt11Request
-	err = json.Unmarshal(bytes, &request)
+	err := json.Unmarshal(bytes, &request)
 	if err != nil {
 		t.Fatalf("could not marshal to correct PostMintBolt11Request struct. %v", err)
 	}
@@ -411,6 +403,19 @@ func TestNut20SuccessfulSignature(t *testing.T) {
 	if request.Outputs[len(request.Outputs)-1].B_.String() != "02209fc2873f28521cbdde7f7b3bb1521002463f5979686fd156f23fe6a8aa2b79" {
 		t.Errorf("last output not parsed correctly")
 	}
+	// The published legacy signature predates the NUT-20 message format used
+	// here. Replace it with a deterministic signature over the current message.
+	privateKey, _ := btcec.PrivKeyFromBytes([]byte{1})
+	message, err := MintQuoteSignatureMessage(request.Quote, request.Outputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(message)
+	request.Signature, err = schnorr.Sign(privateKey, digest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubkey := privateKey.PubKey()
 
 	valid, err := request.VerifyPubkey(pubkey)
 	if err != nil {

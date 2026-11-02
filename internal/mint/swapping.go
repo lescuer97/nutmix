@@ -56,6 +56,9 @@ func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (
 	if err != nil {
 		return cashu.PostSwapResponse{}, fmt.Errorf("sizeCheckTx.Commit(ctx). %w", err)
 	}
+	if m.Observer != nil {
+		m.Observer.SendProofsEvent(proofs)
+	}
 
 	blindSignatures, shouldRemovePendingProofs, err := m.signSwapOutputsAndMarkInputsSpent(ctx, proofs, request)
 	if err != nil {
@@ -70,7 +73,9 @@ func (m *Mint) ExecuteSwap(ctx context.Context, request cashu.PostSwapRequest) (
 	}
 
 	proofs.SetProofsState(cashu.PROOF_SPENT)
-	go m.Observer.SendProofsEvent(proofs)
+	if m.Observer != nil {
+		m.Observer.SendProofsEvent(proofs)
+	}
 	// mark as pending and sign
 	return cashu.PostSwapResponse{
 		Signatures: blindSignatures,
@@ -144,6 +149,10 @@ func (m *Mint) removePendingSwapProofs(ctx context.Context, proofs cashu.Proofs)
 	err = m.MintDB.Commit(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("m.MintDB.Commit(cleanupCtx, tx). %w", err)
+	}
+	proofs.SetProofsState(cashu.PROOF_UNSPENT)
+	if m.Observer != nil {
+		m.Observer.SendProofsEvent(proofs)
 	}
 
 	return nil

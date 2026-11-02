@@ -139,11 +139,22 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 	feeReserve cashu.Amount,
 	amount cashu.Amount,
 	lightningResponse *PaymentResponse) error {
+	// A partial MPP payment has to know the invoice total before it can build
+	// the MPPRecord. Validate the invoice before constructing any client or
+	// issuing a route query so a missing invoice or a nil MilliSat can never
+	// be dereferenced and no RPC is sent for a payment we cannot build.
+	if zpayInvoice == nil {
+		return fmt.Errorf("invalid invoice: nil invoice")
+	}
+	if zpayInvoice.MilliSat == nil {
+		return cashu.ErrAmountlessInvoiceNotSupported
+	}
+
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "macaroon", l.macaroon)
 
 	client := lnrpc.NewLightningClient(l.grpcClient)
 
-	// Convert amounts to Sat for LND
+	// Convert the fee reserve to Sat for LND's fixed fee limit.
 	feeSat := cashu.Amount{Unit: feeReserve.Unit, Amount: feeReserve.Amount}
 	err := feeSat.To(cashu.Sat)
 	if err != nil {
@@ -151,9 +162,9 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 	}
 
 	amountMilisat := cashu.Amount{Unit: amount.Unit, Amount: amount.Amount}
-	err = amountMilisat.To(cashu.Sat)
+	err = amountMilisat.To(cashu.Msat)
 	if err != nil {
-		return fmt.Errorf(`amount.To(cashu.Sat) %w`, err)
+		return fmt.Errorf(`amount.To(cashu.Msat) %w`, err)
 	}
 
 	fixedLimit := lnrpc.FeeLimit_Fixed{
@@ -182,7 +193,10 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 
 		routes = queryResponse.Routes
 
-		if routes[0] == nil {
+		// Guard against an empty route list, a nil route and a route with no
+		// hops before any hop is dereferenced below. QueryRoutes can return any
+		// of these shapes, so keep retrying within the bounded attempt loop.
+		if len(routes) == 0 || routes[0] == nil || len(routes[0].Hops) == 0 {
 			log.Printf("No route found for lnd partial payment. Retrying")
 			continue
 		}
@@ -208,38 +222,84 @@ func (l *LndGrpcWallet) lndGrpcPayPartialInvoice(
 			return fmt.Errorf("client.SendPaymentV2(ctx, &sendRequest) %w", err)
 		}
 
-		for {
-			switch res.Status {
-			case lnrpc.HTLCAttempt_IN_FLIGHT:
-				lightningResponse.PaymentState = PENDING
-			case lnrpc.HTLCAttempt_FAILED:
-				if res.Failure.GetCode() == lnrpc.Failure_TEMPORARY_CHANNEL_FAILURE {
-					failureIndex := res.Failure.GetFailureSourceIndex()
-					failedSource := routes[0].Hops[failureIndex-1].PubKey
-					failedDestination := routes[0].Hops[failureIndex].PubKey
+		// SendToRouteV2 is unary: this single HTLCAttempt is the only
+		// response for the attempt. Handle it with one switch so every
+		// branch either returns or, for a retryable failure, continues
+		// the bounded outer attempt loop instead of re-reading the same
+		// fixed status forever.
+		switch res.Status {
+		case lnrpc.HTLCAttempt_IN_FLIGHT:
+			// The HTLC has been accepted by the network and may still
+			// settle. Return promptly in an ambiguous PENDING state so the
+			// caller keeps the proofs reserved and re-checks the payment
+			// status. Never retry here: sending the same payment hash again
+			// risks a duplicate payment.
+			lightningResponse.PaymentRequest = invoice
+			lightningResponse.PaymentState = PENDING
+			lightningResponse.PaidFee = cashu.NewAmount(feeReserve.Unit, 0)
+			return nil
+		case lnrpc.HTLCAttempt_FAILED:
+			if res.Failure.GetCode() == lnrpc.Failure_TEMPORARY_CHANNEL_FAILURE {
+				failedSource, failedDestination := routeFailureHops(routes[0], res.Failure.GetFailureSourceIndex())
 
-					slog.Info("partial payment attempt failed", slog.Any("failedSource", failedSource), slog.Any("failedDestination", failedDestination))
-					continue
-				}
-				lightningResponse.PaymentState = FAILED
-				return fmt.Errorf("PaymentFailed  %+v", res.GetFailure())
-			case lnrpc.HTLCAttempt_SUCCEEDED:
-				lightningResponse.PaymentRequest = invoice
-				lightningResponse.PaymentState = SETTLED
-				lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
-				// LND returns fee in msat, convert to Amount
-				lightningResponse.PaidFee = cashu.Amount{Unit: cashu.Msat, Amount: uint64(res.Route.TotalFeesMsat)}
-				err := lightningResponse.PaidFee.To(feeReserve.Unit)
-				if err != nil {
-					return fmt.Errorf(`feePaidMsat.To(feeReserve.Unit) %w`, err)
-				}
-				return nil
-			default:
+				slog.Info("partial payment attempt failed", slog.Any("failedSource", failedSource), slog.Any("failedDestination", failedDestination))
 				continue
 			}
+			lightningResponse.PaymentState = FAILED
+			return fmt.Errorf("PaymentFailed  %+v", res.GetFailure())
+		case lnrpc.HTLCAttempt_SUCCEEDED:
+			lightningResponse.PaymentRequest = invoice
+			lightningResponse.PaymentState = SETTLED
+			lightningResponse.Preimage = hex.EncodeToString(res.Preimage)
+			// LND returns fee in msat, convert to Amount
+			lightningResponse.PaidFee = cashu.Amount{Unit: cashu.Msat, Amount: uint64(res.Route.TotalFeesMsat)}
+			err := lightningResponse.PaidFee.To(feeReserve.Unit)
+			if err != nil {
+				return fmt.Errorf(`feePaidMsat.To(feeReserve.Unit) %w`, err)
+			}
+			return nil
+		default:
+			// An unrecognized status means we cannot tell whether the
+			// HTLC was dispatched. Keep ownership with a conservative
+			// PENDING state and surface an explicit error so the caller
+			// re-checks instead of freeing proofs for an ambiguous
+			// payment.
+			lightningResponse.PaymentRequest = invoice
+			lightningResponse.PaymentState = PENDING
+			lightningResponse.PaidFee = cashu.NewAmount(feeReserve.Unit, 0)
+			return fmt.Errorf("unknown HTLC attempt status: %s", res.Status.String())
 		}
 	}
 	return fmt.Errorf("multi nut no route. %w", cashu.ErrPaymentNoRoute)
+}
+
+// routeFailureHops resolves the route hops that surround the node LND blamed
+// for a TEMPORARY_CHANNEL_FAILURE. LND reports that node position in
+// FailureSourceIndex, where position zero is the sending node and a failure at
+// the final node is reported as len(route.Hops) (see the lnrpc.Failure field
+// comment and routerrpc/router_server.go). The value is an unsigned 32-bit
+// index, so it can be zero or one past the end of the hop slice; callers must
+// not subtract from it or index the slice directly. This helper bounds-checks
+// the index and any nil hop entries and returns the pubkeys it could resolve,
+// using the empty string for endpoints that do not exist, instead of panicking.
+func routeFailureHops(route *lnrpc.Route, failureSourceIndex uint32) (sourcePubKey string, destinationPubKey string) {
+	if route == nil || len(route.Hops) == 0 {
+		return "", ""
+	}
+
+	if failureSourceIndex > 0 && int64(failureSourceIndex) <= int64(len(route.Hops)) {
+		if hop := route.Hops[failureSourceIndex-1]; hop != nil {
+			sourcePubKey = hop.PubKey
+		}
+	}
+
+	if int64(failureSourceIndex) < int64(len(route.Hops)) {
+		if hop := route.Hops[failureSourceIndex]; hop != nil {
+			destinationPubKey = hop.PubKey
+		}
+	}
+
+	return sourcePubKey, destinationPubKey
 }
 
 func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *zpay32.Invoice, feeReserve cashu.Amount, mpp bool, amount cashu.Amount) (PaymentResponse, error) {
@@ -247,7 +307,7 @@ func (l LndGrpcWallet) PayInvoice(melt_quote cashu.MeltRequestDB, zpayInvoice *z
 
 	routerClient := routerrpc.NewRouterClient(l.grpcClient)
 	if mpp {
-		err := l.lndGrpcPayPartialInvoice(routerClient, melt_quote.Request, zpayInvoice, feeReserve, feeReserve, &invoiceRes)
+		err := l.lndGrpcPayPartialInvoice(routerClient, melt_quote.Request, zpayInvoice, feeReserve, amount, &invoiceRes)
 		if err != nil {
 			return invoiceRes, fmt.Errorf(`l.lndGrpcPayPartialInvoice(invoice, zpayInvoice, feeReserve, amount_sat, &invoiceRes) %w`, err)
 		}

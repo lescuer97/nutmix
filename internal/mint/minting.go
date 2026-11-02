@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/lescuer97/nutmix/api/cashu"
 	"github.com/lescuer97/nutmix/internal/lightning"
-	"github.com/lescuer97/nutmix/internal/utils"
 	"github.com/lightningnetwork/lnd/zpay32"
 )
 
@@ -65,12 +64,17 @@ func (m *Mint) createBolt11MintQuote(ctx context.Context, request cashu.PostMint
 	if err != nil {
 		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" m.LightningBackend.RequestInvoice. %w", err)
 	}
-	quoteId, err := utils.RandomHash()
+	quoteUUID, err := newQuoteUUID()
 	if err != nil {
-		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf(" utils.RandomHash() %w ", err)
+		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("newQuoteUUID(). %w", err)
 	}
+	quoteId := quoteUUID.String()
 
-	expireTime := cashu.ExpiryTimeMinUnit(15)
+	invoice, err := zpay32.Decode(resInvoice.PaymentRequest, m.LightningBackend.GetNetwork())
+	if err != nil {
+		return cashu.PostMintQuoteBolt11Response{}, fmt.Errorf("zpay32.Decode(resInvoice.PaymentRequest, m.LightningBackend.GetNetwork()). %w", err)
+	}
+	expireTime := invoice.Timestamp.Add(invoice.Expiry()).Unix()
 	now := time.Now().Unix()
 
 	mintRequestDB := cashu.MintRequestDB{
@@ -185,8 +189,12 @@ func (m *Mint) reconcileBolt11MintQuoteState(ctx context.Context, request cashu.
 		return current, nil
 	}
 
+	// paidTransition tracks an actual unpaid-to-paid change so a stale request
+	// for a quote that is already paid does not publish a duplicate event.
+	paidTransition := false
 	switch status {
 	case lightning.SETTLED:
+		paidTransition = current.State != cashu.PAID
 		err = m.MintDB.ChangeMintRequestState(stateChangeTX, current.Quote, cashu.PAID, current.Minted)
 		if err != nil {
 			return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.ChangeMintRequestState(stateChangeTX, current.Quote, cashu.PAID, current.Minted). %w", err)
@@ -207,6 +215,9 @@ func (m *Mint) reconcileBolt11MintQuoteState(ctx context.Context, request cashu.
 	err = m.MintDB.Commit(ctx, stateChangeTX)
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf(" m.MintDB.Commit(ctx, tx). %w", err)
+	}
+	if paidTransition && m.Observer != nil {
+		m.Observer.SendMintEvent(quote)
 	}
 
 	return quote, nil
@@ -432,7 +443,7 @@ func (m *Mint) validateMintIssuanceAuth(request cashu.PostMintBolt11Request, min
 		}
 
 		if !valid {
-			return fmt.Errorf("invalid pubkey signature. %w", err)
+			return cashu.ErrMintQuoteNoValidSignature
 		}
 	}
 	return nil

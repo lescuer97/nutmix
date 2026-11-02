@@ -44,10 +44,11 @@ func (m *Mint) createBolt11MeltQuote(ctx context.Context, meltRequest cashu.Post
 }
 
 func (m *Mint) createAndStoreBolt11MeltQuote(ctx context.Context, meltRequest cashu.PostMeltQuoteBolt11Request, requestData bolt11MeltReqData) (cashu.MeltRequestDB, error) {
-	quoteId, err := utils.RandomHash()
+	quoteUUID, err := newQuoteUUID()
 	if err != nil {
-		return cashu.MeltRequestDB{}, fmt.Errorf("utils.RandomHash(). %w", err)
+		return cashu.MeltRequestDB{}, fmt.Errorf("newQuoteUUID(). %w", err)
 	}
+	quoteId := quoteUUID.String()
 
 	expireTime := cashu.ExpiryTimeMinUnit(15)
 	now := time.Now().Unix()
@@ -360,6 +361,11 @@ func (m *Mint) RefreshMeltQuoteState(ctx context.Context, quoteId string) (cashu
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.Commit(ctx, settleTx). %w", err)
 			}
+			pending_proofs.SetProofsState(cashu.PROOF_SPENT)
+			if m.Observer != nil {
+				m.Observer.SendProofsEvent(pending_proofs)
+				m.Observer.SendMeltEvent(quote)
+			}
 		}
 		if status == lightning.FAILED {
 			quote.State = cashu.UNPAID
@@ -395,6 +401,11 @@ func (m *Mint) RefreshMeltQuoteState(ctx context.Context, quoteId string) (cashu
 			err = m.MintDB.Commit(ctx, failedLnTx)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.Commit(ctx, failedLnTx). %w", err)
+			}
+			pending_proofs.SetProofsState(cashu.PROOF_UNSPENT)
+			if m.Observer != nil {
+				m.Observer.SendProofsEvent(pending_proofs)
+				m.Observer.SendMeltEvent(quote)
 			}
 		}
 	}
@@ -432,9 +443,6 @@ type bolt11MeltData struct {
 }
 
 func (m *Mint) validateBolt11MeltInputs(meltRequest cashu.PostMeltBolt11Request, quote cashu.MeltRequestDB) (bolt11MeltData, error) {
-	if len(meltRequest.Inputs) == 0 {
-		return bolt11MeltData{}, fmt.Errorf("inputs or outputs are empty")
-	}
 	if quote.State == cashu.PENDING {
 		slog.Warn("Quote is pending")
 		return bolt11MeltData{}, cashu.ErrQuoteIsPending
@@ -443,6 +451,12 @@ func (m *Mint) validateBolt11MeltInputs(meltRequest cashu.PostMeltBolt11Request,
 	if quote.Melted {
 		slog.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
 		return bolt11MeltData{}, cashu.ErrMeltAlreadyPaid
+	}
+	if quote.Expiry > 0 && time.Now().Unix() >= quote.Expiry {
+		return bolt11MeltData{}, cashu.ErrQuoteExpired
+	}
+	if len(meltRequest.Inputs) == 0 {
+		return bolt11MeltData{}, fmt.Errorf("inputs or outputs are empty")
 	}
 
 	proofsAmount, err := meltRequest.Inputs.Amount()
@@ -550,6 +564,9 @@ func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest 
 		slog.Info("Quote already melted", slog.String(utils.LogExtraInfo, quote.Quote))
 		return cashu.MeltRequestDB{}, cashu.ErrMeltAlreadyPaid
 	}
+	if quote.Expiry > 0 && time.Now().Unix() >= quote.Expiry {
+		return cashu.MeltRequestDB{}, cashu.ErrQuoteExpired
+	}
 
 	proofs, err := m.validateProofsUnspent(sizeCheckTx, meltRequest.Inputs)
 	if err != nil {
@@ -583,9 +600,30 @@ func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest 
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.settleIfInternalMelt(ctx, preparationTx, quote). %w", err)
 	}
 
+	// An internal settlement pays the matching mint quote in the same
+	// transaction. Snapshot the committed mint state before the commit so the
+	// notification is not raced by a later write, and skip the read entirely
+	// when nobody is listening.
+	var internalMintQuote *cashu.MintRequestDB
+	if quote.State == cashu.PAID && m.Observer != nil {
+		mintRequest, getErr := m.MintDB.GetMintRequestByRequest(sizeCheckTx, quote.Request)
+		if getErr != nil {
+			return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetMintRequestByRequest(sizeCheckTx, quote.Request): %w", getErr)
+		}
+		internalMintQuote = &mintRequest
+	}
+
 	err = m.MintDB.Commit(ctx, sizeCheckTx)
 	if err != nil {
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.Commit(ctx, sizeCheckTx). %w", err)
+	}
+	proofs.SetProofsState(cashu.PROOF_PENDING)
+	if m.Observer != nil {
+		m.Observer.SendProofsEvent(proofs)
+		m.Observer.SendMeltEvent(quote)
+		if internalMintQuote != nil {
+			m.Observer.SendMintEvent(*internalMintQuote)
+		}
 	}
 	return quote, nil
 }
@@ -695,6 +733,13 @@ func (m *Mint) attemptBolt11MeltPayment(ctx context.Context, meltRequest cashu.P
 			err = m.MintDB.Commit(ctx, lnStatusTx)
 			if err != nil {
 				return cashu.MeltRequestDB{}, cashu.Amount{}, fmt.Errorf("m.MintDB.Commit(ctx, lnStatusTx). %w", err)
+			}
+			if m.Observer != nil {
+				if quote.State == cashu.UNPAID {
+					meltRequest.Inputs.SetProofsState(cashu.PROOF_UNSPENT)
+					m.Observer.SendProofsEvent(meltRequest.Inputs)
+				}
+				m.Observer.SendMeltEvent(quote)
 			}
 
 			return quote, cashu.Amount{Amount: 0, Unit: unit}, nil
@@ -822,14 +867,14 @@ func (m *Mint) bolt11Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11R
 			return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.finalizePaidBolt11Melt(ctx, meltRequestData, meltRequest, quote, lnFee): %w", err)
 		}
 
-		go m.Observer.SendProofsEvent(spentProofs)
-		go m.Observer.SendMeltEvent(quote)
+		if m.Observer != nil {
+			m.Observer.SendProofsEvent(spentProofs)
+			m.Observer.SendMeltEvent(quote)
+		}
 
 		return quote, response, nil
 	}
 
-	go m.Observer.SendProofsEvent(meltRequest.Inputs)
-	go m.Observer.SendMeltEvent(quote)
 	return quote, quote.GetPostMeltQuoteResponse(), nil
 }
 

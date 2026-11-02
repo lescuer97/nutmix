@@ -922,12 +922,14 @@ func TestBolt11MeltSendsSuccessEvents(t *testing.T) {
 		t.Fatalf("mint.MintDB.Commit(ctx, tx): %v", err)
 	}
 
-	proofChan := make(chan cashu.Proof, len(proofsForWatch))
-	meltChan := make(chan cashu.MeltRequestDB, 1)
+	proofChan := make(chan cashu.Proof, 2*len(proofsForWatch))
+	meltChan := make(chan cashu.MeltRequestDB, 2)
+	mintChan := make(chan cashu.MintRequestDB, 1)
 	for _, proof := range proofsForWatch {
 		mint.Observer.AddProofWatch(proof.Y.ToHex(), ProofWatchChannel{SubId: "melt-proof-event", Channel: proofChan})
 	}
 	mint.Observer.AddMeltWatch(meltQuote.Quote, MeltQuoteChannel{SubId: "melt-quote-event", Channel: meltChan})
+	mint.Observer.AddMintWatch(mintRequest.Quote, MintQuoteChannel{SubId: "melt-mint-event", Channel: mintChan})
 
 	quote, response, err := mint.bolt11Melt(ctx, cashu.PostMeltBolt11Request{Quote: meltQuote.Quote, Inputs: proofs, Outputs: nil})
 	if err != nil {
@@ -941,32 +943,65 @@ func TestBolt11MeltSendsSuccessEvents(t *testing.T) {
 		t.Fatalf("expected melt response state PAID, got %v", response.State)
 	}
 
-	select {
-	case observedMelt := <-meltChan:
-		if observedMelt.Quote != meltQuote.Quote {
-			t.Fatalf("expected melt event quote %q, got %q", meltQuote.Quote, observedMelt.Quote)
+	// Reservation settles the matching internal mint quote, so the melt quote is
+	// already PAID when it is first published; finalization publishes it PAID
+	// again. Both notifications carry the settled quote.
+	for i := 0; i < 2; i++ {
+		select {
+		case observedMelt := <-meltChan:
+			if observedMelt.Quote != meltQuote.Quote {
+				t.Fatalf("expected melt event quote %q, got %q", meltQuote.Quote, observedMelt.Quote)
+			}
+			if observedMelt.State != cashu.PAID {
+				t.Fatalf("expected melt event state PAID, got %v", observedMelt.State)
+			}
+			if !observedMelt.Melted {
+				t.Fatal("expected melt event to be marked melted")
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for melt event")
 		}
-		if observedMelt.State != cashu.PAID {
-			t.Fatalf("expected melt event state PAID, got %v", observedMelt.State)
-		}
-		if !observedMelt.Melted {
-			t.Fatalf("expected melt event to be marked melted")
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for melt event")
 	}
 
+	// The internal settlement also publishes the matching mint quote as PAID.
+	select {
+	case observedMint := <-mintChan:
+		if observedMint.Quote != mintRequest.Quote {
+			t.Fatalf("expected mint event quote %q, got %q", mintRequest.Quote, observedMint.Quote)
+		}
+		if observedMint.State != cashu.PAID {
+			t.Fatalf("expected mint event state PAID, got %v", observedMint.State)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for mint event")
+	}
+
+	// Reservation publishes the reserved inputs as PENDING, finalization then
+	// publishes the same inputs as SPENT.
 	for i := 0; i < len(proofsForWatch); i++ {
 		select {
 		case observedProof := <-proofChan:
-			if observedProof.State != cashu.PROOF_SPENT {
-				t.Fatalf("expected proof event state SPENT, got %v", observedProof.State)
+			if observedProof.State != cashu.PROOF_PENDING {
+				t.Fatalf("expected reserved proof event state PENDING, got %v", observedProof.State)
 			}
 			if observedProof.Y.PublicKey == nil {
 				t.Fatal("expected proof event Y to be populated")
 			}
 		case <-time.After(2 * time.Second):
-			t.Fatal("timed out waiting for proof event")
+			t.Fatal("timed out waiting for reserved proof event")
+		}
+	}
+	for i := 0; i < len(proofsForWatch); i++ {
+		select {
+		case observedProof := <-proofChan:
+			if observedProof.State != cashu.PROOF_SPENT {
+				t.Fatalf("expected spent proof event state SPENT, got %v", observedProof.State)
+			}
+			if observedProof.Y.PublicKey == nil {
+				t.Fatal("expected proof event Y to be populated")
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for spent proof event")
 		}
 	}
 }
