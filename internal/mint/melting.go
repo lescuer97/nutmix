@@ -361,6 +361,11 @@ func (m *Mint) RefreshMeltQuoteState(ctx context.Context, quoteId string) (cashu
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.Commit(ctx, settleTx). %w", err)
 			}
+			pending_proofs.SetProofsState(cashu.PROOF_SPENT)
+			if m.Observer != nil {
+				m.Observer.SendProofsEvent(pending_proofs)
+				m.Observer.SendMeltEvent(quote)
+			}
 		}
 		if status == lightning.FAILED {
 			quote.State = cashu.UNPAID
@@ -396,6 +401,11 @@ func (m *Mint) RefreshMeltQuoteState(ctx context.Context, quoteId string) (cashu
 			err = m.MintDB.Commit(ctx, failedLnTx)
 			if err != nil {
 				return quote, fmt.Errorf("m.MintDB.Commit(ctx, failedLnTx). %w", err)
+			}
+			pending_proofs.SetProofsState(cashu.PROOF_UNSPENT)
+			if m.Observer != nil {
+				m.Observer.SendProofsEvent(pending_proofs)
+				m.Observer.SendMeltEvent(quote)
 			}
 		}
 	}
@@ -594,6 +604,11 @@ func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest 
 	if err != nil {
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.Commit(ctx, sizeCheckTx). %w", err)
 	}
+	proofs.SetProofsState(cashu.PROOF_PENDING)
+	if m.Observer != nil {
+		m.Observer.SendProofsEvent(proofs)
+		m.Observer.SendMeltEvent(quote)
+	}
 	return quote, nil
 }
 
@@ -702,6 +717,13 @@ func (m *Mint) attemptBolt11MeltPayment(ctx context.Context, meltRequest cashu.P
 			err = m.MintDB.Commit(ctx, lnStatusTx)
 			if err != nil {
 				return cashu.MeltRequestDB{}, cashu.Amount{}, fmt.Errorf("m.MintDB.Commit(ctx, lnStatusTx). %w", err)
+			}
+			if m.Observer != nil {
+				if quote.State == cashu.UNPAID {
+					meltRequest.Inputs.SetProofsState(cashu.PROOF_UNSPENT)
+					m.Observer.SendProofsEvent(meltRequest.Inputs)
+				}
+				m.Observer.SendMeltEvent(quote)
 			}
 
 			return quote, cashu.Amount{Amount: 0, Unit: unit}, nil
@@ -829,14 +851,14 @@ func (m *Mint) bolt11Melt(ctx context.Context, meltRequest cashu.PostMeltBolt11R
 			return cashu.MeltRequestDB{}, cashu.PostMeltQuoteBolt11Response{}, fmt.Errorf("m.finalizePaidBolt11Melt(ctx, meltRequestData, meltRequest, quote, lnFee): %w", err)
 		}
 
-		go m.Observer.SendProofsEvent(spentProofs)
-		go m.Observer.SendMeltEvent(quote)
+		if m.Observer != nil {
+			m.Observer.SendProofsEvent(spentProofs)
+			m.Observer.SendMeltEvent(quote)
+		}
 
 		return quote, response, nil
 	}
 
-	go m.Observer.SendProofsEvent(meltRequest.Inputs)
-	go m.Observer.SendMeltEvent(quote)
 	return quote, quote.GetPostMeltQuoteResponse(), nil
 }
 
