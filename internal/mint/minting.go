@@ -189,8 +189,12 @@ func (m *Mint) reconcileBolt11MintQuoteState(ctx context.Context, request cashu.
 		return current, nil
 	}
 
+	// paidTransition tracks an actual unpaid-to-paid change so a stale request
+	// for a quote that is already paid does not publish a duplicate event.
+	paidTransition := false
 	switch status {
 	case lightning.SETTLED:
+		paidTransition = current.State != cashu.PAID
 		err = m.MintDB.ChangeMintRequestState(stateChangeTX, current.Quote, cashu.PAID, current.Minted)
 		if err != nil {
 			return cashu.MintRequestDB{}, fmt.Errorf("m.MintDB.ChangeMintRequestState(stateChangeTX, current.Quote, cashu.PAID, current.Minted). %w", err)
@@ -211,6 +215,9 @@ func (m *Mint) reconcileBolt11MintQuoteState(ctx context.Context, request cashu.
 	err = m.MintDB.Commit(ctx, stateChangeTX)
 	if err != nil {
 		return cashu.MintRequestDB{}, fmt.Errorf(" m.MintDB.Commit(ctx, tx). %w", err)
+	}
+	if paidTransition && m.Observer != nil {
+		m.Observer.SendMintEvent(quote)
 	}
 
 	return quote, nil

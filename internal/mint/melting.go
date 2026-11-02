@@ -600,6 +600,19 @@ func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest 
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.settleIfInternalMelt(ctx, preparationTx, quote). %w", err)
 	}
 
+	// An internal settlement pays the matching mint quote in the same
+	// transaction. Snapshot the committed mint state before the commit so the
+	// notification is not raced by a later write, and skip the read entirely
+	// when nobody is listening.
+	var internalMintQuote *cashu.MintRequestDB
+	if quote.State == cashu.PAID && m.Observer != nil {
+		mintRequest, getErr := m.MintDB.GetMintRequestByRequest(sizeCheckTx, quote.Request)
+		if getErr != nil {
+			return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.GetMintRequestByRequest(sizeCheckTx, quote.Request): %w", getErr)
+		}
+		internalMintQuote = &mintRequest
+	}
+
 	err = m.MintDB.Commit(ctx, sizeCheckTx)
 	if err != nil {
 		return cashu.MeltRequestDB{}, fmt.Errorf("m.MintDB.Commit(ctx, sizeCheckTx). %w", err)
@@ -608,6 +621,9 @@ func (m *Mint) reserveMeltInputsAndMarkPending(ctx context.Context, meltRequest 
 	if m.Observer != nil {
 		m.Observer.SendProofsEvent(proofs)
 		m.Observer.SendMeltEvent(quote)
+		if internalMintQuote != nil {
+			m.Observer.SendMintEvent(*internalMintQuote)
+		}
 	}
 	return quote, nil
 }
