@@ -1,8 +1,10 @@
 package cashu
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -387,14 +389,55 @@ func (p *PostMintBolt11Request) VerifyPubkey(pubkey *secp256k1.PublicKey) (bool,
 		return false, fmt.Errorf("signature not available for verification. %w", ErrMintQuoteNoValidSignature)
 	}
 
+	hash := p.mintQuoteMessageHash()
+	if p.Signature.Verify(hash[:], pubkey) {
+		return true, nil
+	}
+
+	// Wallets that predate cashubtc/nuts#375 sign the legacy message.
+	legacy := p.legacyMintQuoteMessageHash()
+	return p.Signature.Verify(legacy[:], pubkey), nil
+}
+
+// mintQuoteSigTag is NUT-20's domain-separation tag for mint quote signatures.
+const mintQuoteSigTag = "Cashu_MintQuoteSig_v1"
+
+// mintQuoteMessageHash is the SHA-256 of NUT-20's msg_to_sign:
+//
+//	"Cashu_MintQuoteSig_v1" || len32(quote) || quote
+//	|| for each output: len32(amount) || amount || len32(B_) || B_
+//
+// where len32 is a 4-byte big-endian length, amount is minimal big-endian
+// bytes (empty for 0) and B_ is the compressed point.
+func (p *PostMintBolt11Request) mintQuoteMessageHash() [32]byte {
+	var msg bytes.Buffer
+	writeLen32 := func(b []byte) {
+		var length [4]byte
+		binary.BigEndian.PutUint32(length[:], uint32(len(b)))
+		msg.Write(length[:])
+		msg.Write(b)
+	}
+
+	msg.WriteString(mintQuoteSigTag)
+	writeLen32([]byte(p.Quote))
+	for _, output := range p.Outputs {
+		var amount [8]byte
+		binary.BigEndian.PutUint64(amount[:], output.Amount)
+		writeLen32(bytes.TrimLeft(amount[:], "\x00"))
+		writeLen32(output.B_.SerializeCompressed())
+	}
+	return sha256.Sum256(msg.Bytes())
+}
+
+// legacyMintQuoteMessageHash is the SHA-256 of quote || B_0 || … || B_n as hex text,
+// the message before cashubtc/nuts#375.
+func (p *PostMintBolt11Request) legacyMintQuoteMessageHash() [32]byte {
 	var msg strings.Builder
 	msg.WriteString(p.Quote)
 	for _, output := range p.Outputs {
 		msg.WriteString(output.B_.String())
 	}
-	hash := sha256.Sum256([]byte(msg.String()))
-
-	return p.Signature.Verify(hash[:], pubkey), nil
+	return sha256.Sum256([]byte(msg.String()))
 }
 
 // parseBIP340SignatureString converts a BIP-340 Schnorr signature hex string to schnorr.Signature
