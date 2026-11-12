@@ -147,12 +147,23 @@ func (m *Mint) validateBolt11MeltQuoteRequest(ctx context.Context, meltRequest c
 		return bolt11MeltReqData{}, fmt.Errorf("cashuAmount.To. %w ", err)
 	}
 	isMpp := false
-	mppAmount := cashu.NewAmount(unit, meltRequest.IsMpp())
+	// NUT-15: the partial amount is in millisatoshis.
+	mppMsat := meltRequest.IsMpp()
 
 	// if mpp is valid than change amount to mpp amount
-	if mppAmount.Amount != 0 {
-		if mppAmount.Amount > cashuAmount.Amount {
+	if mppMsat != 0 {
+		if mppMsat > invoiceAmountMilisats {
 			return bolt11MeltReqData{}, fmt.Errorf("mpp amount is bigger than the invoice")
+		}
+		// The quote is kept in whole units of the wallet's unit, and To() floors, so a partial
+		// that is not a whole number of sats would be quoted, and paid, short.
+		if unit == cashu.Sat && mppMsat%1000 != 0 {
+			return bolt11MeltReqData{}, fmt.Errorf("mpp amount must be a whole number of sats")
+		}
+		mppAmount := cashu.NewAmount(cashu.Msat, mppMsat)
+		err = mppAmount.To(unit)
+		if err != nil {
+			return bolt11MeltReqData{}, fmt.Errorf("mppAmount.To. %w ", err)
 		}
 		isMpp = true
 		cashuAmount = mppAmount
